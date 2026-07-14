@@ -1,0 +1,74 @@
+"use client";
+
+import { Chart as ChartJS, Legend, LinearScale, PointElement, TimeScale, Tooltip } from "chart.js";
+import { useEffect } from "react";
+import { Scatter } from "react-chartjs-2";
+
+import "chartjs-adapter-date-fns";
+
+ChartJS.register(LinearScale, PointElement, TimeScale, Tooltip, Legend);
+
+interface ScatterChartProps {
+  yAxis: string;
+  labels: string[];
+  datasets: {
+    label: string;
+    data: number[];
+    backgroundColor?: string;
+  }[];
+}
+
+export default function ScatterChart({ yAxis, labels, datasets }: ScatterChartProps) {
+  const data = {
+    datasets: datasets.map((ds) => ({
+      label: ds.label,
+      backgroundColor: ds.backgroundColor || "rgba(59, 130, 246, 0.8)",
+      data: ds.data.map((y, index) => ({
+        x: new Date(labels[index] + "-01").getTime(),
+        y,
+      })),
+      pointRadius: 5,
+      pointHoverRadius: 7,
+    })),
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "bottom" as const,
+      },
+    },
+    scales: {
+      x: {
+        type: "time",
+        time: {
+          unit: "month",
+          displayFormats: {
+            month: "yyyy-MM",
+          },
+        },
+        ticks: {
+          source: "data",
+        },
+      },
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: yAxis,
+        },
+      },
+    },
+  };
+
+  return (
+    <div
+      className="ml-4 flex w-full flex-col text-sm"
+      style={{ marginTop: "10px", height: "200px" }}
+    >
+      <Scatter data={data} options={options} />
+    </div>
+  );
+}

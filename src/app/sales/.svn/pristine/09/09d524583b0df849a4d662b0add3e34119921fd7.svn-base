@@ -1,0 +1,94 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { UseFormReturn } from "react-hook-form";
+
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import TextEditorModal from "@/components/custom/TextEditorModal";
+import { CustomizeFields, type CustomFieldDefinition } from "@/components/CustomizeFields";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import TopActionBar from "./TopActionBar";
+
+interface DIYFieldFormProps {
+  form: UseFormReturn<any>;
+  onSubmit: (data: any) => void;
+  onSaveAndOpenDialog?: () => void;
+  tempDIYField: any;
+  setTempDIYField: (data: any) => void;
+  handleChange: (field: string, value: any) => void;
+  customDIYFields: CustomFieldDefinition[];
+  onCustomDIYFieldsChange: (fields: CustomFieldDefinition[]) => void;
+}
+
+export default function DIYFieldForm({
+  form,
+  onSubmit,
+  tempDIYField,
+  setTempDIYField,
+  customDIYFields,
+  onCustomDIYFieldsChange,
+}: DIYFieldFormProps) {
+  // Text Editor
+  const [editorData, setEditorData] = useState({
+    field: "",
+    value: "",
+    title: "",
+  });
+
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+
+  const handleEditorSave = (value: string) => {
+    form.setValue(editorData.field, value);
+
+    setTempDIYField({
+      ...tempDIYField,
+      [editorData.field]: value,
+    });
+
+    setIsEditorOpen(false);
+  };;
+
+  return (
+    <>
+      <div className="flex h-full flex-col bg-white @container-[size] overflow-hidden">
+        <TopActionBar onSave={form.handleSubmit(onSubmit)} />
+        <ScrollArea className="h-[90cqh] p-1.5">
+          <div className="max-w-7xl p-4 mx-40">
+            <Form {...form}>
+              <form className="space-y-4" id="preferencesForm">
+                <h2 className="text-md font-bold mb-6">
+                  DIY Field - Customize fields for each section.
+                </h2>
+
+                {/* Custom DIY Fields */}
+                <div className="grid grid-cols gap-4 items-start">
+                  <CustomizeFields
+                    fields={customDIYFields}
+                    onChange={onCustomDIYFieldsChange}
+                  />
+                </div>
+              </form>
+            </Form>
+          </div>
+
+          {isEditorOpen && (
+            <TextEditorModal
+              title={editorData.title}
+              initialValue={editorData.value}
+              onSave={handleEditorSave}
+              onClose={() => setIsEditorOpen(false)}
+            />
+          )}
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
+      </div>
+    </>
+  );
+}

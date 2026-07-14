@@ -1,0 +1,249 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type CustomerBalanceReport = {
+  UUID?: string;
+  customerCode?: string;
+  customerName?: string;
+  localBalanceBringForward?: string;
+  localCurrentBalance?: string;
+  localCFBalance?: string;
+  localCurrentBalanceCarryForward?: string;
+  balanceBringForward?: string;
+  currentBalanceCarryForward?: string;
+};
+
+// Helper to format decimals
+const formatDecimal = (value: any) => {
+  if (value === undefined || value === null || value === "") return "0.00";
+
+  const num = parseFloat(value);
+
+  return isNaN(num) ? "0.00" : num.toFixed(2);
+};
+
+export const customerBalanceReportColumns: ColumnDef<CustomerBalanceReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "customerCode",
+    id: "customerCode",
+    header: "Customer Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "localBalanceBringForward",
+    id: "localBalanceBringForward",
+    header: "B/F Balance",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.localBalanceBringForward)}</div>
+    ),
+  },
+  {
+    accessorKey: "localCurrentBalance",
+    id: "localCurrentBalance",
+    header: "Current Balance",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.localCurrentBalance)}</div>
+    ),
+  },
+  {
+    accessorKey: "localCurrentBalanceCarryForward",
+    id: "localCurrentBalanceCarryForward",
+    header: "C/F Balance",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.localCurrentBalanceCarryForward)}</div>
+    ),
+  },
+];
+
+export const customerBalanceReportCustMultiBalanceColumns: ColumnDef<CustomerBalanceReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "customerCode",
+    id: "customerCode",
+    header: "Customer Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "balanceBringForward",
+    id: "balanceBringForward",
+    header: "B/F Balance",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.balanceBringForward)}</div>
+    ),
+  },
+  {
+    accessorKey: "localBalanceBringForward",
+    id: "localBalanceBringForward",
+    header: "Local B/F Bal.",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.localBalanceBringForward)}</div>
+    ),
+  },
+  {
+    accessorKey: "currentBalanceCarryForward",
+    id: "currentBalanceCarryForward",
+    header: "C/F Balance",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.currentBalanceCarryForward)}</div>
+    ),
+  },
+  {
+    accessorKey: "localCurrentBalanceCarryForward",
+    id: "localCurrentBalanceCarryForward",
+    header: "Local C/F Bal.",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.localCurrentBalanceCarryForward)}</div>
+    ),
+  },
+];
+
+export const customerBalanceReportCustMultiBalanceSummaryColumns: ColumnDef<CustomerBalanceReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "customerCode",
+    id: "customerCode",
+    header: "Customer Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "docAmount",
+    id: "docAmount",
+    header: "Doc Amount",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.currentBalanceCarryForward)}</div>
+    ),
+  },
+  {
+    accessorKey: "localDocAmount",
+    id: "localDocAmount",
+    header: "Local Amount",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.localCurrentBalanceCarryForward)}</div>
+    ),
+  },
+];

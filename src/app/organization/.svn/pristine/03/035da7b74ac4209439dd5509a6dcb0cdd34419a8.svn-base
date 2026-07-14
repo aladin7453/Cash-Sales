@@ -1,0 +1,46 @@
+"use client";
+
+import React, { useState } from 'react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+
+const ConfirmationDialog = ({ open, setOpen, onConfirm }) => {
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const handleConfirm = () => {
+    setIsLoading(true);
+    onConfirm();
+  };
+  
+  // Reset loading state when dialog closes
+  React.useEffect(() => {
+    if (!open) {
+      setIsLoading(false);
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent>
+        <p>Are you sure you want to delete the selected row(s)?</p>
+        <div className="flex justify-end gap-4 mt-4">
+          <Button 
+            onClick={handleConfirm} 
+            disabled={isLoading}
+          >
+            {isLoading ? "Yes" : "Yes"}
+          </Button>
+          <Button 
+            onClick={() => { setOpen(false); }} 
+            variant="destructive" 
+            disabled={isLoading}
+          >
+            No
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default ConfirmationDialog;

@@ -1,0 +1,463 @@
+"use client";
+
+import { Check } from "lucide-react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import React, { useEffect, useRef, useState } from "react";
+import { FiBell, FiHome, FiMail } from "react-icons/fi";
+import { GrSystem } from "react-icons/gr";
+
+//Icon
+import { HiBars3 } from "react-icons/hi2";
+
+import { getAuthHeaders, ORIGIN, versionPath } from "@/lib/constants";
+import { useApi } from "@/lib/hooks/useAPI";
+
+import Breadcrumb from "./Breadcrumb";
+import { ProfileButton } from "./top-bar/ProfileButton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { ScrollArea, ScrollBar } from "./ui/scroll-area";
+
+export default function Topbar({
+  toggleSidebar,
+  isAccountLayout,
+  isLoadingLogOut,
+  setIsLoadingLogOut,
+  onCompanySwitching,
+}: {
+  toggleSidebar?: () => void;
+  isAccountLayout?: boolean;
+  isLoadingLogOut: boolean;
+  setIsLoadingLogOut: React.Dispatch<React.SetStateAction<boolean>>;
+  onCompanySwitching: any;
+}) {
+  const [username, setUsername] = useState<string>("");
+  const [systemAccount, setSystemAccount] = useState<string>("");
+  const [userID, setUserID] = useState<string>("");
+  const [userData, setUserData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const headers = getAuthHeaders();
+  const [error, setError] = useState<string | null>(null);
+  const isOfflineRef = useRef(!navigator.onLine);
+
+  //For handle pathway (Production and Deployment file structure is different)
+  const isDev = process.env.NODE_ENV === "development";
+  const pathway = isDev ? `${window.location.origin}/sales/cash-sales` : `${window.location.origin}/${versionPath}/sales/cash-sales`;
+
+  const [companyName, setCompanyName] = useState<string | null>(() => {
+    const currentCompany = JSON.parse(localStorage.getItem("currentCompany") || "null");
+    return currentCompany?.company ?? null;
+  });
+
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [account, setAccount] = useState<string[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<string | undefined>(() => {
+    return sessionStorage.getItem("selectedAccount") || undefined;
+  });
+  const initialSelectedAccountRef = useRef<string | null>(null);
+  const [pending, setPending] = useState<any[]>([]);
+  const [showAlertDropdown, setShowAlertDropdown] = useState(false);
+  const totalPending = pending ? pending.reduce((sum, item) => sum + Number(item.count), 0) : 0;
+
+  const pathname = usePathname();
+  const isAccount = pathname.includes("/system-account/all-account");
+  const isOrganization = pathname.includes("/organization");
+  const isDashboard = pathname.includes("/sales/cash-sales");
+
+  const {
+    data,
+    error: approvalError,
+    mutate: mutateApproval,
+    isLoading,
+  } = useApi(
+    !isOfflineRef.current
+      ? `${ORIGIN}/approval/api/approval/get-index-approval`
+      : null, {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+
+  useEffect(() => {
+    if (data?.data?.[0]) {
+      const raw = data.data[0];
+
+      const toTitleCase = (str) =>
+        str
+          .toLowerCase()
+          .split(" ")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
+
+      const formatted = Object.entries(raw)
+        .map(([key, value]) => ({
+          name: toTitleCase(key.replace(/([A-Z])/g, " $1").trim()),
+          count: Number(value),
+        }))
+        .filter((x) => x.count > 0);
+
+      setPending(formatted);
+    }
+  }, [data]);
+
+  const revalidateApproval = () => {
+    mutateApproval();
+  };
+
+  useEffect(() => {
+    const keys = Object.keys(account);
+
+    if (keys.length > 0 && !selectedAccount) {
+      setSelectedAccount(keys[0]);
+    }
+  }, [account, selectedAccount]);
+
+  useEffect(() => {
+    if (initialSelectedAccountRef.current === null) {
+      initialSelectedAccountRef.current = sessionStorage.getItem("selectedAccount");
+    }
+
+    if (selectedAccount) {
+      sessionStorage.setItem("selectedAccount", selectedAccount);
+
+      if (
+        initialSelectedAccountRef.current &&
+        selectedAccount !== initialSelectedAccountRef.current
+      ) {
+        window.location.reload();
+      }
+    }
+  }, [selectedAccount]);
+
+  useEffect(() => {
+    const currentCompany = JSON.parse(localStorage.getItem("currentCompany") || "null");
+
+    if (currentCompany && currentCompany.company) {
+      setCompanyName(currentCompany.company);
+    } else {
+      setCompanyName(null);
+    }
+
+    setUsername(JSON.parse(localStorage.getItem("username")) ?? "");
+    setSystemAccount(JSON.parse(localStorage.getItem("system-account")) ?? "");
+    setUserID(JSON.parse(localStorage.getItem("userID")) ?? "");
+
+    fetchUserData();
+  }, []);
+
+  useEffect(() => {
+    if (isAccountLayout) {
+      fetchAccountData();
+    }
+  }, [isAccountLayout]);
+
+  const fetchUserData = async () => {
+    if (!navigator.onLine) {
+      return;
+    }
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${ORIGIN}/universal/get-company-dropdown`, {
+        method: "POST",
+        headers,
+      });
+
+      if (!response.ok) {
+        router.push("/login");
+        throw new Error(`Failed to fetch data: ${response.statusText}`);
+      }
+
+      const responseData = await response.json();
+
+      if (responseData.data && Array.isArray(responseData.data)) {
+        setCompanies(responseData.data);
+        setUserData(responseData);
+      } else {
+        throw new Error("Invalid data format received from API");
+      }
+    } catch (error: any) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAccountData = async () => {
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${ORIGIN}/user/api/user/get-account-drop-down`, {
+        method: "POST",
+        headers,
+      });
+
+      if (!response.ok) {
+        router.push("/login");
+        throw new Error(`Failed to fetch data: ${response.statusText}`);
+      }
+
+      const responseData = await response.json();
+
+      if (responseData && typeof responseData === "object" && !Array.isArray(responseData)) {
+        setAccount(responseData);
+      } else {
+        throw new Error("Invalid data format received from API");
+      }
+    } catch (error: any) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectCompany = async (value: string) => {
+    // Parse the composite value to extract UUID and name
+    const [companyUUID, selectedCompanyName] = value.split("|");
+
+    // If no company is found or no UUID is available, handle the error
+    if (!companyUUID || !selectedCompanyName) {
+      setError("Company UUID or name not found for the selected company.");
+      return;
+    }
+
+    // Only perform the switch if the current company is different from the new company
+    if (companyUUID !== (JSON.parse(localStorage.getItem("currentCompany") || "{}").UUID || null)) {
+      try {
+
+        // Update the state with the latest company name first then enter loading state
+        setCompanyName(selectedCompanyName);
+        onCompanySwitching?.(true);
+        const formData = new FormData();
+
+        // Prepare the FormData with the latest company UUID, company name, and user ID
+        formData.append("user[company]", companyUUID);
+        formData.append("user[companyName]", selectedCompanyName);
+
+        const response = await fetch(`${ORIGIN}/user/api/user/switch-company`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error("API Error:", errorData);
+          throw new Error(
+            `Failed to switch company: ${response.statusText} - ${errorData.message || "Unknown error"
+            }`,
+          );
+        }
+
+        const UserID = JSON.parse(localStorage.getItem("userID")) ?? "";
+        const response2 = await fetch(`${ORIGIN}/user/api/user/get-user-access?id=${UserID}`, {
+          method: "POST",
+          headers,
+        });
+        const data = await response2.json();
+        const jsonData = JSON.stringify(data);
+        localStorage.setItem("userAccess", jsonData); //update userAccess local storage data
+
+        try {
+          const response3 = await fetch(
+            `${ORIGIN}/user/api/user/get-update-user-has-rule-data?id=${UserID}&company=${companyUUID}`,
+            {
+              method: "GET",
+              headers,
+            },
+          );
+
+          const userRule = await response3.json();
+          localStorage.setItem("userRule", JSON.stringify(userRule)); //update userRule local storage data
+        } catch (error) {
+          console.error(error);
+        }
+
+        // Store both company UUID and company name in localStorage
+        localStorage.setItem(
+          "currentCompany",
+          JSON.stringify({ UUID: companyUUID, company: selectedCompanyName }),
+        );
+
+        // Dispatch a custom event to notify that company has been switched
+        const companySwitchEvent = new CustomEvent("companySwitched", {
+          detail: {
+            companyUUID,
+            companyName: selectedCompanyName,
+          },
+        });
+        window.dispatchEvent(companySwitchEvent);
+
+        // Redirect to dashboard after successful company switch
+        isDashboard ? window.location.reload() : window.location.href = pathway;
+      } catch (error: any) {
+        console.error("Error switching company:", error);
+        setError(error.message);
+      } finally {
+        onCompanySwitching?.(false);
+      }
+    }
+  };
+
+  return (
+    <div className="mx-auto box-border flex h-[60px] w-full items-center justify-between bg-white shadow-md md:h-14 md:px-1 md:shadow-sm">
+      {/*Navbar and Breedcrumb container*/}
+      <div className="flex items-center px-2.5 md:px-0">
+        {toggleSidebar && (
+          <button onClick={toggleSidebar} className="text-erp-blue-14" aria-label="Toggle Sidebar">
+            <HiBars3 className="size-6 text-[#1E1E1E] md:hidden md:size-4.5" />
+          </button>
+        )}
+
+        <Breadcrumb />
+      </div>
+
+      {/*Alert button, Company button and profile button container*/}
+      <div className="flex h-[65%] items-center justify-center gap-x-2 px-2 md:h-full md:gap-x-1 md:px-1">
+        {companyName && !isAccount && !isOrganization && (
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger className="flex h-full w-[2rem] flex-col items-center justify-center gap-y-0 rounded-md p-1 text-sm font-medium leading-none tracking-tight outline-none transition-all duration-300 ease-in-out hover:bg-[#EEEEEE] sm:gap-y-1.5 md:w-[4.25rem]">
+              <FiHome className="size-5 text-[#1E1E1E] md:size-4.5" />
+              <span className="hidden w-full truncate text-[clamp(10px,1.2vw,12px)] md:block">
+                {companyName}
+              </span>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent>
+              <DropdownMenuLabel>Company</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <ScrollArea className="max-h-52 flex flex-col justify-center gap-y-1">
+                {companies.map((company, index) => {
+                  const isSelected = company.companyName === companyName;
+                  return (
+                    <DropdownMenuItem
+                      key={index}
+                      onClick={() => selectCompany(`${company.company}|${company.companyName}`)}
+                      className={
+                        isSelected
+                          ? "flex cursor-default items-center justify-between bg-accent text-[clamp(11px,1.2vw,13px)] text-accent-foreground"
+                          : "flex items-center justify-between text-[clamp(11px,1.2vw,13px)]"
+                      }
+                    >
+                      {company.companyName}
+                      {isSelected && <Check className="ml-2 size-4" />}
+                    </DropdownMenuItem>
+                  );
+                })}
+                <ScrollBar orientation="vertical" />
+              </ScrollArea>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        {Object.keys(account).length > 0 && isAccountLayout && !isAccount && (
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger className="flex h-full w-[2rem] flex-col items-center justify-center gap-y-0 rounded-md p-1 text-sm font-medium leading-none tracking-tight outline-none transition-all duration-300 ease-in-out hover:bg-[#EEEEEE] sm:gap-y-1.5 md:w-[4.25rem]">
+              <GrSystem className="size-5 text-[#1E1E1E] md:size-4.5" />
+              <span className="hidden w-full truncate text-[clamp(10px,1.2vw,12px)] md:block">
+                {selectedAccount}
+              </span>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent>
+              <DropdownMenuLabel>System Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <ScrollArea className="max-h-52 flex flex-col justify-center gap-y-1">
+                {Object.entries(account).map(([key, value], index) => {
+                  const isSelected = selectedAccount === key;
+
+                  return (
+                    <DropdownMenuItem
+                      key={index}
+                      onClick={() => setSelectedAccount(key)}
+                      className={
+                        isSelected
+                          ? "flex cursor-default items-center justify-between bg-accent text-[clamp(11px,1.2vw,13px)] text-accent-foreground"
+                          : "flex items-center justify-between text-[clamp(11px,1.2vw,13px)]"
+                      }
+                    >
+                      {value}
+                      {isSelected && <Check className="ml-2 size-4" />}
+                    </DropdownMenuItem>
+                  );
+                })}
+                <ScrollBar orientation="vertical" />
+              </ScrollArea>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        <div className="h-full">
+          <Link
+            href="#"
+            className="flex h-full w-[2rem] flex-col items-center justify-center gap-y-0 
+                         rounded-md p-1 text-sm font-medium leading-none tracking-tight transition-all 
+                         duration-300 ease-in-out hover:bg-[#EEEEEE] sm:gap-y-1.5 md:w-[4.25rem]"
+          >
+            <FiBell className="size-5 text-[#1E1E1E] md:size-4.5" />
+            <span className="hidden text-[clamp(10px,1.2vw,12px)] md:block">Alert</span>
+          </Link>
+        </div>
+
+        <div className="relative h-full">
+          <DropdownMenu
+            modal={false}
+            onOpenChange={(open) => {
+              if (open) {
+                revalidateApproval();
+              }
+            }}
+          >
+            <DropdownMenuTrigger className="flex h-full w-[2rem] flex-col items-center justify-center gap-y-0 rounded-md p-1 text-sm font-medium leading-none tracking-tight transition-all duration-300 ease-in-out hover:bg-[#EEEEEE] sm:gap-y-1.5 md:w-[4.25rem]">
+              <FiMail className="size-5 text-[#1E1E1E] md:size-4.5" />
+              <span className="hidden text-[clamp(10px,1.2vw,12px)] md:block">Message</span>
+              {totalPending > 0 && (
+                <span className="absolute right-1 top-2 size-2.5 rounded-full bg-[#FF0000] md:right-5 md:top-2" />
+              )}
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent className="w-[200px] md:w-[250px]">
+              <DropdownMenuLabel>Pending Approvals</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <ScrollArea className="-mx-2 h-48">
+                {pending.length > 0 ? (
+                  pending.map((p, i) => (
+                    <div
+                      key={i}
+                      className="flex justify-between gap-x-3 px-4 py-1 text-[clamp(11px,1.2vw,13px)]"
+                    >
+                      <span className="flex-1 break-normal">{p.name}</span>
+                      <span className="shrink-0 font-semibold text-red-600">{p.count}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="px-4 py-1 text-sm text-gray-500">No pending approvals</p>
+                )}
+                <ScrollBar orientation="vertical" />
+              </ScrollArea>
+              <button
+                onClick={() => {
+                  setShowAlertDropdown(false);
+                  router.push("/setting/approval-center");
+                }}
+                className="mt-3 w-full rounded bg-erp-blue-11 px-2 py-1.5 text-[12px] text-white transition hover:bg-erp-blue-9 md:text-[15px]"
+              >
+                Go to Approval Center
+              </button>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <ProfileButton isLoadingLogOut={isLoadingLogOut} setIsLoadingLogOut={setIsLoadingLogOut} />
+      </div>
+    </div>
+  );
+}

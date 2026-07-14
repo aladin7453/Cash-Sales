@@ -1,0 +1,112 @@
+import type { Section } from "../sections";
+
+export const serviceSection: Section = {
+  access: "Service",
+  children: [
+    {
+      access: "Service Group",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Finance",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Service Category",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Service",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Master Service",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset", "Compulsary"],
+        },
+        {
+          access: "Sub Service",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset", "Compulsary"],
+        },
+        {
+          access: "Exclusive Customer Groups",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Package Type",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Package",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+  ],
+};

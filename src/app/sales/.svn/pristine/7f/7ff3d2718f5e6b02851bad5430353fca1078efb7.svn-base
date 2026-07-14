@@ -1,0 +1,266 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type CustomerAgingReport = {
+  UUID?: string;
+  customerCode?: string;
+  customerName?: string;
+  payMTD?: string;
+  currentMonthOutstandingAmount?: string;
+  oneMonthOutstandingAmount?: string;
+  twoMonthOutstandingAmount?: string;
+  threeMonthOutstandingAmount?: string;
+  fourMonthOutstandingAmount?: string;
+  fiveMonthOutstandingAmount?: string;
+  outstandingAmountAmount?: string;
+};
+
+// Helper to format decimals
+const formatDecimal = (value: any) => {
+  if (value === undefined || value === null || value === "") return "0.00";
+
+  const num = parseFloat(value);
+
+  return isNaN(num) ? "0.00" : num.toFixed(2);
+};
+
+export const customerAgingReportColumns: ColumnDef<CustomerAgingReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "customerCode",
+    id: "customerCode",
+    header: "Customer Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "payMTD",
+    id: "payMTD",
+    header: "Pay MTD",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "currentMonthOutstandingAmount",
+    id: "currentMonthOutstandingAmount",
+    header: "Current Month",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.currentMonthOutstandingAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "oneMonthOutstandingAmount",
+    id: "oneMonthOutstandingAmount",
+    header: "1 Month",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.oneMonthOutstandingAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "twoMonthOutstandingAmount",
+    id: "twoMonthOutstandingAmount",
+    header: "2 Months",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.twoMonthOutstandingAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "threeMonthOutstandingAmount",
+    id: "threeMonthOutstandingAmount",
+    header: "3 Mths & Above",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.threeMonthOutstandingAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "outstandingAmountAmount",
+    id: "outstandingAmountAmount",
+    header: "Total",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.outstandingAmountAmount)}</div>
+    ),
+  },
+];
+
+export const customerAgingReportCust06MonthsAgingColumns: ColumnDef<CustomerAgingReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "phoneNo",
+    id: "phoneNo",
+    header: "Phone No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "payMTD",
+    id: "payMTD",
+    header: "Pay MTD",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "outstandingAmountAmount",
+    id: "outstandingAmountAmount",
+    header: "Total",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.outstandingAmountAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "currentMonthOutstandingAmount",
+    id: "currentMonthOutstandingAmount",
+    header: "Current Month",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.currentMonthOutstandingAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "oneMonthOutstandingAmount",
+    id: "oneMonthOutstandingAmount",
+    header: "1 Month",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.oneMonthOutstandingAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "twoMonthOutstandingAmount",
+    id: "twoMonthOutstandingAmount",
+    header: "2 Months",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.twoMonthOutstandingAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "threeMonthOutstandingAmount",
+    id: "threeMonthOutstandingAmount",
+    header: "3 Months",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.threeMonthOutstandingAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "fourMonthOutstandingAmount",
+    id: "fourMonthOutstandingAmount",
+    header: "4 Months",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.fourMonthOutstandingAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "fiveMonthOutstandingAmount",
+    id: "fiveMonthOutstandingAmount",
+    header: "5 Mths & Above",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.fiveMonthOutstandingAmount)}</div>
+    ),
+  },
+];

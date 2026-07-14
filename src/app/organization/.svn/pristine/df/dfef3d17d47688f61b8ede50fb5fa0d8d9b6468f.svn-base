@@ -1,0 +1,747 @@
+"use client";
+
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, getCurrentAcc, getCurrentAccount, ORIGIN } from "@/lib/constants";
+
+import type { Dispatch, SetStateAction } from "react";
+import type { UseFormReturn } from "react-hook-form";
+
+import type { User } from "../../../columns";
+import type { ProfileImageAttachment } from "../../page";
+
+type Role = "User" | "Admin";
+
+type Params = {
+  user?: User | null;
+  form: UseFormReturn;
+  tempProfileImage?: ProfileImageAttachment;
+  setTempProfileImage: Dispatch<SetStateAction<ProfileImageAttachment | File | undefined | null>>;
+  initialRole?: Role;
+};
+
+export function UserForm({
+  user,
+  customInformationData,
+  tempRowCustomInfo,
+  form,
+  tempProfileImage,
+  setTempProfileImage,
+}: Params) {
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [showTableAccount, setShowTableAccount] = useState(false);
+  const [showTableUserGroup, setShowTableUserGroup] = useState(false);
+  const [accountDropdownTableData, setAccountDropdownTableData] = useState([]);
+  const [userGroupDropdownData, setUserGroupDropdownData] = useState([]);
+  const [availabilityMessage, setAvailabilityMessage] = useState<string | null>(null);
+  const roleString = localStorage.getItem("role");
+  const role = roleString ? JSON.parse(roleString) : null;
+  const UUIDString = localStorage.getItem("userID");
+  const UUID = UUIDString ? JSON.parse(UUIDString) : null;
+  const isRoleReadOnly = role === "User";
+
+  useEffect(() => {
+    if (user?.UUID === UUID && role !== user?.role) {
+      localStorage.setItem("role", JSON.stringify(user?.role));
+    }
+  }, [user]);
+
+  const currentAcc = getCurrentAcc();
+  const currentAccount = getCurrentAccount();
+
+  const [userGroupFilter, setUserGroupFilter] = useState("");
+
+  const roleList = [
+    { value: "Admin", label: "Admin" },
+    { value: "User", label: "User" },
+  ];
+
+  const genderList = [
+    { value: "Male", label: "Male" },
+    { value: "Female", label: "Female" },
+    { value: "Others", label: "Others" },
+  ];
+
+  const dropdownAccountColumns = [
+    { accessorKey: "code", header: "Account Code" },
+    { accessorKey: "account", header: "Account" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const dropdownUserGroupColumns = [
+    { accessorKey: "userGroup", header: "User Group" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableAccount(false);
+      setShowTableUserGroup(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (tempProfileImage?.link) {
+      const newLink = tempProfileImage.link.replace(/\/view.*$/, "/preview");
+      setImageSrc(newLink);
+    }
+  }, [tempProfileImage]);
+
+  const handleImageChange = async (files: FileList | null) => {
+    const selectedFiles = files ? Array.from(files) : [];
+
+    if (selectedFiles.length > 0) {
+      const selectedFile = selectedFiles[0];
+
+      try {
+        // Create a URL for preview
+        const logoUrl = URL.createObjectURL(selectedFile);
+
+        // Set the file itself for later upload
+        setTempProfileImage(selectedFile);
+
+        // Set the preview URL
+        setImageSrc(logoUrl);
+      } catch (error) {
+        console.error("Error handling image:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to process the selected image.",
+        });
+      }
+    }
+  };
+
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+
+  const handleImageClick = () => {
+    if (imageSrc) {
+      setImageDialogOpen(true);
+    } else {
+      document.getElementById("fileInput")?.click();
+    }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setUserGroupFilter(value);
+    form.setValue("userGroupuserGroup", value);
+
+    if (!showTableUserGroup) setShowTableUserGroup(true);
+  };
+
+  const toggleTableAccount = async () => {
+    const formData = new FormData();
+    const account = "account";
+
+    formData.append("table[]", account);
+
+    if (!showTableAccount) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch account drop-down data");
+        }
+        const accountData = await response.json();
+
+        setAccountDropdownTableData(accountData.rows);
+        setShowTableAccount(true);
+      } catch (error) {
+        console.error("Error fetching account drop-down data:", error);
+      }
+    } else {
+      setShowTableAccount(false);
+    }
+  };
+
+  const toggleTableUserGroup = async () => {
+    const formData = new FormData();
+    const userGroup = "userGroup";
+
+    formData.append("table[]", userGroup);
+
+    if (!showTableUserGroup) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch user group drop-down data");
+        }
+        const userGroupData = await response.json();
+        setUserGroupDropdownData(userGroupData.rows);
+        setShowTableUserGroup(true);
+      } catch (error) {
+        console.error("Error fetching user group drop-down data:", error);
+      }
+    } else {
+      setShowTableUserGroup(false);
+    }
+  };
+
+  const onClickRowAccountCode = (row) => {
+    form.setValue("account", row.UUID);
+    form.setValue("accountName", row.account);
+
+    setShowTableAccount(false);
+  };
+
+  const onClickRowUserGroup = (row) => {
+    form.setValue("userGroup", row.UUID);
+    form.setValue("userGroupuserGroup", row.userGroup);
+
+    setShowTableUserGroup(false);
+  };
+
+  // Verify function
+  const verifyField = async (field: "username" | "fullName", value: string) => {
+    form.clearErrors(field);
+
+    if (!value) {
+      form.setError(field, {
+        type: "custom",
+        message: "This field is empty.",
+      });
+      return;
+    } else if (value.startsWith(" ") || value.endsWith(" ")) {
+      form.setError(field, {
+        type: "custom",
+        message: "This field must not start or end with a space.",
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append(`user[${field}]`, value);
+
+    try {
+      const res = await fetch(
+        id ? `${ORIGIN}/user/api/user/verify?id=${id}` : `${ORIGIN}/user/api/user/verify`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        },
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        if (res.status === 403) {
+          toast({
+            title: "Error",
+            description: errorData.message,
+            variant: "destructive",
+          });
+        }
+        throw new Error(errorData.message);
+      }
+
+      const exists: boolean = await res.json();
+      if (exists) {
+        form.setError(field, {
+          type: "custom",
+          message: `"${value}" already exists.`,
+        });
+      } else {
+        if (value === user?.username || value === user?.fullName) {
+          return;
+        } else {
+          form.setError(field, {
+            type: "success",
+            message: `"${value}" is available.`,
+          });
+        }
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  return (
+    <>
+      <Card className="h-auto shadow-md">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-bold">Document Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form>
+              <div className="grid grid-cols-1 items-start gap-x-8 gap-y-3 md:grid-cols-[minmax(0,17rem)_1fr_1fr_1fr_1fr]">
+                <FormField
+                  control={form.control}
+                  name="profileImage"
+                  render={({ field }) => (
+                    <FormItem className="row-span-4 grid h-full grid-rows-[auto_1fr] space-y-1.5">
+                      <FormLabel>Profile Image:</FormLabel>
+                      <FormControl>
+                        <div
+                          onClick={handleImageClick}
+                          className="relative mt-0.5 flex w-full cursor-pointer items-center justify-center overflow-hidden border-2 border-dashed border-gray-300"
+                        >
+                          {imageSrc ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <iframe
+                              src={imageSrc}
+                              className="pointer-events-none size-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-gray-500">Click to upload Profile Image</span>
+                          )}
+                          <input
+                            id="fileInput"
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleImageChange(e.target.files)}
+                          />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1.5">
+                      <div className="flex items-center gap-x-8">
+                        <FormLabel
+                          className={
+                            form.formState.errors.username?.type === "required"
+                              ? "text-red-500"
+                              : ""
+                          }
+                        >
+                          Username: <span className="text-red-500">*</span>
+                        </FormLabel>
+
+                        <FormField
+                          control={form.control}
+                          name="webAccess"
+                          render={({ field }) => (
+                            <FormItem className="flex items-center gap-x-2 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  {...field}
+                                  checked={field.value === "1"}
+                                  onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                                />
+                              </FormControl>
+                              <FormLabel>Web Access</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <FormControl>
+                        <div className="relative h-7.5">
+                          <Input
+                            className="h-7.5 pr-7"
+                            {...field}
+                            onBlur={() => {
+                              if (field.value && field.value.trim()) {
+                                verifyField("username", field.value);
+                              }
+                            }}
+                            moduleName="user"
+                            fieldName="username"
+                            columnName="Username"
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage
+                        className={
+                          form.formState.errors.username?.type === "success"
+                            ? "mt-1 w-60 text-sm text-green-500"
+                            : "mt-1 w-60 text-sm text-red-500"
+                        }
+                      />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="fullName"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1.5">
+                      <FormLabel>Full Name:</FormLabel>
+                      <FormControl>
+                        <div className="relative h-7.5">
+                          <Input
+                            className="h-7.5 pr-7"
+                            {...field}
+                            onBlur={() => {
+                              if (field.value && field.value.trim()) {
+                                verifyField("fullName", field.value);
+                              }
+                            }}
+                            moduleName="user"
+                            fieldName="fullName"
+                            columnName="Full Name"
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage
+                        className={
+                          form.formState.errors.fullName?.type === "success"
+                            ? "mt-1 w-60 text-sm text-green-500"
+                            : "mt-1 w-60 text-sm text-red-500"
+                        }
+                      />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="userGroup"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormLabel>UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="userGroupuserGroup"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1.5">
+                      <FormLabel>User Group:</FormLabel>
+                      <FormControl className="relative">
+                        <div className="relative">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                            onClick={() => toggleTableUserGroup()}
+                            onChange={handleSearchChange}
+                            ref={inputRef}
+                            autoComplete="off"
+                          />
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="text-gray-400" />
+                          </div>
+                          {showTableUserGroup && (
+                            <div
+                              ref={dropdownRef}
+                              className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownUserGroupColumns}
+                                  data={userGroupDropdownData}
+                                  onClickRow={onClickRowUserGroup}
+                                  filterValue={userGroupFilter}
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1.5">
+                      <FormLabel>Role:</FormLabel>
+                      <FormControl>
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          disabled={isRoleReadOnly}
+                        >
+                          <SelectTrigger className="h-7.5 w-full">
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {roleList.map((item) => (
+                              <SelectItem key={item.value} value={item.value}>
+                                {item.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="gender"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1.5">
+                      <FormLabel>Gender:</FormLabel>
+                      <FormControl>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger className="h-7.5 w-full">
+                            <SelectValue placeholder="Select gender" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {genderList.map((item) => (
+                              <SelectItem key={item.value} value={item.value}>
+                                {item.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1.5">
+                      <FormLabel>Title:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          moduleName="user"
+                          fieldName="title"
+                          columnName="Title"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="phoneNo"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1.5">
+                      <FormLabel>Phone No.:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          moduleName="user"
+                          fieldName="phoneNo"
+                          columnName="Phone No."
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1.5">
+                      <FormLabel>Email:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          moduleName="user"
+                          fieldName="email"
+                          columnName="Email"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 flex flex-col space-y-1.5">
+                      <FormLabel>Address:</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          moduleName="user"
+                          fieldName="address"
+                          columnName="Address"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 flex flex-col space-y-1.5">
+                      <FormLabel>Description:</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          moduleName="user"
+                          fieldName="description"
+                          columnName="Description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="account"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormLabel>UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <ProfileImageDialog
+        open={imageDialogOpen}
+        setOpen={setImageDialogOpen}
+        imageSrc={imageSrc}
+        setImageSrc={setImageSrc}
+        setTempProfileImage={setTempProfileImage}
+      />
+    </>
+  );
+}
+
+function ProfileImageDialog({
+  open,
+  setOpen,
+  imageSrc,
+  setImageSrc,
+  setTempProfileImage,
+}: {
+  open: boolean;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  imageSrc: string | null;
+  setImageSrc: Dispatch<SetStateAction<string | null>>;
+  setTempProfileImage: Dispatch<SetStateAction<ProfileImageAttachment | File | null | undefined>>;
+}) {
+  if (!imageSrc) return;
+
+  const onClickRemoveImage = () => {
+    setImageSrc(null);
+    setTempProfileImage(null);
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen} className="m-2">
+      <DialogContent className="w-fit max-w-6xl">
+        <DialogHeader>
+          <DialogTitle>Profile Image</DialogTitle>
+        </DialogHeader>
+        <div className="flex justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <iframe src={imageSrc} />
+        </div>
+        <DialogFooter className="sm:justify-center">
+          <Button onClick={onClickRemoveImage} type="button" variant="destructive">
+            Remove Image
+          </Button>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Close
+            </Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

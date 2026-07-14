@@ -1,0 +1,211 @@
+"use client";
+
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  TableInstance,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useEffect, useState } from "react";
+import { FaSort, FaSortDown, FaSortUp } from "react-icons/fa6";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { DEFAULT_DATA_TABLE_PAGE_SIZE } from "@/lib/constants";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { cn } from "@/lib/utils/cn";
+
+import type { ColumnDef, Row, SortingState } from "@tanstack/react-table";
+
+import type { eInvoiceRecords } from "./columns";
+import DataTableToolbar from "./DataTableToolbar";
+
+type Props = {
+  columns: ColumnDef<eInvoiceRecords>[];
+  tempRowEInvoiceRecords: eInvoiceRecords[];
+  data: eInvoiceRecords[];
+  setTempRowEInvoiceRecords: (data: any) => void;
+  revalidateEInvoiceRecordsData: () => void;
+  onRowSelect: (rowUUID: string) => void;
+  onTableInstanceReady?: (table: TableInstance<any>) => void;
+  id?: string | null;
+  revalidateCashSales:()=>void;
+};
+
+const COLUMN_VISIBILITY_KEY =
+  "cash-sales.e-invoice-records.bs.table.columns";
+
+export default function EInvoiceRecordsDataTable({
+  columns,
+  data,
+  tempRowEInvoiceRecords,
+  setTempRowEInvoiceRecords,
+  revalidateEInvoiceRecordsData,
+  onRowSelect,
+  onTableInstanceReady,
+  id,
+  revalidateCashSales
+}: Props) {
+  function setTempRowEInvoiceRecordsData(data: any, overwrite: boolean) {
+    if (overwrite) {
+      setTempRowEInvoiceRecords(data);
+    } else {
+      setTempRowEInvoiceRecords((tempRowEInvoiceRecords) => [
+        ...tempRowEInvoiceRecords,
+        data,
+      ]);
+    }
+  }
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<
+    Record<string, boolean>
+  >(() => {
+    if (typeof window !== "undefined") {
+      return JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}");
+    }
+    return {};
+  });
+
+  const table = useReactTable({
+    columns,
+    data,
+    state: { sorting, columnVisibility },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    autoResetPageIndex: false,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      },
+      columnVisibility: JSON.parse(
+        localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}"
+      ),
+    },
+  });
+
+  useEffect(() => {
+    if (onTableInstanceReady) onTableInstanceReady(table);
+  }, [table, onTableInstanceReady]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      COLUMN_VISIBILITY_KEY,
+      JSON.stringify(columnVisibility)
+    );
+  }, [columnVisibility]);
+
+  usePreventShiftTextSelect();
+
+  const onRowSelection = useHandleRowSelect(
+    table,
+    (row: Row<eInvoiceRecords>) => {
+      const rowUUID = row.original.UUID;
+      onRowSelect(rowUUID);
+    }
+  );
+
+  return (
+    <div className="bg-erp-blue-3">
+      <DataTableToolbar
+        table={table}
+        revalidateData={revalidateEInvoiceRecordsData}
+        id={id}
+        revalidateCashSales={revalidateCashSales}
+      />
+      <Separator className="bg-erp-blue-11" />
+      <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+        <Table className="border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1">
+          <TableHeader className="sticky top-0 z-10">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    className="bg-erp-blue-11 font-normal"
+                    key={header.id}
+                  >
+                    <div className="flex flex-col gap-y-0.5">
+                      <div
+                        className={cn(
+                          "flex items-center gap-x-0.5 text-white",
+                          header.column.getCanSort()
+                            ? "cursor-pointer select-none"
+                            : ""
+                        )}
+                        onClick={header.column.getToggleSortingHandler()}
+                      >
+                        <span className="font-bold">
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                        </span>
+                        {{
+                          asc: <FaSortUp />,
+                          desc: <FaSortDown />,
+                        }[header.column.getIsSorted() as string] ?? <FaSort />}
+                      </div>
+                      {header.column.id === "validity" ? (
+                        <TableHeadValidityFilter table={table} />
+                      ) : (
+                        <TableHeadColumnTextFilter
+                          column={header.column}
+                          table={table}
+                        />
+                      )}
+                    </div>
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+                  data-state={row.getIsSelected() && "selected"}
+                  onClick={onRowSelection(row)}
+                  key={row.id}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <NoResultsTableRow columns={columns} />
+            )}
+          </TableBody>
+        </Table>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
+    </div>
+  );
+}

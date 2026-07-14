@@ -1,0 +1,198 @@
+"use client";
+
+import { NumberFormatter } from "@/components/ui/number-formatter";
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type MonthlyComparisonByCompanyReport = {
+  quotationNo: string;
+  salesOrderNo: string;
+  salesOrdersNo: string;
+  salesInvoices: string;
+  UUID: string;
+  customerCode: string;
+  customerName: string;
+  docNo: string;
+  docType: string;
+  docDate: string;
+  docDateFormat: string;
+  NewSales: string;
+  Renewal: string;
+  quotationAmount: string;
+  salesOrderAmount: string;
+  totalDiscount: string;
+  totalSubtotal: string;
+  outstandingAmount: string;
+  Overdue: string;
+  ThisYearMonthlyCollection: string;
+  LastYearMonthlyCollection: string;
+};
+
+export const columnDefinitionsByDocType: ColumnDef<MonthlyComparisonByCompanyReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id: "docDateFormat",
+    header: "Date",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Company Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "quotationNo",
+    id: "quotationNo",
+    header: "Quotation No.",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "salesOrderNo",
+    id: "salesOrderNo",
+    header: "SO No.",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "salesInvoices",
+    id: "salesInvoices",
+    header: "Inv No.",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "quotationAmount",
+    id: "quotationAmount",
+    header: "Quotation (RM)",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right">
+        <NumberFormatter value={row.original.quotationAmount} />
+      </div>
+    ),
+  },
+  {
+    accessorKey: "salesOrderAmount",
+    id: "salesOrderAmount",
+    header: "SO (RM)",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right">
+        <NumberFormatter value={row.original.salesOrderAmount} />
+      </div>
+    ),
+  },
+  {
+    accessorKey: "NewSales",
+    id: "NewSales",
+    header: "New Sales Invoice (RM)",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right">
+        <NumberFormatter value={row.original.NewSales} />
+      </div>
+    ),
+  },
+  {
+    accessorKey: "Renewal",
+    id: "Renewal",
+    header: "Renewal Sales Invoice (RM)",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right">
+        <NumberFormatter value={row.original.Renewal} />
+      </div>
+    ),
+  },
+  {
+    accessorKey: "totalDiscount",
+    id: "totalDiscount",
+    header: "Rebate (RM) (Discount from Invoice)",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right">
+        <NumberFormatter value={row.original.totalDiscount} />
+      </div>
+    ),
+  },
+  {
+    accessorKey: "totalSubtotal",
+    id: "totalSubtotal",
+    header: "Collection (Amount Paid) (RM)",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right">
+        <NumberFormatter value={row.original.totalSubtotal} />
+      </div>
+    ),
+  },
+  {
+    accessorKey: "outstandingAmount",
+    id: "outstandingAmount",
+    header: "Outstanding (RM)",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right">
+        <NumberFormatter value={row.original.outstandingAmount} />
+      </div>
+    ),
+  },
+  {
+    accessorKey: "Overdue",
+    id: "Overdue",
+    header: "Overdue (RM) (Base on terms)",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right">
+        <NumberFormatter value={row.original.Overdue} />
+      </div>
+    ),
+  },
+  {
+    accessorKey: "ThisYearMonthlyCollection",
+    id: "ThisYearMonthlyCollection",
+    header: "This Year Monthly Collection (RM)",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right">
+        <NumberFormatter value={row.original.ThisYearMonthlyCollection} />
+      </div>
+    ),
+  },
+  {
+    accessorKey: "LastYearMonthlyCollection",
+    id: "LastYearMonthlyCollection",
+    header: "Last Year Monthly Collection (RM)",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right">
+        <NumberFormatter value={row.original.LastYearMonthlyCollection} />
+      </div>
+    ),
+  },
+];

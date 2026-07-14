@@ -1,0 +1,237 @@
+"use client";
+
+import React, { memo, useEffect, useState } from "react";
+import type { MouseEvent } from "react";
+import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
+import type {
+  ColumnDef,
+  ColumnFiltersState,
+  ColumnOrderState,
+  PaginationState,
+  Row,
+  SortingState,
+  Table as TableType,
+  VisibilityState,
+} from "@tanstack/react-table";
+
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { cn } from "@/lib/utils/cn";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import handleDndDragEnd from "@/lib/utils/data-table/handleDndDragEnd";
+
+import DataTableToolbar from "./DataTableToolbar";
+import type { CustomerAgingReport } from "./columns";
+
+type DataTableProps = {
+  columns: ColumnDef<CustomerAgingReport>[];
+  data: CustomerAgingReport[];
+  revalidateCustomerAgingReport: () => void;
+  columnFilters: ColumnFiltersState;
+  setColumnFilters: (filters: ColumnFiltersState) => void;
+  pagination: PaginationState;
+  message?: string;
+  setPagination: (pagination: PaginationState) => void;
+  sorting: SortingState;
+  setSorting: (sorting: SortingState) => void;
+  formData: any;
+  totalNumOfRows: number;
+};
+
+const COLUMN_VISIBILITY_KEY = "customer-aging-report.table.columns";
+const COLUMN_ORDERING_KEY = "customer-aging-report.table.ordering";
+
+export default function CustomerAgingReportDataTable({
+  columns,
+  data,
+  revalidateCustomerAgingReport,
+  columnFilters,
+  setColumnFilters,
+  pagination,
+  message,
+  setPagination,
+  sorting,
+  setSorting,
+  formData,
+  totalNumOfRows,
+}: DataTableProps) {
+  // Prevent text selection when performing multiple row selection with "shift" + click
+  usePreventShiftTextSelect();
+
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
+    if (typeof window !== "undefined") {
+      return JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}");
+    }
+    return {};
+  });
+
+  const initialColumnOrder = columns.map((column) => column.id!);
+  const [columnOrder, setColumnOrder] = useLocalStorage<ColumnOrderState>(
+    COLUMN_ORDERING_KEY,
+    initialColumnOrder,
+  );
+
+  const table = useReactTable({
+    columns,
+    data,
+    state: { columnFilters, columnVisibility, pagination, sorting, columnOrder },
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    onColumnOrderChange: setColumnOrder,
+    manualPagination: true,
+    manualSorting: true,
+    manualFiltering: true,
+    pageCount: totalNumOfRows ? Math.ceil(totalNumOfRows / pagination.pageSize) : -1,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  useEffect(() => {
+    localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
+
+  useEffect(() => {
+    revalidateCustomerAgingReport();
+  }, [pagination, sorting, columnFilters]);
+
+  const onDoubleClick = (row: Row<ItemList>) => {
+
+    const UUID = row.original.UUID
+    const docNo = row.original.customerCode
+
+    const isDev = process.env.NODE_ENV === "development";
+    const url = isDev
+      ? `/sales/customer/edit?item=${docNo}&id=${UUID}`
+      : `/view/sales/customer/edit?item=${docNo}&id=${UUID}`;
+    window.open(url, "_blank", "noopener, noreferrer");
+  };
+
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  const sensors = useDndSensors();
+
+  const columnSizeVars = useColumnSizeVars(table);
+
+  return (
+    <div className="mt-2 h-auto w-full rounded-sm bg-erp-blue-3 p-0 shadow-md">
+      <div className="p-2">
+        <DataTableToolbar
+          table={table}
+          revalidateCustomerAgingReport={revalidateCustomerAgingReport}
+          totalNumOfRows={totalNumOfRows}
+          title="Generated Report"
+        />
+        <Separator className="bg-erp-blue-11" />
+        <ScrollArea className="h-[100cqh] p-1.5">
+          {message ? (
+            <NoResultsTableRow columns={columns} message={message} />
+          ) : (
+            <DndContext
+              collisionDetection={closestCenter}
+              modifiers={[restrictToHorizontalAxis]}
+              onDragEnd={(event) => handleDndDragEnd(event, setColumnOrder)}
+              sensors={sensors}
+            >
+              <Table
+                className="table-fixed border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1"
+                style={{ ...columnSizeVars, width: table.getTotalSize() }}
+              >
+                <TableHeader className="sticky top-0">
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id}>
+                      <SortableContext items={columnOrder} strategy={horizontalListSortingStrategy}>
+                        {headerGroup.headers.map((header) => (
+                          <DragableTableHead
+                            key={header.id}
+                            header={header}
+                            className="bg-erp-blue-11 font-normal"
+                            style={{
+                              width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                            }}
+                          >
+                            <ColumnResizer header={header} />
+                          </DragableTableHead>
+                        ))}
+                      </SortableContext>
+                    </TableRow>
+                  ))}
+                </TableHeader>
+                {/* When resizing any column in the table, render the memoized version of the table body */}
+                {table.getState().columnSizingInfo.isResizingColumn ? (
+                  <MemoizedTableBody table={table} onRowSelection={onRowSelection} />
+                ) : (
+                  <NonMemoizedTableBody table={table} onRowSelection={onRowSelection} />
+                )}
+              </Table>
+            </DndContext>
+          )}
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
+      </div>
+    </div>
+  );
+}
+
+type TableBodyProps = {
+  table: TableType<CustomerAgingReport>;
+  onRowSelection: (row: Row<CustomerAgingReport>) => (event: MouseEvent<HTMLTableRowElement>) => void;
+};
+
+function NonMemoizedTableBody({ table, onRowSelection }: TableBodyProps) {
+  return (
+    <TableBody>
+      {table.getRowModel().rows?.length ? (
+        table.getRowModel().rows.map((row) => (
+          <TableRow
+            className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+            data-state={row.getIsSelected() && "selected"}
+            onClick={onRowSelection(row)}
+            key={row.id}
+          >
+            {row.getVisibleCells().map((cell) => (
+              <TableCell
+                key={cell.id}
+                className="truncate"
+                title={(cell.getValue() ?? "").toString()}
+                style={{
+                  width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                  minWidth: cell.column.columnDef.minSize,
+                }}
+              >
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </TableCell>
+            ))}
+          </TableRow>
+        ))
+      ) : (
+        <NoResultsTableRow columns={table.getVisibleLeafColumns()} />
+      )}
+    </TableBody>
+  );
+}
+
+const MemoizedTableBody = memo(
+  NonMemoizedTableBody,
+  (prev, next) => prev.table.options.data === next.table.options.data,
+) as typeof NonMemoizedTableBody;

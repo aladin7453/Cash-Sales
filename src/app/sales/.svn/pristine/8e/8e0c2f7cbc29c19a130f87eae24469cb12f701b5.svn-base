@@ -1,0 +1,528 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { Input } from "@/components/ui/input";
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type CashSales = {
+  seq: string;
+  UUID: string;
+  quotation: string;
+  item: string;
+  itemName: string;
+  type: number;
+  description: string;
+  "2ndDescription": string;
+  moreDescription: string;
+  itemGroup: string;
+  itemCategory: string;
+  tariff: string;
+  classification: string;
+  permitNo: string;
+  project: string;
+  quantity: number;
+  quantity2?: number;
+  quantity3?: number;
+  UOM: string;
+  UOM2?: string;
+  UOM3?: string;
+  UOMDropdown2?: any[];
+  UOMDropdown3?: any[];
+  price: number;
+  discountRate: number;
+  discountAmount: number;
+  discountRate2?: number;
+  discountAmount2?: number;
+  discountRate3?: number;
+  discountAmount3?: number;
+  tax: string;
+  deliveryDate: string;
+  billingFrequency: number;
+  billingInterval: string;
+  startAt: string;
+  endAt: string;
+  remark1: string;
+  remark2: string;
+  serviceName: string;
+  serviceCode: string;
+  createdAt: string;
+  createdBy: string;
+  updatedBy: string;
+  updatedAt: string;
+  valid: string;
+  taxInclusive: string;
+  master: string;
+  showTemplate: string;
+  customerCodeCode: string;
+  customerName: string;
+  customerBRN: string;
+  customerID: string;
+  customermembershipID: string;
+  customerDescription: string;
+  date: string;
+};
+
+const defaultInputCell = ({ getValue, row, column: { id } }, className: string, inputType) => {
+  const initialValue = getValue();
+  // We need to keep and update the state of the cell normally
+  const [value, setValue] = useState(initialValue);
+
+  // When the input is blurred, we'll call update the data into the database
+  const onBlur = () => { };
+
+  const onChange = (e) => {
+    row.original[id] = e.target.value;
+    setValue(e.target.value);
+  };
+
+  // If the initialValue is changed external, sync it up with our state
+  useEffect(() => {
+    setValue(initialValue);
+  }, [initialValue]);
+
+  return (
+    <Input
+      className={className}
+      value={value as typeof inputType}
+      onChange={onChange}
+      onBlur={onBlur}
+    />
+  );
+};
+
+const isDev = process.env.NODE_ENV === "development";
+
+const urlMap = {
+  quotation: isDev ? "sales/quotation" : "view/sales/quotation",
+  cashSales: isDev ? "sales/cash-sales" : "view/sales/cash-sales",
+  deliveryOrder: isDev ? "sales/delivery-order" : "view/sales/delivery-order",
+  jobOrder: isDev ? "job-management/job-order" : "view/job-management/job-order",
+  salesInvoice: isDev ? "sales/sales-invoice" : "view/sales/sales-invoice",
+  salesDebitNote: isDev ? "sales/sales-debit-note" : "view/sales/sales-debit-note",
+  salesOrder: isDev ? "sales/sales-order" : "view/sales/sales-order",
+  salesCreditNote: isDev ? "sales/sales-credit-note" : "view/sales/sales-credit-note",
+};
+
+export const CashSalesColumns: ColumnDef<CashSales>[] = [
+  {
+    id: "seq",
+    accessorKey: "seq",
+    header: "Seq",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "itemCode",
+    header: "Item",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "itemName",
+    header: "Item Name",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerCodeCode",
+    accessorKey: "customerCodeCode",
+    header: "Customer Code",
+    filterFn: "includesString",
+  },
+
+  {
+    id: "customerName",
+    accessorKey: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+  },
+
+  {
+    id: "customerBRN",
+    accessorKey: "customerBRN",
+    header: "BRN",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerID",
+    accessorKey: "customerID",
+    header: "ID",
+    filterFn: "includesString",
+  },
+  {
+    id: "customermembershipID",
+    accessorKey: "customermembershipID",
+    header: "Membership ID",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerDescription",
+    accessorKey: "customerDescription",
+    header: "Cust. Desc",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "type",
+    header: "Type",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "itemUOM",
+    header: "UOM[1]",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "quantity",
+    header: "Quantity[1]",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "itemUOM2",
+    header: "UOM[2]",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "quantity2",
+    header: "Quantity[2]",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "itemUOM3",
+    header: "UOM[3]",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "quantity3",
+    header: "Quantity[3]",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "price",
+    header: "Price",
+    // Selling Price History Popover (Imports)
+    cell: ({ row }) => {
+      return (
+        <div className="flex items-center justify-between gap-1">
+          <p className="text-right flex-1">{row.original.price}</p>
+        </div>
+      );
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "subtotalTax",
+    header: "Subtotal (Tax)",
+    cell: ({ row }) => {
+      const subtotalTax = parseFloat(row.original.subtotalTax) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{subtotalTax.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "description",
+    header: "Description",
+    cell: (rowControl) => defaultInputCell(rowControl, "h-7.5", "text"),
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "2ndDescription",
+    header: "2nd Description",
+    cell: (rowControl) => defaultInputCell(rowControl, "h-7.5", "text"),
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "moreDescription",
+    header: "More Description",
+    cell: (rowControl) => defaultInputCell(rowControl, "h-7.5", "text"),
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "itemGroupCode",
+    header: "Group",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "itemCategoryCode",
+    header: "Category",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "masterItemCode",
+    header: "Master Item",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "tariffCode",
+    header: "Tariff",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "classificationCode",
+    header: "Classification",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "permitNo",
+    header: "Permit No.",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "projectCode",
+    header: "Project",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "stockBatchCode",
+    header: "Stock Batch",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "locationCode",
+    header: "Location",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "itemRate",
+    header: "Rate",
+    cell: ({ row }) => <p className="text-right">{row.original.itemRate}</p>,
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "amount",
+    header: "Amount",
+    cell: ({ row }) => {
+      const amount = parseFloat(row.original.amount) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{amount.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  // Three Discount (Start)
+  {
+    accessorKey: "discountRate",
+    header: "Discount Rate (%) [1]",
+    cell: ({ row }) => {
+      const discountRate = parseFloat(row.original.discountRate) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{discountRate.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "discountAmount",
+    header: "Discount Amount [1]",
+    cell: ({ row }) => {
+      const discountAmount = parseFloat(row.original.discountAmount) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{discountAmount.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "discountRate2",
+    header: "Discount Rate (%) [2]",
+    cell: ({ row }) => {
+      const discountRate2 = parseFloat(row.original.discountRate2) || 0;
+      return <p className="text-right">{discountRate2.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "discountAmount2",
+    header: "Discount Amount [2]",
+    cell: ({ row }) => {
+      const discountAmount2 = parseFloat(row.original.discountAmount2) || 0;
+      return <p className="text-right">{discountAmount2.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "discountRate3",
+    header: "Discount Rate (%) [3]",
+    cell: ({ row }) => {
+      const discountRate3 = parseFloat(row.original.discountRate3) || 0;
+      return <p className="text-right">{discountRate3.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "discountAmount3",
+    header: "Discount Amount [3]",
+    cell: ({ row }) => {
+      const discountAmount3 = parseFloat(row.original.discountAmount3) || 0;
+      return <p className="text-right">{discountAmount3.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  // Three Discount (End)
+  {
+    accessorKey: "subTotal",
+    header: "Subtotal",
+    cell: ({ row }) => {
+      const subTotal = parseFloat(row.original.subTotal) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{subTotal.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "taxCode",
+    header: "Tax",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "taxRate",
+    header: "Tax Rate",
+    cell: ({ row }) => {
+      const taxRate = parseFloat(row.original.taxRate) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{taxRate.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "taxInclusive",
+    header: "Tax Inclusive",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "taxAmount",
+    header: "Tax Amount",
+    cell: ({ row }) => {
+      const taxAmount = parseFloat(row.original.taxAmount) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{taxAmount.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "localTaxAmount",
+    header: "Local Tax Amount",
+    cell: ({ row }) => {
+      const localTaxAmount = parseFloat(row.original.localTaxAmount) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{localTaxAmount.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "deliveryDate",
+    header: "Delivery Date",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "billingFrequency",
+    header: " Billing Frequency",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "billingInterval",
+    header: "Billing Interval",
+    filterFn: "includesString",
+  },
+  {
+    id: "date",
+    accessorKey: "date",
+    header: "Date",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "startAt",
+    header: "Start Date",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "endAt",
+    header: "End Date",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "remark1",
+    header: "Remark 1",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "remark2",
+    header: "Remark 2",
+    filterFn: "includesString",
+  },
+  {
+    id: "transferFrom",
+    accessorKey: "transferFrom",
+    header: "Transfer From",
+    cell: ({ row }) => {
+      const transferFromDocuments = row.original.transferFromDocuments;
+
+      if (!transferFromDocuments || typeof transferFromDocuments !== "object") {
+        return <span className="text-gray-400">-</span>;
+      }
+
+      const docNo = transferFromDocuments.docNo || "";
+      const docType = transferFromDocuments.docType || "";
+
+
+      const url = `/${urlMap[docType as keyof typeof urlMap]}/edit?item=${docNo}&id=${transferFromDocuments.UUID}`;
+
+      return (
+        <a
+          href={url}
+          className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {transferFromDocuments.docNo}
+        </a>
+      );
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "transferTo",
+    accessorKey: "transferTo",
+    header: "Transfer To",
+    cell: ({ row }) => {
+      const transferToDocuments = row.original.transferToDocuments;
+
+      if (!transferToDocuments || transferToDocuments.length === 0) {
+        return <span className="text-gray-400">-</span>;
+      }
+
+      return (
+        <div className="flex flex-wrap">
+          {transferToDocuments.map((doc, index) => {
+            const docNo = doc.docNo || "";
+            const docType = doc.docType || "";
+            const url = `/${urlMap[docType as keyof typeof urlMap]}/edit?item=${docNo}&id=${doc.UUID}`;
+
+            return (
+              <span key={index}>
+                <a
+                  href={url}
+                  className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {doc.docNo}
+                </a>
+                {index < transferToDocuments.length - 1 && ", "}
+              </span>
+            );
+          })}
+        </div>
+      );
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as CashSales["valid"];
+      return validity ? "Valid" : "Invalid";
+    },
+    filterFn: filterWithStringConversion,
+  },
+  {
+    accessorKey: "master",
+    header: "Master Service",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "showTemplate",
+    header: "Show in PDF",
+    filterFn: "includesString",
+  },
+];

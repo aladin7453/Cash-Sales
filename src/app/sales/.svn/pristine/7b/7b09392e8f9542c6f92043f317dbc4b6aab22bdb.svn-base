@@ -1,0 +1,272 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { useForm } from "react-hook-form";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { notFound, useSearchParams, useRouter } from "next/navigation";
+
+import { cn } from "@/lib/utils/cn";
+import { 
+  ORIGIN, 
+  getAuthHeaders, 
+  getCurrentAcc, 
+  getCurrentAccount, 
+  getCurrentCompanyUUID, 
+  getCurrentCompany 
+} from "@/lib/constants";
+
+import DropdownTable from "@/components/data-table/DropdownTable";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { useToast } from "@/components/ui/use-toast";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { 
+  Card, 
+  CardHeader, 
+  CardContent, 
+  CardTitle,
+  CardFooter 
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+import type { AgentType } from "../../../columns";
+
+type Params = {
+  agentType?: AgentType | null;
+};
+
+export function AgentTypeForm({ 
+  agentType, 
+  customInformationData, 
+  tempRowCustomInfo, 
+  form 
+}: Params) {
+  const headers = getAuthHeaders();
+  const currentAcc = getCurrentAcc();
+  const currentAccount = getCurrentAccount();
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const { toast } = useToast();
+  const [showTableCompany, setShowTableCompany] = useState(false);
+
+  const [companyDropdownTableData, setCompanyDropdownTableData] = useState([]);
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target) && inputRef.current !== event.target) {
+      setShowTableCompany(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener('click', handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    const currentCompanyID = getCurrentCompanyUUID();
+    const currentCompanyName = getCurrentCompany();
+
+    if (!form.getValues("company")) {
+      form.setValue('company', currentCompanyID);
+    }
+
+    if (!form.getValues("companyName")) {
+      form.setValue('companyName', currentCompanyName);
+    }
+    // setCurrentCompanyUUID(currentCompanyID);
+    // setCurrentCompany(currentCompanyName);
+  }, []);
+
+   // Verify function
+  const verifyField = async (field: "agentTypeCode" , value: string) => {
+    form.clearErrors(field);
+
+    if (!value) {
+      form.setError(field, {
+        type: "custom",
+        message: "This field is empty.",
+      });
+
+      return;
+    } else if (value.trim() !== value) {
+      form.setError(field, {
+        type: "custom",
+        message: "This field must not start or end with a space.",
+      });
+
+      return;
+    }
+
+    const formData = new FormData();
+
+    formData.append(`agentType[${field}]`, value);
+
+    try {
+      const res = await fetch(`${ORIGIN}/agent_type/api/agent-type/verify`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        if (res.status === 403) {
+          toast({
+            title: "Error",
+            description: errorData.message,
+            variant: "destructive",
+          });
+        }
+        throw new Error(errorData.message);
+      }
+
+      const data: boolean = await res.json();
+      form.setError(field, {
+        type: "custom",
+        message: data ? `"${value}" already exists.` : `"${value}" is available.`,
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  return (
+   <Form {...form}>
+    <form className="space-y-2">
+      <Card collapsible defaultCollapsed={false} className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold">Document Details</CardTitle>
+        </CardHeader>
+
+        { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+        <CardContent>
+          <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="account"
+              render={({ field }) => (
+                <FormItem className="hidden">
+                  <FormLabel>UUID:</FormLabel>
+                  <FormControl>
+                    <Input 
+                      className="h-7" 
+                      {...field} 
+                      value={currentAccount} 
+                      readOnly={true} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="company"
+              render={({ field }) => (
+                <FormItem className="hidden">
+                  <FormLabel>UUID:</FormLabel>
+                  <FormControl>
+                    <Input 
+                      className="h-7" 
+                      {...field} 
+                      readOnly={true} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="agentTypeCode"
+              render={({ field }) => (
+                <FormItem className="flex flex-col space-y-1">
+                 <FormLabel>Agent Type Code:</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-7.5 pr-7"
+                      {...field}
+                      moduleName="agentType"
+                      fieldName="agentTypeCode"
+                      columnName="Agent Type Code"
+                      onBlur={() => {
+                        if (field.value && field.value.trim()) {
+                          verifyField("agentTypeCode", field.value);
+                        }
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="agentType"
+              render={({ field }) => (
+                <FormItem className="flex flex-col space-y-1">
+                  <FormLabel>Agent Type:<span className="text-red-500">*</span></FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-7.5"
+                      {...field}
+                      moduleName="agentType"
+                      fieldName="agentType"
+                      columnName="Agent Type"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-1 mt-4">
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem className="col-span-3 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                  <FormLabel>Description:</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      className="h-7"
+                      {...field}
+                      moduleName="agentType"
+                      fieldName="description"
+                      columnName="Description"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </form>
+  </Form>
+  );
+}

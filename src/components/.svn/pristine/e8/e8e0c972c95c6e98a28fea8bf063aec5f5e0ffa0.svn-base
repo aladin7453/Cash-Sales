@@ -1,0 +1,76 @@
+import { useMemo } from "react";
+import { DIRECTORY, ORIGIN ,versionPath} from "@/lib/constants";
+import type { TransferToConfig, TransferDestination } from "../types";
+
+interface ProcessedConfig extends TransferToConfig {
+  itemsEndpoint: string;
+  transferEndpoint: string;
+  queryParam: string; // Make it required in processed config
+  fetchQueryParam: string;
+  transferQueryParam: string;
+  urlMappings: Record<string, { devRoute: string; prodRoute: string }>;
+}
+
+export function useTransferToConfig(config: TransferToConfig): ProcessedConfig {
+  return useMemo(() => {
+    // Validate required fields
+    if (!config.module || !config.model || !config.apiNamespace) {
+      throw new Error("TransferTo: module, model, and apiNamespace are required");
+    }
+
+    if (!config.itemsEndpointSuffix) {
+      throw new Error("TransferTo: itemsEndpointSuffix is required");
+    }
+
+    if (!config.transferEndpointSuffix) {
+      throw new Error("TransferTo: transferEndpointSuffix is required");
+    }
+
+    if (!config.destinations || config.destinations.length === 0) {
+      throw new Error("TransferTo: destinations array is required");
+    }
+
+    if (!config.columns || config.columns.length === 0) {
+      throw new Error("TransferTo: columns array is required");
+    }
+
+    // Generate default endpoints using required suffix
+    const defaultItemsEndpoint = `${ORIGIN}/${config.module}/api/${config.model}/${config.itemsEndpointSuffix}`;
+    const defaultTransferEndpoint = `${ORIGIN}/${config.module}/api/${config.model}/${config.transferEndpointSuffix}`;
+
+    // Create URL mappings for each destination
+    const isDev = process.env.NODE_ENV === "development";
+    const urlMappings = config.destinations.reduce((mappings, dest) => {
+      mappings[dest.key] = {
+        devRoute: dest.devRoute || dest.route,
+        prodRoute: `${versionPath}/${dest.route}`,
+      };
+      return mappings;
+    }, {} as Record<string, { devRoute: string; prodRoute: string }>);
+
+    // Process queryParam to support array
+    let fetchQueryParam: string;
+    let transferQueryParam: string;
+
+    if (Array.isArray(config.queryParam)) {
+      fetchQueryParam = config.queryParam[0] || "id";
+      transferQueryParam = config.queryParam[1] || config.queryParam[0] || "id";
+    } else {
+      fetchQueryParam = config.queryParam || "id";
+      transferQueryParam = config.queryParam || "id";
+    }
+
+    return {
+      ...config,
+      itemsEndpoint: config.itemsEndpoint || defaultItemsEndpoint,
+      transferEndpoint: config.transferEndpoint || defaultTransferEndpoint,
+      queryParam: config.queryParam || "id", // Keep original for backward compatibility
+      fetchQueryParam,
+      transferQueryParam,
+      buttonText: config.buttonText || "T-To",
+      dialogTitle: config.dialogTitle || "Transfer to",
+      popoverTitle: config.popoverTitle || "Select Item",
+      urlMappings,
+    };
+  }, [config]);
+}

@@ -1,0 +1,292 @@
+"use client";
+
+import { useState, useEffect } from "react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+
+type ChangeDetail = {
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+};
+
+interface DetailsPopoverProps {
+  id: string;
+  action: string;
+  isOpen: boolean;
+  onClose: () => void;
+  tableName?: string; // Optional tableName parameter
+}
+
+// Field Name Mapping
+const fieldNameMapping: Record<string, string> = {
+  // Main Details
+  UUID: "UUID",
+  customerCategoryCode: "Customer Category Code",
+  customerCategory: "Customer Category",
+  description: "Description",
+  createdByUsername: "Created By",
+  updatedByUsername: "Updated By",
+  createdAt: "Created At",
+  updatedAt: "Updated At",
+  account: "Account",
+  company: "Company",
+
+  // Custom Information
+  fieldName: "Field Name",
+  fieldValue: "Field Value",
+  attachment: "Attachment",
+  valid: "Valid",
+};
+
+export default function DetailsPopover({
+  id,
+  action,
+  isOpen,
+  onClose,
+  tableName,
+}: DetailsPopoverProps) {
+  const [details, setDetails] = useState<ChangeDetail[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function LoadingDots() {
+    const [dots, setDots] = useState(1);
+
+    useEffect(() => {
+      const interval = setInterval(() => {
+        setDots((prev) => (prev >= 3 ? 1 : prev + 1));
+      }, 500);
+
+      return () => clearInterval(interval);
+    }, []);
+
+    return (
+      <span className="text-md font-medium">
+        Loading details{".".repeat(dots)}
+      </span>
+    );
+  }
+
+  useEffect(() => {
+    if (isOpen && id && action) {
+      fetchDetails();
+    }
+  }, [isOpen, id, action]);
+
+  useEffect(() => {
+    console.log("Table Name:", tableName);
+  }, [tableName]);
+
+  const fetchDetails = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const headers = getAuthHeaders();
+      let url;
+
+      if (tableName === "customerCategoryHasCustomInfo") {
+        url = `${ORIGIN}/customer_category/api/customer-category/get-customer-category-has-custom-info-log-details?id=${id}&action=${action}`;
+      } else {
+        // Build URL with optional tableName parameter
+        url = `${ORIGIN}/customer_category/api/customer-category/get-customer-category-log-details?id=${id}&action=${action}`;
+      }
+
+      const response = await fetch(url, { headers });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch details");
+      }
+
+      const data = await response.json();
+
+      if (data && data.history && Array.isArray(data.history)) {
+        setDetails(data.history);
+      } else {
+        setDetails([]);
+      }
+    } catch (err) {
+      console.error("Error fetching changelog details:", err);
+      setError("Could not load details. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Format timestamp to readable date
+  const formatTimestamp = (timestamp: string | null): string => {
+    if (!timestamp) return "-";
+    try {
+      const date = new Date(parseInt(timestamp) * 1000);
+      return date.toLocaleString();
+    } catch (e) {
+      return timestamp;
+    }
+  };
+
+  // Customer category form fields to filter out from the changelog
+  const fieldsToFilter = [
+    "UUID",
+    "historyUUID",
+    "updatedAt",
+    "updatedBy",
+    "valid",
+    "serialNo",
+  ];
+
+  // Additional table fields to filter based on tableName
+  const getTableSpecificFieldsToFilter = (): string[] => {
+    if (tableName === "customerCategoryHasCustomInfo") {
+      return [
+        "UUID",
+        "customerCategoryCode",
+        "customerCategory",
+        "description",
+        "createdByUsername",
+        "updatedByUsername",
+        "createdAt",
+        "updatedAt",
+        "account",
+        "company",
+      ];
+    }
+    return [];
+  };
+
+  // Filter only the fields that actually changed and are not in the filter list
+  const changedDetails = details.filter((detail) => {
+    const combinedFieldsToFilter = [
+      ...fieldsToFilter,
+      ...getTableSpecificFieldsToFilter(),
+    ];
+
+    return (
+      detail.oldValue !== detail.newValue &&
+      !(detail.oldValue === null && detail.newValue === null) &&
+      !combinedFieldsToFilter.includes(detail.field)
+    );
+  });
+
+  // Format value based on field name
+  const formatValue = (
+    field: string,
+    value: string | null
+  ): string | JSX.Element => {
+    if (value === null) return "-";
+
+    // Handle timestamp fields
+    if (["createdAt", "updatedAt", "date_created"].includes(field)) {
+      return formatTimestamp(value);
+    }
+
+    // Handle JSON arrays and objects
+    if (
+      field === "Attachment" ||
+      (value.startsWith("[") && value.endsWith("]"))
+    ) {
+      try {
+        const parsedValue = JSON.parse(value);
+        if (Array.isArray(parsedValue)) {
+          if (field === "Attachment") {
+            return parsedValue
+              .map((item) => item.Name || item.filename || "Unnamed attachment")
+              .join(", ");
+          }
+          // For other array types, try to extract meaningful data or join values
+          return parsedValue
+            .map((item) => {
+              if (typeof item === "object" && item !== null) {
+                // Try to get a useful property from the object
+                return (
+                  item.name ||
+                  item.Name ||
+                  item.title ||
+                  item.id ||
+                  JSON.stringify(item)
+                );
+              }
+              return String(item);
+            })
+            .join(", ");
+        }
+      } catch (e) {
+        // If parsing fails, return the original value
+        console.error(`Error parsing JSON value for field ${field}:`, e);
+      }
+    }
+
+    return value;
+  };
+
+  // Get display name for field
+  const getFieldDisplayName = (fieldName: string): string => {
+    return fieldNameMapping[fieldName] || fieldName;
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[800px] flex flex-col max-h-[90vh]">
+        <DialogHeader className="sticky top-0 z-10 bg-white pb-2">
+          <DialogTitle>Change Details</DialogTitle>
+        </DialogHeader>
+        <div className="overflow-y-auto flex-1">
+          {loading ? (
+            <p className="py-4 text-center">
+              <LoadingDots />
+            </p>
+          ) : error ? (
+            <p className="py-4 text-center text-red-500">{error}</p>
+          ) : changedDetails.length === 0 ? (
+            <p className="py-4 text-center">
+              {details.length === 0
+                ? "No details available"
+                : "No field changes detected"}
+            </p>
+          ) : (
+            <div className="border rounded-md">
+              <table className="w-full">
+                <thead className="bg-erp-blue-11 text-white sticky top-0 z-10">
+                  <tr>
+                    <th className="py-1 px-2 text-left">Field</th>
+                    <th className="py-1 px-2 text-left">Old Value</th>
+                    <th className="py-1 px-2 text-center w-8"></th>
+                    <th className="py-1 px-2 text-left">New Value</th>
+                  </tr>
+                </thead>
+                <tbody className="relative">
+                  {changedDetails.map((detail, index) => (
+                    <tr
+                      key={index}
+                      className={
+                        index % 2 === 0 ? "bg-erp-blue-5" : "bg-erp-blue-1"
+                      }
+                    >
+                      <td className="py-1 px-2 font-medium border-r">
+                        {getFieldDisplayName(detail.field)}
+                      </td>
+                      <td className="py-1 px-2 font-medium text-gray-600">
+                        {formatValue(detail.field, detail.oldValue)}
+                      </td>
+                      <td className="py-1 px-2 text-center text-gray-500">→</td>
+                      <td className="py-1 px-2 font-medium text-green-700">
+                        {formatValue(detail.field, detail.newValue)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

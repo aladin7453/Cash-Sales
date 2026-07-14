@@ -1,0 +1,234 @@
+"use client";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+import type { ColumnDef } from "@tanstack/react-table";
+import React from "react";
+
+export type ItemList = {
+  UUID: string;
+  quotation: string;
+  docNo: string;
+  type: number;
+  description: string;
+  "2ndDescription": string;
+  moreDescription: string;
+  itemGroup: string;
+  itemCategory: string;
+  tariff: string;
+  classification: string;
+  permitNo: string;
+  project: string;
+  quantity: number;
+  totalSubtotaltotalSubtotal:number,
+  totalTaxtotalTax:number,
+  UOM: string;
+  price: number;
+  discountRate: number;
+  discountAmount: number;
+  tax: string;
+  deliveryDate: string;
+  billingFrequency: number;
+  billingInterval: string;
+  startAt: string;
+  endAt: string;
+  remark1: string;
+  remark2: string;
+  serviceName: string;
+  serviceCode: string;
+  createdAt: string;
+  createdBy: string;
+  updatedBy: string;
+  updatedAt: string;
+  valid: string; 
+};
+
+export const ServiceColumns: ColumnDef<ItemList>[] = [
+  {
+    id: "docNo",
+    accessorKey: "docNo",
+    header: "Doc No",
+    filterFn: "includesString"
+  },
+  {
+    id: "docDateFormat",
+    accessorKey: "docDateFormat",
+    header: "Doc Date",
+    filterFn: "includesString"
+  },
+  {
+    id: "customerName",
+    accessorKey: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString"
+  },
+  {
+    id: "customerCodeCode",
+    accessorKey: "customerCodeCode",
+    header: "Customer Code",
+    filterFn: "includesString"
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} columnName="description"/>,
+    filterFn: "includesString"
+  },
+  {
+    id: "quantity",
+    accessorKey: "quantity",
+    header: "Quantity",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.quantity}</p>
+    ),
+    filterFn: "includesString"
+  },
+  {
+    id: "price",
+    accessorKey: "price",
+    header: "Price",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.price}</p>
+    ),
+    filterFn: "includesString"
+  },
+  {
+    id: "totalAmountAmount",
+    accessorKey: "totalAmountAmount",
+    header: "Amount",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.totalAmountAmount}</p>
+    ),
+    filterFn: "includesString"
+  },
+  {
+    id: "totalSubtotaltotalSubtotal",
+    accessorKey: "totalSubtotaltotalSubtotal",
+    header: "Subtotal",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.totalSubtotaltotalSubtotal}</p>
+    ),
+    filterFn: "includesString"
+  },
+  {
+    id: "totalTaxtotalTax",
+    accessorKey: "totalTaxtotalTax",
+    header: "Tax Amount",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.totalTaxtotalTax}</p>
+    ),
+    filterFn: "includesString"
+  },
+  {
+    id: "totalSubtotalTax",
+    accessorKey: "totalSubtotalTax",
+    header: "Subtotal (Tax)",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.totalSubtotalTax}</p>
+    ),
+    filterFn: "includesString"
+  },
+];
+
+export const StockColumns: ColumnDef<ItemList>[] = [
+  {
+    id: "stockCode",
+    accessorKey: "stockCode",
+    header: "Item",
+    filterFn: "includesString"
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} columnName="description"/>,
+    filterFn: "includesString"
+  },
+  {
+    id: "2ndDescription",
+    accessorKey: "2ndDescription",
+    header: "2nd Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} columnName="2ndDescription"/>,
+    filterFn: "includesString"
+  },
+  {
+    id: "moreDescription",
+    accessorKey: "moreDescription",
+    header: "More Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} columnName="moreDescription"/>,
+    filterFn: "includesString"
+  },
+  {
+    id: "stockGroupCodeCode",
+    accessorKey: "stockGroupCodeCode",
+    header: "Group Code",
+    filterFn: "includesString"
+  },
+  {
+    id: "stockCategoryCodeCode",
+    accessorKey: "stockCategoryCodeCode",
+    header: "Category Code",
+    filterFn: "includesString"
+  },
+  {
+    id: "tariffCodeCode",
+    accessorKey: "tariffCodeCode",
+    header: "Tariff",
+    filterFn: "includesString"
+  },
+  {
+    id: "classificationCodeCode",
+    accessorKey: "classificationCodeCode",
+    header: "Classification",
+    filterFn: "includesString"
+  },
+  {
+    id: "quantity",
+    accessorKey: "",
+    header: "Quantity",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.quantity}</p>
+    ),
+    filterFn: "includesString"
+  },
+  {
+    id: "UOM",
+    accessorKey: "UOM",
+    header: "UOM",
+    filterFn: "includesString"
+  },
+  {
+    id: "rate",
+    accessorKey: "",
+    header: "Rate",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.rate}</p>
+    ),
+    filterFn: "includesString"
+  },
+  {
+    id: "refPrice",
+    accessorKey: "refPrice",
+    header: "Price",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.refPrice}</p>
+    ),
+    filterFn: "includesString"
+  },
+  {
+    id: "billingFrequency",
+    accessorKey: "billingFrequency",
+    header: "Billing Frequency",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.billingFrequency}</p>
+    ),
+    filterFn: "includesString"
+  },
+  {
+    id: "billingInterval",
+    accessorKey: "billingInterval",
+    header: "Billing Interval",
+    filterFn: "includesString"
+  },
+];

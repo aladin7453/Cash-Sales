@@ -1,0 +1,297 @@
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardTitle,
+} from "@/components/ui/card"
+import StatusCard from "./statusCard"
+import BarChart from "./barChart"
+import TableCard from "./table"
+import { FaCoins, FaRegCreditCard, FaRegUser } from "react-icons/fa";
+import { CiCircleInfo } from "react-icons/ci";
+import { useState } from "react";
+
+export default function Purchase() {
+
+    const [stockData, setStockData] = useState([
+        {
+            name: "Farmland Organic Yogurt 450g",
+            price: "RM 9",
+            actual: 89,
+            expected: 200,
+            supplierCode: "FL240806023",
+        },
+        {
+            name: "Dairy Fresh Whole Milk 1L",
+            price: "RM 6",
+            actual: 156,
+            expected: 300,
+            supplierCode: "DF240805001",
+        },
+        {
+            name: "Premium White Bread Loaf",
+            price: "RM 4",
+            actual: 234,
+            expected: 400,
+            supplierCode: "PB240807045",
+        },
+    ])
+
+    const lowStockColumn=["Stock Name","Actual Quantity","Expected Quantity","Supplier Code"]
+    
+
+
+    const [purchaseOverviewChart, setPurchaseOverviewChart] = useState(
+        {
+            title: "Purchase Overview",
+            labels: ["Electronics", "Clothing", "Home appliances", "Sports", "Books"],
+            data: [5000, 3000, 2500, 2000, 1000],
+            datasetLabel: "Sales (RM)",
+            backgroundColors:
+                [
+                    "rgba(59, 130, 246,1)",
+                    "rgba(16,185,129,1)",
+                    "rgba(245, 158, 11, 1)",
+                    "rgba(239, 68, 68, 1)",
+                    "rgba(139, 92, 246, 1)",
+                ]
+        }
+
+    )
+
+    const [lastpurchase, setlastPurchase] = useState(
+        {
+            lastpurchase: "",
+            documentNo: "CS101251626",
+            subtotalTax: "102.50",
+            customerCode: "Cust00",
+
+        }
+
+    )
+
+
+    const [monthlyPurchaseTrend, setMonthlyPurchaseTrend] = useState(
+        {
+            title: "Monthly Sales Trends",
+            labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+            datasets: [
+                {
+                    label: "Sales",
+                    data: [12, 19, 3, 5, 2],
+                    borderColor: "rgba(255, 99, 132, 1)",
+                    backgroundColor: "rgba(255, 99, 132, 0.2)",
+                },
+                {
+                    label: "Purchases",
+                    data: [8, 15, 6, 9, 4],
+                    borderColor: "rgba(54, 162, 235, 1)",
+                    backgroundColor: "rgba(54, 162, 235, 0.2)",
+                },
+            ]
+        }
+
+    )
+
+    const [stockAvailable, setStockAvailable] = useState(
+        {
+            title: "Stock Available : 50000",
+            labels: ["Electronics", "Clothing", "Home appliances", "Sports", "Books"],
+            data: [5000, 3000, 2500, 2000, 1000],
+            // datasetLabel: "Sales (RM)",
+            backgroundColors:
+                [
+                    "rgba(59, 130, 246,1)",
+                    "rgba(16,185,129,1)",
+                    "rgba(245, 158, 11, 1)",
+                    "rgba(239, 68, 68, 1)",
+                    "rgba(139, 92, 246, 1)",
+                ]
+        }
+
+    )
+
+    const [purchaseOverallPerformance, setPurchaseOverallPerformance] = useState([
+        { icon: FaCoins, title: "Total Purchase Amount:", value: "RM 12450.00", change: "21.10%", changeText: "more  expenses", changeType: "down" },
+        { icon: FaRegCreditCard, title: "No. Of Purchase:", value: "206", change: "+58", changeText: "than previous month", changeType: "up" },
+        { icon: FaRegUser, title: "Total Supplier:", value: "10572", change: "+107", changeText: "since last month", changeType: "up" }
+
+    ])
+
+    const [purchaseInformation, setPurchaseInformation] = useState(
+        { totalQuantityCount: "51", totalQuantity: "1071", expectedAmountExpenses: "5328.00", expectedAmountIncome: "6800.00" }
+
+    )
+
+    const [visitData, setVisitData] = useState([
+        { label: "Expected Visit", value: 150, color: "border-blue-500 text-blue-500", borderLineColor: "#0D6EFD" },
+        { label: "Actual Visit", value: 148, color: "border-green-500 text-green-500", borderLineColor: "#198754" },
+        { label: "Miss Visit", value: 2, color: "border-red-500 text-red-500", borderLineColor: "#DC3545" },
+    ])
+
+
+    return (
+        <>
+            <div className="grid grid-cols-3 gap-4">
+                {/* Top wide card */}
+                <div className="col-span-2 row-span-1">
+                    <Card className="flex flex-col text-sm" style={{ marginTop: "10px", overflow: "hidden" }}>
+                        <CardTitle className="pl-4 pt-2 text-md">Overall Performance</CardTitle>
+                        <CardContent className="flex-1 overflow-y-auto px-4" style={{ maxHeight: "calc(45vh - 60px)" }}>
+                            <div className="flex gap-8 justify-around">
+
+                                {purchaseOverallPerformance.map((sales, index) => (
+                                    <StatusCard
+                                        key={index}
+                                        icon={<sales.icon />}
+                                        title={sales.title}
+                                        value={sales.value}
+                                        change={sales.change}
+                                        changeText={sales.changeText}
+                                        changeType={sales.changeType}
+                                    />
+
+                                ))}
+
+
+
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Third column card (will be same height as both left cards) */}
+                <div className="row-span-2">
+                    <Card className="flex flex-col text-sm" style={{ marginTop: "10px", overflow: "hidden" }}>
+                        <CardTitle className="text-center pt-3 font-normal pb-2">Purchase Information</CardTitle>
+                        <CardContent>
+                            <table className="table-auto w-full border border-grey border-collapse text-center text-lg pt-3">
+                                <tbody>
+                                    <tr>
+                                        <td colSpan="2" style={{ background: "#D5D2D2" }}>Total Quantity</td>
+                                    </tr>
+                                    <tr>
+                                        <td style={{ borderRight: "1px solid black" }}>Item Count</td>
+                                        <td>Quantity</td>
+                                    </tr>
+                                    <tr>
+                                        <td style={{ borderRight: "1px solid black" }}>{purchaseInformation.totalQuantityCount}</td>
+                                        <td>{purchaseInformation.totalQuantity}</td>
+                                    </tr>
+
+                                    <tr>
+                                        <td colSpan="2" style={{ background: "#D5D2D2" }}>Expected Amount {purchaseInformation.total}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style={{ borderRight: "1px solid black" }}> Expenses</td>
+                                        <td>Income</td>
+                                    </tr>
+                                    <tr>
+                                        <td style={{ borderRight: "1px solid black" }}>{purchaseInformation.expectedAmountExpenses}</td>
+                                        <td>{purchaseInformation.expectedAmountIncome}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+
+
+
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Second stacked card under the first */}
+                <div className="col-span-2 row-span-2">
+                    <Card className="flex flex-col text-sm" style={{ marginTop: "10px", overflow: "hidden" }}>
+                        <CardTitle className="pl-4 pt-2 text-md">Top 5 purchase item</CardTitle>
+                        <CardContent className="flex-1 overflow-y-auto px-4" style={{ maxHeight: "calc(45vh - 60px)" }}>
+                            <div className="flex gap-8 justify-around">
+                                <BarChart
+                                    title={purchaseOverviewChart.title}
+                                    labels={purchaseOverviewChart.labels}
+                                    data={purchaseOverviewChart.data}
+                                    // datasetLabel="Sales (RM)"
+                                    backgroundColors={purchaseOverviewChart.backgroundColors}
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+
+                </div>
+
+                   <div className="row-span-1">
+                    <Card className="flex flex-col text-sm" style={{ marginTop: "10px", overflow: "hidden" }}>
+                        <CardContent className="pt-3">
+                            <p className="text-lg">Last Purchase:{lastpurchase.lastpurchase}</p>
+                            <p>Document No: {lastpurchase.documentNo}</p>
+                            <p>Subtotal(Tax): {lastpurchase.subtotalTax}</p>
+                            <p>Customer Code: {lastpurchase.customerCode}</p>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                
+
+
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+                {/* First div - spans 2 columns */}
+                <div className="col-span-2 row-span-2">
+                    <Card className="flex flex-col text-sm" style={{ marginTop: "10px", overflow: "hidden" }}>
+                        <CardTitle className="pl-4 pt-2 text-md"></CardTitle>
+                        <CardContent className="flex-1 overflow-y-auto px-4" style={{ maxHeight: "calc(45vh - 60px)" }}>
+                            <TableCard
+                                title="Low Quantity Stock"
+                                subtitle="(Purchase suggestion)"
+                                type="lowQuantityStock"
+                                column={lowStockColumn}
+                                data={stockData}
+                            />
+
+
+                        </CardContent>
+                    </Card>
+                </div>
+
+              
+
+                {/* Third div - 1 column */}
+                <div className="row-span-1">
+                    <Card className="flex flex-col text-sm mt-2 overflow-hidden">
+                        <CardContent className="p-0">
+                            {visitData.map((stat, index) => (
+                                <div
+                                    key={index}
+                                    className={`flex items-center justify-between p-4`}
+                                    style={{ borderBottom: "solid 1px #D5D2D2" }}
+                                >
+                                    <span className="flex items-center gap-2" style={{ borderLeft: `solid 3px ${stat.borderLineColor}`, paddingLeft: "8px" }}>{stat.label}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`font-bold text-lg ${stat.color}`}>{stat.value}</span>
+                                        <button className="p-1 rounded-full bg-gray-100 hover:bg-gray-200">
+                                            <CiCircleInfo size={16} className="text-gray-500" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+
+
+
+
+
+
+
+
+
+
+
+        </>
+    );
+}

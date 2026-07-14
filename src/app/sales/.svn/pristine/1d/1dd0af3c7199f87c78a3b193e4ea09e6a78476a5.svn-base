@@ -1,0 +1,425 @@
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { IoDocumentsSharp } from "react-icons/io5";
+import useSWR from "swr";
+
+import TransferButton from "@/components/features/transfer/TransferButton";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import CloneButton from "@/components/form/ActionButton/Clone";
+import DeleteButton from "@/components/form/ActionButton/Delete";
+import LayoutToggleButton from "@/components/form/ActionButton/LayoutToggleButton";
+import NewButton from "@/components/form/ActionButton/New";
+import PreviewButton from "@/components/form/ActionButton/Preview";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+// Mobile View (Imports)
+import MobileFormActionGroup from "@/components/form/MobileFormActionGroup";
+import { SVGNote2 } from "@/components/icons/svg-repo/SVGNote2";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, ORIGIN, TOOLTIP_DELAY_DURATION } from "@/lib/constants";
+
+import { salesInvoiceTransferFromConfig } from "../transfer/transferFrom/config";
+import { salesInvoiceTransferToConfig } from "../transfer/transferTo/config";
+import { ApprovalStatusIcon } from "./ApprovalStatusIcon";
+import { eInvoiceRecords } from "./e-invoice-record/columns";
+import EInvoiceRecordsDataTable from "./e-invoice-record/DataTable";
+import { useDateRestriction } from "@/components/custom/DateRestrictionContext";
+
+import type { Table } from "@tanstack/react-table";
+
+import type { SalesInvoice } from "../columns";
+
+type TopActionBarProps = {
+  salesInvoice?: SalesInvoice | null;
+  approvalStatus?: SalesInvoice | null;
+  tempRowSalesInvoiceDetailsList: () => void;
+  form: Form;
+  handleSubmit: any;
+  revalidateSalesInvoiceDetails: () => void;
+  revalidateSalesInvoice: () => void;
+  slug: string;
+  isLoading?: boolean;
+  table: Table<any> | null;
+  action: string;
+  viewEInvoiceDetails?: (row: any) => void;
+  salesInvoiceData?: any;
+  layout: "new" | "old";
+  isMobile: boolean;
+  onLayoutChange: (layout: "new" | "old") => void;
+};
+
+const fetcher = (url: string) => {
+  const headers = getAuthHeaders();
+  return fetch(url, { headers }).then((res) => res.json());
+};
+
+export default function TopActionBar({
+  salesInvoice,
+  approvalStatus,
+  tempRowSalesInvoiceDetailsList,
+  form,
+  handleSubmit,
+  revalidateSalesInvoiceDetails,
+  slug,
+  isLoading,
+  table,
+  action,
+  revalidateSalesInvoice,
+  viewEInvoiceDetails,
+  salesInvoiceData,
+  layout,
+  onLayoutChange,
+  isMobile
+}: TopActionBarProps) {
+  const headers = getAuthHeaders();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const { toast } = useToast();
+
+  const [selectedRowUUID, setSelectedRowUUID] = useState<string | null>(null);
+  const [tempRowEInvoiceRecords, setTempRowEInvoiceRecords] = useState([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [tableInstance, setTableInstance] = useState<Table | null>(null);
+
+  useEffect(() => {
+    form.reset(salesInvoice || {});
+  }, [salesInvoice, form]);
+
+  const handleReset = () => {
+    form.reset(salesInvoice || {});
+  };
+
+  const handleDialogToggle = () => {
+    setDialogOpen(!dialogOpen);
+  };
+
+  const handleRowSelect = (rowUUID: string) => {
+    setSelectedRowUUID(rowUUID);
+  };
+
+  const handleTableInstanceReady = (table: Table<any>) => {
+    if (table) {
+      setTableInstance(table);
+    } else {
+      console.error("Table instance is null or undefined");
+    }
+  };
+
+  const eInvoiceStat = form.getValues("eInvoiceStatus");
+  const consolidatedStat = form.getValues("consolidatedInvoiceDocNo");
+
+  const {
+    data: eInvoiceRecordsData,
+    error: eInvoiceRecordError,
+    mutate: mutateEInvoice,
+  } = useSWR(
+    id
+      ? `${ORIGIN}/sales_invoice/api/sales-invoice/get-update-sales-invoice-has-e-invoice-data?id=${id}`
+      : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+
+  const revalidateEInvoiceRecordsData = () => {
+    mutateEInvoice();
+  };
+
+  // Dropdown Filter Configuration
+  const getTransferFromFilters = () => {
+    const filters = [];
+
+    // Add customer filter if customer is selected
+    const customerName = form.getValues("customerName");
+
+    if (customerName) {
+      filters.push({
+        column: "customerName",
+        value: customerName,
+      });
+    }
+
+    // You can add more filters here based on other form values
+    // const projectCode = form.getValues("projectCode");
+    // if (projectCode) {
+    //   filters.push({
+    //     column: "projectCode",
+    //     value: projectCode
+    //   });
+    // }
+
+    return filters;
+  };
+
+  const { allowPastRecord, setAllowPastRecord } = useDateRestriction();
+  // Change layout button condition (HardCode)
+  const systemAccount = JSON.parse(localStorage.getItem("system-account") || "{}");
+
+  const canChangeLayout = ["infollective", "infollectivetesting", "dev", "mymug", "vminimarket"].includes(systemAccount);
+
+  return (
+    <div className={isMobile ? "hidden" : "flex h-full w-full flex-1 items-center justify-between bg-erp-gray-3 py-2"}>
+      <div className="flex flex-1 space-x-3">
+        {/* Mobile View (Action Buttons) */}
+        <MobileFormActionGroup
+          config={{
+            onSave: handleSubmit,
+            onReset: handleReset,
+            onCancel: () => router.push(`/sales/sales-invoice/`),
+            newDestination: "/sales/sales-invoice/new",
+            cloneDestination: `/sales/sales-invoice/clone?id=${id}`,
+            deleteConfig:
+              id && slug !== "clone"
+                ? {
+                  module: "sales_invoice",
+                  model: "sales-invoice",
+                  id: `${id}`,
+                  indexPath: `/sales/sales-invoice/`,
+                }
+                : undefined,
+            showNew: !!(id && slug !== "clone"),
+            showClone: !!(id && slug !== "clone"),
+            showDelete: !!(id && slug !== "clone"),
+          }}
+        >
+          {/* Additional Actions (Other than Save, New, Clone, Reset, Delete, and Cancel) */}
+          {salesInvoice && slug === "edit" && (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <PreviewButton
+                previewType={"SALES INVOICE"}
+                module={"sales_invoice"}
+                model={"sales-invoice"}
+                doc_id={salesInvoice.UUID}
+                data={salesInvoiceData}
+              />
+            </DropdownMenuItem>
+          )}
+          {/* Transfer From (Mobile View) */}
+          {slug === "new" ? (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <TransferButton
+                transferFromProps={{
+                  id: id,
+                  slug: slug,
+                  config: salesInvoiceTransferFromConfig,
+                  filterConfig: getTransferFromFilters(),
+                }}
+                showTransferTo={false}
+              />
+            </DropdownMenuItem>
+          ) : (
+            ""
+          )}
+          {/* Transfer To (Mobile View) */}
+          {slug === "edit" ? (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <TransferButton
+                transferToProps={{
+                  id: id,
+                  config: salesInvoiceTransferToConfig,
+                }}
+                showTransferFrom={false}
+              />
+            </DropdownMenuItem>
+          ) : (
+            ""
+          )}
+        </MobileFormActionGroup>
+
+        {/* Web View (Action Buttons) */}
+        <div className="hidden space-x-3 md:flex">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <SaveButton
+                    onClick={handleSubmit}
+                    disabled={
+                      slug !== "clone" &&
+                      (eInvoiceStat == "Valid" ||
+                        eInvoiceStat == "Submitted" ||
+                        consolidatedStat != null)
+                    }
+                  />
+                </span>
+              </TooltipTrigger>
+
+              {consolidatedStat != null && (
+                <TooltipContent side="right">
+                  Edit not allowed. This document has been consolidated.
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+
+          {id && slug === "edit" && (
+            <NewButton destination="/sales/sales-invoice/new" />
+          )}
+
+          {id && slug === "edit" && (
+            <CloneButton id={id} destination={`/sales/sales-invoice/clone?id=${id}`} />
+          )}
+          <ResetButton onClick={handleReset} />
+          {id && slug === "edit" && (
+            <DeleteButton
+              module={"sales_invoice"}
+              model={"sales-invoice"}
+              id={`${id}`}
+              indexPath={`/sales/sales-invoice/`}
+            />
+          )}
+          {/* PreviewButton integration */}
+          {salesInvoice && slug === "edit" && (
+            <PreviewButton
+              previewType={"SALES INVOICE"}
+              module={"sales_invoice"}
+              model={"sales-invoice"}
+              doc_id={salesInvoice.UUID}
+              data={salesInvoiceData}
+            />
+          )}
+          {/* Transfer From (Web View) */}
+          {slug === "new" ? (
+            <TransferButton
+              transferFromProps={{
+                id: id,
+                slug: slug,
+                config: salesInvoiceTransferFromConfig,
+                filterConfig: getTransferFromFilters(),
+              }}
+              showTransferTo={false}
+            />
+          ) : (
+            ""
+          )}
+          {/* Transfer To (Web View) */}
+          {slug === "edit" ? (
+            <TransferButton
+              transferToProps={{
+                id: id,
+                config: salesInvoiceTransferToConfig,
+              }}
+              showTransferFrom={false}
+            />
+          ) : (
+            ""
+          )}
+          <CancelButton onClick={() => router.push(`/sales/sales-invoice`)} />
+
+          {/* Change Layout button */}
+          {canChangeLayout && <LayoutToggleButton layout={layout} onChange={onLayoutChange} />}
+        </div>
+      </div>
+
+      <Form id="topActionBarForm" {...form}>
+        {/* Added onSubmit to Form */}
+        <FormField
+          control={form.control}
+          name="valid"
+          render={({ field }) => (
+            <FormItem className="flex items-center gap-x-2 space-y-0 px-3">
+              {approvalStatus?.approvalStatus &&
+                (approvalStatus.approvalStatus === "Rejected" ? (
+                  <TooltipProvider delayDuration={0}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <ApprovalStatusIcon status={approvalStatus.approvalStatus} />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <p>{approvalStatus.rejectReason || "No reason provided"}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : (
+                  <ApprovalStatusIcon status={approvalStatus.approvalStatus} />
+                ))}
+              <TooltipProvider delayDuration={TOOLTIP_DELAY_DURATION}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      className="hidden size-8 md:flex"
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleDialogToggle}
+                      disabled={
+                        form.getValues("invoiceType") == "Consolidate" ||
+                        form.getValues("invoiceType") == "None" ||
+                        form.getValues("invoiceType") == ""
+                      }
+                    >
+                      <IoDocumentsSharp className="size-5.5 text-primary" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="font-medium">E-Invoice Records</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <FormControl>
+                <Checkbox
+                  checked={field.value === "1"}
+                  onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                />
+              </FormControl>
+              <FormLabel>Valid</FormLabel>
+            </FormItem>
+          )}
+        />
+
+        {/* Past Record checkbox */}
+        <FormField
+          control={form.control}
+          name="allowPastDates"
+          render={({ field }) => (
+            <FormItem className="flex items-center gap-x-2 space-y-0 mr-2">
+              <FormControl>
+                <Checkbox
+                  checked={field.value === "1"}
+                  onCheckedChange={(state) => {
+                    field.onChange(state ? "1" : "0");
+                    setAllowPastRecord(state === true);
+                  }}
+                />
+              </FormControl>
+              <FormLabel className="cursor-pointer">Past Record</FormLabel>
+            </FormItem>
+          )}
+        />
+      </Form>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-4xl space-y-2.5 bg-white p-3 pt-2">
+          <span className="text-sm/none font-semibold">e-Invoice Records</span>
+          <div className="max-w-4xl overflow-x-auto rounded-sm bg-erp-blue-3 p-1">
+            <EInvoiceRecordsDataTable
+              columns={eInvoiceRecords}
+              data={
+                id && slug == "edit"
+                  ? eInvoiceRecordsData
+                    ? eInvoiceRecordsData.rows
+                    : []
+                  : tempRowEInvoiceRecords
+              }
+              tempRowEInvoiceRecords={tempRowEInvoiceRecords}
+              setTempRowEInvoiceRecords={setTempRowEInvoiceRecords}
+              revalidateEInvoiceRecordsData={revalidateEInvoiceRecordsData}
+              onRowSelect={handleRowSelect}
+              onTableInstanceReady={handleTableInstanceReady}
+              id={id && slug == "edit" ? id : ""}
+              revalidateSalesInvoice={revalidateSalesInvoice}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

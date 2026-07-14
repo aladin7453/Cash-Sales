@@ -1,0 +1,328 @@
+"use client";
+
+import React from "react";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useWatch } from "react-hook-form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+type Params = {
+  form: any;
+  isMobile?: boolean;
+};
+
+export default function ShipperDetailsForm({ form, isMobile }: Params) {
+
+  if (isMobile) {
+    return (
+      <>
+        <div className="flex flex-col gap-y-4 px-4 py-2.5 bg-gray-100/10">
+          <h1 className="mt-3 font-bold uppercase text-black">Shipper Details</h1>
+
+          {/* First Row */}
+          <div className="grid grid-cols-2 items-center gap-x-3">
+            {/* Name */}
+            <FormField
+              control={form.control}
+              name="shipperName"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">Shipper Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-10 bg-white border border-gray-200 px-2 text-[11px] rounded-md outline-none transition-all duration-300 ease-in-out shadow-sm focus-visible:ring-blue-300"
+                      {...field}
+                      placeholder="Shipper Name"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* TIN */}
+            <FormField
+              control={form.control}
+              name="shipperTIN"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">Shipper TIN</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-10 bg-white border border-gray-200 px-2 text-[11px] rounded-md outline-none transition-all duration-300 ease-in-out shadow-sm focus-visible:ring-blue-300"
+                      {...field}
+                      placeholder="Shipper TIN"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Second Row */}
+          <div className="grid grid-cols-2 items-center gap-x-3">
+            {/* SST */}
+            <FormField
+              control={form.control}
+              name="shipperSSTNo"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">Shipper SST No</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-10 bg-white border border-gray-200 px-2 text-[11px] rounded-md outline-none transition-all duration-300 ease-in-out shadow-sm focus-visible:ring-blue-300"
+                      {...field}
+                      placeholder="Shipper SST No"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* BRN */}
+            <FormField
+              control={form.control}
+              name="shipperBRN"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">Shipper BRN</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-10 bg-white border border-gray-200 px-2 text-[11px] rounded-md outline-none transition-all duration-300 ease-in-out shadow-sm focus-visible:ring-blue-300"
+                      {...field}
+                      placeholder="Shipper BRN"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Third Row */}
+          <div className="grid grid-cols-1 items-center">
+            {/* TTx No */}
+            <FormField
+              control={form.control}
+              name="shipperTTXNo"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">Shipper TTX No</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-10 bg-white border border-gray-200 px-2 text-[11px] rounded-md outline-none transition-all duration-300 ease-in-out shadow-sm focus-visible:ring-blue-300"
+                      {...field}
+                      placeholder="Shipper TTx No"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Shipper Address */}
+          <FormField
+            control={form.control}
+            name="shipperAddress"
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <FormLabel className="text-[11px] font-semibold tracking-wider text-black">Shipper Address</FormLabel>
+                <FormControl>
+                  <Textarea
+                    className="h-10 bg-white border border-gray-200 px-2 text-[11px] rounded-md outline-none transition-all duration-300 ease-in-out shadow-sm focus-visible:ring-blue-300"
+                    {...field}
+                    placeholder="Shipper Address"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <Form {...form}>
+      <form>
+        <div className="flex flex-col gap-y-2 pt-1.5">
+          {/* First Row */}
+          <div className="grid grid-cols-3 items-center gap-x-2">
+            {/* Name */}
+            <FormField
+              control={form.control}
+              name="shipperName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <TooltipProvider delayDuration={1000}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Input
+                            className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                            {...field}
+                            placeholder="Shipper Name"
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="center">
+                          Shipper Name
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* TIN */}
+            <FormField
+              control={form.control}
+              name="shipperTIN"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <TooltipProvider delayDuration={1000}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Input
+                            className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                            {...field}
+                            placeholder="Shipper TIN"
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="center">
+                          Shipper TIN
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* SST */}
+            <FormField
+              control={form.control}
+              name="shipperSSTNo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <TooltipProvider delayDuration={1000}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Input
+                            className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                            {...field}
+                            placeholder="Shipper SST No"
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="center">
+                          Shipper SST No
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Second Row */}
+          <div className="grid grid-cols-3 items-center gap-x-2">
+            {/* BRN */}
+            <FormField
+              control={form.control}
+              name="shipperBRN"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <TooltipProvider delayDuration={1000}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Input
+                            className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                            {...field}
+                            placeholder="Shipper BRN"
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="center">
+                          Shipper BRN
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* TTx No */}
+            <FormField
+              control={form.control}
+              name="shipperTTXNo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <TooltipProvider delayDuration={1000}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Input
+                            className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                            {...field}
+                            placeholder="Shipper TTx No"
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="center">
+                          Shipper TTx No
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Third Row */}
+          <div className="flex-1">
+            {/* Shipper Address */}
+            <FormField
+              control={form.control}
+              name="shipperAddress"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <Textarea
+                      className="h-[127px] resize-none text-[11px] outline-none transition-all duration-300 ease-in-out"
+                      {...field}
+                      placeholder="Shipper Address"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+      </form>
+    </Form>
+  );
+}

@@ -1,0 +1,19 @@
+import { FaSackDollar } from "react-icons/fa6";
+
+type PaymentButtonProps = {
+    onClick: () => void;
+};
+
+export default function PaymentButton({ onClick }: PaymentButtonProps) {
+    return (
+        <div>
+            <button
+                onClick={onClick}
+                className="flex flex-col items-center gap-y-1"
+            >
+                <FaSackDollar className="size-4.5 text-green-500" />
+                <span className="text-[11px]/none font-medium">Payment</span>
+            </button>
+        </div>
+    );
+}

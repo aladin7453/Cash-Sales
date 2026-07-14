@@ -1,0 +1,568 @@
+"use client";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+// Drag and Drop (Imports)
+import { DragHandle } from "@/components/data-table/row-drag-drop";
+
+export type DeliveryOrder = {
+  seq: string;
+  UUID: string;
+  item: string;
+  itemName: string;
+  type: number;
+  description: string;
+  "2ndDescription": string;
+  moreDescription: string;
+  itemGroup: string;
+  itemCategory: string;
+  masterItem: string;
+  tariff: string;
+  classification: string;
+  permitNo: string;
+  locationCode: string;
+  project: string;
+  quantity: number;
+  quantity2?: number;
+  quantity3?: number;
+  UOM: string;
+  UOM2?: string;
+  UOM3?: string;
+  UOMDropdown2?: any[];
+  UOMDropdown3?: any[];
+  itemRate: string;
+  price: number;
+  discountRate: number;
+  discountAmount: number;
+  discountRate2?: number;
+  discountAmount2?: number;
+  discountRate3?: number;
+  discountAmount3?: number;
+  subtotal: number;
+  tax: string;
+  taxRate: number;
+  taxInclusive: string;
+  taxableAmount: number;
+  taxAmount: number;
+  localNetAmount: number;
+  subtotalTax: number;
+  deliveryDate: string;
+  billingFrequency: number;
+  billingInterval: string;
+  startDate: string;
+  endDate: string;
+  remark1: string;
+  remark2: string;
+  transferredFrom: string;
+  transferredTo: string;
+  stockBatch: string;
+  valid: string;
+  master: string;
+  showTemplate: string;
+  customerCodeCode: string;
+  customerName: string;
+  customerBRN: string;
+  customerID: string;
+  customermembershipID: string;
+  customerDescription: string;
+};
+
+const isDev = process.env.NODE_ENV === "development";
+
+const urlMap = {
+  quotation: isDev ? "sales/quotation" : "view/sales/quotation",
+  salesOrder: isDev ? "sales/sales-order" : "view/sales/sales-order",
+  jobOrder: isDev ? "sales/job-order" : "view/sales/job-order",
+  salesInvoice: isDev ? "sales/sales-invoice" : "view/sales/sales-invoice",
+  cashSales: isDev ? "sales/cash-sales" : "view/sales/cash-sales",
+  salesDebitNote: isDev ? "sales/sales-debit-note" : "view/sales/sales-debit-note",
+};
+
+export const DeliveryOrderColumns: ColumnDef<DeliveryOrder>[] = [
+  {
+    id: "seq",
+    accessorKey: "seq",
+    header: "Seq",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemCode",
+    accessorKey: "itemCode",
+    header: "Item",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemName",
+    accessorKey: "itemName",
+    header: "Item Name",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerCodeCode",
+    accessorKey: "customerCodeCode",
+    header: "Customer Code",
+    filterFn: "includesString",
+  },
+
+  {
+    id: "customerName",
+    accessorKey: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+  },
+
+  {
+    id: "customerBRN",
+    accessorKey: "customerBRN",
+    header: "BRN",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerID",
+    accessorKey: "customerID",
+    header: "ID",
+    filterFn: "includesString",
+  },
+  {
+    id: "customermembershipID",
+    accessorKey: "customermembershipID",
+    header: "Membership ID",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerDescription",
+    accessorKey: "customerDescription",
+    header: "Cust. Desc",
+    filterFn: "includesString",
+  },
+  {
+    id: "type",
+    accessorKey: "type",
+    header: "Type",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemUOM",
+    accessorKey: "itemUOM",
+    header: "UOM[1]",
+    filterFn: "includesString",
+  },
+  {
+    id: "quantity",
+    accessorKey: "quantity",
+    header: "Quantity[1]",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemUOM2",
+    accessorKey: "itemUOM2",
+    header: "UOM[2]",
+    filterFn: "includesString",
+  },
+  {
+    id: "quantity2",
+    accessorKey: "quantity2",
+    header: "Quantity[2]",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemUOM3",
+    accessorKey: "itemUOM3",
+    header: "UOM[3]",
+    filterFn: "includesString",
+  },
+  {
+    id: "quantity3",
+    accessorKey: "quantity3",
+    header: "Quantity[3]",
+    filterFn: "includesString",
+  },
+  {
+    id: "price",
+    accessorKey: "price",
+    header: "Price",
+    // Selling Price History Popover (Imports)
+    cell: ({ row }) => {
+      return (
+        <div className="flex items-center justify-between gap-1">
+          <p className="text-right flex-1">{row.original.price}</p>
+        </div>
+      );
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "subtotalTax",
+    accessorKey: "subtotalTax",
+    header: "Subtotal (Tax)",
+    cell: ({ row }) => {
+      const subtotalTax = parseFloat(row.original.subtotalTax) || 0;
+
+      return <p className="text-right">{subtotalTax.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    filterFn: "includesString",
+  },
+  {
+    id: "2ndDescription",
+    accessorKey: "2ndDescription",
+    header: "2nd Description",
+    filterFn: "includesString",
+  },
+  {
+    id: "moreDescription",
+    accessorKey: "moreDescription",
+    header: "More Description",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemGroupCode",
+    accessorKey: "itemGroupCode",
+    header: "Group",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemCategoryCode",
+    accessorKey: "itemCategoryCode",
+    header: "Category",
+    filterFn: "includesString",
+  },
+  {
+    id: "masterItemCode",
+    accessorKey: "masterItemCode",
+    header: "Master Item",
+    filterFn: "includesString",
+  },
+  {
+    id: "tariffCode",
+    accessorKey: "tariffCode",
+    header: "Tariff",
+    filterFn: "includesString",
+  },
+  {
+    id: "classificationCode",
+    accessorKey: "classificationCode",
+    header: "Classification",
+    filterFn: "includesString",
+  },
+  {
+    id: "permitNo",
+    accessorKey: "permitNo",
+    header: "Permit No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "locationCode",
+    accessorKey: "locationCode",
+    header: "Location",
+    filterFn: "includesString",
+  },
+  {
+    id: "projectCode",
+    accessorKey: "projectCode",
+    header: "Project",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemRate",
+    accessorKey: "itemRate",
+    header: "Rate",
+    cell: ({ row }) => <p className="text-right">{row.original.itemRate}</p>,
+    filterFn: "includesString",
+  },
+  {
+    id: "amount",
+    accessorKey: "amount",
+    header: "Amount",
+    cell: ({ row }) => {
+      const amount = parseFloat(row.original.amount) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{amount.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  // Three Discount (Start)
+  {
+    id: "discountRate",
+    accessorKey: "discountRate",
+    header: "Discount Rate (%) [1]",
+    cell: ({ row }) => {
+      const discountRate = parseFloat(row.original.discountRate) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{discountRate.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "discountAmount",
+    accessorKey: "discountAmount",
+    header: "Discount Amount [1]",
+    cell: ({ row }) => {
+      const discountAmount = parseFloat(row.original.discountAmount) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{discountAmount.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "discountRate2",
+    accessorKey: "discountRate2",
+    header: "Discount Rate (%) [2]",
+    cell: ({ row }) => {
+      const discountRate2 = parseFloat(row.original.discountRate2) || 0;
+      return <p className="text-right">{discountRate2.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "discountAmount2",
+    accessorKey: "discountAmount2",
+    header: "Discount Amount [2]",
+    cell: ({ row }) => {
+      const discountAmount2 = parseFloat(row.original.discountAmount2) || 0;
+      return <p className="text-right">{discountAmount2.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "discountRate3",
+    accessorKey: "discountRate3",
+    header: "Discount Rate (%) [3]",
+    cell: ({ row }) => {
+      const discountRate3 = parseFloat(row.original.discountRate3) || 0;
+      return <p className="text-right">{discountRate3.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "discountAmount3",
+    accessorKey: "discountAmount3",
+    header: "Discount Amount [3]",
+    cell: ({ row }) => {
+      const discountAmount3 = parseFloat(row.original.discountAmount3) || 0;
+      return <p className="text-right">{discountAmount3.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  // Three Discount (End)
+  {
+    id: "subTotal",
+    accessorKey: "subTotal",
+    header: "Subtotal",
+    cell: ({ row }) => {
+      const subTotal = parseFloat(row.original.subTotal) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{subTotal.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "taxCode",
+    accessorKey: "taxCode",
+    header: "Tax",
+    filterFn: "includesString",
+  },
+  {
+    id: "taxRate",
+    accessorKey: "taxRate",
+    header: "Tax Rate",
+    cell: ({ row }) => {
+      const taxRate = parseFloat(row.original.taxRate) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{taxRate.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "taxInclusive",
+    accessorKey: "taxInclusive",
+    header: "Tax Inclusive",
+    filterFn: "includesString",
+  },
+  {
+    id: "taxableAmount",
+    accessorKey: "taxableAmount",
+    header: "Taxable Amount",
+    cell: ({ row }) => {
+      const taxableAmount = parseFloat(row.original.taxableAmount) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{taxableAmount.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "taxAmount",
+    accessorKey: "taxAmount",
+    header: "Tax Amount",
+    cell: ({ row }) => {
+      const taxAmount = parseFloat(row.original.taxAmount) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{taxAmount.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "localTaxAmount",
+    accessorKey: "localTaxAmount",
+    header: "Local Tax Amount",
+    cell: ({ row }) => {
+      const localTaxAmount = parseFloat(row.original.localTaxAmount) || 0; // Convert to number and handle NaN
+      return <p className="text-right">{localTaxAmount.toFixed(2)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "deliveryDate",
+    accessorKey: "deliveryDate",
+    header: "Delivery Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "billingFrequency",
+    accessorKey: "billingFrequency",
+    header: "Billing Frequency",
+    cell: ({ row }) => <p className="text-right">{row.original.billingFrequency}</p>,
+    filterFn: "includesString",
+  },
+  {
+    id: "billingInterval",
+    accessorKey: "billingInterval",
+    header: "Billing Interval",
+    filterFn: "includesString",
+  },
+  {
+    id: "startAt",
+    accessorKey: "startAt",
+    header: "Start Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "endAt",
+    accessorKey: "endAt",
+    header: "End Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "remark1",
+    accessorKey: "remark1",
+    header: "Remark 1",
+    filterFn: "includesString",
+  },
+  {
+    id: "remark2",
+    accessorKey: "remark2",
+    header: "Remark 2",
+    filterFn: "includesString",
+  },
+  {
+    id: "transferFrom",
+    accessorKey: "transferFrom",
+    header: "Transfer From Doc No",
+    cell: ({ row }) => {
+      const transferFromDocuments = row.original.transferFromDocuments;
+
+      if (!transferFromDocuments || typeof transferFromDocuments !== "object") {
+        return <span className="text-gray-400">-</span>;
+      }
+
+      const docNo = transferFromDocuments.docNo || "";
+      const docType = transferFromDocuments.docType || "";
+
+      const url = `/${urlMap[docType as keyof typeof urlMap]}/edit?item=${docNo}&id=${transferFromDocuments.UUID}`;
+
+      return (
+        <a
+          href={url}
+          className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {transferFromDocuments.docNo}
+        </a>
+      );
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "transferFromDocType",
+    accessorKey: "transferFromDocType",
+    header: "Transfer From Doc Type",
+    cell: ({ row }) => {
+      const transferFromDocuments = row.original.transferFromDocuments;
+
+      if (!transferFromDocuments || typeof transferFromDocuments !== "object") {
+        return <span className="text-gray-400">-</span>;
+      }
+
+      return <span className="text-sm">{transferFromDocuments.docType || "-"}</span>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "transferTo",
+    accessorKey: "transferTo",
+    header: "Transfer To",
+    cell: ({ row }) => {
+      const transferToDocuments = row.original.transferToDocuments;
+
+      if (!transferToDocuments || transferToDocuments.length === 0) {
+        return <span className="text-gray-400">-</span>;
+      }
+
+      return (
+        <div className="flex flex-wrap">
+          {transferToDocuments.map((doc, index) => {
+            const docNo = doc.docNo || "";
+            const docType = doc.docType || "";
+            const url = `/${urlMap[docType as keyof typeof urlMap]}/edit?item=${docNo}&id=${doc.UUID}`;
+
+            return (
+              <span key={index}>
+                <a
+                  href={url}
+                  className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {doc.docNo}
+                </a>
+                {index < transferToDocuments.length - 1 && ", "}
+              </span>
+            );
+          })}
+        </div>
+      );
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "stockBatchCode",
+    accessorKey: "stockBatchCode",
+    header: "Stock Batch",
+    filterFn: "includesString",
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as UOMList["valid"];
+      return validity ? "Valid" : "Invalid";
+    },
+    // Custom filter function that first convert the row's numeric boolean
+    // value to string, then check if the string contains the filterValue
+    filterFn: filterWithStringConversion,
+  },
+  {
+    id: "master",
+    accessorKey: "master",
+    header: "Master Service",
+    filterFn: "includesString",
+  },
+  {
+    id: "showTemplate",
+    accessorKey: "showTemplate",
+    header: "Show in PDF",
+    filterFn: "includesString",
+  },
+];

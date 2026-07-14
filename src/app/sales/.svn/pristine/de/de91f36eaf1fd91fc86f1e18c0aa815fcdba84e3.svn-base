@@ -1,0 +1,196 @@
+import React, { useState } from "react";
+import { PDFViewer, PDFDownloadLink } from "@react-pdf/renderer";
+import type { Table } from "@tanstack/react-table";
+
+import PreviewPDF from "@/components/previewTemplateCP";
+import PreviewPDF2 from "@/components/templates/sales/previewTemplateCP2";
+import { SVGPreview } from "@/components/icons/svg-repo/SVGPreview";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+
+type Props<TData> = {
+  table: Table<TData>;
+  previewType: string;
+  module: string;
+  model: string;
+  doc_id: string;
+};
+
+export default function PreviewButton<TData>({
+  table,
+  module,
+  model,
+  doc_id,
+  previewType
+}: Props<TData>) {
+  const headers = getAuthHeaders();
+
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [showPreviewPDFDialog, setShowPreviewPDFDialog] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
+  const [itemsData, setItemsData] = useState(null);
+  const [currentCompanyData, setCurrentCompanyData] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [currentBankAccount, setCurrentBankAccount] = useState(null);
+  const [PDFPreviewType, setPDFPreviewType] = useState(null);
+  const [selectedTemplate, setSelectedTemplate] = useState(1);
+
+  const previewPDFTemplate = async (template = 1) => {
+    setSelectedTemplate(template);
+    setShowPreviewPDFDialog(true);
+
+    var form_data = new FormData();
+    form_data.append("UUIDs[]", doc_id);
+
+    try {
+      const response = await fetch(
+        `${ORIGIN}/${module}/api/${model}/preview-pdf`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(responseData.data);
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+      setCurrentBankAccount(responseData.currentBankAccount);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  return (
+    <>
+      <AlertDialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+        <AlertDialogTrigger asChild>
+          <button
+            className="group flex flex-col items-center gap-y-1 disabled:cursor-not-allowed"
+            onClick={() => setShowPreviewDialog(true)}
+          >
+            <div className="size-4.5 text-erp-blue-11">
+              <SVGPreview />
+            </div>
+            <span className="text-[11px]/none font-medium group-disabled:text-erp-gray-5">
+              Preview
+            </span>
+          </button>
+        </AlertDialogTrigger>
+        <AlertDialogContent className="w-auto min-w-[300px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Preview - {previewType}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="flex flex-wrap items-center gap-3 px-1">
+            <button onClick={() => previewPDFTemplate(1)} className="rounded bg-blue-500 px-4 py-2 text-white">
+              Normal
+            </button>
+            <button onClick={() => previewPDFTemplate(2)} className="rounded bg-blue-500 px-4 py-2 text-white">
+              Normal [2]
+            </button>
+          </div>
+          <AlertDialogFooter className="flex justify-end p-4">
+            <AlertDialogCancel className="h-9 w-24" onClick={() => setShowPreviewDialog(false)}>
+              Close
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog for Preview PDF */}
+      <Dialog open={showPreviewPDFDialog} onOpenChange={setShowPreviewPDFDialog}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>
+            Preview PDF - {previewType}
+          </DialogTitle>
+          <div className="relative h-[550px] w-full">
+            <PDFViewer width="100%" height="100%" className="absolute inset-0">
+              {selectedTemplate === 2 ? (
+                <PreviewPDF2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  currentBankAccount={currentBankAccount}
+                />
+              ) : (
+                <PreviewPDF
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  currentBankAccount={currentBankAccount}
+                />
+              )}
+            </PDFViewer>
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                selectedTemplate === 2 ? (
+                  <PreviewPDF2
+                    previewData={previewData}
+                    itemsData={itemsData}
+                    currentCompanyData={currentCompanyData}
+                    currentUser={currentUser}
+                    PDFPreviewType={PDFPreviewType}
+                    currentBankAccount={currentBankAccount}
+                  />
+                ) : (
+                  <PreviewPDF
+                    previewData={previewData}
+                    itemsData={itemsData}
+                    currentCompanyData={currentCompanyData}
+                    currentUser={currentUser}
+                    PDFPreviewType={PDFPreviewType}
+                    currentBankAccount={currentBankAccount}
+                  />
+                )
+              }
+              fileName={`${previewData?.docNo || 'Document'}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? 'Preparing...' : 'Download PDF')}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowPreviewPDFDialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

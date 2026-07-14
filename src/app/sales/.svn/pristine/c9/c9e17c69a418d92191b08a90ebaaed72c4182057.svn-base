@@ -1,0 +1,392 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { FaClipboard, FaLayerGroup, FaTableList } from "react-icons/fa6";
+import { ColumnFiltersState, PaginationState, SortingState } from "@tanstack/react-table";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+
+import useSWR from "swr";
+import { useApi } from "@/lib/hooks/useAPI"
+import { Form } from "@/components/ui/form";
+import LoadingUI from "@/components/LoadingUI";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/components/ui/use-toast";
+import { TabsNavigator } from "@/components/ui/TabsNavigator";
+
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+import {
+  getAuthHeaders,
+  getCurrentAcc,
+  getCurrentAccount,
+  ORIGIN,
+  DEFAULT_DATA_TABLE_PAGE_SIZE,
+} from "@/lib/constants";
+
+import TopActionBar from "./TopActionBar";
+import { AgentForm } from "./main-details/general-details/AgentForm";
+import { OtherDetailForm } from "./more-details/OtherDetails/OtherDetailForm";
+import { changelogColumns } from "./changelog/columns";
+import AgentChangelogDataTable from "./changelog/Datatable";
+
+type PageParams = {
+  params: { slug: string };
+};
+
+const validRoutes = ["new", "edit", "clone"] as const;
+
+
+type ValidRoute = (typeof validRoutes)[number];
+
+const agentFormSchema = z.object({
+  agentName: z.string().min(2, {
+    message: "Agent Name must be at least 2 characters.",
+  }),
+});
+
+// Function to check if a route is valid
+function isValidRoute(route: string): route is ValidRoute {
+  return validRoutes.includes(route as ValidRoute);
+}
+
+export type ProfileImageAttachment = {
+  name: string;
+  link: string;
+};
+
+export default function AccountDetailsPage({ params }: PageParams) {
+  const slug = params.slug;
+  const router = useRouter();
+  const { toast } = useToast();
+  const headers = getAuthHeaders();
+  const currentAcc = getCurrentAcc();
+  const currentAccount = getCurrentAccount();
+
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const [formResetKey, setFormResetKey] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [tempProfileImage, setTempProfileImage] = useState<ProfileImageAttachment>();
+  const [agentData, setAgentData] = useState({});
+  const [changelogData, setChangelogData] = useState(null);
+
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+  });
+  const [sorting, setSorting] = useState<SortingState>([{ id: "createdAt", desc: true }]);
+  const resetForm = () => {
+    setFormResetKey((prevKey) => prevKey + 1);
+  };
+
+  if (!isValidRoute(slug)) {
+    notFound();
+  }
+
+
+  const {
+    data: agent,
+    error,
+    isValidating,
+    isLoading,
+    mutate: mutateAgent
+  } = useApi(
+    id ? `${ORIGIN}/agent/api/agent/get-update-agent-data?id=${id}` : null,
+    {
+      refreshInterval: 0,
+      revalidateOnFocus: false
+    }
+  );
+
+  const isFetching = isLoading || isValidating;
+
+  // Separate SWR hook for changelog data with table parameters
+  // const {
+  //   data: changelogResponse,
+  //   isLoading: isChangelogLoading,
+  // } = useSWR(
+  //   id && slug !== "new" 
+  //     ? [`${ORIGIN}/agent/api/agent/get-changelog-data?id=${id}`, pagination, columnFilters, sorting]
+  //     : null,
+  //   ([url]) => {
+  //     const params = new FormData();
+
+  //     params.append("param[limit]", `${pagination.pageSize}`);
+  //     params.append("param[offset]", `${pagination.pageIndex * pagination.pageSize}`);
+
+  //     const columnFiltersWithoutValid = columnFilters.filter((filter) => filter.id !== "valid");
+
+  //     params.append(
+  //       "param[filter]",
+  //       columnFiltersWithoutValid.length > 0
+  //         ? JSON.stringify(
+  //             columnFiltersWithoutValid.reduce<Record<string, unknown>>((acc, curr) => {
+  //               acc[curr.id] = curr.value;
+  //               return acc;
+  //             }, {})
+  //           )
+  //         : "{}"
+  //     );
+
+  //     params.append(
+  //       "param[order]",
+  //       sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc"
+  //     );
+
+  //     params.append(
+  //       "param[valid]",
+  //       columnFilters.length > 0
+  //         ? `${columnFilters.find((row) => row.id === "valid")?.value}`
+  //         : ""
+  //     );
+
+  //     params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "createdAt");
+
+  //     return fetcher(url, { method: "POST", body: params });
+  //   }
+  // );
+
+  useEffect(() => {
+    if (agent) {
+      if (slug === "clone") {
+        agent.data.agentCode = ""
+      }
+      setAgentData(agent.data);
+      if (agent.historyData) {
+        const historyData = {
+          agent: agent.historyData || { rows: [] },
+          agentHasCustomInfo: agent.historyData.agentHasDetailsHistory || { rows: [] },
+        };
+        setChangelogData(historyData);
+      }
+      setTempProfileImage(
+        Array.isArray(agent.data.profileImageLink) && agent.data.profileImageLink[0],
+      );
+      setIsSaving(false)
+    }
+  }, [agent]);
+
+  // useEffect(() => {
+  //   if (changelogResponse) {
+  //     setChangelogData(changelogResponse);
+  //   }
+  // }, [changelogResponse]);
+
+  const handleSubmit = async () => {
+    try {
+
+      await form.trigger();
+
+      await form.handleSubmit(onSubmit)();
+    } catch (error) {
+      console.error("Form submission error:", error);
+    }
+  };
+
+  const form = useForm<z.infer<typeof agentFormSchema>>({
+    resolver: zodResolver(agentFormSchema),
+    defaultValues: {
+      account: agent?.account ?? currentAccount,
+      accountName: agent?.accountName ?? currentAcc,
+      companyName: agent?.companyName ?? "",
+      agentCode: agent?.agentCode ?? "",
+      agent: agent?.agent ?? "",
+      description: agent?.description ?? "",
+      valid: agent?.valid ?? "1",
+    },
+  });
+
+  const onSubmit = async () => {
+    setIsSaving(true)
+    var form_data = new FormData();
+    var formValues = form.getValues();
+    var saveType =
+      slug == "clone" ? `create-data?c_id=1` : id ? `update-agent?id=${id}` : `create-data`;
+
+    for (var key in formValues) {
+      form_data.append(`agent[${key}]`, formValues[key] ? formValues[key] : "");
+    }
+
+    if (saveType == "create-data") {
+      if ("File" in window && tempProfileImage instanceof File) {
+        const base64 = await getFileToBase64(tempProfileImage);
+
+        form_data.append(`agent[profileImage][0][Name]`, tempProfileImage.name);
+        form_data.append(`agent[profileImage][0][File]`, base64);
+      }
+    } else {
+      if ("File" in window && tempProfileImage instanceof File) {
+        const base64 = await getFileToBase64(tempProfileImage);
+
+        form_data.append(`agent[profileImage][0][Name]`, tempProfileImage.name);
+        form_data.append(`agent[profileImage][0][File]`, base64);
+      } else {
+        if (tempProfileImage?.link) {
+          form_data.append(`agent[profileImage][0][Name]`, tempProfileImage.name);
+          form_data.append(`agent[profileImage][0][File]`, "");
+        }
+      }
+    }
+
+    try {
+      const response = await fetch(`${ORIGIN}/agent/api/agent/${saveType}`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (response.status === 401) {
+        console.error("Session expired. Redirecting to login.");
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "Your session has expired. Redirecting to login page.",
+        });
+        router.push("/login");
+        throw new Error("Session expired");
+      }
+
+      if (!response.ok) {
+        setIsSaving(false)
+        const errorData = await response.json();
+
+        let errorMessage = errorData.message;
+
+        // Error Handling for "Data too long"
+        if (errorMessage.includes("Data too long")) {
+          errorMessage = errorMessage.split("\n")[0];
+        }
+
+        toast({
+          title: errorData.name,
+          description: errorMessage,
+          variant: "destructive",
+          duration: 2000,
+        });
+
+        throw new Error("Failed to fetch data");
+      }
+
+      const responseData = await response.json();
+
+      if (responseData && responseData.item) {
+        const url = `/sales/agent/edit?item=${responseData.item}&id=${responseData.data}`;
+
+        router.push(url);
+        if (params.slug == "edit") {
+          mutateAgent()
+        }
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      } else if (slug === "clone" && id) {
+        router.push(`/sales/agent/clone?id=${id}`);
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      setIsSaving(false)
+      console.error("Error creating new freight term data :", error);
+    }
+  };
+
+  const handleTableParamsChange = (
+    newFilters: ColumnFiltersState,
+    newPagination: PaginationState,
+    newSorting: SortingState
+  ) => {
+    setColumnFilters(newFilters);
+    setPagination(newPagination);
+    setSorting(newSorting);
+  };
+
+  const tabs = [
+    {
+      id: "mainDetails",
+      name: "Main Details",
+      shortName: "Main",
+      icon: FaClipboard,
+    },
+    {
+      id: "moreDetails",
+      name: "More Details",
+      shortName: "More",
+      icon: FaLayerGroup,
+    },
+    ...(slug !== "new"
+      ? [
+        {
+          id: "changelog",
+          name: "Changelog",
+          shortName: "Changelog",
+          icon: FaTableList,
+        },
+      ]
+      : []),
+  ];
+
+  return (
+    <>
+      <div className="sticky top-0 z-20">
+        <TopActionBar
+          agent={agentData}
+          form={form}
+          handleSubmit={handleSubmit}
+          agentFormSchema={agentFormSchema}
+          params={params}
+          isSaving={isSaving}
+          setIsSaving={setIsSaving}
+        />
+      </div>
+      <div className="grid h-full grid-rows-[auto_1fr]">
+        <Form {...form}>
+          <div className="grid h-full grid-cols-[1fr_auto] gap-x-2">
+            <ScrollArea className="h-full">
+              <div id="mainDetails" className="mt-2">
+                <AgentForm
+                  key={formResetKey}
+                  form={form}
+                  tempProfileImage={tempProfileImage}
+                  setTempProfileImage={setTempProfileImage}
+                />
+              </div>
+
+              <div id="moreDetails" className="mt-2">
+                <OtherDetailForm
+                  key={formResetKey}
+                  form={form}
+                  pageAction={slug}
+                />
+              </div>
+
+              {slug !== "new" && (
+                <div id="changelog" className="mt-2">
+                  <AgentChangelogDataTable
+                    columns={changelogColumns}
+                    initialData={changelogData}
+                    onTableParamsChange={handleTableParamsChange}
+                  />
+                </div>
+              )}
+            </ScrollArea>
+
+            <TabsNavigator tabs={tabs} initialActiveTabId="mainDetails" stickyTop="top-14" />
+          </div>
+          {/* {(isLoading) && <LoadingUI />} */}
+          {(isFetching || isSaving) && <LoadingUI />}
+          {(isLoading || isSaving) && <LoadingUI />}
+        </Form>
+      </div>
+    </>
+  );
+}

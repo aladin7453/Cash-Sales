@@ -1,0 +1,301 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { FaMinus, FaPlus, FaCube } from "react-icons/fa6";
+import type { Table } from "@tanstack/react-table";
+
+import { notFound, useSearchParams } from "next/navigation";
+
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+
+import { useToast } from "@/components/ui/use-toast";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import Validity from "@/components/data-table/Validity";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { TOOLTIP_DELAY_DURATION } from "@/lib/constants";
+import ConfirmationDialog from './ConfirmationDialog';
+
+// Mobile View (Imports)
+import MobileFormTableActionGroupStart from "@/components/form/MobileFormTableActionGroupStart";
+import MobileFormTableActionGroupEnd from "@/components/form/MobileFormTableActionGroupEnd";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+
+type Props<TData> = {
+  table: Table<TData>;
+  onAdd?: () => void;
+  setTempRowDeliveryOrderDetailsListData: (data, overwrite) => void;
+  tempRowDeliveryOrderDetailsList: [];
+  revalidateDeliveryOrderDetails: any;
+  handleOnPackage: () => void;
+  slug: string;
+  form: any;
+  isMobile?: boolean;
+};
+
+export default function DeliveryOrderDataTableToolbar<TData>({
+  table,
+  onAdd,
+  setTempRowDeliveryOrderDetailsListData,
+  tempRowDeliveryOrderDetailsList,
+  revalidateDeliveryOrderDetails,
+  handleOnPackage,
+  slug,
+  form,
+  isMobile
+}: Props<TData>) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<any[]>([]);
+
+  const handleDeleteConfirmation = async () => {
+    var form_data = new FormData();
+
+    const selectedRows = table.getSelectedRowModel().rows;
+    selectedRows.forEach((row, index) => {
+      form_data.append(`UUIDs[${index}]`, row.original.UUID);
+    });
+
+    const deletedIndex = selectedRows.map((item) => {
+      return item.index;
+    });
+
+    // Calculate totals from the remaining rows (after deletion)
+    const remainingRows = table.getFilteredRowModel().rows.filter(
+      row => !selectedRows.some(selectedRow => selectedRow.id === row.id)
+    );
+
+    // Calculate total values
+    let totalAmount = remainingRows.reduce((sum, row) => {
+      return sum + (row.original.amount ? parseFloat(row.original.amount) : 0);
+    }, 0);
+
+    let totalDiscount = remainingRows.reduce((sum, row) => {
+      return sum + (row.original.discountAmount ? parseFloat(row.original.discountAmount) : 0);
+    }, 0);
+
+    let totalDiscount2 = remainingRows.reduce((sum, row) => {
+      return sum + (row.original.discountAmount2 ? parseFloat(row.original.discountAmount2) : 0);
+    }, 0);
+
+
+    let totalDiscount3 = remainingRows.reduce((sum, row) => {
+      return sum + (row.original.discountAmount3 ? parseFloat(row.original.discountAmount3) : 0);
+    }, 0);
+
+    const finalTotalDiscount = totalDiscount + totalDiscount2 + totalDiscount3
+
+
+    let totalTax = remainingRows.reduce((sum, row) => {
+      return sum + (row.original.taxAmount ? parseFloat(row.original.taxAmount) : 0);
+    }, 0);
+
+    // Calculate subtotal tax (this is what should be used for outstanding amount)
+    const subtotalTax = totalAmount - finalTotalDiscount + totalTax;
+    const roundTotalPayable = Math.round(subtotalTax * 20) / 20;
+    const roundingAmount = roundTotalPayable - subtotalTax;
+    const currentCurrencyRate = form.getValues("currencyRate");
+
+    const localNetTotal = roundTotalPayable * currentCurrencyRate;
+
+    // Add the calculated totals to form data
+    form_data.append('deliveryOrder[totalAmount]', totalAmount.toFixed(2));
+    form_data.append('deliveryOrder[totalDiscount]', finalTotalDiscount.toFixed(2));
+    form_data.append('deliveryOrder[totalTax]', totalTax.toFixed(2));
+    form_data.append('deliveryOrder[totalSubtotal]', (totalAmount - finalTotalDiscount).toFixed(2));
+    form_data.append('deliveryOrder[totalPayable]', roundTotalPayable.toFixed(2));
+    form_data.append('deliveryOrder[outstandingAmount]', roundTotalPayable.toFixed(2));
+
+
+    form_data.append('deliveryOrder[localNetTotal]', localNetTotal.toFixed(2));
+    form_data.append('deliveryOrder[netTotal]', roundTotalPayable.toFixed(2));
+    form_data.append('deliveryOrder[roundingAmount]', roundingAmount.toFixed(2));
+
+    // if (id && slug !== "clone") {
+    //   try {
+    //     const response = await fetch(`${ORIGIN}/delivery_order/api/delivery-order/remove-delivery-order-has-details?deliveryOrderUUID=${id}`, {
+    //       method: 'POST',
+    //       headers,
+    //       body: form_data,
+    //     });
+    //     if (!response.ok) {
+    //       const errorData = await response.json();
+    //       if (response.status === 403) {
+    //         toast({
+    //           title: errorData.message,
+    //           duration: 2000
+    //         });
+    //       }
+    //       throw new Error('Failed to fetch data');
+    //     }
+    //     const responseData = await response.json();
+    //     if (responseData.RemoveSuccess && responseData.RemoveSuccess.length > 0) {
+    //       revalidateDeliveryOrderDetails()
+    //     }
+    //   } catch (error) {
+    //     console.error('Error deleting pacakge type authorized user data:', error);
+    //   }
+    //   revalidateDeliveryOrderDetails()
+    //   setShowConfirmationDialog(false);
+    // } else {
+    // const deletedIndex = selectedRows.map(item => {
+    //   return item.index
+    // })
+    const remainRows = tempRowDeliveryOrderDetailsList.filter((item, index) => !deletedIndex.includes(index));
+    const resequencedRows = remainRows.map((row, index) => ({
+      ...row,
+      seq: index + 1
+    }));
+    setTempRowDeliveryOrderDetailsListData(resequencedRows, true)
+    setShowConfirmationDialog(false);
+    // }
+  };
+
+  //Update total selected rows
+  useEffect(() => {
+    const selected = table.getSelectedRowModel().rows;
+    setSelectedRow(selected);
+  }, [table.getState().rowSelection, table.getRowModel().rows.length]);
+
+  return (
+    <>
+      <div className="flex items-center justify-center px-2">
+        {/* Mobile View (Start Action Buttons) */}
+        <MobileFormTableActionGroupStart
+          table={table}
+          config={{
+            core: {
+              add: {
+                handler: () => onAdd?.(),
+                tooltip: "Add service or stock",
+              },
+              remove: {
+                handler: () => setShowConfirmationDialog(true),
+              },
+            },
+          }}
+        >
+          {/* Additional Actions - Remove Up/Down buttons */}
+          {(closeDropdown) => (
+            <>
+              <DropdownMenuItem>
+                <div className="flex w-full flex-col items-center">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      closeDropdown();
+                      handleOnPackage();
+                    }}
+                  >
+                    <FaCube className="size-5" />
+                  </Button>
+                  <span className="text-[11px]/none font-medium text-black">Package</span>
+                </div>
+              </DropdownMenuItem>
+            </>
+          )}
+        </MobileFormTableActionGroupStart>
+
+        {/* Web View Action Buttons*/}
+
+        {/* Add Button */}
+        <div className="flex items-center justify-center gap-x-4 text-erp-blue-14">
+          <div className="flex flex-col items-center">
+            <TooltipProvider delayDuration={TOOLTIP_DELAY_DURATION}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    className="size-6 hover:text-erp-blue-14 active:bg-erp-blue-14 active:text-white"
+                    variant="ghost"
+                    size="icon"
+                    onClick={onAdd}
+                  >
+                    <FaPlus className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Add
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <span className="text-[11px]/none font-medium text-black">Add</span>
+          </div>
+
+          {/* Remove */}
+          <div className="flex flex-col items-center">
+            <TooltipProvider delayDuration={TOOLTIP_DELAY_DURATION}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    className="size-6 hover:text-erp-blue-14 active:bg-erp-blue-14 active:text-white"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowConfirmationDialog(true)}
+                  >
+                    <FaMinus className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Remove
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <span className="text-[11px]/none font-medium text-black">Remove</span>
+          </div>
+
+          {/* Package */}
+          <div className="flex flex-col items-center">
+            <TooltipProvider delayDuration={TOOLTIP_DELAY_DURATION}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    className="size-6 hover:text-erp-blue-14 active:bg-erp-blue-14 active:text-white"
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleOnPackage}
+                  >
+                    <FaCube className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Package
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <span className="text-[11px]/none font-medium text-black">Package</span>
+          </div>
+
+          {/* Refresh */}
+          <div className="[&_button]:!size-6 [&_svg]:!size-4">
+            <Refresh refreshTable={revalidateDeliveryOrderDetails} />
+          </div>
+
+          {/* Validity */}
+          <div className="[&_button]:!size-6 [&_svg]:!size-4">
+            <Validity table={table} />
+          </div>
+
+          {/* Columns */}
+          <div className={isMobile ? "hidden" : "[&_button]:!size-6 [&_svg]:!size-4"}>
+            <ColumnVisibilityToggle table={table} />
+          </div>
+        </div>
+      </div>
+
+      <ConfirmationDialog
+        open={showConfirmationDialog}
+        setOpen={setShowConfirmationDialog}
+        onConfirm={handleDeleteConfirmation}
+        selectedRows={selectedRow}
+      />
+    </>
+  );
+}

@@ -1,0 +1,152 @@
+import React from "react";
+import { TableRow, TableCell } from "@/components/ui/table";
+import CheckboxRow from "./CheckboxRow";
+
+interface ActionMeta {
+  value: boolean;
+  disabled: boolean;
+}
+
+interface PermissionNode {
+  [key: string]: ActionMeta | PermissionNode | undefined;
+  children?: Record<string, PermissionNode>;
+}
+
+interface DynamicSectionProps {
+  category: string;
+  sectionPermissions: Record<string, PermissionNode>;
+  handleCheckboxChange: (
+    category: string,
+    subKey: string,
+    action: string,
+    childKey?: string
+  ) => void;
+  expandedSections: Record<string, boolean>;
+  toggleSection: (key: string) => void;
+  parentKey?: string;
+}
+
+const formatLabel = (key: string): string =>
+  key.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+
+const isActionMeta = (value: unknown): value is ActionMeta =>
+  typeof value === "object" &&
+  value !== null &&
+  "value" in value &&
+  typeof (value as any).value === "boolean";
+
+const DynamicSection: React.FC<DynamicSectionProps> = ({
+  category,
+  sectionPermissions,
+  handleCheckboxChange,
+  expandedSections,
+  toggleSection,
+  parentKey = "",
+}) => {
+  const currentKey = parentKey || category;
+  const isExpanded = expandedSections[currentKey];
+
+  return (
+    <>
+      {!parentKey && (
+        <TableRow onClick={() => toggleSection(currentKey)}>
+          <TableCell
+            colSpan={20}
+            className="bg-erp-blue-1"
+            style={{ cursor: "pointer", fontWeight: "bold" }}
+          >
+            {isExpanded
+              ? `▲ ${formatLabel(category)}`
+              : `▼ ${formatLabel(category)}`}
+          </TableCell>
+        </TableRow>
+      )}
+
+      {isExpanded &&
+        Object.entries(sectionPermissions || {}).map(([key, node]) => {
+          if (!node || typeof node !== "object") return null;
+
+          const compoundKey = `${currentKey}/${key}`;
+          const childPermissions = node as PermissionNode;
+
+          // Here we assume that childPermissions already contains all defaultKeys.
+          const actions: Record<string, { value: boolean; disabled: boolean }> =
+            {};
+          Object.entries(childPermissions).forEach(([action, meta]) => {
+            // Skip any property that is not an action (like "children")
+            if (isActionMeta(meta)) {
+              actions[action] = { value: meta.value, disabled: meta.disabled };
+            }
+          });
+
+          const pathSegments = compoundKey.split("/");
+          const [catKey, subKey, ...childParts] = pathSegments;
+          const childKey =
+            childParts.length > 0 ? childParts.join("/") : undefined;
+
+          const hasChildren =
+            childPermissions.children &&
+            Object.keys(childPermissions.children).length > 0;
+
+          return (
+            <React.Fragment key={compoundKey}>
+              <CheckboxRow
+                label={
+                  hasChildren ? (
+                    <span
+                      onClick={() => toggleSection(compoundKey)}
+                      style={{ cursor: "pointer" }}
+                    >
+                      {expandedSections[compoundKey] ? "▲" : "▶"}{" "}
+                      {formatLabel(key)}
+                    </span>
+                  ) : (
+                    formatLabel(key)
+                  )
+                }
+                actions={actions}
+                onChange={(actionKey) =>
+                  childKey
+                    ? handleCheckboxChange(catKey, subKey, actionKey, childKey)
+                    : handleCheckboxChange(catKey, key, actionKey)
+                }
+                onToggleAll={() =>
+                  childKey
+                    ? handleCheckboxChange(
+                        catKey,
+                        subKey,
+                        "toggleAll",
+                        childKey
+                      )
+                    : handleCheckboxChange(catKey, key, "toggleAll")
+                }
+                nested={!!parentKey}
+              />
+
+              {expandedSections[compoundKey] &&
+                Object.entries(childPermissions.children || {}).map(
+                  ([childKey, grandChildPermissions]) => {
+                    const nestedKey = `${compoundKey}/${childKey}`;
+                    return (
+                      <DynamicSection
+                        key={nestedKey}
+                        category={category}
+                        sectionPermissions={{
+                          [childKey]: grandChildPermissions,
+                        }}
+                        handleCheckboxChange={handleCheckboxChange}
+                        expandedSections={expandedSections}
+                        toggleSection={toggleSection}
+                        parentKey={compoundKey}
+                      />
+                    );
+                  }
+                )}
+            </React.Fragment>
+          );
+        })}
+    </>
+  );
+};
+
+export default DynamicSection;

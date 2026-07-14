@@ -1,0 +1,63 @@
+// components/DoughnutChart.tsx
+"use client";
+
+import { ArcElement, Chart as ChartJS, Legend, Tooltip } from "chart.js";
+import { Doughnut } from "react-chartjs-2";
+
+ChartJS.register(ArcElement, Tooltip, Legend);
+
+interface DoughnutChartProps {
+  labels: string[];
+  data: any;
+}
+
+export default function DoughnutChart({ labels, data }: DoughnutChartProps) {
+  const defaultColors = [
+    "rgba(59, 130, 246, 1)",
+    "rgba(16, 185, 129, 1)",
+    "rgba(245, 158, 11, 1)",
+    "rgba(239, 68, 68, 1)",
+    "rgba(139, 92, 246, 1)",
+    "rgba(14, 165, 233, 1)",
+    "rgba(236, 72, 153, 1)",
+    "rgba(132, 204, 22, 1)",
+    "rgba(251, 146, 60, 1)",
+    "rgba(20, 184, 166, 1)",
+  ];
+
+  const chartData = {
+    labels,
+    datasets: [
+      {
+        data: data[0]?.data,
+        backgroundColor: data[0]?.data.map(
+          (_: any, i: number) => defaultColors[i % defaultColors.length],
+        ),
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true,
+        position: "bottom" as const,
+      },
+      tooltip: {
+        enabled: true,
+      },
+    },
+  };
+
+  return (
+    <div
+      className="ml-4 flex w-full flex-col text-sm"
+      style={{ marginTop: "10px", height: "250px" }}
+    >
+      <Doughnut data={chartData} options={options} />
+    </div>
+  );
+}

@@ -1,0 +1,118 @@
+"use client";
+
+import React from "react";
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type TransferFromItem = {
+  id: string;
+  UUID: string;
+  type: string;
+  quantity: string;
+  transferQuantity: string;
+  transferableQuantity: string;
+  itemCode: string;
+  itemName: string;
+  description: string;
+  "2ndDescription": string;
+  moreDescription: string;
+  itemUOM: string;
+  itemRate: string;
+  projectCode: string;
+  remark1: string;
+  remark2: string;
+  deliveryDate: string;
+  locationCode: string;
+  stockBatchCode: string;
+  valid: string;
+};
+
+export const salesDebitNoteItemColumns: ColumnDef<TransferFromItem>[] = [
+  {
+    accessorKey: "type",
+    header: "Type",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "transferQuantity",
+    header: "Transfer Quantity",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "transferableQuantity",
+    header: "Balance Quantity",
+    cell: ({ row }) => <p className="text-right">{row.original.transferableQuantity}</p>,
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "quantity",
+    header: "Original Quantity",
+    cell: ({ row }) => <p className="text-right">{row.original.quantity}</p>,
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "itemCode",
+    header: "Item",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "itemName",
+    header: "Item Name",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "description",
+    header: "Description",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "2ndDescription",
+    header: "2nd Description",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "moreDescription",
+    header: "More Description",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "itemUOM",
+    header: "UOM",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "itemRate",
+    header: "Rate",
+    cell: ({ row }) => <p className="text-right">{row.original.itemRate}</p>,
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "projectCode",
+    header: "Project",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "remark1",
+    header: "Remark 1",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "remark2",
+    header: "Remark 2",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "deliveryDate",
+    header: "Delivery Date",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "locationCode",
+    header: "Location",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "stockBatchCode",
+    header: "Stock Batch",
+    filterFn: "includesString"
+  },
+];

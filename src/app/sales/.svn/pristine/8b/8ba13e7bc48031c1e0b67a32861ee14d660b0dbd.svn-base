@@ -1,0 +1,520 @@
+"use client";
+
+import React, { memo, useEffect, useState } from "react";
+import type { MouseEvent } from "react";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import type {
+  ColumnDef,
+  ColumnFiltersState,
+  ColumnOrderState,
+  ColumnSizingState,
+  PaginationState,
+  Row,
+  SortingState,
+  Table as TableType,
+  VisibilityState,
+} from "@tanstack/react-table";
+
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+
+import { useRouter } from "next/navigation";
+
+import DataLoadingStatusBadge from "@/components/data-table/badge/DataLoadingStatusBadge";
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import TableHeadStatusFilter from "@/components/data-table/TableHeadStatusFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import LoadingUI from "@/components/LoadingUI";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import getExcludedColumns from "@/lib/utils/data-table/getExcludedColumns";
+import handleDndDragEnd from "@/lib/utils/data-table/handleDndDragEnd";
+
+import AutoBillingConfigDataTableToolbar from "./DataTableToolbar";
+
+// Mobile View (Imports)
+import MobileDataTable from "@/components/data-table/MobileDataTable";
+
+// Server-Side Filtering (Imports)
+import useSWR from "swr";
+import { useToast } from "@/components/ui/use-toast";
+import { columns, type AutoBillingConfig } from "./columns";
+import {
+  DATA_TABLE_DEFAULT_COLUMN_SIZING,
+  DEFAULT_DATA_TABLE_PAGE_SIZE,
+  getAuthHeaders,
+  getCurrentAccount,
+  getCurrentCompanyUUID,
+  removeAuthData,
+  ORIGIN,
+} from "@/lib/constants";
+
+// Server-Side Filtering (Define Data Structure)
+type AutoBillingConfigData = {
+  total: string;
+  rows: AutoBillingConfig[];
+};
+
+type DataTableProps = {
+  columns?: ColumnDef<AutoBillingConfig>[];
+  data?: AutoBillingConfig[];
+  refreshTable?: () => void;
+  message?: string;
+  isError?: boolean;
+  isLoading?: boolean;
+};
+
+const COLUMN_FILTERS_KEY = "auto-billing-config.bs.table.filters";
+const COLUMN_ORDERING_KEY = "auto-billing-config.bs.table.ordering";
+const COLUMN_SIZING_KEY = "auto-billing-config.bs.table.sizing";
+const COLUMN_VISIBILITY_KEY = "auto-billing-config.bs.table.columns";
+const PAGINATION_KEY = "auto-billing-config.bs.table.pagination";
+const SORTING_KEY = "auto-billing-config.bs.table.sorting";
+
+export default function AutoBillingConfigDataTable({ }: DataTableProps) {
+  // Server-Side Filtering (Declare)
+  const router = useRouter();
+  const { toast } = useToast();
+
+  // Server-Side Filtering (State)
+  const [tableData, setTableData] = useState<AutoBillingConfigData[]>([]);
+  const [forbiddenMessage, setForbiddenMessage] = useState<string | null>(null);
+  const [totalNumOfRows, setTotalNumOfRows] = useState<number>(0);
+
+  // Preference (State)
+  const [preferenceData, setPreferenceData] = useState<any>(null);
+
+  const [columnFilters, setColumnFilters] = useLocalStorage<ColumnFiltersState>(
+    COLUMN_FILTERS_KEY,
+    []
+  );
+  const initialColumnOrder = columns.map((column) => column.id!);
+  const [columnOrder, setColumnOrder] = useLocalStorage<ColumnOrderState>(
+    COLUMN_ORDERING_KEY,
+    initialColumnOrder
+  );
+  const [columnSizing, setColumnSizing] = useLocalStorage<ColumnSizingState>(
+    COLUMN_SIZING_KEY,
+    {}
+  );
+  const defaultColumns: Array<keyof AutoBillingConfig> = [
+    "ID",
+    "customerName",
+    "customerCode",
+    "description",
+  ];
+  const defaultColumnVisibility = getExcludedColumns(columns, defaultColumns);
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    COLUMN_VISIBILITY_KEY,
+    defaultColumnVisibility
+  );
+
+  const [pagination, setPagination] = useLocalStorage<PaginationState>(
+    PAGINATION_KEY,
+    {
+      pageIndex: 0, // initial page index
+      pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE, // default page size
+    }
+  );
+
+  const [sorting, setSorting] = useLocalStorage<SortingState>(SORTING_KEY, []);
+
+  // Server-Side Filtering (Get Current Account and Company)
+  const currentAccount = getCurrentAccount();
+  const currentCompanyUUID = getCurrentCompanyUUID();
+
+  let apiUrl = `${ORIGIN}/auto_billing_config/api/auto-billing-config/get-index-auto-billing-config`;
+
+  if (currentAccount && currentCompanyUUID) {
+    apiUrl += `?byCom=${currentCompanyUUID}&byAcc=${currentAccount}`;
+  }
+
+  // Preference (Fetch Function)
+  const fetchPreferenceData = async () => {
+    try {
+      const headers = getAuthHeaders();
+
+      const response = await fetch(`${ORIGIN}/universal/get-preference?module=sales`, {
+        method: "GET",
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch preference data');
+      }
+
+      const data = await response.json();
+      setPreferenceData(data);
+    } catch (error) {
+      console.error('Error fetching preference data:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchPreferenceData();
+  }, []);
+
+  // Server-Side Filtering (Data Fetching)
+  const {
+    data: autoBillingConfigIndexData,
+    error,
+    isLoading,
+    isValidating,
+    mutate: mutateTableData,
+  } = useSWR<AutoBillingConfigData, Error>(
+    [apiUrl, columnFilters, pagination, sorting],
+    async ([url]) => {
+      const columnFiltersWithoutValid = columnFilters.filter(
+        (filter) => filter.id !== "valid"
+      );
+
+      const params = new FormData();
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append(
+        "param[offset]",
+        `${pagination.pageIndex * pagination.pageSize}`
+      );
+      params.append(
+        "param[filter]",
+        columnFiltersWithoutValid.length > 0
+          ? JSON.stringify(
+            columnFiltersWithoutValid.reduce<Record<string, unknown>>(
+              (acc, curr) => {
+                acc[curr.id] = curr.value;
+                return acc;
+              },
+              {}
+            )
+          )
+          : "{}"
+      );
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc"
+      );
+      params.append(
+        "param[valid]",
+        columnFilters.length > 0
+          ? `${columnFilters.find((row) => row.id === "valid")?.value ?? ""}`
+          : ""
+      );
+      params.append(
+        "param[sort]",
+        sorting.length > 0 ? sorting[0].id : "createdAt"
+      );
+
+      const headers = getAuthHeaders();
+
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers,
+          body: params,
+        });
+
+        if (response.status === 401) {
+          throw new Error("Session expired");
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to fetch data");
+        }
+
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        throw error;
+      }
+    },
+    {
+      revalidateOnFocus: false,
+    }
+  );
+
+  // Server-Side Filtering: Update table data when API response changes
+  useEffect(() => {
+    if (autoBillingConfigIndexData) {
+      // Preference (Add Data)
+      const dataWithPreferences = autoBillingConfigIndexData.rows.map(row => ({
+        ...row,
+        preferenceData: preferenceData
+      }));
+
+      setTableData(dataWithPreferences);
+      setTotalNumOfRows(+autoBillingConfigIndexData.total);
+    }
+  }, [autoBillingConfigIndexData]);
+
+  // Server-Side Filtering: Handle errors and session expiration
+  useEffect(() => {
+    if (error) {
+      if (error.message === "Session expired") {
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "Your session has expired. Redirecting to login page.",
+        });
+
+        removeAuthData();
+
+        setTimeout(() => {
+          mutateTableData(undefined, false);
+
+          router.push("/login");
+        }, 500);
+      } else {
+        setForbiddenMessage(error.message);
+      }
+    }
+  }, [error, router, toast]);
+
+  // Reset Ordering Function
+  const handleResetColumnOrdering = () => {
+    try {
+      localStorage.removeItem(COLUMN_ORDERING_KEY);
+    } catch {
+      // ignore storage errors
+    }
+    // Immediately apply default order to current state
+    setColumnOrder([...initialColumnOrder]);
+  };
+
+  // Server-Side Filtering (Table)
+  const table = useReactTable({
+    columns,
+    data: tableData,
+    state: {
+      columnFilters,
+      columnOrder,
+      columnSizing,
+      columnVisibility,
+      pagination,
+      sorting,
+    },
+    onColumnFiltersChange: setColumnFilters,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+    onColumnVisibilityChange: setColumnVisibility,
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    columnResizeMode: "onChange",
+    // defaultColumn: DATA_TABLE_DEFAULT_COLUMN_SIZING,
+    enableColumnResizing: true,
+    manualFiltering: true,
+    manualPagination: true,
+    manualSorting: true,
+    pageCount: totalNumOfRows
+      ? Math.ceil(totalNumOfRows / pagination.pageSize)
+      : -1,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  usePreventShiftTextSelect();
+
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
+  const [isLoadedSuccessfully, setIsLoadedSuccessfully] = useState<boolean>(false);
+
+  // Server-Side Filtering (Loading State)
+  useEffect(() => {
+    if (isLoading || !autoBillingConfigIndexData) {
+      setLoadingProgress(90);
+    } else {
+      setIsLoadedSuccessfully(true);
+    }
+  }, [isLoading, autoBillingConfigIndexData]);
+
+  // Server-Side Filtering (Handle Validation State Changes)
+  useEffect(() => {
+    if (isValidating) {
+      setIsLoadedSuccessfully(false);
+      setLoadingProgress(95);
+    } else {
+      setIsLoadedSuccessfully(true);
+    }
+  }, [isValidating]);
+
+  const onDoubleClick = (row: Row<AutoBillingConfig>) => {
+    const url = `/sales/auto-billing-config/edit?item=${row.original.ID}&id=${row.original.UUID}`;
+
+    router.push(url);
+  };
+
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  const sensors = useDndSensors();
+
+  // Use custom hook to memoize and generate CSS variable mappings for header and column sizes
+  const columnSizeVars = useColumnSizeVars(table);
+
+  return (
+    <div className="flex h-full flex-col bg-erp-blue-3 @container-[size]">
+      {/* Server-Side Filtering (Pass mutateTableData and totalNumOfRows) */}
+      <AutoBillingConfigDataTableToolbar
+        table={table}
+        refreshTable={mutateTableData}
+        totalNumOfRows={totalNumOfRows}
+        defaultColumns={defaultColumnVisibility}
+        dataStatusBadgeDisplay={
+          (isLoadedSuccessfully && (
+            <DataLoadingStatusBadge variant="success" />
+          )) ||
+          (!!error && <DataLoadingStatusBadge variant="error" />)
+        }
+        onResetColumnOrdering={handleResetColumnOrdering}
+      />
+      <Separator className="bg-erp-blue-11" />
+      <ScrollArea className="h-[100cqh] p-1.5">
+        {/* Server-Side Filtering (Use forbiddenMessage Instead of Message Prop) */}
+        {forbiddenMessage ? (
+          <NoResultsTableRow columns={columns} message={forbiddenMessage} />
+        ) : (
+          <>
+            {/* Mobile View (Data Table) */}
+            {/* <MobileDataTable
+              table={table}
+              headerFields={["autoBillingConfigCode", "createdAtFormat"]}
+              initialVisibleFields={3}
+              excludeFromGrid={["autoBillingConfigCode", "createdAtFormat"]}
+              headerLabels={{
+                createdAtFormat: "Created At",
+              }}
+            /> */}
+
+            {/* Web View (Data Table) */}
+            <div className="hidden md:block">
+              <DndContext
+                collisionDetection={closestCenter}
+                modifiers={[restrictToHorizontalAxis]}
+                onDragEnd={(event) => handleDndDragEnd(event, setColumnOrder)}
+                sensors={sensors}
+              >
+                <Table
+                  className="table-fixed border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1"
+                  style={{ ...columnSizeVars, width: table.getTotalSize() }}
+                >
+                  <TableHeader className="sticky top-0">
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id}>
+                        <SortableContext
+                          items={columnOrder}
+                          strategy={horizontalListSortingStrategy}
+                        >
+                          {headerGroup.headers.map((header) => (
+                            <DragableTableHead
+                              key={header.id}
+                              header={header}
+                              className="bg-erp-blue-11 font-normal"
+                              style={{
+                                width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                              }}
+                            >
+                              {header.column.id === "status" ? (
+                                <TableHeadStatusFilter table={table} />
+                              ) : header.column.id === "valid" ? (
+                                <TableHeadValidityFilter table={table} />
+                              ) : (
+                                <TableHeadColumnTextFilter
+                                  column={header.column}
+                                  table={table}
+                                />
+                              )}
+                              <ColumnResizer header={header} />
+                            </DragableTableHead>
+                          ))}
+                        </SortableContext>
+                      </TableRow>
+                    ))}
+                  </TableHeader>
+                  {/* When resizing any column in the table, render the memoized version of the table body */}
+                  {table.getState().columnSizingInfo.isResizingColumn ? (
+                    <MemoizedTableBody
+                      table={table}
+                      onRowSelection={onRowSelection}
+                    />
+                  ) : (
+                    <NonMemoizedTableBody
+                      table={table}
+                      onRowSelection={onRowSelection}
+                    />
+                  )}
+                </Table>
+              </DndContext>
+            </div>
+          </>
+        )}
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
+      {!isLoadedSuccessfully && <LoadingUI progressValue={loadingProgress} />}
+    </div>
+  );
+}
+
+type TableBodyProps = {
+  table: TableType<AutoBillingConfig>;
+  onRowSelection: (
+    row: Row<AutoBillingConfig>
+  ) => (event: MouseEvent<HTMLTableRowElement>) => void;
+};
+
+function NonMemoizedTableBody({ table, onRowSelection }: TableBodyProps) {
+  return (
+    <TableBody>
+      {table.getRowModel().rows?.length ? (
+        table.getRowModel().rows.map((row) => (
+          <TableRow
+            className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+            data-state={row.getIsSelected() && "selected"}
+            onClick={onRowSelection(row)}
+            key={row.id}
+          >
+            {row.getVisibleCells().map((cell) => (
+              <TableCell
+                key={cell.id}
+                className="truncate"
+                title={(cell.getValue() ?? "").toString()}
+                style={{
+                  width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                  minWidth: cell.column.columnDef.minSize,
+                }}
+              >
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </TableCell>
+            ))}
+          </TableRow>
+        ))
+      ) : (
+        <NoResultsTableRow columns={table.getVisibleLeafColumns()} />
+      )}
+    </TableBody>
+  );
+}
+
+const MemoizedTableBody = memo(
+  NonMemoizedTableBody,
+  (prev, next) => prev.table.options.data === next.table.options.data
+) as typeof NonMemoizedTableBody;

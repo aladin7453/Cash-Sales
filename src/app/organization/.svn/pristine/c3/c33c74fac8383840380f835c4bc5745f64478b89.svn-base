@@ -1,0 +1,46 @@
+"use client";
+
+import { ColumnDef } from "@tanstack/react-table";
+
+export type ChangelogItem = {
+  UUID: string;
+  action: string;
+  userGroupCode: string;
+  createdAtFormat: string;
+  createdByUsername: string;
+  _version: string;
+  _actionUUID: string;
+  historyUUID: string;
+};
+
+export const changelogColumns: ColumnDef<ChangelogItem>[] = [
+  {
+    accessorKey: "createdAtFormat",
+    header: "Date",
+    cell: ({ row }) => {
+      const date = row.getValue("createdAtFormat") as string;
+      return date || "-";
+    },
+  },
+  {
+    accessorKey: "createdByUsername",
+    header: "User",
+  },
+  {
+    accessorKey: "action",
+    header: "Action",
+  },
+  {
+    accessorKey: "userGroupCode", // Default fallback - will be overridden by tab-specific referenceField
+    header: "Reference",
+    cell: ({ row }) => {
+      const value = row.getValue("userGroupCode") as string;
+      return value || "-";
+    },
+  },
+  {
+    accessorKey: "",
+    header: "Details",
+    // The cell implementation will be replaced in DataTable.tsx
+  },
+];

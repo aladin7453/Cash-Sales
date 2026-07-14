@@ -1,0 +1,163 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+import NewButton from "@/components/form/ActionButton/New";
+import CloneButton from "@/components/form/ActionButton/Clone";
+import DeleteButton from "@/components/form/ActionButton/Delete";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useDateRestriction } from "@/components/custom/DateRestrictionContext";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+} from "@/components/ui/form";
+
+// Mobile View (Imports)
+import MobileFormActionGroup from "@/components/form/MobileFormActionGroup";
+
+type TopActionBarProps = {
+  salesPurchaseContra?: any | null;
+  handleSubmit: () => void;
+  resetForm: () => void;
+  onSubmit: (values: any) => void;
+  form: any;
+  action: string;
+  slug: string;
+  isSaving?: boolean;
+  setIsSaving?: (saving: boolean) => void;
+};
+
+export default function TopActionBar({
+  salesPurchaseContra,
+  form,
+  handleSubmit,
+  resetForm,
+  action,
+  slug,
+}: TopActionBarProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    form.reset(salesPurchaseContra || {});
+  }, [salesPurchaseContra, form]);
+
+  const handleReset = () => {
+    form.reset();
+    resetForm();
+  };
+
+  const handleSave = async () => {
+    if (isSaving) return; // Prevent multiple clicks
+    setIsSaving(true);
+
+    try {
+      await handleSubmit();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const { allowPastRecord, setAllowPastRecord } = useDateRestriction();
+
+  return (
+    <div className="-mx-2 -mt-1 flex items-center justify-between bg-erp-gray-3 px-4 py-2">
+      <div className="flex space-x-3">
+        {/* Mobile View (Action Buttons) */}
+        <MobileFormActionGroup
+          config={{
+            onSave: handleSave,
+            onReset: handleReset,
+            onCancel: () => router.push(`/sales/sales-purchase-contra/`),
+            newDestination: "/sales/sales-purchase-contra/new",
+            cloneDestination: `/sales/sales-purchase-contra/clone?id=${id}`,
+            deleteConfig: id && action !== "clone" ? {
+              module: "sales_purchase_contra",
+              model: "sales-purchase-contra",
+              id: `${id}`,
+              indexPath: `/sales/sales-purchase-contra/`
+            } : undefined,
+            showNew: !!(id && action !== "clone"),
+            showClone: !!(id && action !== "clone"),
+            showDelete: !!(id && action !== "clone"),
+          }}
+        />
+
+        {/* Web View (Action Buttons) */}
+        <div className="hidden md:flex space-x-3">
+          <SaveButton onSubmit={handleSave} disabled={isSaving} />
+          {id && action !== "clone" && (
+            <NewButton destination="/sales/sales-purchase-contra/new" />
+          )}
+          {id && action !== "clone" && (
+            <CloneButton destination={`/sales/sales-purchase-contra/clone?id=${id}`} />
+          )}
+          <ResetButton onClick={handleReset} />
+          {id && action !== "clone" && (
+            <DeleteButton
+              module={"sales_purchase_contra"}
+              model={"sales-purchase-contra"}
+              id={`${id}`}
+              indexPath={`/sales/sales-purchase-contra/`}
+            />
+          )}
+          <CancelButton onClick={() => router.push(`/sales/sales-purchase-contra/`)} />
+        </div>
+      </div>
+
+      <Form id="topActionBarForm" {...form}>
+        <div className="flex items-center gap-x-2 md:gap-x-10 text-erp-blue-14">
+          <div className="flex flex-col items-center">
+            <FormField
+              control={form.control}
+              name="valid"
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-x-2 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value === "1"}
+                      onCheckedChange={(state) =>
+                        field.onChange(state ? "1" : "0")
+                      }
+                    />
+                  </FormControl>
+                  <FormLabel>Valid</FormLabel>
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Past Record checkbox */}
+          <FormField
+            control={form.control}
+            name="allowPastDates"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-x-2 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value === "1"}
+                    onCheckedChange={(state) => {
+                      field.onChange(state ? "1" : "0");
+                      setAllowPastRecord(state === true);
+                    }}
+                  />
+                </FormControl>
+                <FormLabel className="cursor-pointer">Past Record</FormLabel>
+              </FormItem>
+            )}
+          />
+        </div>
+      </Form>
+    </div>
+  );
+}

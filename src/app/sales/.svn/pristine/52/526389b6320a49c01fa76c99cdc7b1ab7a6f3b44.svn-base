@@ -1,0 +1,8 @@
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+
+  title: "Consolidated e-invoice",
+};
+export default function ConsolidatedEInvoicePageLayout({ children }: { children: React.ReactNode }) {
+  return children;
+}

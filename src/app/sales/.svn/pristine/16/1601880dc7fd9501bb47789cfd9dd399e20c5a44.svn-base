@@ -1,0 +1,81 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { Input } from "@/components/ui/input";
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type CustomerContraDetails = {
+  UUID: string;
+  salesPurchaseContra: string;
+  salesInvoice: string;
+  purchaseInvoice: string;
+  docNo: string;
+  docDate: string;
+  docDateFormat: string; // Add docDateFormat field
+  docType: string;
+  description: string;
+  outstanding: number;
+  balanceOutstanding: number;
+  contraAmount: number;
+  subtotalTax: number;
+  createdAt: string;
+  createdBy: string;
+  updatedBy: string;
+  updatedAt: string;
+  valid: string;
+};
+
+export const CustomerContraDetailsColumns: ColumnDef<CustomerContraDetails>[] = [
+  {
+    id: "docNo",
+    accessorKey: "docNo",
+    header: "Doc. No",
+    filterFn: "includesString",
+  },
+  {
+    id: "docDateFormat",
+    accessorKey: "docDateFormat",
+    header: "Doc. Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    filterFn: "includesString",
+  },
+  {
+    id: "outstanding",
+    accessorKey: "outstanding",
+    header: "Outstanding",
+    cell: ({ row }) => <p className="text-right">{`${Number(row.original.outstanding || 0).toFixed(2)}`}</p>,
+    filterFn: "includesString",
+  },
+  {
+    id: "balanceOutstanding",
+    accessorKey: "balanceOutstanding",
+    header: "Balance Outstanding",
+    cell: ({ row }) => <p className="text-right">{`${Number(row.original.balanceOutstanding || 0).toFixed(2)}`}</p>,
+    filterFn: "includesString",
+  },
+  {
+    id: "contraAmount",
+    accessorKey: "contraAmount",
+    header: "Contra Amount",
+    cell: ({ row }) => <p className="text-right">{`${Number(row.original.contraAmount || 0).toFixed(2)}`}</p>,
+    filterFn: "includesString",
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as CustomerContraDetails["valid"];
+      return validity ? "Valid" : "Invalid";
+    },
+    filterFn: filterWithStringConversion,
+  },
+];

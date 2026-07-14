@@ -1,0 +1,251 @@
+"use client";
+
+import React from "react";
+import { UseFormReturn } from "react-hook-form";
+
+import { Input } from "@/components/ui/input";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
+
+interface SummaryFormProps {
+  form: UseFormReturn<any>;
+  onSubmit: (data: any) => void;
+}
+
+export default function SummaryForm({ form, onSubmit }: SummaryFormProps) {
+  return (
+    <>
+      <div className="rounded-sm w-full p-2 mx-auto bg-erp-blue-8 mt-2">
+        <div className="rounded-sm p-4 bg-erp-blue-4">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              <h2 className="text-md font-bold mb-4">Summary</h2>
+
+              <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5">
+                <FormField
+                  control={form.control}
+                  name="total"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total Count of No.:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totalSLMonth1Local"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total SL Month 1 (Local):</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totalSLMonth2Local"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total SL Month 2 (Local):</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totalSLMonth3Local"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total SL Month 3 (Local):</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totalSLMonth4Local"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total SL Month 4 (Local):</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5 mt-4">
+                <FormField
+                  control={form.control}
+                  name="totalSLMonth5Local"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total SL Month 5 (Local):</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totalSLMonth6Local"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total SL Month 6 (Local):</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totalSLMonth7Local"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total SL Month 7 (Local):</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totalSLMonth8Local"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total SL Month 8 (Local):</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totalSLMonth9Local"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total SL Month 9 (Local):</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5 mt-4">
+                <FormField
+                  control={form.control}
+                  name="totalSLMonth10Local"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total SL Month 10 (Local):</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totalSLMonth11Local"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total SL Month 11 (Local):</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totalSLMonth12Local"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total SL Month 12 (Local):</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totallocalSalesAmount"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total Sales Amount (Local):</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totalquantity"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total Quantity:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>    
+            </form>
+          </Form>
+        </div>
+      </div>
+    </>
+  );
+}

@@ -1,0 +1,1354 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+import { FaSortAmountDown } from "react-icons/fa";
+import Sales from "@/app/dashboard/sales";
+
+export type DocumentListingReport = {
+  UUID?: string;
+  docNo: string;
+  docDate?: string;
+  orderDate?: string;
+  deliveryDate?: string;
+  saleDate?: string;
+  description?: string;
+  customerCodeCode?: string;
+  customerName: string;
+  totalTax?: string;
+  totalSubtotal?: string;
+  totalSubtotalTax?: string;
+  totalPaidAmount?: string;
+  balance?: string;
+  createdBy?: string;
+  createdByUsername?: string;
+  docDateFormat?: string;
+  paymentDateFormat?: string;
+  validUntil?: string;
+  remarks?: string;
+  orderQuantity?: string;
+  quantityDelivered?: string;
+  totalDiscount?: string;
+  amountAfterDiscount?: string;
+  paymentMethod?: string;
+};
+
+export const valueToDateFormat = (value: string | number | undefined): string | null => {
+  if (!value) 
+    return null;
+
+  const seconds = typeof value === "string" ? parseInt(value, 10) : value;
+  
+  if (isNaN(seconds)) 
+    return value.toString();
+  
+  const date = new Date(seconds * 1000);
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const year = date.getFullYear();
+  
+  if (day && month && year) 
+    return `${year}-${month}-${day}`;
+  
+  return value.toString();
+};
+
+const formatDecimal = (value: any) => {
+  if (value === undefined || value === null || value === "") 
+    return "0.00";
+  
+  const num = parseFloat(value);
+  
+  return isNaN(num) ? "0.00" : num.toFixed(2);
+};
+
+export const columnDefinitionsByDocType: Record<string, ColumnDef<DocumentListingReport>[]> = {
+  quotation: [
+    {
+      accessorKey: "rowNumber",
+      id: "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      id: "docNo",
+      header: "Doc No",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docDateFormat",
+      id: "docDateFormat",
+      header: "Quotation Date",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerName",
+      id: "customerName",
+      header: "Customer",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalAmount",
+      id: "totalAmount",
+      header: "Total Amount",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalDiscount",
+      id: "totalDiscount",
+      header: "Discount",
+      filterFn: "includesString",
+      cell: ({ row }) => {
+        const value = parseFloat(row.original.totalDiscount);
+        return isNaN(value) ? row.original.totalDiscount: value.toFixed(2);
+      },
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "amountAfterDiscount",
+      id: "amountAfterDiscount",
+      header: "Subtotal (After Discount)",
+      filterFn: "includesString",
+      cell: ({ row }) => {
+        const value = parseFloat(row.original.amountAfterDiscount);
+
+        return isNaN(value) ? row.original.amountAfterDiscount: value.toFixed(2);
+      },
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalTax",
+      id: "totalTax",
+      header: "Tax",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalTax),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalSubtotalTax",
+      id: "totalSubtotalTax",
+      header: "Subtotal (Tax)",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalSubtotalTax),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docValidityFormat",
+      id : "docValidityFormat",
+      header: "Valid Until",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "description",
+      id: "description",
+      header: "Description",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+  salesOrder: [
+    {
+      accessorKey: "rowNumber",
+      id: "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      id: "docNo",
+      header: "Doc No",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docDateFormat",
+      id: "docDateFormat",
+      header: "Order Date",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerName",
+      id: "customerName",
+      header: "Customer",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalQuantity",
+      id: "totalQuantity",
+      header: "Order Quantity",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalAmount",
+      id: "totalAmount",
+      header: "Total Amount",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalDiscount",
+      id: "totalDiscount",
+      header: "Discount",
+      filterFn: "includesString",
+      cell: ({ row }) => {
+        const value = parseFloat(row.original.totalDiscount);
+        return isNaN(value) ? row.original.totalDiscount: value.toFixed(2);
+      },
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "amountAfterDiscount",
+      id : "amountAfterDiscount",
+      header: "Subtotal (After Discount)",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.amountAfterDiscount),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalTax",
+      id : "totalTax",
+      header: "Tax",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalTax),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalSubtotalTax",
+      id : "totalSubtotalTax",
+      header: "Subtotal (Tax)",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalSubtotalTax),
+      enableColumnFilter: false,
+    },
+     {
+      accessorKey: "description",
+      id: "description",
+      header: "Description",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+
+  salesOrderListing:[
+    {
+      accessorKey: "rowNumber",
+      id : "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      header: "Doc No",
+    },
+    {
+      accessorKey: "docDateFormat",
+      header: "Doc Date",
+    },
+    {
+      accessorKey: "customerName",
+      header: "Name",
+    },
+    {
+      accessorKey: "totalDiscount",
+      header:  "Discount",
+    },
+    {
+      accessorKey: "amountAfterDiscount",
+      header: "Amount after discount",
+    },
+    {
+      accessorKey: "totalAmount",
+      header:"Total Amount",
+    },
+  ],
+  
+  // transactionHistory: [
+  //   {
+  //     accessorKey: "rowNumber",
+  //     id : "rowNumber",
+  //     header: "No",
+  //     cell: ({ table, row }) => {
+  //       const { pageIndex, pageSize } = table.getState().pagination;
+  //       return pageIndex * pageSize + row.index + 1;
+  //     },
+  //     enableSorting: false,
+  //     enableColumnFilter: false,
+  //   },
+  //   {
+  //     accessorKey: "docNo",
+  //     header: "Doc No",
+  //   },
+  //   {
+  //     accessorKey: "totalQuantity",
+  //     header: "Quantity",
+  //   },
+  //   {
+  //     accessorKey: "totalAmount",
+  //     header: "Amount",
+  //   }
+  // ],
+    
+  deliveryOrder: [
+    {
+      accessorKey: "rowNumber",
+      id : "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      id : "docNo",
+      header: "Doc No",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docDateFormat",
+      id :  "docDateFormat",
+      header: "Delivery Date",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerName",
+      id: "customerName",
+      header: "Customer",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalQuantity",
+      id : "totalQuantity",
+      header: "Quantity Delivered",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalAmount",
+      id: "totalAmount",
+      header: "Total Amount",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalDiscount",
+      id : "totalDiscount",
+      header: "Discount",
+      filterFn: "includesString",
+      cell: ({ row }) => {
+        const value = parseFloat(row.original.totalDiscount);
+        return isNaN(value) ? row.original.totalDiscount: value.toFixed(2);
+      },
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "amountAfterDiscount",
+      id : "amountAfterDiscount",
+      header: "Subtotal (After Discount)",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.amountAfterDiscount),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalTax",
+      id: "totalTax",
+      header: "Tax",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalTax),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalSubtotalTax",
+      id : "totalSubtotalTax",
+      header: "Subtotal (Tax)",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalSubtotalTax),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "description",
+      id : "description",
+      header: "Description",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+  salesInvoice: [
+    {
+      accessorKey: "rowNumber",
+      id : "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      id : "docNo",
+      header: "Doc No",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerName",
+      id : "customerName",
+      header: "Customer",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docDateFormat",
+      id : "docDateFormat",
+      header: "Invoice Date",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalAmount",
+      id: "totalAmount",
+      header: "Total Amount",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalSubtotal",
+      id: "totalSubtotal",
+      header: "Total",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalSubtotal),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalDiscount",
+      id: "totalDiscount",
+      header: "Discount",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalDiscount),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "amountAfterDiscount",
+      id: "amountAfterDiscount",
+      header: "Subtotal (After Discount)",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.amountAfterDiscount),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalTax",
+      id: "totalTax",
+      header: "Tax",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalTax),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalSubtotalTax",
+      id: "totalSubtotalTax",
+      header: "Subtotal (Tax)",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalSubtotalTax),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "description",
+      id: "description",
+      header: "Description",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+
+  salesInvoiceListing:[
+    {
+      accessorKey: "rowNumber",
+      id : "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      header: "Doc No",
+    },
+    {
+      accessorKey: "docDateFormat",
+      header: "Doc. Date"
+    },
+    {
+      accessorKey: "customerName",
+      header: "Customer Name",
+    },
+    {
+      accessorKey: "totalDiscount",
+      header:  "Discount",
+    },
+    {
+      accessorKey: "amountAfterDiscount",
+      header: "Amount after discount",
+    },
+    {
+      accessorKey: "totalAmount",
+      header:"Total Amount",
+    },
+  ],
+
+
+  cashSales: [
+    {
+      accessorKey: "rowNumber",
+      id: "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      id: "docNo",
+      header: "Doc No",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docDateFormat",
+      id: "docDateFormat",
+      header: "Sale Date",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerName",
+      id: "customerName",
+      header: "Customer",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalAmount",
+      id: "totalAmount",
+      header: "Total Amount",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "paidAmount",
+      id: "paidAmount",
+      header: "Amount Paid",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.paidAmount),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalDiscount",
+      id: "totalDiscount",
+      header: "Discount",
+      filterFn: "includesString",
+      cell: ({ row }) => {
+        const value = parseFloat(row.original.totalDiscount);
+        return isNaN(value) ? row.original.totalDiscount: value.toFixed(2);
+      },
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "amountAfterDiscount",
+      id: "amountAfterDiscount",
+      header: "Subtotal (After Discount)",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.amountAfterDiscount),
+      enableColumnFilter: false,
+    },
+    { 
+      accessorKey: "totalTax",
+      id: "totalTax",
+      header: "Tax",
+      filterFn: "includesString",
+      cell: ({ row }) => {
+        const value = parseFloat(row.original.totalTax);
+        return isNaN(value) ? row.original.totalTax: value.toFixed(2);
+      },
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalSubtotalTax",
+      id: "totalSubtotalTax",
+      header: "Subtotal (Tax)",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalSubtotalTax),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "paymentMethodCode",
+      id: "paymentMethodCode",
+      header: "Payment Method",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+  cashSalesListing:[
+    {
+      accessorKey: "rowNumber",
+      id : "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      header: "Doc No",
+    },
+    {
+      accessorKey: "docDateFormat",
+      header: "Date",
+    },
+    {
+      accessorKey: "customerCodeCode",
+      header: "Customer Code",
+    },
+    {
+      accessorKey: "customerName",
+      header: "Customer Name",
+    },
+    {
+      accessorKey: "totalAmount",
+      header: "Amount",
+    },
+    {
+      accessorKey: "totalDiscount",
+      header: "Discount",
+      cell: ({ row }) => {
+        const value = parseFloat(row.original.totalDiscount);
+        return isNaN(value) ? row.original.totalDiscount: value.toFixed(2);
+      },
+    },
+    {
+      accessorKey: "amountAfterDiscount",
+      header: "Subtotal (After Discount)",
+      cell: ({ row }) => formatDecimal(row.original.amountAfterDiscount),
+    },
+  ],
+
+  cashSalesCollection: [
+    {
+      accessorKey: "rowNumber",
+      id: "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      header: "Doc No",
+    },
+    {
+      accessorKey: "docDateFormat",
+      header: "Doc. Date",
+    },
+    {
+      accessorKey: "customerCodeCode",
+      header: "Customer Code",
+    },
+    {
+      accessorKey:"customerName",
+      header:"Customer Name",
+    },
+    {
+      accessorKey: "totalDiscount",
+      header: "Discount",
+      cell: ({ row }) => {
+        const value = parseFloat(row.original.totalDiscount);
+        return isNaN(value) ? row.original.totalDiscount: value.toFixed(2);
+      },
+    },
+    {
+      accessorKey: "totalAmount",
+      header: "Total Amount",
+    },
+    { 
+      accessorKey: "totalTax",
+      header: "Tax",
+      cell: ({ row }) => {
+        const value = parseFloat(row.original.totalTax);
+        return isNaN(value) ? row.original.totalTax: value.toFixed(2);
+      },
+    },
+    {
+      accessorKey: "totalSubtotalTax",
+      header: "Subtotal (Tax)",
+      cell: ({ row }) => formatDecimal(row.original.totalSubtotalTax),
+    },
+    {
+      accessorKey: "paidAmount",
+      header: "Amount Paid",
+      cell: ({ row }) => formatDecimal(row.original.paidAmount),
+    },
+    {
+      accessorKey: "amountAfterDiscount",
+      header: "Subtotal (After Discount)",
+      cell: ({ row }) => formatDecimal(row.original.amountAfterDiscount),
+    },
+
+    {
+      accessorKey: "paymentMethodCode",
+      header: "Payment Method Code",
+    },
+  ],
+      
+  salesDebitNote: [
+    {
+      accessorKey: "rowNumber",
+      id: "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      id: "docNo",
+      header: "Doc No",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docDateFormat",
+      id: "docDateFormat",
+      header: "Date",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerName",
+      id: "customerName",
+      header: "Customer",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalAmount",
+      id: "totalAmount",
+      header: "Total Amount",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalDiscount",
+      id: "totalDiscount",
+      header: "Discount",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalDiscount),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "amountAfterDiscount",
+      id: "amountAfterDiscount",
+      header: "Subtotal (After Discount)",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.amountAfterDiscount),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalTax",
+      id: "totalTax",
+      header: "Tax",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalTax),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalSubtotalTax",
+      id: "totalSubtotalTax",
+      header: "Subtotal (Tax)",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalSubtotalTax),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "description",
+      id: "description",
+      header: "Description",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+
+
+  salesDebitNoteListing:[
+    {
+      accessorKey: "rowNumber",
+      id : "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      header: "Doc No",
+    },
+    {
+      accessorKey: "docDateFormat",
+      header: "Doc Date",
+    },
+    {
+      accessorKey: "customerCodeCode",
+      header: "Code"
+    },
+    {
+      accessorKey: "customerName",
+      header: "Name",
+    },
+    {
+      accessorKey: "totalAmount",
+      header: "Amount",
+    },
+  ],
+  salesDebitNoteMultiListing: [
+    {
+      accessorKey: "rowNumber",
+      id : "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      header: "Doc No",
+    },
+    {
+      accessorKey: "docDateFormat",
+      header: "Doc Date",
+    },
+    {
+      accessorKey: "customerName",
+      header: "Name",
+    },
+    {
+      accessorKey: "totalDiscount",
+      header:  "Discount",
+    },
+    {
+      accessorKey: "amountAfterDiscount",
+      header: "Amount after discount",
+    },
+    {
+      accessorKey: "totalAmount",
+      header:"Total Amount",
+    },
+  ],
+  
+  salesCreditNote: [
+    {
+      accessorKey: "rowNumber",
+      id: "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      id: "docNo",
+      header: "Doc No",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docDateFormat",
+      id: "docDateFormat",
+      header: "Date",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerName",
+      id: "customerName",
+      header: "Customer",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalAmount",
+      id: "totalAmount",
+      header: "Total Amount",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalDiscount",
+      id: "totalDiscount",
+      header: "Discount",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalDiscount),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "amountAfterDiscount",
+      id: "amountAfterDiscount",
+      header: "Subtotal (After Discount)",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.amountAfterDiscount),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalTax",
+      id: "totalTax",
+      header: "Tax",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalTax),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalSubtotalTax",
+      id: "totalSubtotalTax",
+      header: "Subtotal (Tax)",
+      filterFn: "includesString",
+      cell: ({ row }) => formatDecimal(row.original.totalSubtotalTax),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "description",
+      id: "description",
+      header: "Description",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+  creditNoteListing:[
+    {
+    accessorKey: "rowNumber",
+    id : "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+    const { pageIndex, pageSize } = table.getState().pagination;
+    return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    },
+    {
+    accessorKey: "docNo",
+    header: "Doc No",
+    },
+    {
+    accessorKey: "docDateFormat",
+    header: "Doc Date",
+    },
+    {
+    accessorKey: "customerName",
+    header: "Name",
+    },
+    {
+    accessorKey: "totalDiscount",
+    header:  "Discount",
+    },
+    {
+    accessorKey: "amountAfterDiscount",
+    header: "Amount after discount",
+    },
+    {
+    accessorKey: "totalAmount",
+    header:"Total Amount",
+    },
+  ],
+};
+
+export const columnReportDefinitionsByDocType: Record<string, ColumnDef<DocumentListingReport>[]> = {
+  quotation: [
+    {
+      accessorKey: "rowNumber",
+      id: "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      id: "docNo",
+      header: "Doc No",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docDateFormat",
+      id: "docDateFormat",
+      header: "Doc Date",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerCodeCode",
+      id: "customerCodeCode",
+      header: "Code",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerName",
+      id: "customerName",
+      header: "Name",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalAmount",
+      id: "totalAmount",
+      header: "Amount",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+  salesOrder: [
+    {
+      accessorKey: "rowNumber",
+      id: "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      id: "docNo",
+      header: "Doc No",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docDateFormat",
+      id: "docDateFormat",
+      header: "Doc Date",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerCodeCode",
+      id: "customerCodeCode",
+      header: "Code",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerName",
+      id: "customerName",
+      header: "Name",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalAmount",
+      id: "totalAmount",
+      header: "Amount",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+  deliveryOrder: [
+    {
+      accessorKey: "rowNumber",
+      id: "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      id: "docNo",
+      header: "Doc No",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docDateFormat",
+      id: "docDateFormat",
+      header: "Doc Date",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerCodeCode",
+      id: "customerCodeCode",
+      header: "Code",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerName",
+      id: "customerName",
+      header: "Name",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalAmount",
+      id: "totalAmount",
+      header: "Amount",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+  salesInvoice: [
+    {
+      accessorKey: "rowNumber",
+      id: "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      id: "docNo",
+      header: "Doc No",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docDateFormat",
+      id: "docDateFormat",
+      header: "Doc Date",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerCodeCode",
+      id: "customerCodeCode",
+      header: "Code",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerName",
+      id: "customerName",
+      header: "Name",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalAmount",
+      id: "totalAmount",
+      header: "Amount",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+  cashSales: [
+    {
+      accessorKey: "rowNumber",
+      id: "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      id: "docNo",
+      header: "Doc No",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docDateFormat",
+      id: "docDateFormat",
+      header: "Doc Date",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerCodeCode",
+      id: "customerCodeCode",
+      header: "Code",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerName",
+      id: "customerName",
+      header: "Name",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalAmount",
+      id: "totalAmount",
+      header: "Amount",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+  salesDebitNote: [
+    {
+      accessorKey: "rowNumber",
+      id: "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      id: "docNo",
+      header: "Doc No",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docDateFormat",
+      id: "docDateFormat",
+      header: "Doc Date",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerCodeCode",
+      id: "customerCodeCode",
+      header: "Code",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerName",
+      id: "customerName",
+      header: "Name",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalAmount",
+      id: "totalAmount",
+      header: "Amount",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+  salesCreditNote: [
+    {
+      accessorKey: "rowNumber",
+      id: "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docNo",
+      id: "docNo",
+      header: "Doc No",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "docDateFormat",
+      id: "docDateFormat",
+      header: "Doc Date",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerCodeCode",
+      id: "customerCodeCode",
+      header: "Code",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "customerName",
+      id: "customerName",
+      header: "Name",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "totalAmount",
+      id: "totalAmount",
+      header: "Amount",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+};

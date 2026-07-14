@@ -1,0 +1,791 @@
+"use client";
+
+import React, { useEffect, useRef, useState } from "react";
+import type {
+  ColumnDef,
+  Row,
+  SortingState,
+  ColumnOrderState,
+  ColumnSizingState,
+  VisibilityState,
+  Table as TableType
+} from "@tanstack/react-table";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+
+import { useSearchParams } from "next/navigation";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import {
+  DEFAULT_DATA_TABLE_PAGE_SIZE,
+  getAuthHeaders,
+  ORIGIN,
+  DATA_TABLE_DEFAULT_COLUMN_SIZING,
+} from "@/lib/constants";
+
+import QuotationDetailsDataTableToolbar from "./DataTableToolbar";
+import { itemColumn } from "./itemColumns";
+import ItemPopover from "./ItemPopover";
+import type { Quotation } from "../../../columns";
+import type { UOMList } from "./columns";
+
+// Mobile View (Imports)
+import MobileFormDataTable from "@/components/form/MobileFormDataTable";
+import DataTableTotals from "@/components/form/MobileFormDataTableTotals";
+
+// Drag and Drop (Imports)
+import { DragDropDataTable, DraggableRow, useDragDropTable } from "@/components/data-table/row-drag-drop";
+
+// Column Drag and Drop and Resize (Imports)
+import { memo } from "react";
+import type { MouseEvent } from "react";
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import getExcludedColumns from "@/lib/utils/data-table/getExcludedColumns";
+import handleDndDragEnd from "@/lib/utils/data-table/handleDndDragEnd";
+import { DragHandle } from "@/components/data-table/row-drag-drop";
+
+// Selling Price History Popover (Imports)
+import SellingPriceHistoryPopover from "@/components/features/sales-purchase-transaction/selling-price-history-popover/sellingPriceHistoryPopover";
+
+// Refactor Charges Details Input Cell (Imports)
+import {
+  UOMDropdownInputCell,
+  NumberInputCellComponent,
+  TextInputCellComponent,
+  DescriptionInputCellComponent,
+  DateInputCellComponent,
+  DropdownInputCellComponent
+} from "@/components/features/sales-purchase-transaction/charges-details/inputCell";
+
+type DataTableProps = {
+  columns: ColumnDef<UOMList>[];
+  data: UOMList[];
+  tempRowQuotationDetailsList: any;
+  setTempRowQuotationDetailsList: (data: any) => void;
+  revalidateQuotationDetails: () => void;
+  form: any;
+  quotationData: any;
+  UOMDetails: any[];
+  preferenceData?: any;
+  isMobile?: boolean;
+  slug: string;
+};
+
+// Column Drag and Drop and Resize (Local Storage Keys)
+const COLUMN_ORDERING_KEY = "auto-billing-config.details.bs.table.ordering";
+const COLUMN_SIZING_KEY = "auto-billing-config.details.bs.table.sizing";
+const COLUMN_VISIBILITY_KEY = "auto-billing-config.details.bs.table.columns";
+
+// HTML Utility Function
+function stripHtml(html) {
+  if (!html) return "";
+  // Replace <br> and <br/> with newlines
+  let text = html.replace(/<br\s*\/?>/gi, '\n');
+  // Replace <p> with nothing, </p> with newline
+  text = text.replace(/<p[^>]*>/gi, '').replace(/<\/p>/gi, '\n');
+  // Remove all other HTML tags
+  text = text.replace(/<[^>]+>/g, '');
+  // Replace HTML entities
+  text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+
+  return text;
+}
+
+export default function QuotationDetailsDataTable({
+  columns,
+  data,
+  tempRowQuotationDetailsList,
+  setTempRowQuotationDetailsList,
+  revalidateQuotationDetails,
+  form,
+  quotationData,
+  UOMDetails,
+  preferenceData,
+  isMobile,
+  slug,
+}: DataTableProps) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [itemSorting, setItemSorting] = useState<SortingState>([]);
+
+  // Column Drag and Drop and Resize (Constants)
+  const initialColumnOrder = columns?.filter(column => column?.id).map((column) => column.id!) || [];
+  const [columnOrder, setColumnOrder] = useLocalStorage<ColumnOrderState>(
+    COLUMN_ORDERING_KEY,
+    initialColumnOrder
+  );
+  const [columnSizing, setColumnSizing] = useLocalStorage<ColumnSizingState>(
+    COLUMN_SIZING_KEY,
+    {}
+  );
+  const defaultColumns: Array<keyof UOMList> = [
+    "docNo",
+    "docDateFormat",
+    "customerName",
+
+  ];
+  const defaultColumnVisibility: VisibilityState = getExcludedColumns(
+    columns || [],
+    defaultColumns
+  );
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    COLUMN_VISIBILITY_KEY,
+    defaultColumnVisibility
+  );
+
+  // Preference (Include Preference Data)
+  function setTempRowQuotationDetailsListData(data, overwrite) {
+    if (overwrite) {
+      // Ensure first row always has master and showTemplate set to "1"
+      const updatedData = data.map((item, index) => ({
+        ...item,
+        preferenceData: preferenceData,
+        master: index === 0 ? "1" : item.master || "0",
+        showTemplate: index === 0 ? "1" : item.showTemplate || "0",
+      }));
+
+      setTempRowQuotationDetailsList(updatedData);
+    } else {
+      const newData = Array.isArray(data) ? data : [data];
+
+      setTempRowQuotationDetailsList((tempRowQuotationDetailsList) => {
+        const existingData = [...tempRowQuotationDetailsList];
+        const updatedData = [...existingData, ...newData];
+
+        // Ensure first row always has master and showTemplate set to "1"
+        return updatedData.map((item, index) => ({
+          ...item,
+
+        }));
+      });
+    }
+  }
+
+  // Drag and Drop (State & Functions)
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const [rowSelection, setRowSelection] = useState({});
+  const [shouldFetch, setShouldFetch] = useState(false)
+
+  // Use tempRowQuotationDetailsList if it exists, otherwise use data
+  const tableData = (tempRowQuotationDetailsList) || slug === "clone"
+    ? tempRowQuotationDetailsList.map(row => ({
+      ...row,
+      preferenceData: preferenceData
+    }))
+    : (data || []).map(row => ({
+      ...row,
+      preferenceData: preferenceData
+    }));
+
+  const {
+    items,
+    activeId,
+    isDragging,
+    handleDragStart,
+    handleDragEnd,
+    getRowId,
+  } = useDragDropTable({
+    data: tableData,
+    onReorder: (newData) => {
+
+      // Update sequence numbers for all items based on their new order
+      const dataWithUpdatedSeq = newData.map((item, index) => {
+        const updatedItem = {
+          ...item,
+          seq: (index + 1).toString(), // Update seq to reflect new order (1-based)
+        };
+
+        // Always set first row as master and show in PDF
+        if (index === 0) {
+          updatedItem.master = "1";
+          updatedItem.showTemplate = "1";
+        }
+
+        return updatedItem;
+      });
+
+      // Update the data immediately and force re-render
+      setTempRowQuotationDetailsList(dataWithUpdatedSeq);
+
+
+      // Force table to update by incrementing refresh key
+      setRefreshKey(prev => prev + 1);
+    },
+    idField: "UUID",
+    disabled: false,
+  });
+
+  // Column Drag and Drop and Resize (Data Table)
+  const table = useReactTable({
+    columns,
+    data: tableData,
+    state: {
+      sorting,
+      columnVisibility,
+      rowSelection,
+      columnOrder,
+      columnSizing,
+    },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+    enableRowSelection: true,
+    autoResetPageIndex: false,
+    columnResizeMode: "onChange",
+    defaultColumn: DATA_TABLE_DEFAULT_COLUMN_SIZING,
+    enableColumnResizing: true,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getRowId: (row, index) => getRowId(row, index),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      },
+      columnVisibility: JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}"),
+    },
+  });
+
+  const sensors = useDndSensors();
+  const columnSizeVars = useColumnSizeVars(table);
+
+  useEffect(() => {
+    localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [itemData, setItemData] = useState([]);
+  const [packageDialogOpen, setPackageDialogOpen] = useState(false);
+  const [packageData, setPackageData] = useState([]);
+  const [taxInclusiveStates, setTaxInclusiveStates] = useState({});
+  const [masterServiceStates, setMasterServiceStates] = useState({});
+  const [showInPDFStates, setShowInPDFStates] = useState({});
+  const [itemType, setItemType] = useState("stock");
+  const [textInputs, setTextInputs] = useState({});
+  const [UOMInputs, setUOMInputs] = useState<Record<string, string>>({});
+  const [UOM2Inputs, setUOM2Inputs] = useState<Record<string, string>>({});
+  const [UOM3Inputs, setUOM3Inputs] = useState<Record<string, string>>({});
+  const [numberInputs, setNumberInputs] = useState({});
+  const [moreDescriptions, setMoreDescriptions] = useState({});
+  const [dropdownDatas, setDropdownDatas] = useState({});
+  const [showTables, setShowTables] = useState({});
+  const [dropdownInputDatas, setDropdownInputDatas] = useState({});
+
+  // Selling Price History Popover (State)
+  const [priceHistoryDialogOpen, setPriceHistoryDialogOpen] = useState(false);
+  const [selectedItemForPriceHistory, setSelectedItemForPriceHistory] = useState<string>("");
+
+  const dropdownTableColumns = {
+    classificationCode: [
+      { accessorKey: "classificationCode", header: "Classification Code" },
+      { accessorKey: "description", header: "Description" },
+    ],
+    projectCode: [
+      { accessorKey: "projectCode", header: "Project Code" },
+      { accessorKey: "description", header: "Description" },
+    ],
+    taxCode: [
+      { accessorKey: "taxCode", header: "Tax Code" },
+      { accessorKey: "taxTypeCode", header: "Tax Type" },
+      { accessorKey: "taxRate", header: "Tax Rate" },
+      { accessorKey: "description", header: "Description" },
+    ],
+    customerCodeCode: [
+      { accessorKey: "customerCode", header: "Customer Code" },
+      { accessorKey: "customerGroupCode", header: "Customer Group" },
+      { accessorKey: "customerName", header: "Customer Name" },
+      { accessorKey: "BRN", header: "BRN" },
+    ],
+  };
+
+  // Prevent text selection when performing multiple row selection with "shift" + click
+  usePreventShiftTextSelect();
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTables(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  const onDoubleClick = (row: Row<Quotation>) => { };
+
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  const handleOnAdd = async () => {
+
+    setShouldFetch(prev => !prev)
+
+    if (form.getValues("customer") == "") {
+      toast({
+        title: "Please select customer first",
+        duration: 2000,
+      });
+      return false
+    }
+    setDialogOpen(true);
+
+    // await fetchItemData(itemType);
+  };
+
+  // Refactor Charges Details Input Cell (Start)
+  const textInputCell = ({ row, column: { id } }, className: string = "h-7.5") => {
+    return (
+      <TextInputCellComponent
+        row={row}
+        column={{ id }}
+        className={className}
+        setTextInputs={setTextInputs}
+        setTempRowDetailsList={setTempRowQuotationDetailsList}
+      />
+    );
+  };
+
+  const descriptionInputCell = ({ row, column: { id } }, className: string = "h-7.5 p-0") => {
+    return (
+      <DescriptionInputCellComponent
+        row={row}
+        column={{ id }}
+        className={className}
+        setTextInputs={setTextInputs}
+        setMoreDescriptions={setMoreDescriptions}
+        setTempRowDetailsList={setTempRowQuotationDetailsList}
+      />
+    );
+  };
+
+  const UOMDropdownCell = ({ row, column: { id } }) => {
+    return (
+      <UOMDropdownInputCell
+        row={row}
+        column={{ id }}
+        UOMInputs={UOMInputs}
+        setUOMInputs={setUOMInputs}
+        UOM2Inputs={UOM2Inputs}
+        setUOM2Inputs={setUOM2Inputs}
+        UOM3Inputs={UOM3Inputs}
+        setUOM3Inputs={setUOM3Inputs}
+        setTempRowDetailsList={setTempRowQuotationDetailsList}
+      />
+    );
+  };
+
+  const dateInputCell = ({ row, column: { id } }) => {
+    return (
+      <DateInputCellComponent
+        row={row}
+        column={{ id }}
+        setTempRowDetailsList={setTempRowQuotationDetailsList}
+      />
+    );
+  };
+
+  const dropDownInputCell = ({ row, column: { id } }) => {
+    return (
+      <DropdownInputCellComponent
+        row={row}
+        column={{ id }}
+        dropdownDatas={dropdownDatas}
+        setDropdownDatas={setDropdownDatas}
+        dropdownInputDatas={dropdownInputDatas}
+        setDropdownInputDatas={setDropdownInputDatas}
+        showTables={showTables}
+        setShowTables={setShowTables}
+        setTempRowDetailsList={setTempRowQuotationDetailsList}
+        fetchDropdownData={fetchDropdownData}
+        dropdownTableColumns={dropdownTableColumns}
+        inputRef={inputRef}
+        dropdownRef={dropdownRef}
+      />
+    );
+  };
+
+  const numberInputCell = ({ row, column: { id } }, allowDecimal: boolean) => {
+    return (
+      <NumberInputCellComponent
+        row={row}
+        column={{ id }}
+        allowDecimal={allowDecimal}
+        preferenceData={preferenceData}
+        setNumberInputs={setNumberInputs}
+        setTempRowDetailsList={setTempRowQuotationDetailsList}
+        onPriceHistoryClick={(itemId) => {
+          setSelectedItemForPriceHistory(itemId);
+          setPriceHistoryDialogOpen(true);
+        }}
+      />
+    );
+  };
+  // Refactor Charges Details Input Cell (End)
+
+  const fetchDropdownData = async (table: string) => {
+    try {
+      var form_data = new FormData();
+
+      table == "customerCodeCode" ? form_data.append(`table[0]`, table.slice(0, -8)) : form_data.append(`table[0]`, table.slice(0, -4));
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch dropdown data");
+      }
+
+      const data = await response.json();
+      if (table == "customerCodeCode") {
+        data.rows = data.rows.map((row) => {
+          return {
+            ...row,
+            customerCodeCode: row.customerCode,
+          }
+        })
+      }
+
+      setDropdownDatas((dropdownDatas) => ({ ...dropdownDatas, [table]: data.rows }));
+    } catch (error) {
+      console.error("Error fetching dropdown data:", error);
+
+      throw new Error("Failed to fetch dropdown data");
+    }
+  };
+
+
+  // Mobile View (Field Configurations)
+
+
+
+  const mobileCheckboxHandlers = {
+
+  };
+
+
+  // Column Drag and Drop and Resize (Unified Drag Handler for Both Rows and Columns)
+  const handleUnifiedDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    // Check if it's a column drag (column IDs are simple strings like "docNo", "description")
+    const isColumnDrag = columnOrder.includes(active.id as string);
+
+    if (isColumnDrag) {
+      // Handle column drag
+      handleDndDragEnd(event, setColumnOrder);
+    } else {
+      // Handle row drag
+      handleDragEnd(event);
+    }
+  };
+
+
+  return (
+    <Card className={isMobile ? "shadow-none rounded-none border-none p-0" : "w-full shadow-sm mb-2"}>
+      <div className="flex w-full items-center justify-between p-1">
+        <CardTitle className="px-1 hidden lg:block md:hidden sm:block text-nowrap text-sm font-bold">Quotation List</CardTitle>
+
+        <QuotationDetailsDataTableToolbar
+          table={table}
+          onAdd={handleOnAdd}
+          setTempRowQuotationDetailsListData={setTempRowQuotationDetailsListData}
+          tempRowQuotationDetailsList={tempRowQuotationDetailsList}
+          revalidateQuotationDetails={revalidateQuotationDetails}
+          slug={slug}
+        />
+      </div>
+      <CardContent className="p-0">
+        <div className="flex h-[70cqh] md:h-[100cqh] flex-col justify-between rounded-md bg-erp-blue-3 @container-[size] md:max-h-[472px]">
+          <ScrollArea className="flex-1 min-h-0">
+
+            {/* Web View (Data Table) */}
+            <div className="hidden md:block">
+              {/* Column Drag and Drop (DnD Context) */}
+              <DndContext
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleUnifiedDragEnd}
+                sensors={sensors}
+              >
+                {/* Row Drag and Drop (Data Table) - Tell it parent has DndContext */}
+                <DragDropDataTable
+                  items={items}
+                  disabled={false}
+                  hasParentDndContext={true}
+                >
+                  {/* Column Drag and Drop and Resize (Table) */}
+                  <Table
+                    // Column Drag and Drop and Resize Dropdown Fix (Add overflow-visible)
+                    className="table-fixed border-separate overflow-visible whitespace-nowrap text-[11px]"
+                    style={{ ...columnSizeVars, width: table.getTotalSize() }}
+                  >
+                    <TableHeader className="sticky top-0 z-10">
+                      {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id}>
+                          {/* Column Drag and Drop and Resize (Sortable Context) */}
+                          <SortableContext
+                            items={columnOrder}
+                            strategy={horizontalListSortingStrategy}
+                          >
+                            {headerGroup.headers.map((header) => (
+                              // Column Drag and Drop and Resize (Dragable Table Head)
+                              <DragableTableHead
+                                key={header.id}
+                                header={header}
+                                className="bg-erp-blue-11 font-normal"
+                                style={{
+                                  width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                                }}
+                              >
+                                {header.column.id === "valid" ? (
+                                  <TableHeadValidityFilter table={table} />
+                                ) : (
+                                  <TableHeadColumnTextFilter
+                                    column={header.column}
+                                    table={table}
+                                  />
+                                )}
+                                <ColumnResizer header={header} />
+                              </DragableTableHead>
+                            ))}
+                          </SortableContext>
+                        </TableRow>
+                      ))}
+                    </TableHeader>
+                    {/* Column Drag and Drop and Resize (Table Body) */}
+                    {table.getState().columnSizingInfo.isResizingColumn ? (
+                      <MemoizedTableBody
+                        table={table}
+                        onRowSelection={onRowSelection}
+                        getRowId={getRowId}
+                        refreshKey={refreshKey}
+                        taxInclusiveStates={taxInclusiveStates}
+                        masterServiceStates={masterServiceStates}
+                        showInPDFStates={showInPDFStates}
+
+                        descriptionInputCell={descriptionInputCell}
+                        textInputCell={textInputCell}
+                        numberInputCell={numberInputCell}
+                        dropDownInputCell={dropDownInputCell}
+                        dateInputCell={dateInputCell}
+                        UOMDropdownCell={UOMDropdownCell}
+                        form={form}
+                        preferenceData={preferenceData}
+
+                      />
+                    ) : (
+                      <NonMemoizedTableBody
+                        table={table}
+                        onRowSelection={onRowSelection}
+                        getRowId={getRowId}
+                        refreshKey={refreshKey}
+                        taxInclusiveStates={taxInclusiveStates}
+                        masterServiceStates={masterServiceStates}
+                        showInPDFStates={showInPDFStates}
+
+                        descriptionInputCell={descriptionInputCell}
+                        textInputCell={textInputCell}
+                        numberInputCell={numberInputCell}
+                        dropDownInputCell={dropDownInputCell}
+                        dateInputCell={dateInputCell}
+                        UOMDropdownCell={UOMDropdownCell}
+                        form={form}
+                        preferenceData={preferenceData}
+
+                      />
+                    )}
+                  </Table>
+                </DragDropDataTable>
+              </DndContext>
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+
+          {/* Mobile View (Totals) */}
+          {/* <DataTableTotals {...totalsConfig} />
+
+            {/* Web View (Totals) */}
+
+          <ItemPopover
+            open={dialogOpen}
+            setOpen={setDialogOpen}
+            columns={itemColumn}
+            setTempRowQuotationDetailsListData={setTempRowQuotationDetailsListData}
+            tempRowQuotationDetailsList={tempRowQuotationDetailsList}
+            revalidateQuotationDetails={revalidateQuotationDetails}
+            // itemTable={itemTable}
+            itemType={itemType}
+            setItemType={setItemType}
+            form={form}
+            slug={slug}
+            preferenceData={preferenceData}
+            shouldFetch={shouldFetch}
+          />
+
+        </div>
+
+      </CardContent>
+    </Card>
+  );
+}
+
+// Column Drag and Drop and Resize (Table Body)
+type TableBodyProps = {
+  table: TableType<UOMList>;
+  onRowSelection: (
+    row: Row<UOMList>
+  ) => (event: MouseEvent<HTMLTableRowElement>) => void;
+  getRowId: (row: any, index: number) => string;
+  refreshKey: number;
+  taxInclusiveStates: any;
+  masterServiceStates: any;
+  showInPDFStates: any;
+  handleTaxInclusiveCheckedChanged: (rowIndex: number, isChecked: boolean, row: any) => void;
+  handleMasterServiceCheckedChanged: (rowIndex: number, isChecked: boolean, row: any) => void;
+  handleShowInPDFCheckedChanged: (rowIndex: number, isChecked: boolean, row: any) => void;
+  descriptionInputCell: (cell: any, className: string) => JSX.Element;
+  textInputCell: (cell: any, className: string) => JSX.Element;
+  numberInputCell: (cell: any, allowDecimal: boolean) => JSX.Element;
+  dropDownInputCell: (cell: any) => JSX.Element;
+  dateInputCell: (cell: any) => JSX.Element;
+  UOMDropdownCell: (cell: any) => JSX.Element;
+  form: any;
+  preferenceData: any;
+  currentCurrencyRate: number; // Accurate Currency Rate Update
+};
+
+function NonMemoizedTableBody({
+  table,
+  onRowSelection,
+  getRowId,
+  refreshKey,
+  taxInclusiveStates,
+  masterServiceStates,
+  showInPDFStates,
+  handleTaxInclusiveCheckedChanged,
+  handleMasterServiceCheckedChanged,
+  handleShowInPDFCheckedChanged,
+  descriptionInputCell,
+  textInputCell,
+  numberInputCell,
+  dropDownInputCell,
+  dateInputCell,
+  UOMDropdownCell,
+  form,
+  preferenceData,
+  currentCurrencyRate, // Accurate Currency Rate Update
+}: TableBodyProps) {
+  const decimal = preferenceData?.data?.decimal || 2;
+  return (
+    <TableBody>
+      {table.getRowModel().rows?.length ? (
+        table.getRowModel().rows.map((row, index) => {
+          return (
+            // Row Drag and Drop (Row)
+            <DraggableRow
+              key={`${getRowId(row.original, index)}-${refreshKey}`}
+              id={getRowId(row.original, index)}
+              className="bg-erp-blue-5 data-[state=selected]:bg-erp-blue-9"
+              onClick={onRowSelection(row)}
+              data-state={row.getIsSelected() && "selected"}
+              disabled={false}
+            >
+              {row.getVisibleCells().map((cell, cellIndex) => {
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className="truncate p-2"
+                    title={(cell.getValue() ?? "").toString()}
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                    }}
+                  >
+                    {cellIndex === 0 ? (
+                      <div className="flex items-center gap-2">
+                        <DragHandle
+                          id={getRowId(row.original, index)}
+                          className="flex-shrink-0"
+                        />
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </div>
+                    ) : (
+                      flexRender(cell.column.columnDef.cell, cell.getContext())
+                    )}
+                  </TableCell>
+                );
+
+              })}
+            </DraggableRow>
+          );
+        })
+      ) : (
+        <NoResultsTableRow columns={table.getVisibleLeafColumns()} />
+      )}
+    </TableBody>
+  );
+}
+
+const MemoizedTableBody = memo(
+  NonMemoizedTableBody,
+  (prev, next) => prev.table.options.data === next.table.options.data
+) as typeof NonMemoizedTableBody;

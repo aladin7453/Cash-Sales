@@ -1,0 +1,745 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { FaClipboard, FaLayerGroup, FaTableList } from "react-icons/fa6";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+
+import useSWR from "swr";
+
+import { useToast } from "@/components/ui/use-toast";
+import LoadingUI from "@/components/LoadingUI";
+import { Form } from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { TabsNavigator } from "@/components/ui/TabsNavigator";
+import { CustomFieldHandle, CustomFieldDefinition } from "@/components/DisplayCustomField";
+
+import { getAuthHeaders, ORIGIN, DEFAULT_DATA_TABLE_PAGE_SIZE } from "@/lib/constants";
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+
+//New UI
+import { CustomerDetailsForm } from "./main-details/general-details/CustomerDetailsForm";
+import { DocumentDetailsForm } from "./main-details/general-details/DocumentDetailsForm";
+import CustomerContraDetailsDataTable from "./main-details/customer-contra-details/DataTable";
+
+//Old UI
+import { CustomerDetailsFormOld } from "./main-details/general-details/CustomerDetailsFormOld";
+import { DocumentDetailsFormOld } from "./main-details/general-details/DocumentDetailsFormOld";
+import { OtherDetailsForm } from "./more-details/OtherDetailsForm";
+import CustomerContraDetailsDataTableOld from "./main-details/customer-contra-details/DataTableOld";
+
+
+import { CustomerContraDetailsColumns } from "./main-details/customer-contra-details/columns";
+import TopActionBar from "./TopActionBar";
+import { changelogColumns } from "./changelog/columns";
+import SalesPurchaseContraChangelogDataTable from "./changelog/DataTable";
+import { DateRestrictionContext } from "@/components/custom/DateRestrictionContext";
+
+type PageParams = {
+  params: { slug: string };
+};
+
+const validRoutes = [
+  "new",
+  "edit",
+  "clone",
+] as const;
+
+const fetcher = async (url, tableState = null) => {
+  const headers = getAuthHeaders();
+
+  try {
+    if (tableState) {
+      const { columnFilters, sorting, pagination } = tableState;
+
+      const columnFiltersWithoutValid = columnFilters.filter(
+        (filter) => filter.id !== "valid"
+      );
+
+      const params = new FormData();
+
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append(
+        "param[offset]",
+        `${pagination.pageIndex * pagination.pageSize}`
+      );
+      params.append(
+        "param[filter]",
+        columnFiltersWithoutValid.length > 0
+          ? JSON.stringify(
+            columnFiltersWithoutValid.reduce((acc, curr) => {
+              acc[curr.id] = curr.value;
+              return acc;
+            }, {})
+          )
+          : "{}"
+      );
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc"
+      );
+      params.append(
+        "param[valid]",
+        columnFilters.length > 0
+          ? `${columnFilters.find((row) => row.id === "valid")?.value || ""}`
+          : ""
+      );
+      params.append(
+        "param[sort]",
+        sorting.length > 0 ? sorting[0].id : "createdAt"
+      );
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: params,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to fetch data");
+      }
+
+      const responseData = await response.json();
+      return responseData;
+    }
+
+    // Default GET request for initial data load
+    const response = await fetch(url, {
+      method: "GET",
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Failed to fetch data");
+    }
+
+    const responseData = await response.json();
+    return responseData;
+  } catch (error) {
+    throw error;
+  }
+};
+
+type ValidRoute = (typeof validRoutes)[number];
+
+const salesPurchaseContraFormSchema = z.object({
+  customerCodeCode: z.string().min(1, {
+    message: "Required",
+  }),
+  currencyCode: z.string().optional(),
+  currencyRate: z.string().optional(),
+  currency: z.string().optional(),
+  note: z.string().optional().nullable(),
+  docDate: z.string().default(() => Math.floor(Date.now() / 1000).toString()).nullable(),
+});
+
+function isValidRoute(route: string): route is ValidRoute {
+  return validRoutes.includes(route as ValidRoute);
+}
+
+export default function SalesPurchaseContraPage({ params }: PageParams) {
+  const headers = getAuthHeaders();
+  const router = useRouter();
+  const customFieldRef = useRef<CustomFieldHandle>(null);
+
+  const slug = params.slug;
+
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  const { toast } = useToast();
+
+  const [formResetKey, setFormResetKey] = useState(0);
+
+  const [salesPurchaseContraData, setSalesPurchaseContraData] = useState({});
+  const [tempRowCustomerContraDetailsList, setTempRowCustomerContraDetailsList] = useState([]);
+  const [tempRowAttachments, setTempRowAttachments] = useState([]);
+  const [changelogData, setChangelogData] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [allowPastRecord, setAllowPastRecord] = useState(false);
+
+  // Add table state management
+  const [tableState, setTableState] = useState(null);
+  const [totalContraDetailsCount, setTotalContraDetailsCount] = useState(0);
+
+  // Create refs for each section
+  const mainDetailsRef = useRef(null);
+  const moreDetailsRef = useRef(null);
+
+  //Layout State
+  const [layout, setLayout] = useState<"new" | "old">(() => {
+    if (typeof window === "undefined") return "old";
+    return (localStorage.getItem("Layout") as "new" | "old") || "old";
+  });
+
+  const handleLayoutChange = (newLayout: "new" | "old") => {
+    localStorage.setItem("Layout", newLayout);
+    setLayout(newLayout);
+  };
+
+  const resetForm = () => {
+    setFormResetKey((prevKey) => prevKey + 1);
+  };
+
+  if (!isValidRoute(slug)) {
+    notFound();
+  }
+
+  const {
+    data: attachmentData,
+    error: attachmentDataError,
+    mutate: mutateAttachmentData,
+  } = useSWR(
+    id
+      ? `${ORIGIN}/sales_purchase_contra/api/sales-purchase-contra/load-files?id=${id}`
+      : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+
+  // Preference (State)
+  const [preferenceData, setPreferenceData] = useState<any>(null);
+  const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
+  const [customFieldSavedData, setCustomFieldSavedData] = useState<Record<string, unknown>>({});
+
+  // Preference (Fetch Function)
+  const fetchPreferenceData = async () => {
+    try {
+      const headers = getAuthHeaders();
+
+      const response = await fetch(
+        `${ORIGIN}/universal/get-preference?module=sales`,
+        {
+          method: "GET",
+          headers,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch preference data");
+      }
+
+      const data = await response.json();
+
+      setPreferenceData(data);
+
+      // Fetch custom field definitions
+      const prefRes = await fetch(
+        `${ORIGIN}/sales_preference/api/sales-preference/get-index-sales-preference`,
+        { method: "GET", headers }
+      );
+
+      if (!prefRes.ok) throw new Error("Failed to fetch custom field preference");
+      const prefData = await prefRes.json();
+      const raw = prefData?.data?.customDIYFields ?? prefData?.customDIYFields ?? [];
+
+      const rawFields: CustomFieldDefinition[] = (() => {
+        try {
+          const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+          return Array.isArray(parsed) ? parsed : [];
+        } catch { return []; }
+      })();
+      setCustomFieldDefs(rawFields);
+    } catch (error) {
+      console.error("Error fetching preference data:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchPreferenceData();
+  }, []);
+
+  const {
+    data: salesPurchaseContra,
+    error,
+    isLoading,
+    mutate: mutateSalesPurchaseContra,
+  } = useSWR(
+    id ? `${ORIGIN}/sales_purchase_contra/api/sales-purchase-contra/get-update-sales-purchase-contra-data?id=${id}` : null,
+    (url) => fetcher(url, null) // Pass null for initial load, no table state
+  );
+
+  useEffect(() => {
+    if (error || attachmentDataError) {
+      toast({
+        variant: "destructive",
+        title: "Session Expired",
+        description: "Your session has expired. Redirecting to login page.",
+      });
+      router.push("/login");
+    }
+  }, [
+    error,
+    salesPurchaseContra,
+    router,
+    toast,
+    attachmentData,
+    attachmentDataError,
+  ]);
+
+
+
+  useEffect(() => {
+    if (attachmentData) {
+      setTempRowAttachments(attachmentData);
+    }
+  }, [attachmentData]);
+
+  const form = useForm<z.infer<typeof salesPurchaseContraFormSchema>>({
+    resolver: zodResolver(salesPurchaseContraFormSchema),
+    defaultValues: {
+      docNo: salesPurchaseContra?.data?.docNo ?? "",
+      docDate: salesPurchaseContra?.data?.docDate ?? Math.floor(Date.now() / 1000).toString(),
+      agent: salesPurchaseContra?.data?.agent ?? "",
+      agentName: salesPurchaseContra?.data?.agentName ?? "",
+      creditTerm: salesPurchaseContra?.data?.creditTerm ?? "",
+      creditTermCode: salesPurchaseContra?.data?.creditTermCode ?? "",
+      creditTermType: salesPurchaseContra?.data?.creditTermType ?? "",
+      description: salesPurchaseContra?.data?.description ?? "",
+      customerCode: salesPurchaseContra?.data?.customerCode ?? "",
+      customerCodeCode: salesPurchaseContra?.data?.customerCodeCode ?? "",
+      customerName: salesPurchaseContra?.data?.customerName ?? "",
+      BRN: salesPurchaseContra?.data?.BRN ?? "",
+      attentionName: salesPurchaseContra?.data?.attentionName ?? "",
+      attention: salesPurchaseContra?.data?.attention ?? "",
+      address: salesPurchaseContra?.data?.address ?? "",
+      TIN: salesPurchaseContra?.data?.TIN ?? "",
+      SSTNo: salesPurchaseContra?.data?.SSTNo ?? "",
+      phoneNo: salesPurchaseContra?.data?.phoneNo ?? "",
+      email: salesPurchaseContra?.data?.email ?? "",
+      // Other Details fields
+      currencyCode: salesPurchaseContra?.data?.currencyCode ?? "",
+      currencyRate: salesPurchaseContra?.data?.currencyRate ?? "",
+      currency: salesPurchaseContra?.data?.currency ?? "",
+      note: salesPurchaseContra?.data?.note ?? "",
+      valid: salesPurchaseContra?.data?.valid ?? "1",
+    },
+  });
+
+  useEffect(() => {
+    if (
+      salesPurchaseContra &&
+      slug !== "transfer-to" &&
+      slug !== "transfer-from"
+    ) {
+      if (salesPurchaseContra.data) {
+        const salesPurchaseContraDataCopy = { ...salesPurchaseContra.data };
+
+        // Clear docNo if it's a clone page
+        if (slug === "clone") {
+          salesPurchaseContraDataCopy.docNo = "";
+          salesPurchaseContraDataCopy.docDate = Math.floor(Date.now() / 1000);
+        }
+
+        setSalesPurchaseContraData(salesPurchaseContraDataCopy);
+        setAllowPastRecord(salesPurchaseContra.data.allowPastDates === "1");
+        // setTempRowAttachments(salesPurchaseContra.data.attachmentLink ? salesPurchaseContra.data.attachmentLink : []);
+
+        // Set changelog data if available
+        if (salesPurchaseContra.historyData) {
+          const historyData = {
+            salesPurchaseContra: salesPurchaseContra.historyData.salesPurchaseContra || { rows: [] },
+            salesPurchaseContraHasDetails: salesPurchaseContra.historyData.salesPurchaseContraHasDetails || { rows: [] },
+          };
+
+          setChangelogData(historyData);
+        }
+      }
+    }
+  }, [salesPurchaseContra, slug, form]);
+
+  useEffect(() => {
+    if (
+      salesPurchaseContra &&
+      salesPurchaseContra.salesPurchaseContraHasDetails &&
+      slug !== "transfer-to" &&
+      slug !== "transfer-from"
+    ) {
+      if (Array.isArray(salesPurchaseContra.salesPurchaseContraHasDetails.rows)) {
+        setTempRowCustomerContraDetailsList(salesPurchaseContra.salesPurchaseContraHasDetails.rows);
+
+        if (salesPurchaseContra.salesPurchaseContraHasDetails.total) {
+          setTotalContraDetailsCount(
+            typeof salesPurchaseContra.salesPurchaseContraHasDetails.total === 'string'
+              ? parseInt(salesPurchaseContra.salesPurchaseContraHasDetails.total, 10)
+              : salesPurchaseContra.salesPurchaseContraHasDetails.total
+          );
+        }
+      }
+    }
+  }, [salesPurchaseContra, slug]);
+
+  const handleSubmit = async () => {
+    const isFormValid = await form.trigger();
+
+    if (!isFormValid) {
+      const errors = form.formState.errors;
+
+      if (errors.customerCodeCode) {
+        toast({
+          title: "Customer Required",
+          description: "Please select a customer before saving.",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+      return;
+    }
+
+    try {
+      await onSubmit();
+    } catch (error) {
+      console.error("Form submission error:", error);
+    }
+  };
+
+  const isFetching = isLoading || isSaving;
+
+  const onSubmit = async () => {
+    setIsSaving(true);
+    var form_data = new FormData();
+    var formValues = form.getValues();
+
+    if (!formValues.docDate || formValues.docDate.trim() === '') {
+      formValues.docDate = Math.floor(Date.now() / 1000).toString();
+    }
+
+    var saveType =
+      slug == "clone"
+        ? `create-data?c_id=1`
+        : id
+          ? `update-sales-purchase-contra-data?id=${id}`
+          : `create-data`;
+
+    for (var key in formValues) {
+      form_data.append(
+        `salesPurchaseContra[${key}]`,
+        formValues[key] ? formValues[key] : ""
+      );
+    }
+
+    if (tempRowCustomerContraDetailsList && tempRowCustomerContraDetailsList.length > 0) {
+      tempRowCustomerContraDetailsList.forEach((item, index) => {
+        for (var key in item) {
+          form_data.append(
+            `salesPurchaseContraHasDetails[${index}][${key}]`,
+            item[key] ? item[key] : ""
+          );
+        }
+      });
+    }
+
+    // Handle file attachments
+    if (saveType === "create-data" || slug === "clone") {
+      var counter = 0;
+
+      for (const file of tempRowAttachments) {
+        const base64 = await getFileToBase64(file);
+
+        form_data.append(
+          `salesPurchaseContra[attachment][${counter}][Name]`,
+          file.name
+        );
+
+        form_data.append(
+          `salesPurchaseContra[attachment][${counter}][File]`,
+          base64
+        );
+
+        counter++;
+      }
+    } else {
+      // Update scenario - handle both existing and new attachments
+      var counter = 0;
+
+      for (const attachment of tempRowAttachments) {
+        if (attachment.link) {
+          // Existing attachment
+          form_data.append(
+            `salesPurchaseContra[attachment][${counter}][Name]`,
+            attachment.name
+          );
+
+          form_data.append(
+            `salesPurchaseContra[attachment][${counter}][File]`,
+            ""
+          );
+        } else {
+          // New attachment
+          const base64 = await getFileToBase64(attachment);
+
+          form_data.append(
+            `salesPurchaseContra[attachment][${counter}][Name]`,
+            attachment.name
+          );
+
+          form_data.append(
+            `salesPurchaseContra[attachment][${counter}][File]`,
+            base64
+          );
+        }
+
+        counter++;
+      }
+    }
+
+    try {
+      const response = await fetch(
+        `${ORIGIN}/sales_purchase_contra/api/sales-purchase-contra/${saveType}`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        let errorMessage = errorData.message;
+
+        // Error Handling for "Data too long"
+        if (errorMessage.includes("Data too long")) {
+          errorMessage = errorMessage.split("\n")[0];
+        }
+
+        toast({
+          title: errorData.name,
+          description: errorMessage,
+          variant: "destructive",
+          duration: 2000,
+        });
+
+        throw new Error("Failed to fetch data");
+      }
+
+      const responseData = await response.json();
+
+      if (responseData && responseData.item) {
+        const url = `/sales/sales-purchase-contra/edit?item=${responseData.item}&id=${responseData.data}`;
+
+        router.push(url);
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      } else if (responseData.message) {
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      } else if (slug === "clone" && id) {
+        router.push(`/sales/sales-purchase-contra/clone?id=${id}`);
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      console.error("Error saving sales purchase contra data:", error);
+
+      toast({
+        title: `${error.message}`,
+        duration: 2000,
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const revalidateCustomerContraDetails = (newTableState = null) => {
+    if (newTableState) {
+      setTableState(newTableState);
+
+      if (id) {
+        const url = `${ORIGIN}/sales_purchase_contra/api/sales-purchase-contra/get-update-sales-purchase-contra-data?id=${id}`;
+
+        fetcher(url, newTableState).then((data) => {
+          if (data && data.salesPurchaseContraHasDetails) {
+            if (Array.isArray(data.salesPurchaseContraHasDetails.rows)) {
+              setTempRowCustomerContraDetailsList(data.salesPurchaseContraHasDetails.rows);
+              if (data.salesPurchaseContraHasDetails.total) {
+                setTotalContraDetailsCount(
+                  typeof data.salesPurchaseContraHasDetails.total === 'string'
+                    ? parseInt(data.salesPurchaseContraHasDetails.total, 10)
+                    : data.salesPurchaseContraHasDetails.total
+                );
+              }
+            }
+          }
+        }).catch((error) => {
+          console.error('Error fetching contra details:', error);
+        });
+      }
+    } else {
+      mutateSalesPurchaseContra();
+    }
+  };
+
+  const tabs = [
+    {
+      id: "mainDetails",
+      name: "Main Details",
+      icon: FaClipboard,
+      shortName: "Main",
+    },
+    {
+      id: "moreDetails",
+      name: "More Details",
+      icon: FaLayerGroup,
+      shortName: "More",
+    },
+    ...(slug !== "new"
+      ? [
+        {
+          id: "changelog",
+          name: "Changelog",
+          shortName: "Changelog",
+          icon: FaTableList,
+        },
+      ]
+      : []),
+  ];
+
+  //Shared Props
+  const [isExpand, setIsExpand] = useState(false);
+
+  const dataTableProps = {
+    form,
+    slug,
+    columns: CustomerContraDetailsColumns,
+    data: tempRowCustomerContraDetailsList,
+    tempRowCustomerContraDetailsList,
+    setTempRowCustomerContraDetailsList,
+    revalidateCustomerContraDetails,
+    customerContraData: salesPurchaseContraData,
+    totalCount: totalContraDetailsCount,
+  };
+
+  const documentDetailsProps = {
+    form,
+    slug,
+    isExpand,
+    tempRowAttachments,
+    setTempRowAttachments,
+    preferenceData
+  };
+
+  return (
+    <DateRestrictionContext.Provider value={{ allowPastRecord, setAllowPastRecord }}>
+      <div className="sticky top-0 z-20">
+        <TopActionBar
+          salesPurchaseContra={salesPurchaseContraData}
+          form={form}
+          handleSubmit={handleSubmit}
+          resetForm={resetForm}
+          onSubmit={onSubmit}
+          action={slug}
+          slug={slug}
+          isSaving={isSaving}
+          setIsSaving={setIsSaving}
+          layout={layout}
+          onLayoutChange={handleLayoutChange}
+        />
+      </div>
+
+      {/* New Design */}
+      {layout === "new" && (
+        <div className="box-border flex w-full h-full items-center justify-between gap-x-2 p-1.5">
+          <Form {...form}>
+            {/* Left Container */}
+            <div className="flex h-full min-w-[380px] w-[480px] flex-col gap-y-2">
+              <CustomerDetailsForm
+                form={form}
+                isExpand={isExpand}
+                setIsExpand={setIsExpand}
+                customFieldRef={customFieldRef}
+                customFieldDefs={customFieldDefs}
+                customFieldSavedData={customFieldSavedData}
+                docNo={salesPurchaseContra?.docNo}
+                id={id}
+              />
+              <DocumentDetailsForm {...documentDetailsProps} />
+            </div>
+
+            {/* Right */}
+            <div className="w-full flex flex-1 flex-col h-full mt-3.5 md:mt-0">
+              <CustomerContraDetailsDataTable {...dataTableProps} />
+            </div>
+            {/* Loading */}
+            {isFetching && <LoadingUI />}
+          </Form>
+        </div>
+      )}
+
+      {/* Old Design */}
+      {layout === "old" && (
+        <div className="grid h-full grid-rows-[auto_1fr]">
+          <Form {...form}>
+            <div className="grid h-full grid-cols-[1fr_auto] gap-x-2">
+              <ScrollArea className="h-full">
+                <div id="mainDetails" className="mt-2" ref={mainDetailsRef}>
+                  <DocumentDetailsFormOld key={formResetKey} form={form} slug={slug} />
+                </div>
+
+                <div className="mt-2">
+                  <CustomerDetailsFormOld
+                    key={formResetKey}
+                    form={form}
+                    preferenceData={preferenceData}
+                  />
+                </div>
+
+                <div className="mt-2">
+                  <CustomerContraDetailsDataTableOld
+                    columns={CustomerContraDetailsColumns}
+                    data={tempRowCustomerContraDetailsList}
+                    tempRowCustomerContraDetailsList={tempRowCustomerContraDetailsList}
+                    setTempRowCustomerContraDetailsList={setTempRowCustomerContraDetailsList}
+                    revalidateCustomerContraDetails={revalidateCustomerContraDetails}
+                    form={form}
+                    customerContraData={salesPurchaseContraData}
+                    totalCount={totalContraDetailsCount}
+                    slug={slug}
+                  />
+                </div>
+
+                <div id="moreDetails" className="mt-2" ref={moreDetailsRef}>
+                  <OtherDetailsForm
+                    key={formResetKey}
+                    tempRowAttachments={tempRowAttachments}
+                    setTempRowAttachments={setTempRowAttachments}
+                    form={form}
+                    slug={slug}
+                    preferenceData={preferenceData}
+                  />
+                </div>
+
+                {slug !== "new" && (
+                  <div id="changelog" className="mt-2">
+                    <SalesPurchaseContraChangelogDataTable
+                      columns={changelogColumns}
+                      initialData={changelogData}
+                      onTableParamsChange={() => { }} // Add proper handler if needed
+                    />
+                  </div>
+                )}
+              </ScrollArea>
+
+              <TabsNavigator tabs={tabs} initialActiveTabId="mainDetails" stickyTop="top-14" />
+            </div>
+          </Form>
+          {isFetching && <LoadingUI />}
+        </div>
+      )}
+    </DateRestrictionContext.Provider>
+  );
+}

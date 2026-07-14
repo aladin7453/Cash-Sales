@@ -1,0 +1,183 @@
+import type { Section } from "../sections";
+
+export const assetSection: Section = {
+  access: "Asset",
+  children: [
+    {
+      access: "Asset Group",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Asset Category",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Asset Type",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Computer",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Asset",
+      hasScope: true,
+      allowedActions: [
+        "View",
+        "New",
+        "Edit",
+        "Clone",
+        "Trash",
+        "Restore",
+        "Delete",
+        "Download",
+        "Export",
+      ],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Acquisition Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Valuation and Depreciation Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Main & Sub Asset",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Service and Maintenance Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "QR Code",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset", "Print"],
+        },
+      ],
+    },
+    {
+      access: "Asset Assignment",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Asset Lease",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Asset Borrow",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Asset Disposal",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+  ],
+};

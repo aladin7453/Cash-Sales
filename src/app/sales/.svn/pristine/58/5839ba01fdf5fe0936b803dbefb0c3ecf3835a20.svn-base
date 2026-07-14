@@ -1,0 +1,2229 @@
+"use client";
+
+import React, { useEffect, useRef, useState } from "react";
+import type {
+  ColumnDef,
+  Row,
+  SortingState,
+  ColumnOrderState,
+  ColumnSizingState,
+  VisibilityState,
+  Table as TableType
+} from "@tanstack/react-table";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+
+import { useSearchParams } from "next/navigation";
+
+import formatNumber from "@/lib/utils/data-table/formatNumber";
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import {
+  DEFAULT_DATA_TABLE_PAGE_SIZE_NEW,
+  getAuthHeaders,
+  ORIGIN,
+  DATA_TABLE_DEFAULT_COLUMN_SIZING,
+} from "@/lib/constants";
+
+import QuotationDetailsDataTableToolbar from "./DataTableToolbar";
+import { ServiceColumns, StockColumns } from "./itemColumns";
+import ItemPopover from "./ItemPopover";
+import { PackageColumns } from "./packageColumns";
+import PackagePopover from "./PackagePopover";
+import type { Quotation } from "../../../columns";
+import type { UOMList } from "./columns";
+
+// Mobile View (Imports)
+import MobileFormDataTable from "@/components/form/MobileFormDataTable";
+import DataTableTotals from "@/components/form/MobileFormDataTableTotals";
+
+// Drag and Drop (Imports)
+import { DragDropDataTable, DraggableRow, useDragDropTable } from "@/components/data-table/row-drag-drop";
+
+// Column Drag and Drop and Resize (Imports)
+import { memo } from "react";
+import type { MouseEvent } from "react";
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import getExcludedColumns from "@/lib/utils/data-table/getExcludedColumns";
+import handleDndDragEnd from "@/lib/utils/data-table/handleDndDragEnd";
+import { DragHandle } from "@/components/data-table/row-drag-drop";
+
+// Selling Price History Popover (Imports)
+import SellingPriceHistoryPopover from "@/components/features/sales-purchase-transaction/selling-price-history-popover/sellingPriceHistoryPopover";
+
+// Refactor Charges Details Input Cell (Imports)
+import {
+  UOMDropdownInputCell,
+  NumberInputCellComponent,
+  TextInputCellComponent,
+  DescriptionInputCellComponent,
+  DateInputCellComponent,
+  DropdownInputCellComponent,
+  SelectInputCellComponent
+} from "@/components/features/sales-purchase-transaction/charges-details/inputCell";
+
+type DataTableProps = {
+  columns: ColumnDef<UOMList>[];
+  data: UOMList[];
+  tempRowQuotationDetailsList: any;
+  setTempRowQuotationDetailsList: (data: any) => void;
+  revalidateQuotationDetails: () => void;
+  form: any;
+  quotationData: any;
+  UOMDetails: any[];
+  preferenceData?: any;
+  isMobile?: boolean;
+  slug: string;
+};
+
+// Column Drag and Drop and Resize (Local Storage Keys)
+const COLUMN_ORDERING_KEY = "quotation.details.bs.table.ordering";
+const COLUMN_SIZING_KEY = "quotation.details.bs.table.sizing";
+const COLUMN_VISIBILITY_KEY = "quotation.details.bs.table.columns";
+
+// HTML Utility Function
+function stripHtml(html) {
+  if (!html) return "";
+  // Replace <br> and <br/> with newlines
+  let text = html.replace(/<br\s*\/?>/gi, '\n');
+  // Replace <p> with nothing, </p> with newline
+  text = text.replace(/<p[^>]*>/gi, '').replace(/<\/p>/gi, '\n');
+  // Remove all other HTML tags
+  text = text.replace(/<[^>]+>/g, '');
+  // Replace HTML entities
+  text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+
+  return text;
+}
+
+export default function QuotationDetailsDataTable({
+  columns,
+  data,
+  tempRowQuotationDetailsList,
+  setTempRowQuotationDetailsList,
+  revalidateQuotationDetails,
+  form,
+  quotationData,
+  UOMDetails,
+  preferenceData,
+  slug,
+  isMobile
+}: DataTableProps) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [itemSorting, setItemSorting] = useState<SortingState>([]);
+
+  // Column Drag and Drop and Resize (Constants)
+  const initialColumnOrder = columns?.filter(column => column?.id).map((column) => column.id!) || [];
+  const [columnOrder, setColumnOrder] = useLocalStorage<ColumnOrderState>(
+    COLUMN_ORDERING_KEY,
+    initialColumnOrder
+  );
+  const [columnSizing, setColumnSizing] = useLocalStorage<ColumnSizingState>(
+    COLUMN_SIZING_KEY,
+    {}
+  );
+  const defaultColumns: Array<keyof UOMList> = [
+    "itemCode",
+    "itemName",
+    "type",
+    "quantity",
+    "price",
+    "subtotalTax",
+  ];
+  const defaultColumnVisibility: VisibilityState = getExcludedColumns(
+    columns || [],
+    defaultColumns
+  );
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    COLUMN_VISIBILITY_KEY,
+    defaultColumnVisibility
+  );
+
+  // Preference (Include Preference Data)
+  function setTempRowQuotationDetailsListData(data, overwrite) {
+    if (overwrite) {
+      // Ensure first row always has master and showTemplate set to "1"
+      const updatedData = data.map((item, index) => ({
+        ...item,
+        preferenceData: preferenceData,
+        master: index === 0 ? "1" : item.master || "0",
+        showTemplate: index === 0 ? "1" : item.showTemplate || "0",
+      }));
+
+      setTempRowQuotationDetailsList(updatedData);
+    } else {
+      const newData = Array.isArray(data) ? data : [data];
+
+      setTempRowQuotationDetailsList((tempRowQuotationDetailsList) => {
+        const existingData = [...tempRowQuotationDetailsList];
+        const updatedData = [...existingData, ...newData];
+
+        // Ensure first row always has master and showTemplate set to "1"
+        return updatedData.map((item, index) => ({
+          ...item,
+          preferenceData: preferenceData,
+          master: index === 0 ? "1" : item.master || "0",
+          showTemplate: index === 0 ? "1" : item.showTemplate || "0",
+        }));
+      });
+    }
+  }
+
+  // Drag and Drop (State & Functions)
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const [rowSelection, setRowSelection] = useState({});
+
+  // Use tempRowQuotationDetailsList if it exists, otherwise use data
+  const tableData = (tempRowQuotationDetailsList) || slug === "clone"
+    ? tempRowQuotationDetailsList.map(row => ({
+      ...row,
+      preferenceData: preferenceData
+    }))
+    : (data || []).map(row => ({
+      ...row,
+      preferenceData: preferenceData
+    }));
+
+  const {
+    items,
+    activeId,
+    isDragging,
+    handleDragStart,
+    handleDragEnd,
+    getRowId,
+  } = useDragDropTable({
+    data: tableData,
+    onReorder: (newData) => {
+
+      // Update sequence numbers for all items based on their new order
+      const dataWithUpdatedSeq = newData.map((item, index) => {
+        const updatedItem = {
+          ...item,
+          seq: (index + 1).toString(), // Update seq to reflect new order (1-based)
+        };
+
+        // Always set first row as master and show in PDF
+        if (index === 0) {
+          updatedItem.master = "1";
+          updatedItem.showTemplate = "1";
+        }
+
+        return updatedItem;
+      });
+
+      // Update the data immediately and force re-render
+      setTempRowQuotationDetailsList(dataWithUpdatedSeq);
+
+      // Update checkbox states based on new order
+      const newMasterStates = {};
+      const newShowInPDFStates = {};
+
+      dataWithUpdatedSeq.forEach((item, index) => {
+        newMasterStates[index] = item.master || "0";
+        newShowInPDFStates[index] = item.showTemplate || "0";
+      });
+
+      setMasterServiceStates(newMasterStates);
+      setShowInPDFStates(newShowInPDFStates);
+
+      // Force table to update by incrementing refresh key
+      setRefreshKey(prev => prev + 1);
+    },
+    idField: "UUID",
+    disabled: false,
+  });
+
+  // Column Drag and Drop and Resize (Data Table)
+  const table = useReactTable({
+    columns,
+    data: tableData,
+    state: {
+      sorting,
+      columnVisibility,
+      rowSelection,
+      columnOrder,
+      columnSizing,
+    },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+    enableRowSelection: true,
+    autoResetPageIndex: false,
+    columnResizeMode: "onChange",
+    defaultColumn: DATA_TABLE_DEFAULT_COLUMN_SIZING,
+    enableColumnResizing: true,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getRowId: (row, index) => getRowId(row, index),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE_NEW,
+      },
+      columnVisibility: JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}"),
+    },
+  });
+
+  const sensors = useDndSensors();
+  const columnSizeVars = useColumnSizeVars(table);
+
+  useEffect(() => {
+    localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [itemData, setItemData] = useState([]);
+  const [packageDialogOpen, setPackageDialogOpen] = useState(false);
+  const [packageData, setPackageData] = useState([]);
+  const [taxInclusiveStates, setTaxInclusiveStates] = useState({});
+  const [masterServiceStates, setMasterServiceStates] = useState({});
+  const [showInPDFStates, setShowInPDFStates] = useState({});
+  const [itemType, setItemType] = useState("stock");
+  const [textInputs, setTextInputs] = useState({});
+  const [UOMInputs, setUOMInputs] = useState<Record<string, string>>({});
+  const [UOM2Inputs, setUOM2Inputs] = useState<Record<string, string>>({});
+  const [UOM3Inputs, setUOM3Inputs] = useState<Record<string, string>>({});
+  const [numberInputs, setNumberInputs] = useState({});
+  const [moreDescriptions, setMoreDescriptions] = useState({});
+  const [dropdownDatas, setDropdownDatas] = useState({});
+  const [showTables, setShowTables] = useState({});
+  const [dropdownInputDatas, setDropdownInputDatas] = useState({});
+
+  // Selling Price History Popover (State)
+  const [priceHistoryDialogOpen, setPriceHistoryDialogOpen] = useState(false);
+  const [selectedItemForPriceHistory, setSelectedItemForPriceHistory] = useState<string>("");
+
+  const dropdownTableColumns = {
+    classificationCode: [
+      { accessorKey: "classificationCode", header: "Classification Code" },
+      { accessorKey: "description", header: "Description" },
+    ],
+    projectCode: [
+      { accessorKey: "projectCode", header: "Project Code" },
+      { accessorKey: "description", header: "Description" },
+    ],
+    taxCode: [
+      { accessorKey: "taxCode", header: "Tax Code" },
+      { accessorKey: "taxTypeCode", header: "Tax Type" },
+      { accessorKey: "taxRate", header: "Tax Rate" },
+      { accessorKey: "description", header: "Description" },
+    ],
+    customerCodeCode: [
+      { accessorKey: "customerCode", header: "Customer Code" },
+      { accessorKey: "customerGroupCode", header: "Customer Group" },
+      { accessorKey: "customerName", header: "Customer Name" },
+      { accessorKey: "BRN", header: "BRN" },
+    ],
+  };
+
+  // Prevent text selection when performing multiple row selection with "shift" + click
+  usePreventShiftTextSelect();
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTables(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  const onDoubleClick = (row: Row<Quotation>) => { };
+
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  const itemTable = useReactTable({
+    columns: itemType === "service" ? ServiceColumns : StockColumns,
+    data: itemData,
+    state: { sorting: itemSorting },
+    onSortingChange: setItemSorting,
+    autoResetPageIndex: false,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE_NEW,
+      },
+    },
+  });
+
+  const handleOnAdd = async () => {
+    setDialogOpen(true);
+
+    await fetchItemData(itemType);
+  };
+
+  const fetchItemData = async (itemType: string) => {
+    try {
+      const response = await fetch(
+        `${ORIGIN}/universal/get-all-item-details?itemType=${itemType}`,
+        {
+          headers,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to create new service category data");
+      }
+
+      const responseData = await response.json();
+
+      setItemType(itemType);
+      setItemData(responseData.rows);
+    } catch (error) {
+      console.error(`Failed to fetch ${itemType} data`);
+    }
+  };
+
+  const handleOnPackage = async () => {
+    setPackageDialogOpen(true); // Open the dialog immediately
+    fetchPackageData(); // Fetch package data asynchronously
+  };
+
+  const fetchPackageData = async () => {
+    try {
+      const response = await fetch(`${ORIGIN}/universal/get-all-package`, {
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create fetch package data");
+      }
+
+      const responseData = await response.json();
+
+      setPackageData(responseData.rows);
+    } catch (error) {
+      console.error(`Failed to fetch ${itemType} data`);
+    }
+  };
+
+  useEffect(() => {
+    if (data) {
+      // table.getRowModel().rows.forEach((row, index) => {
+      //   setTaxInclusiveStates((taxInclusiveStates) => ({
+      //     ...taxInclusiveStates,
+      //     [index]: row.original.taxInclusive,
+      //   }));
+
+      //   setMasterServiceStates((masterServiceStates) => ({
+      //     ...masterServiceStates,
+      //     [index]: row.original.master,
+      //   }));
+
+      //   setShowInPDFStates((showInPDFStates) => ({
+      //     ...showInPDFStates,
+      //     [index]: row.original.showTemplate,
+      //   }));
+      // });
+      data.forEach((row, index) => {
+        setTaxInclusiveStates((taxInclusiveStates) => ({
+          ...taxInclusiveStates,
+          [index]: row.taxInclusive,
+        }));
+
+        setMasterServiceStates((masterServiceStates) => ({
+          ...masterServiceStates,
+          [index]: row.master,
+        }));
+
+        setShowInPDFStates((showInPDFStates) => ({
+          ...showInPDFStates,
+          [index]: row.showTemplate,
+        }));
+      });
+    }
+  }, [data]);
+
+  const handleTaxInclusiveCheckedChanged = (rowIndex, isChecked, row) => {
+    const value = isChecked ? "1" : "0";
+
+    setTaxInclusiveStates((taxInclusiveStates) => ({
+      ...taxInclusiveStates,
+      [rowIndex]: value,
+    }));
+
+    // Directly update the row's original data
+    row.original.taxInclusive = value;
+
+    // Update tempRowQuotationDetailsList
+    setTempRowQuotationDetailsList((prevList) =>
+      prevList.map((item, idx) => {
+        if (idx === rowIndex) {
+          return { ...item, taxInclusive: value };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleMasterServiceCheckedChanged = (rowIndex, isChecked, row) => {
+    // Prevent unchecking master service for the first row
+    if (row.index === 0 && !isChecked) {
+      return;
+    }
+    const value = isChecked ? "1" : "0";
+
+    setMasterServiceStates((masterServiceStates) => ({
+      ...masterServiceStates,
+      [row.index]: value,
+    }));
+
+    // If Master Service is checked, ensure Show in PDF is checked
+    if (isChecked) {
+      setShowInPDFStates((showInPDFStates) => ({
+        ...showInPDFStates,
+        [row.index]: "1",
+      }));
+
+      // Update temp data
+      setTempRowQuotationDetailsList((prevList) =>
+        prevList.map((item, idx) => {
+          if (idx === row.index) {
+            return { ...item, master: value, showTemplate: "1" };
+          }
+          return item;
+        })
+      );
+    } else {
+      // Update temp data
+      setTempRowQuotationDetailsList((prevList) =>
+        prevList.map((item, idx) => {
+          if (idx === row.index) {
+            return { ...item, master: value };
+          }
+          return item;
+        })
+      );
+    }
+
+    row.original.master = value;
+    if (isChecked) {
+      row.original.showTemplate = "1";
+    }
+  };
+
+  const handleShowInPDFCheckedChanged = (rowIndex, isChecked, row) => {
+    // Prevent unchecking Show in PDF for the first row
+    if (row.index === 0 && !isChecked) {
+      return;
+    }
+
+    // 'Show in PDF' can only be unchecked if 'Master Service' is unchecked
+    if (masterServiceStates[row.index] === "1" && !isChecked) {
+      return;
+    }
+
+    const value = isChecked ? "1" : "0";
+
+    setShowInPDFStates((showInPDFStates) => ({
+      ...showInPDFStates,
+      [row.index]: value,
+    }));
+
+    // Update temp data
+    setTempRowQuotationDetailsList((prevList) =>
+      prevList.map((item, idx) => {
+        if (idx === row.index) {
+          return { ...item, showTemplate: value };
+        }
+        return item;
+      })
+    );
+
+    row.original.showTemplate = value;
+  };
+
+  // Accurate Currency Rate Update
+  const [currentCurrencyRate, setCurrentCurrencyRate] = useState<number>(1);
+
+  // Preference (Format Number Function)
+  const formatNumberWithPreference = (value: string | number): string => {
+    const decimal = preferenceData?.data?.decimal || 2;
+
+    if (value === null || value === undefined || value === '') {
+      return (0).toFixed(decimal);
+    }
+
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+
+    if (isNaN(numValue)) {
+      return (0).toFixed(decimal);
+    }
+
+    return numValue.toFixed(decimal);
+  };
+
+  // Preference (Calculate Total with Formatting)
+  const calculateTotal = (field: string) => {
+    let total = 0;
+
+    // Three Discount (Total Calculation)
+    table.getRowModel().rows.forEach((row) => {
+      if (field === "discountAmount") {
+        // For discount amount, sum all three tiers
+        const discount1 = Number(row.original.discountAmount) || 0;
+        const discount2 = Number(row.original.discountAmount2) || 0;
+        const discount3 = Number(row.original.discountAmount3) || 0;
+        total += discount1 + discount2 + discount3;
+      } else if (row.original[field]) {
+        total += Number(row.original[field]);
+      }
+    });
+
+    // If the field is "quantity", return the total as an integer
+    if (field === "quantity") {
+      return Math.round(total).toString();
+    }
+
+    // Preference (Apply Decimal Formatting to Total)
+    return formatNumberWithPreference(total);
+  };
+
+  // Preference (Calculate Net Total with Formatting) - Updated to use fetched currency rate
+  const calculateNetTotal = (convertToLocal: boolean) => {
+    let total = 0;
+
+    table.getCoreRowModel().rows.forEach((row) => {
+      if (row.original.subtotalTax) total += Number(row.original.subtotalTax);
+    });
+
+    total = Math.round(total * 20) / 20;
+
+    if (convertToLocal) {
+      total *= currentCurrencyRate; // Accurate Currency Rate Update
+    }
+
+    // Preference (Apply Decimal Formatting to Net Total)
+    return formatNumberWithPreference(total);
+  };
+
+  //temporary harcoded first
+  const templateOptionsMap = {
+    salesInvoice: [
+      { label: "Default 2 (Itemized CG)(NEW)", value: "Default_2_(Itemized CG).html" },
+      { label: "Default 2 (Itemized)(NEW)", value: "Default_2_(Itemized).html" },
+      { label: "E Invoice(NEW)", value: "E_Invoice.html" },
+      { label: "Service 1 (Itemized)(NEW)", value: "Service_1_(Itemized).html" },
+      { label: "Service 1 (Itemized Relationship)(NEW)", value: "Service_1_(Itemized_Relationship).html" },
+      { label: "Service 2 (Summary)(NEW)", value: "Service_2_(Summary).html" },
+      { label: "Service 2 (Summary BRN)(NEW)", value: "Service_2_(Summary_BRN).html" },
+      { label: "Service 2 (Summary ID Remark1)(NEW)", value: "Service_2_(Summary_ID_Remark1).html" },
+      { label: "Service 2 (Summary Remark1)(NEW)", value: "Service_2_(Summary_Remark1).html" },
+      { label: "Service 2 (Summary SST 6%)(NEW)", value: "Service_2_(Summary_SST_6%).html" },
+      { label: "Service 3 (Summary Remark2)(NEW)", value: "Service_3_(Summary_Remark2).html" },
+      { label: "Service 4 (Summary Remark1 TIN)(NEW)", value: "Service_4_(Summary_Remark1_TIN).html" },
+      { label: "Service 5 (Summary)(NEW)", value: "Service_5_(Summary).html" },
+
+    ],
+    salesOrder: [
+      { label: "Default 1 (Itemized CG)(NEW)", value: "Default_1_(Itemized_CG).html" },
+      { label: "Default 1 (Summary  CG)(NEW)", value: "Default_1_(Summary _CG).html" },
+      { label: "Proforma Invoice(NEW)", value: "Proforma_Invoice.html" },
+    ],
+  };
+  const selectInputCell = ({ row, column: { id } }) => {
+    let columnOptions = []
+
+    const currentModule = row.original.module;
+    const autoBillingConfigInvertal = [{ label: "Daily", value: "Daily" },
+    { label: "Weekly", value: "Weekly" },
+    { label: "Monthly", value: "Monthly" },
+    { label: "Quarterly", value: "Quarterly" },
+    { label: "Yearly", value: "Yearly" }]
+
+    if (id == "billingInterval") {
+      columnOptions = autoBillingConfigInvertal
+    } else if (id == "module") {
+      columnOptions = [{ label: "Sales Invoice", value: "salesInvoice" }, { label: "Sales Order", value: "salesOrder" }]
+    } else if (id == "template") {
+      columnOptions = templateOptionsMap[currentModule] || [];
+    }
+    return (
+      <SelectInputCellComponent
+        row={row}
+        column={{ id }}
+        className="h-7.5 text-[11px]"
+        setTextInputs={setTextInputs}
+        setTempRowDetailsList={setTempRowQuotationDetailsList}
+        options={columnOptions}
+      />
+    );
+  };
+
+  // Refactor Charges Details Input Cell (Start)
+  const textInputCell = ({ row, column: { id } }) => {
+    return (
+      <TextInputCellComponent
+        row={row}
+        column={{ id }}
+        className="h-7.5 text-[11px]"
+        setTextInputs={setTextInputs}
+        setTempRowDetailsList={setTempRowQuotationDetailsList}
+      />
+    );
+  };
+
+  const descriptionInputCell = ({ row, column: { id } }) => {
+    return (
+      <DescriptionInputCellComponent
+        row={row}
+        column={{ id }}
+        className="h-7.5 px-2 py-0 text-[11px]"
+        setTextInputs={setTextInputs}
+        setMoreDescriptions={setMoreDescriptions}
+        setTempRowDetailsList={setTempRowQuotationDetailsList}
+      />
+    );
+  };
+
+  const UOMDropdownCell = ({ row, column: { id } }) => {
+    return (
+      <UOMDropdownInputCell
+        row={row}
+        column={{ id }}
+        UOMInputs={UOMInputs}
+        setUOMInputs={setUOMInputs}
+        UOM2Inputs={UOM2Inputs}
+        setUOM2Inputs={setUOM2Inputs}
+        UOM3Inputs={UOM3Inputs}
+        setUOM3Inputs={setUOM3Inputs}
+        setTempRowDetailsList={setTempRowQuotationDetailsList}
+      />
+    );
+  };
+
+  const dateInputCell = ({ row, column: { id } }) => {
+    return (
+      <DateInputCellComponent
+        row={row}
+        column={{ id }}
+        setTempRowDetailsList={setTempRowQuotationDetailsList}
+        isDisabled={id=="nextGenerateAt" && row.original.autoBilling?true:false}
+      />
+    );
+  };
+
+  const dropDownInputCell = ({ row, column: { id } }) => {
+    return (
+      <DropdownInputCellComponent
+        row={row}
+        column={{ id }}
+        dropdownDatas={dropdownDatas}
+        setDropdownDatas={setDropdownDatas}
+        dropdownInputDatas={dropdownInputDatas}
+        setDropdownInputDatas={setDropdownInputDatas}
+        showTables={showTables}
+        setShowTables={setShowTables}
+        setTempRowDetailsList={setTempRowQuotationDetailsList}
+        fetchDropdownData={fetchDropdownData}
+        dropdownTableColumns={dropdownTableColumns}
+        inputRef={inputRef}
+        dropdownRef={dropdownRef}
+      />
+    );
+  };
+
+  const numberInputCell = ({ row, column: { id } }, allowDecimal: boolean) => {
+    return (
+      <NumberInputCellComponent
+        row={row}
+        column={{ id }}
+        allowDecimal={allowDecimal}
+        preferenceData={preferenceData}
+        setNumberInputs={setNumberInputs}
+        setTempRowDetailsList={setTempRowQuotationDetailsList}
+        onPriceHistoryClick={(itemId) => {
+          setSelectedItemForPriceHistory(itemId);
+          setPriceHistoryDialogOpen(true);
+        }}
+      />
+    );
+  };
+  // Refactor Charges Details Input Cell (End)
+
+  const fetchDropdownData = async (table: string) => {
+    try {
+      var form_data = new FormData();
+
+      table == "customerCodeCode" ? form_data.append(`table[0]`, table.slice(0, -8)) : form_data.append(`table[0]`, table.slice(0, -4));
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch dropdown data");
+      }
+
+      const data = await response.json();
+      if (table == "customerCodeCode") {
+        data.rows = data.rows.map((row) => {
+          return {
+            ...row,
+            customerCodeCode: row.customerCode,
+          }
+        })
+      }
+
+      setDropdownDatas((dropdownDatas) => ({ ...dropdownDatas, [table]: data.rows }));
+    } catch (error) {
+      console.error("Error fetching dropdown data:", error);
+
+      throw new Error("Failed to fetch dropdown data");
+    }
+  };
+
+  const updateItem = async (prop) => {
+    const now = new Date();
+    const startDayTs = Math.floor(now.getTime() / 1000);    // Start = now (seconds)
+    const lastDayTs = Math.floor(
+      new Date(
+        now.getFullYear(),
+        now.getMonth() + 1,
+        0,
+        23, 59, 59, 999
+      ).getTime() / 1000
+    ); // End = end of last day of current month (seconds)
+
+    try {
+      const formData = new FormData();
+
+      let selectedRowModel = Array(0);
+
+      if (prop.table) {
+        // Selection Order (Logic)
+        if (prop.selectionOrder && prop.selectionOrder.length > 0) {
+          // Create a map of selected rows for quick lookup
+          const selectedRowsMap = new Map(
+            prop.table.getSelectedRowModel().rows.map(row => [row.id, row])
+          );
+          // Reorder selected rows based on selection order
+          selectedRowModel = prop.selectionOrder
+            .filter(rowId => selectedRowsMap.has(rowId))
+            .map(rowId => selectedRowsMap.get(rowId));
+        } else {
+          // Fallback to default table order if no selection order is provided
+          selectedRowModel = prop.table.getSelectedRowModel().rows;
+        }
+      } else {
+        selectedRowModel.push(prop.row);
+      }
+
+      // Calculate totals from all rows in the table
+      let totalAmount = table.getFilteredRowModel().rows.reduce((sum, row) => {
+        return sum + (row.original.amount ? parseFloat(row.original.amount) : 0);
+      }, 0);
+
+      let totalDiscount = table.getFilteredRowModel().rows.reduce((sum, row) => {
+        return sum + (row.original.discountAmount ? parseFloat(row.original.discountAmount) : 0);
+      }, 0);
+
+      let totalDiscount2 = table.getFilteredRowModel().rows.reduce((sum, row) => {
+        return sum + (row.original.discountAmount2 ? parseFloat(row.original.discountAmount2) : 0);
+      }, 0);
+
+      let totalDiscount3 = table.getFilteredRowModel().rows.reduce((sum, row) => {
+        return sum + (row.original.discountAmount3 ? parseFloat(row.original.discountAmount3) : 0);
+      }, 0);
+
+      let totalTax = table.getFilteredRowModel().rows.reduce((sum, row) => {
+        return sum + (row.original.taxAmount ? parseFloat(row.original.taxAmount) : 0);
+      }, 0);
+
+      const finalTotalDiscount = totalDiscount + totalDiscount2 + totalDiscount3
+
+      if (!prop.isUpdate) {
+        // Add selected items
+        selectedRowModel.forEach((row) => {
+          totalAmount += row.original.refPrice ? parseFloat(row.original.refPrice) : 0;
+        });
+      }
+
+      // Calculate totals
+      let totalSubtotal = totalAmount - finalTotalDiscount;
+      let totalPayable = totalAmount - finalTotalDiscount + totalTax;
+      const roundTotalPayable = Math.round(totalPayable * 20) / 20;
+      const localNetTotal = roundTotalPayable * currentCurrencyRate
+
+      const roundingAmount = roundTotalPayable - totalPayable;
+
+      const decimal = preferenceData?.data?.decimal || 2;
+
+
+      // Create quotation object with totals
+      const quotationData = {
+        totalAmount: totalAmount.toFixed(decimal),
+        totalDiscount: finalTotalDiscount.toFixed(decimal),
+        totalTax: totalTax.toFixed(decimal),
+        totalSubtotal: totalSubtotal.toFixed(decimal),
+        totalPayable: roundTotalPayable.toFixed(decimal),
+        outstandingAmount: roundTotalPayable.toFixed(decimal),
+        localNetTotal: localNetTotal.toFixed(decimal),
+        netTotal: roundTotalPayable.toFixed(decimal),
+        roundingAmount: roundingAmount.toFixed(decimal)
+
+      };
+
+      // Get current quotation details
+      let quotationHasDetailsData = [];
+
+      if (prop.isUpdate) {
+        // For updates, use the current table data
+        quotationHasDetailsData = table.getFilteredRowModel().rows.map(row => row.original);
+
+      } else {
+        // For new items, add selected items to existing data
+        const existingData = table.getFilteredRowModel().rows.map(row => row.original);
+
+        // Selection Order (Add Index and Sequence)
+        const newItems = selectedRowModel.map((row, index) => {
+          const item = row.original;
+
+          // Get the maximum existing sequence number
+          const existingData = table.getFilteredRowModel().rows.map(row => row.original);
+          const maxSeq = existingData.length > 0
+            ? Math.max(...existingData.map(item => parseInt(item.seq) || 0))
+            : 0;
+
+          return {
+            UUID: "",
+            seq: (maxSeq + index + 1).toString(),
+            item: item.UUID,
+            type: prop.itemType === "service" ? "Service" : "Stock",
+            description: stripHtml(item.description) || "",
+            "2ndDescription": stripHtml(item["2ndDescription"]) || "",
+            moreDescription: stripHtml(item.moreDescription) || "",
+            itemGroup: item.serviceGroupCode || item.stockGroupCodeCode || "",
+            itemCategory: item.serviceCategoryCode || item.stockCategoryCodeCode || "",
+            tariff: null,
+            classification: item.classification || "",
+            permitNo: null,
+            project: form.getValues("project") || "",
+            quantity: 1,
+            quantity2: 1,
+            quantity3: 1,
+            UOM: item.defaultUOMSales || "",
+            price: item.promotionPrice || "",
+            discountRate: "",
+            discountAmount: "",
+            tax: null,
+            deliveryDate: prop.itemType === "service" ? item.deliveryDate : "",
+            billingFrequency: prop.itemType === "service" ? item.billingFrequency : null,
+            billingInterval: prop.itemType === "service" ? item.billingInterval : null,
+            startAt: preferenceData?.data?.quotationDefaultDate == "1" ? startDayTs : "",
+            endAt: preferenceData?.data?.quotationDefaultDate == "1" ? lastDayTs : "",
+            remark1: "",
+            remark2: "",
+            amount: item.refPrice || "",
+            subTotal: item.refPrice || "",
+            subtotalTax: item.refPrice || "",
+            taxableAmount: item.refPrice || "",
+            amountExclTax: item.refPrice || "",
+            amountInclTax: item.refPrice || "",
+          };
+        });
+
+        quotationHasDetailsData = [...existingData, ...newItems];
+      }
+
+      // Combine quotation and quotationHasDetails into single data object
+      const combinedData = {
+        quotation: quotationData,
+        quotationHasDetails: quotationHasDetailsData
+      };
+
+      // Add combined data as JSON string
+      formData.append('data', JSON.stringify(combinedData));
+
+      const response = await fetch(
+        `${ORIGIN}/quotation/api/quotation/update-quotation-has-details-data?id=${id}`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        if (response.status === 403) {
+          toast({
+            title: errorData.message,
+            duration: 2000,
+          });
+        }
+
+        throw new Error("Failed to fetch data");
+      }
+
+      revalidateQuotationDetails();
+    } catch (error) {
+      console.error("Error updating service data:", error);
+      // Handle errors, e.g., display an error message or log the error
+    }
+  };
+
+  // Mobile View (Field Configurations)
+  const mobileFieldConfigs = {
+    description: {
+      type: 'text' as const,
+      label: 'Description',
+      colSpan: 2 as const
+    },
+    '2ndDescription': {
+      type: 'text' as const,
+      label: '2nd Description',
+      colSpan: 2 as const
+    },
+    moreDescription: {
+      type: 'text' as const,
+      label: 'More Description',
+      colSpan: 2 as const
+    },
+    quantity: {
+      type: 'number' as const,
+      label: 'Quantity[1]',
+      allowDecimal: false
+    },
+    quantity2: {
+      type: 'number' as const,
+      label: 'Quantity[2]',
+      allowDecimal: false
+    },
+    quantity3: {
+      type: 'number' as const,
+      label: 'Quantity[3]',
+      allowDecimal: false
+    },
+    price: {
+      type: 'number' as const,
+      label: 'Price',
+      allowDecimal: true,
+    },
+    discountRate: {
+      type: 'number' as const,
+      label: 'Discount %',
+      allowDecimal: true
+    },
+    discountAmount: {
+      type: 'number' as const,
+      label: 'Discount Amount',
+      allowDecimal: true
+    },
+    startAt: {
+      type: 'date' as const,
+      label: 'Start Date'
+    },
+    endAt: {
+      type: 'date' as const,
+      label: 'End Date'
+    },
+    taxInclusive: {
+      type: 'checkbox' as const,
+      label: 'Tax Inclusive'
+    },
+    master: {
+      type: 'checkbox' as const,
+      label: 'Master Service'
+    },
+    showTemplate: {
+      type: 'checkbox' as const,
+      label: 'Show in PDF'
+    },
+    UOM: {
+      type: 'uom' as const,
+      label: 'UOM[1]'
+    },
+    UOM2: {
+      type: 'uom2' as const,
+      label: 'UOM[2]'
+    },
+    UOM3: {
+      type: 'uom3' as const,
+      label: 'UOM[3]'
+    },
+    itemUOM: {
+      type: 'uom' as const,
+      label: 'Item UOM[1]'
+    },
+    itemUOM2: {
+      type: 'uom2' as const,
+      label: 'Item UOM[2]'
+    },
+    itemUOM3: {
+      type: 'uom3' as const,
+      label: 'Item UOM[3]'
+    },
+    permitNo: {
+      type: 'text' as const,
+      label: 'Permit No'
+    },
+    remark1: {
+      type: 'text' as const,
+      label: 'Remark 1',
+      colSpan: 2 as const
+    },
+    remark2: {
+      type: 'text' as const,
+      label: 'Remark 2',
+      colSpan: 2 as const
+    },
+
+    // Readonly fields
+    subtotalTax: { type: 'readonly' as const, label: 'Subtotal Tax' },
+    itemGroupCode: { type: 'readonly' as const, label: 'Item Group' },
+    itemCategoryCode: { type: 'readonly' as const, label: 'Item Category' },
+    itemRate: { type: 'readonly' as const, label: 'Item Rate' },
+    amount: { type: 'readonly' as const, label: 'Amount' },
+    subTotal: { type: 'readonly' as const, label: 'Subtotal' },
+    taxRate: { type: 'readonly' as const, label: 'Tax Rate' },
+  };
+
+  const handleMobileFieldChange = (rowId: string, fieldId: string, value: any) => {
+    const rowIndex = parseInt(rowId);
+    const row = table.getRowModel().rows[rowIndex];
+
+    if (!row) return;
+
+    row.original[fieldId] = value;
+
+    // Preference (Get Decimal Places)
+    const decimal = preferenceData?.data?.decimal || 2;
+
+    // Multi-UOM calculation logic - multiply all quantities with price
+    if (fieldId === "price" || fieldId === "quantity" || fieldId === "quantity2" || fieldId === "quantity3") {
+      const quantity1 = Number(row.original.quantity) || 0;
+      const quantity2 = Number(row.original.quantity2) || (row.original.type === "Stock" ? 1 : row.original.quantity2 === 0 ? 0 : 1);
+      const quantity3 = Number(row.original.quantity3) || (row.original.type === "Stock" ? 1 : row.original.quantity3 === 0 ? 0 : 1);
+      const price = Number(row.original.price) || 0;
+
+      // Calculate total amount: Quantity1 × Quantity2 × Quantity3 × Price
+      const totalAmount = quantity1 * quantity2 * quantity3 * price;
+
+      // Only recalculate discount amount if rate exists but amount doesn't
+      if (row.original.discountRate && (!row.original.discountAmount || Number(row.original.discountAmount) === 0)) {
+        row.original.discountAmount = ((totalAmount * Number(row.original.discountRate)) / 100).toFixed(decimal).toString();
+      }
+    } else if (fieldId === "discountRate" && value) {
+      const quantity1 = Number(row.original.quantity) || 0;
+      const quantity2 = Number(row.original.quantity2) || (row.original.type === "Stock" ? 1 : row.original.quantity2 === 0 ? 0 : 1);
+      const quantity3 = Number(row.original.quantity3) || (row.original.type === "Stock" ? 1 : row.original.quantity3 === 0 ? 0 : 1);
+      const price = Number(row.original.price) || 0;
+      const totalAmount = quantity1 * quantity2 * quantity3 * price;
+
+      if (totalAmount > 0) {
+        row.original.discountAmount = ((totalAmount * Number(value)) / 100).toFixed(decimal).toString();
+      }
+    } else if (fieldId === "discountAmount" && value) {
+      const quantity1 = Number(row.original.quantity) || 0;
+      const quantity2 = Number(row.original.quantity2) || (row.original.type === "Stock" ? 1 : row.original.quantity2 === 0 ? 0 : 1);
+      const quantity3 = Number(row.original.quantity3) || (row.original.type === "Stock" ? 1 : row.original.quantity3 === 0 ? 0 : 1);
+      const price = Number(row.original.price) || 0;
+      const totalAmount = quantity1 * quantity2 * quantity3 * price;
+
+      if (totalAmount > 0) {
+        row.original.discountRate = ((100 * Number(value)) / totalAmount).toFixed(decimal).toString();
+      }
+    }
+
+    // Update tempRowQuotationDetailsList
+    setTempRowQuotationDetailsList((prevList) =>
+      prevList.map((item, idx) => {
+        if ((item.UUID && item.UUID === row.original.UUID) || idx === row.index) {
+          return { ...item, [fieldId]: value };
+        }
+        return item;
+      }),
+    );
+  };
+
+  const mobileCheckboxHandlers = {
+    taxInclusive: handleTaxInclusiveCheckedChanged,
+    master: handleMasterServiceCheckedChanged,
+    showTemplate: handleShowInPDFCheckedChanged,
+  };
+
+  // Mobile View (Totals Configuration)
+  const totalsConfig = {
+    title: "Total",
+    sections: [
+      {
+        fields: [
+          {
+            key: "noOfRecord",
+            label: "No. of Record",
+            value: table.getRowModel().rows ? table.getRowModel().rows.length : 0,
+            readOnly: true,
+          },
+          {
+            key: "quantity",
+            label: "Quantity",
+            value: table.getRowModel().rows ? calculateTotal("quantity") : 0,
+            readOnly: true,
+          },
+          {
+            key: "subtotal",
+            label: "Subtotal",
+            value: table.getRowModel().rows ? calculateTotal("subTotal") : 0,
+            readOnly: true,
+          },
+          {
+            key: "taxAmount",
+            label: "Tax Amount",
+            value: table.getRowModel().rows ? calculateTotal("taxAmount") : 0,
+            readOnly: true,
+          },
+          {
+            key: "subtotalTax",
+            label: "Subtotal (Tax)",
+            value: table.getRowModel().rows
+              ? formatNumberWithPreference(
+                parseFloat(calculateTotal("subTotal").replace(/,/g, '')) +
+                parseFloat(calculateTotal("taxAmount").replace(/,/g, '')),
+              )
+              : 0,
+            readOnly: true,
+          },
+        ],
+      },
+      {
+        fields: [
+          {
+            key: "localNetTotal",
+            label: "Local Net Total",
+            value: table.getRowModel().rows ? calculateNetTotal(true) : 0,
+            readOnly: true,
+          },
+          {
+            key: "netTotal",
+            label: "Net Total (RM)",
+            value: table.getRowModel().rows ? calculateNetTotal(false) : 0,
+            readOnly: true,
+          },
+        ],
+      },
+    ],
+  };
+
+  // Column Drag and Drop and Resize (Unified Drag Handler for Both Rows and Columns)
+  const handleUnifiedDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    // Check if it's a column drag (column IDs are simple strings like "docNo", "description")
+    const isColumnDrag = columnOrder.includes(active.id as string);
+
+    if (isColumnDrag) {
+      // Handle column drag
+      handleDndDragEnd(event, setColumnOrder);
+    } else {
+      // Handle row drag
+      handleDragEnd(event);
+    }
+  };
+
+  // Three Discount (Row Calculations)
+  // Real-Time Total Calculations (Calculation Function)
+  const calculateRowValues = (rowData: any, rowIndex: number) => {
+    const decimal = preferenceData?.data?.decimal || 2;
+    // Multi-UOM Calculation Logic - multiply all quantities with price
+    const quantity1 = rowData.quantity ? Number(rowData.quantity) : 0;
+    const quantity2 = rowData.quantity2 ? Number(rowData.quantity2) : rowData.type == "Stock" ? 1 : rowData.quantity2 === 0 ? 0 : 1;
+    const quantity3 = rowData.quantity3 ? Number(rowData.quantity3) : rowData.type == "Stock" ? 1 : rowData.quantity3 === 0 ? 0 : 1;
+    const price = rowData.price ? Number(rowData.price) : 0;
+
+    // Calculate total amount: Quantity1 × Quantity2 × Quantity3 × Price
+    const totalAmount =
+      (quantity1 ?? (rowData.type === "Stock" ? 1 : rowData.quantity === 0 ? 0 : 1)) *
+      (quantity2 ?? (rowData.type === "Stock" ? 1 : rowData.quantity2 === 0 ? 0 : 1)) *
+      (quantity3 ?? (rowData.type === "Stock" ? 1 : rowData.quantity3 === 0 ? 0 : 1)) *
+      price;
+    // Helper function to calculate discount amount from rate
+    const calculateDiscountAmount = (rate: number, baseAmount: number) => {
+      return (baseAmount * rate) / 100;
+    };
+
+    // Helper function to calculate discount rate from amount
+    const calculateDiscountRate = (amount: number, baseAmount: number) => {
+      return baseAmount > 0 ? (amount * 100) / baseAmount : 0;
+    };
+
+    // 3-tier discount calculation - preserve amounts when both rate and amount exist
+    let currentAmount = totalAmount;
+    let totalDiscountAmount = 0;
+
+    // First discount - preserve existing amount if it exists
+    if (rowData.discountAmount && Number(rowData.discountAmount) > 0) {
+      // Use existing amount, calculate rate if needed
+      if (!rowData.discountRate || Number(rowData.discountRate) === 0) {
+        rowData.discountRate = calculateDiscountRate(Number(rowData.discountAmount), currentAmount).toFixed(decimal);
+      }
+    } else if (rowData.discountRate && Number(rowData.discountRate) > 0) {
+      // Calculate amount from rate
+      rowData.discountAmount = calculateDiscountAmount(Number(rowData.discountRate), currentAmount).toFixed(decimal);
+    }
+
+    const discountAmount1 = Number(rowData.discountAmount) || 0;
+
+    currentAmount -= discountAmount1;
+    totalDiscountAmount += discountAmount1;
+
+    // Second discount - preserve existing amount if it exists
+    if (rowData.discountAmount2 && Number(rowData.discountAmount2) > 0) {
+      // Use existing amount, calculate rate if needed
+      if (!rowData.discountRate2 || Number(rowData.discountRate2) === 0) {
+        rowData.discountRate2 = calculateDiscountRate(Number(rowData.discountAmount2), currentAmount).toFixed(decimal);
+      }
+    } else if (rowData.discountRate2 && Number(rowData.discountRate2) > 0) {
+      // Calculate amount from rate
+      rowData.discountAmount2 = calculateDiscountAmount(Number(rowData.discountRate2), currentAmount).toFixed(decimal);
+    }
+
+    const discountAmount2 = Number(rowData.discountAmount2) || 0;
+
+    currentAmount -= discountAmount2;
+    totalDiscountAmount += discountAmount2;
+
+    // Third discount - preserve existing amount if it exists
+    if (rowData.discountAmount3 && Number(rowData.discountAmount3) > 0) {
+      // Use existing amount, calculate rate if needed
+      if (!rowData.discountRate3 || Number(rowData.discountRate3) === 0) {
+        rowData.discountRate3 = calculateDiscountRate(Number(rowData.discountAmount3), currentAmount).toFixed(decimal);
+      }
+    } else if (rowData.discountRate3 && Number(rowData.discountRate3) > 0) {
+      // Calculate amount from rate
+      rowData.discountAmount3 = calculateDiscountAmount(Number(rowData.discountRate3), currentAmount).toFixed(decimal);
+    }
+
+    const discountAmount3 = Number(rowData.discountAmount3) || 0;
+
+    currentAmount -= discountAmount3;
+    totalDiscountAmount += discountAmount3;
+
+    // Helper function to safely parse tax rate
+    function safeParseTaxRate(value) {
+      if (!value) return 0;
+
+      const parsed = parseFloat(value);
+
+      return isNaN(parsed) ? 0 : parsed;
+    }
+
+    // Update tax and totals
+    if (taxInclusiveStates[rowIndex] === "1") {
+      rowData.amount = totalAmount;
+      rowData.subTotalEInvoice = totalAmount;
+      rowData.subTotal = totalAmount - totalDiscountAmount;
+      rowData.taxAmount = parseFloat((rowData.subTotal * (safeParseTaxRate(rowData.taxRate) / 100)).toFixed(2));
+      rowData.subtotalTax = rowData.subTotal;
+    } else {
+      rowData.amount = totalAmount;
+      rowData.subTotalEInvoice = totalAmount;
+      rowData.subTotal = totalAmount - totalDiscountAmount;
+      rowData.taxAmount = parseFloat((rowData.subTotal * (safeParseTaxRate(rowData.taxRate) / 100)).toFixed(2));
+      rowData.subtotalTax = rowData.subTotal + rowData.taxAmount;
+    }
+
+    // Fix: Taxable Amount = (Quantity * Price) - Discount
+    rowData.taxableAmount = totalAmount - totalDiscountAmount;
+
+    rowData.amountExclTax =
+      (rowData.subTotal ? Number(rowData.subTotal) : 0) +
+      (rowData.feeAmount ? Number(rowData.feeAmount) : 0);
+
+    rowData.amountInclTax =
+      (rowData.subtotalTax ? Number(rowData.subtotalTax) : 0) +
+      (rowData.feeAmount ? Number(rowData.feeAmount) : 0);
+
+    // Add local tax amount calculation using form currency rate
+    const currencyRate = form.getValues("currencyRate");
+
+    rowData.localTaxAmount = rowData.taxAmount * (currencyRate ? Number(currencyRate) : 1);
+
+    return rowData;
+  };
+
+  // Real-Time Total Calculations (useEffect)
+  useEffect(() => {
+    if (tempRowQuotationDetailsList && tempRowQuotationDetailsList.length > 0) {
+      const updatedData = tempRowQuotationDetailsList.map((rowData, index) => {
+        // Accurate Currency Rate Update
+        const calculatedRow = calculateRowValues({ ...rowData }, index);
+
+        // Use fetched currency rate for local tax amount calculation
+        calculatedRow.localTaxAmount = calculatedRow.taxAmount * currentCurrencyRate;
+
+        return calculatedRow;
+      });
+
+      // Only update if there are actual changes to prevent infinite loops
+      const hasChanges = updatedData.some((newRow, index) => {
+        const oldRow = tempRowQuotationDetailsList[index];
+        return newRow.subtotalTax !== oldRow.subtotalTax ||
+          newRow.taxAmount !== oldRow.taxAmount ||
+          newRow.localTaxAmount !== oldRow.localTaxAmount;
+      });
+
+      if (hasChanges) {
+        setTempRowQuotationDetailsList(updatedData);
+      }
+    }
+  }, [
+    tempRowQuotationDetailsList,
+    taxInclusiveStates,
+    currentCurrencyRate, // Accurate Currency Rate Update
+  ]);
+
+  const [contextMenu, setContextMenu] = useState(null);
+
+  const handleRowRightClick = (event, row) => {
+    event.preventDefault(); // prevent browser default context menu
+    setContextMenu({
+      mouseX: event.clientX + 2,
+      mouseY: event.clientY - 6,
+      rowData: row,
+    });
+
+  };
+
+  const handleCloseContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  const handleCloneRows = () => {
+    const multipleCloneRowCopy = JSON.parse(JSON.stringify(table.getSelectedRowModel().rows));
+    if (multipleCloneRowCopy.length > 0) {
+      setTempRowQuotationDetailsList((prev) => {
+        const newList = [...prev];
+        let offset = 0; // track how many rows have been inserted to adjust index
+        multipleCloneRowCopy.forEach((item2, index2) => {
+          const cloneIndex = item2.index + offset;
+          const cloneRow = { ...item2.original, UUID: "" };
+          newList.splice(cloneIndex + 1, 0, cloneRow);
+          offset += 1; // increment offset
+        });
+        const updatedList = newList.map((item, index) => ({
+          ...item,
+          seq: index + 1,
+        }));
+        return updatedList;
+      });
+    } else {
+      const cloneIndex = contextMenu?.rowData.index;
+      const cloneRowCopy = JSON.parse(
+        JSON.stringify(tempRowQuotationDetailsList.find((item, index) => index === cloneIndex)),
+      );
+      setTempRowQuotationDetailsList((prev) => {
+        const newList = [...prev];
+        cloneRowCopy.UUID = "";
+        newList.splice(cloneIndex + 1, 0, cloneRowCopy);
+        const updatedList = newList.map((item, index) => ({
+          ...item,
+          seq: index + 1,
+        }));
+        return updatedList;
+      });
+    }
+    setContextMenu(null);
+  };
+
+  // pass this object to TableBody
+  const rowContextMenu = {
+    handleRowRightClick,
+    handleCloseContextMenu,
+    contextMenu,
+    handleCloneRows,
+  };
+
+  // Accurate Currency Rate Update
+  // const fetchCurrentCurrencyRate = async (currencyUUID?: string) => {
+  //   try {
+  //     const targetCurrencyUUID = currencyUUID || form.getValues("currency");
+  //     console.log(targetCurrencyUUID)
+  //     if (!targetCurrencyUUID) {
+  //       setCurrentCurrencyRate(1);
+  //       return;
+  //     }
+
+  //     const formData = new FormData();
+  //     formData.append("table[0]", "currency");
+
+  //     const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+  //       method: "POST",
+  //       headers,
+  //       body: formData,
+  //     });
+
+  //     if (response.ok) {
+  //       const data = await response.json();
+  //       const currency = data.rows?.find(row => row.UUID === targetCurrencyUUID);
+
+  //       console.log(currency)
+
+  //       if (currency && currency.exchangeRateSales) {
+  //         setCurrentCurrencyRate(Number(currency.exchangeRateSales));
+  //       } else {
+  //         console.log('111')
+  //         setCurrentCurrencyRate(1);
+  //       }
+  //     } else {
+  //       setCurrentCurrencyRate(1);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error fetching currency rate:', error);
+  //     setCurrentCurrencyRate(1);
+  //   }
+  // };
+
+  // Accurate Currency Rate Update2
+  const fetchCurrentCurrencyRate2 = async (currencyUUID?: string) => {
+    const watchedCurrencyRate = form.getValues("currencyRate")
+    watchedCurrencyRate ? setCurrentCurrencyRate(watchedCurrencyRate) : setCurrentCurrencyRate(1);
+
+  };
+
+  // Accurate Currency Rate Update
+  useEffect(() => {
+    fetchCurrentCurrencyRate2();
+  }, [form.watch("currencyRate")]);
+
+  return (
+    <Card className={isMobile ? "shadow-none rounded-none border-none p-0" : "w-full shadow-sm mb-2"}>
+      <div className="flex w-full items-center justify-between p-1">
+        <CardTitle className="px-1 hidden lg:block md:hidden sm:block text-nowrap text-sm font-bold">Charges Details</CardTitle>
+
+        <QuotationDetailsDataTableToolbar
+          table={table}
+          onAdd={handleOnAdd}
+          setTempRowQuotationDetailsListData={setTempRowQuotationDetailsListData}
+          tempRowQuotationDetailsList={tempRowQuotationDetailsList}
+          revalidateQuotationDetails={revalidateQuotationDetails}
+          handleOnPackage={handleOnPackage}
+          slug={slug}
+          form={form}
+        />
+      </div>
+      <CardContent className="p-0">
+        <div className="flex h-[70cqh] md:h-[100cqh] flex-col justify-between rounded-md bg-erp-blue-3 @container-[size] md:max-h-[472px]">
+          <ScrollArea className="flex-1 min-h-0">
+            {/* Mobile View (Form Data Table) */}
+            <MobileFormDataTable
+              table={table}
+              headerFields={['itemCode', 'itemName']}
+              fieldConfigs={mobileFieldConfigs}
+              initialVisibleFields={4}
+              onFieldChange={handleMobileFieldChange}
+              checkboxHandlers={mobileCheckboxHandlers}
+              UOMInputs={UOMInputs}
+              setUOMInputs={setUOMInputs}
+              UOM2Inputs={UOM2Inputs}
+              setUOM2Inputs={setUOM2Inputs}
+              UOM3Inputs={UOM3Inputs}
+              setUOM3Inputs={setUOM3Inputs}
+              setTempRowDetailsList={setTempRowQuotationDetailsList}
+            />
+
+            {/* Web View (Data Table) */}
+            <div className="hidden md:block">
+              {/* Column Drag and Drop (DnD Context) */}
+              <DndContext
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleUnifiedDragEnd}
+                sensors={sensors}
+              >
+                {/* Row Drag and Drop (Data Table) - Tell it parent has DndContext */}
+                <DragDropDataTable
+                  items={items}
+                  disabled={false}
+                  hasParentDndContext={true}
+                >
+                  {/* Column Drag and Drop and Resize (Table) */}
+                  <Table
+                    // Column Drag and Drop and Resize Dropdown Fix (Add overflow-visible)
+                    className="table-fixed border-separate overflow-visible whitespace-nowrap text-[11px]"
+                    style={{ ...columnSizeVars, width: table.getTotalSize() }}
+                  >
+                    <TableHeader className="sticky top-0 z-10">
+                      {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id}>
+                          {/* Column Drag and Drop and Resize (Sortable Context) */}
+                          <SortableContext
+                            items={columnOrder}
+                            strategy={horizontalListSortingStrategy}
+                          >
+                            {headerGroup.headers.map((header) => (
+                              // Column Drag and Drop and Resize (Dragable Table Head)
+                              <DragableTableHead
+                                key={header.id}
+                                header={header}
+                                className="bg-erp-blue-11 text-[11px]"
+                                style={{
+                                  width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                                }}
+                              >
+                                {header.column.id === "valid" ? (
+                                  <TableHeadValidityFilter table={table} />
+                                ) : (
+                                  <TableHeadColumnTextFilter
+                                    column={header.column}
+                                    table={table}
+                                  />
+                                )}
+                                <ColumnResizer header={header} />
+                              </DragableTableHead>
+                            ))}
+                          </SortableContext>
+                        </TableRow>
+                      ))}
+                    </TableHeader>
+                    {/* Column Drag and Drop and Resize (Table Body) */}
+                    {table.getState().columnSizingInfo.isResizingColumn ? (
+                      <MemoizedTableBody
+                        table={table}
+                        onRowSelection={onRowSelection}
+                        rowContextMenu={rowContextMenu}
+                        getRowId={getRowId}
+                        refreshKey={refreshKey}
+                        taxInclusiveStates={taxInclusiveStates}
+                        masterServiceStates={masterServiceStates}
+                        showInPDFStates={showInPDFStates}
+                        handleTaxInclusiveCheckedChanged={handleTaxInclusiveCheckedChanged}
+                        handleMasterServiceCheckedChanged={handleMasterServiceCheckedChanged}
+                        handleShowInPDFCheckedChanged={handleShowInPDFCheckedChanged}
+                        descriptionInputCell={descriptionInputCell}
+                        textInputCell={textInputCell}
+                        numberInputCell={numberInputCell}
+                        dropDownInputCell={dropDownInputCell}
+                        dateInputCell={dateInputCell}
+                        UOMDropdownCell={UOMDropdownCell}
+                        selectInputCell={selectInputCell}
+                        form={form}
+                        preferenceData={preferenceData}
+                        currentCurrencyRate={currentCurrencyRate} // Accurate Currency Rate Update
+                      />
+                    ) : (
+                      <NonMemoizedTableBody
+                        table={table}
+                        onRowSelection={onRowSelection}
+                        rowContextMenu={rowContextMenu}
+                        getRowId={getRowId}
+                        refreshKey={refreshKey}
+                        taxInclusiveStates={taxInclusiveStates}
+                        masterServiceStates={masterServiceStates}
+                        showInPDFStates={showInPDFStates}
+                        handleTaxInclusiveCheckedChanged={handleTaxInclusiveCheckedChanged}
+                        handleMasterServiceCheckedChanged={handleMasterServiceCheckedChanged}
+                        handleShowInPDFCheckedChanged={handleShowInPDFCheckedChanged}
+                        descriptionInputCell={descriptionInputCell}
+                        textInputCell={textInputCell}
+                        numberInputCell={numberInputCell}
+                        dropDownInputCell={dropDownInputCell}
+                        dateInputCell={dateInputCell}
+                        UOMDropdownCell={UOMDropdownCell}
+                        selectInputCell={selectInputCell}
+                        form={form}
+                        preferenceData={preferenceData}
+                        currentCurrencyRate={currentCurrencyRate} // Accurate Currency Rate Update
+                      />
+                    )}
+                  </Table>
+
+                  {/* CONTEXT MENU */}
+                  {contextMenu && (
+                    <ul
+                      style={{
+                        position: "fixed",
+                        top: contextMenu.mouseY,
+                        left: contextMenu.mouseX,
+                        background: "white",
+                        border: "1px solid #ccc",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                        padding: "4px 0",
+                        zIndex: 1000,
+                        listStyle: "none",
+                      }}
+                      onMouseLeave={handleCloseContextMenu}
+                    >
+                      <li
+                        style={{ padding: "4px 12px", cursor: "pointer" }}
+                        onClick={handleCloneRows}
+                      >
+                        Clone
+                      </li>
+                    </ul>
+                  )}
+                </DragDropDataTable>
+              </DndContext>
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+
+          {/* Mobile View (Totals) */}
+          <DataTableTotals {...totalsConfig} />
+
+          {/* Web View (Totals) */}
+          <div className={isMobile ? "hidden" : "flex border-t border-border bg-white"}>
+            <ScrollArea>
+              <div className="flex pt-1">
+                <div className="flex min-w-[85px] flex-shrink-0 flex-col gap-y-1 border-r border-border p-2.5">
+                  <span className="text-[11px] text-muted-foreground">Records</span>
+                  <Input
+                    className="text-[11px] rounded-none font-medium border-none text-left w-16 h-3 bg-transparent outline-none focus-visible:ring-0 focus-visible:ring-offset-0 !px-0"
+                    readOnly
+                    value={table.getRowModel().rows ? table.getRowModel().rows.length : 0}
+                  />
+                </div>
+
+                <div className="flex min-w-[85px] flex-shrink-0 flex-col gap-y-1 border-r border-border p-2.5">
+                  <span className="text-[11px] text-muted-foreground ">Quantity</span>
+                  <Input
+                    className="text-[11px] rounded-none font-medium border-none text-left w-16 h-3 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 !px-0"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateTotal("quantity") : 0}
+                  />
+                </div>
+
+                <div className="flex min-w-[100px] flex-shrink-0 flex-col gap-y-1 border-r border-border p-2.5">
+                  <span className="text-[11px] text-muted-foreground">Subtotal</span>
+                  <Input
+                    className="text-[11px] rounded-none font-medium border-none text-left w-20 h-3 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 !px-0"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateTotal("subTotal") : 0}
+                  />
+                </div>
+
+                <div className="flex min-w-[100px] flex-shrink-0 flex-col gap-y-1 border-r border-border p-2.5">
+                  <span className="text-[11px] text-muted-foreground">Tax amount</span>
+                  <Input
+                    className="text-[11px] rounded-none font-medium border-none text-left w-20 h-3 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 !px-0"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateTotal("taxAmount") : 0}
+                  />
+                </div>
+
+                <div className="flex min-w-[100px] flex-shrink-0 flex-col gap-y-1 border-r border-border p-2.5">
+                  <span className="text-[11px] text-muted-foreground">Subtotal (tax)</span>
+                  <Input
+                    className="text-[11px] rounded-none font-medium border-none text-left w-20 h-3 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 !px-0"
+                    readOnly
+                    value={
+                      table.getRowModel().rows
+                        ? formatNumber(
+                          parseFloat(calculateTotal("subTotal")) +
+                          parseFloat(calculateTotal("taxAmount")),
+                        )
+                        : 0
+                    }
+                  />
+                </div>
+
+                <div className="flex min-w-[170px] flex-shrink-0 flex-col gap-y-1 border-r border-border p-2.5">
+                  <span className="text-[11px] text-muted-foreground">
+                    Subtotal (tax) - rounding
+                  </span>
+                  <Input
+                    className="netTotal text-[11px] rounded-none font-medium border-none text-left w-20 h-3 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 !px-0"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateNetTotal(false) : 0}
+                  />
+                </div>
+
+                <div className="flex min-w-[170px] flex-shrink-0 flex-col gap-y-1 p-2.5">
+                  <span className="text-[11px] text-muted-foreground">Local subtotal (tax)</span>
+                  <Input
+                    className="localNetTotal text-[11px] rounded-none font-medium border-none text-left w-20 h-3 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 !px-0"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateNetTotal(true) : 0}
+                  />
+                </div>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </div>
+
+          <ItemPopover
+            open={dialogOpen}
+            setOpen={setDialogOpen}
+            columns={itemType === "service" ? ServiceColumns : StockColumns}
+            setTempRowQuotationDetailsListData={setTempRowQuotationDetailsListData}
+            tempRowQuotationDetailsList={tempRowQuotationDetailsList}
+            revalidateQuotationDetails={revalidateQuotationDetails}
+            itemTable={itemTable}
+            fetchItemData={fetchItemData}
+            itemType={itemType}
+            form={form}
+            updateItem={updateItem}
+            itemData={itemData}
+            slug={slug}
+            preferenceData={preferenceData}
+          />
+
+          <PackagePopover
+            open={packageDialogOpen}
+            setOpen={setPackageDialogOpen}
+            columns={PackageColumns}
+            data={packageData}
+            fetchPackageData={fetchPackageData}
+            revalidateQuotationDetails={revalidateQuotationDetails}
+            setTempRowQuotationDetailsListData={setTempRowQuotationDetailsListData}
+            tempRowQuotationDetailsList={tempRowQuotationDetailsList}
+            slug={slug}
+            preferenceData={preferenceData}
+          />
+
+          <SellingPriceHistoryPopover
+            open={priceHistoryDialogOpen}
+            setOpen={setPriceHistoryDialogOpen}
+            itemId={selectedItemForPriceHistory}
+            preferenceData={preferenceData}
+          />
+        </div>
+      </CardContent>
+    </Card >
+  );
+}
+
+// Column Drag and Drop and Resize (Table Body)
+type TableBodyProps = {
+  table: TableType<UOMList>;
+  onRowSelection: (row: Row<UOMList>) => (event: MouseEvent<HTMLTableRowElement>) => void;
+  rowContextMenu: (row: Row<UOMList>) => (event: MouseEvent<HTMLTableRowElement>) => void;
+  getRowId: (row: any, index: number) => string;
+  refreshKey: number;
+  taxInclusiveStates: any;
+  masterServiceStates: any;
+  showInPDFStates: any;
+  handleTaxInclusiveCheckedChanged: (rowIndex: number, isChecked: boolean, row: any) => void;
+  handleMasterServiceCheckedChanged: (rowIndex: number, isChecked: boolean, row: any) => void;
+  handleShowInPDFCheckedChanged: (rowIndex: number, isChecked: boolean, row: any) => void;
+  descriptionInputCell: (cell: any, className: string) => JSX.Element;
+  textInputCell: (cell: any, className: string) => JSX.Element;
+  numberInputCell: (cell: any, allowDecimal: boolean) => JSX.Element;
+  dropDownInputCell: (cell: any) => JSX.Element;
+  dateInputCell: (cell: any) => JSX.Element;
+  UOMDropdownCell: (cell: any) => JSX.Element;
+  selectInputCell: (cell: any) => JSX.Element;
+  form: any;
+  preferenceData: any;
+  currentCurrencyRate: number; // Accurate Currency Rate Update
+};
+
+function NonMemoizedTableBody({
+  table,
+  onRowSelection,
+  rowContextMenu,
+  getRowId,
+  refreshKey,
+  taxInclusiveStates,
+  masterServiceStates,
+  showInPDFStates,
+  handleTaxInclusiveCheckedChanged,
+  handleMasterServiceCheckedChanged,
+  handleShowInPDFCheckedChanged,
+  descriptionInputCell,
+  textInputCell,
+  numberInputCell,
+  dropDownInputCell,
+  dateInputCell,
+  UOMDropdownCell,
+  selectInputCell,
+  form,
+  preferenceData,
+  currentCurrencyRate, // Accurate Currency Rate Update
+}: TableBodyProps) {
+  const decimal = preferenceData?.data?.decimal || 2;
+
+  // Preference (Format Number Function for Table Body)
+  const formatNumberWithPreference = (value: string | number): string => {
+    if (value === null || value === undefined || value === '') {
+      return (0).toFixed(decimal);
+    }
+
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+
+    if (isNaN(numValue)) {
+      return (0).toFixed(decimal);
+    }
+
+    return numValue.toFixed(decimal);
+  };
+
+  return (
+    <TableBody>
+      {table.getRowModel().rows?.length ? (
+        table.getRowModel().rows.map((row, index) => {
+          return (
+            // Row Drag and Drop (Row)
+            <DraggableRow
+              key={`${getRowId(row.original, index)}-${refreshKey}`}
+              id={getRowId(row.original, index)}
+              className="bg-erp-blue-5 data-[state=selected]:bg-erp-blue-9"
+              onClick={onRowSelection(row)}
+              onContextMenu={(e) => rowContextMenu.handleRowRightClick(e, row)}
+              data-state={row.getIsSelected() && "selected"}
+              disabled={false}
+            >
+              {row.getVisibleCells().map((cell, cellIndex) => {
+                if (cell.column.id === "taxInclusive") {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-center truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                      onContextMenu={(e) => rowContextMenu.handleRowRightClick(e, row)}
+                    >
+                      <Checkbox
+                        checked={taxInclusiveStates[index] === "1"}
+                        onCheckedChange={(state) =>
+                          handleTaxInclusiveCheckedChanged(index, state, cell.row)
+                        }
+                      />
+                    </TableCell>
+                  );
+                } else if (
+                  cell.column.id === "description" ||
+                  cell.column.id === "2ndDescription" ||
+                  cell.column.id === "moreDescription" ||
+                  cell.column.id === "customerDescription"
+                ) {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-center truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                      onContextMenu={(e) => rowContextMenu.handleRowRightClick(e, row)}
+                    >
+                      {descriptionInputCell(cell, "h-7.5 p-0")}
+                    </TableCell>
+                  );
+                } else if (
+                  cell.column.id === "itemName" ||
+                  cell.column.id === "permitNo" ||
+                  cell.column.id === "remark1" ||
+                  cell.column.id === "remark2" ||
+                  cell.column.id === "customerName" ||
+                  cell.column.id === "customerBRN" ||
+                  cell.column.id === "customerID" ||
+                  cell.column.id === "customermembershipID" ||
+                  cell.column.id === "email"
+                ) {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-center truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                      onContextMenu={(e) => rowContextMenu.handleRowRightClick(e, row)}
+                    >
+                      {textInputCell(cell, "h-7.5", true)}
+                    </TableCell>
+                  );
+                } else if (
+                  // Three Discount (Render)
+                  cell.column.id === "price" ||
+                  cell.column.id === "discountRate" ||
+                  cell.column.id === "discountAmount" ||
+                  cell.column.id === "discountRate2" ||
+                  cell.column.id === "discountAmount2" ||
+                  cell.column.id === "discountRate3" ||
+                  cell.column.id === "discountAmount3"
+                ) {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-center truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                      onContextMenu={(e) => rowContextMenu.handleRowRightClick(e, row)}
+                    >
+                      {numberInputCell(cell, true)}
+                    </TableCell>
+                  );
+                } else if (cell.column.id === "quantity" || cell.column.id === "quantity2" || cell.column.id === "quantity3") {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-center truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                      onContextMenu={(e) => rowContextMenu.handleRowRightClick(e, row)}
+                    >
+                      {numberInputCell(cell, false)}
+                    </TableCell>
+                  );
+                } else if (
+                  cell.column.id === "classificationCode" ||
+                  cell.column.id === "projectCode" ||
+                  cell.column.id === "customerCodeCode" ||
+                  cell.column.id === "taxCode"
+                ) {
+                  return (
+                    // Column Drag and Drop and Resize Dropdown Fix (Add overflow-visible, relative and style)
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-center overflow-visible relative"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                        overflow: 'visible',
+                        position: 'relative',
+                      }}
+                      onContextMenu={(e) => rowContextMenu.handleRowRightClick(e, row)}
+                    >
+                      {dropDownInputCell(cell)}
+                    </TableCell>
+                  );
+                } else if (cell.column.id === "localTaxAmount") {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      className="text-right truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                      onContextMenu={(e) => rowContextMenu.handleRowRightClick(e, row)}
+                    >
+                      <p className="text-right">
+                        {/* Accurate Currency Rate Update */}
+                        {formatNumberWithPreference(
+                          row.original.taxAmount * currentCurrencyRate
+                        )}
+                      </p>
+                    </TableCell>
+                  );
+                } else if (
+                  cell.column.id === "deliveryDate" ||
+                  cell.column.id === "startAt" ||
+                  cell.column.id === "endAt" ||
+                  cell.column.id === "nextGenerateAt"
+                ) {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-right truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                      onContextMenu={(e) => rowContextMenu.handleRowRightClick(e, row)}
+                    >
+                      {dateInputCell(cell)}
+                    </TableCell>
+                  );
+                } else if (
+                  cell.column.id === "itemUOM" ||
+                  cell.column.id === "itemUOM2" ||
+                  cell.column.id === "itemUOM3"
+                ) {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-right truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                      onContextMenu={(e) => rowContextMenu.handleRowRightClick(e, row)}
+                    >
+                      {UOMDropdownCell(cell)}
+                    </TableCell>
+                  );
+                }
+                else if (
+                  cell.column.id === "template" || cell.column.id === "billingInterval" || cell.column.id === "module"
+                ) {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-right truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                      onContextMenu={(e) => rowContextMenu.handleRowRightClick(e, row)}
+                    >
+                      {selectInputCell(cell)}
+                    </TableCell>
+                  );
+                }
+                else if (cell.column.id === "master") {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-center [&:has([role=checkbox])]:pr-4 truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                      onContextMenu={(e) => rowContextMenu.handleRowRightClick(e, row)}
+                    >
+                      <Checkbox
+                        checked={masterServiceStates[row.index] === "1"}
+                        onCheckedChange={(state) =>
+                          handleMasterServiceCheckedChanged(index, state, cell.row)
+                        }
+                        disabled={row.index === 0} // Disable checkbox for the first row
+                      />
+                    </TableCell>
+                  );
+                } else if (cell.column.id === "showTemplate") {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-center [&:has([role=checkbox])]:pr-4 truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                      onContextMenu={(e) => rowContextMenu.handleRowRightClick(e, row)}
+                    >
+                      <Checkbox
+                        checked={showInPDFStates[row.index] === "1"}
+                        onCheckedChange={(state) =>
+                          handleShowInPDFCheckedChanged(index, state, cell.row)
+                        }
+                        disabled={row.index === 0} // Disable checkbox for the first row
+                      />
+                    </TableCell>
+                  );
+                } else {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      className="truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                      onContextMenu={(e) => rowContextMenu.handleRowRightClick(e, row)}
+                    >
+                      {cellIndex === 0 ? (
+                        <div className="flex items-center gap-2.5">
+                          <DragHandle
+                            id={getRowId(row.original, index)}
+                            className="flex-shrink-0"
+                          />
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      ) : (
+                        flexRender(cell.column.columnDef.cell, cell.getContext())
+                      )}
+                    </TableCell>
+                  );
+                }
+              })}
+            </DraggableRow>
+          );
+        })
+      ) : (
+        <NoResultsTableRow columns={table.getVisibleLeafColumns()} />
+      )}
+    </TableBody>
+  );
+}
+
+const MemoizedTableBody = memo(
+  NonMemoizedTableBody,
+  (prev, next) => prev.table.options.data === next.table.options.data
+) as typeof NonMemoizedTableBody;

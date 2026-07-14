@@ -1,0 +1,415 @@
+"use client";
+
+import React, { useEffect, useRef, useState } from "react";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardTitle,
+  CardHeader
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+
+type DropdownConfig = {
+  tableName: string;
+  columns: { accessorKey: string; header: string }[];
+  valueField: string;
+  displayField: string;
+  formValueField: string;
+  formDisplayField: string;
+  additionalMappings?: { sourceField: string; targetFormField: string }[];
+};
+
+type Params = {
+  form: any;
+  onInvoiceTypeChange?: (oldValue: string, newValue: string) => void;
+};
+
+export function EInvoiceUsageForm({ form, onInvoiceTypeChange }: Params) {
+  const headers = getAuthHeaders();
+
+  const [previousInvoiceType, setPreviousInvoiceType] = useState("");
+
+  const [dropdownState, setDropdownState] = useState({
+    currentDropdown: null as string | null,
+    data: [] as any[],
+    originalData: [] as any[],
+    showTable: false,
+  });
+
+  const dropdownInputRef = useRef(null);
+  const dropdownTableRef = useRef(null)
+
+  const dropdownConfigs: Record<string, DropdownConfig> = {
+    state: {
+      tableName: "state",
+      columns: [
+        { accessorKey: "code", header: "State Code" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "description",
+      formValueField: "state",
+      formDisplayField: "stateCode"
+
+    },
+    countryOfOrigin: {
+      tableName: "countryOfOrigin",
+      columns: [
+        { accessorKey: "code", header: "Country Code" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "description",
+      formValueField: "country",
+      formDisplayField: "countryOfOriginCode"
+
+    },
+  };
+
+  const fetchDropdownData1 = async (dropdownKey: string) => {
+    try {
+      const config = dropdownConfigs[dropdownKey];
+
+      if (!config) return;
+
+      var form_data = new FormData();
+
+      form_data.append(`table[0]`, config.tableName);
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${dropdownKey} data`);
+      }
+
+      const data = await response.json();
+
+      setDropdownState({
+        currentDropdown: dropdownKey,
+        data: data.rows,
+        originalData: data.rows,
+        showTable: true,
+      });
+    } catch (error) {
+      console.error(`Error fetching ${dropdownKey} data:`, error);
+
+      throw new Error(`Failed to fetch ${dropdownKey} data`);
+    }
+  };
+
+
+  const onClickRow = (row: any) => {
+    const config = dropdownConfigs[dropdownState.currentDropdown!];
+
+    if (config) {
+
+
+      form.setValue(config.formValueField, row[config.valueField]);
+      if (config.formDisplayField == "stateCode" || config.formDisplayField == "countryOfOriginCode") {
+        form.setValue(config.formDisplayField, `${row["description"]}(${row["code"]})`);
+      } else {
+        form.setValue(config.formDisplayField, row[config.displayField]);
+      }
+
+
+      if (config.additionalMappings) {
+        config.additionalMappings.forEach((mapping) => {
+          if (row[mapping.sourceField]) {
+            form.setValue(mapping.targetFormField, row[mapping.sourceField]);
+          }
+        });
+      }
+    }
+
+    setDropdownState((prev) => ({ ...prev, showTable: false }));
+  };
+
+
+
+  const handleClickOutside = (event) => {
+    // State dropdown
+    if (
+      dropdownTableRef.current &&
+      !dropdownTableRef.current.contains(event.target) &&
+      dropdownInputRef.current !== event.target
+    ) {
+      setDropdownState((prev) => ({ ...prev, showTable: false }));
+    }
+  };
+
+  const handleDropdownSearchChange = (dropdownKey: string, searchTerm: string) => {
+    const config = dropdownConfigs[dropdownKey];
+    if (!config) return;
+
+    form.setValue(config.formDisplayField, searchTerm);
+
+    if (searchTerm == "") {
+      form.setValue(config.formValueField, "");//Empty uuid field if search term == empty
+    }
+
+    if (!dropdownState.originalData || dropdownState.currentDropdown !== dropdownKey) {
+      fetchDropdownData1(dropdownKey);
+      return;
+    }
+
+    const filtered = dropdownState.originalData.filter((row: any) =>
+      row[config.displayField]
+        ?.toString()
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
+    );
+
+    setDropdownState((prev) => ({
+      ...prev,
+      data: filtered,
+      showTable: true,
+      currentDropdown: dropdownKey,
+    }));
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+
+  // Watch for invoice type changes
+  const watchInvoiceType = form.watch("invoiceType");
+
+  useEffect(() => {
+    if (watchInvoiceType !== undefined && previousInvoiceType !== "" &&
+      watchInvoiceType !== previousInvoiceType && onInvoiceTypeChange) {
+      onInvoiceTypeChange(previousInvoiceType, watchInvoiceType);
+    }
+    setPreviousInvoiceType(watchInvoiceType || "");
+  }, [watchInvoiceType, previousInvoiceType, onInvoiceTypeChange]);
+
+  // Initialize previous invoice type
+  useEffect(() => {
+    const currentValue = form.getValues("invoiceType");
+    if (currentValue) {
+      setPreviousInvoiceType(currentValue);
+    }
+  }, [form]);
+
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">e-Invoice Usage</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form>
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5">
+              <FormField
+                control={form.control}
+                name="postcode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Post Code:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7.5"
+                        {...field}
+                        moduleName="customer"
+                        fieldName="postcode"
+                        columnName="Post Code"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="city"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>City:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7.5"
+                        {...field}
+                        moduleName="customer"
+                        fieldName="city"
+                        columnName="City"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+
+                 <FormField
+                control={form.control}
+                name="country"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-1 grid hidden h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="countryOfOriginCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Country:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative h-7.5">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          // readOnly
+                          onChange={(e) => handleDropdownSearchChange("countryOfOrigin", e.target.value)}
+                          onClick={() => fetchDropdownData1('countryOfOrigin')}
+                          ref={dropdownState.currentDropdown === 'countryOfOrigin' ? dropdownInputRef : null}
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable && dropdownState.currentDropdown === 'countryOfOrigin' && (
+                          <div
+                            ref={dropdownTableRef}
+                            className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                          >
+                            <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownConfigs.countryOfOrigin.columns}
+                                data={dropdownState.data}
+                                onClickRow={onClickRow}
+                              />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="state"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-1 grid hidden h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="stateCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>State:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative h-7.5">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          // readOnly
+                          onChange={(e) => handleDropdownSearchChange("state", e.target.value)}
+                          onClick={() => fetchDropdownData1('state')}
+                          ref={dropdownState.currentDropdown === 'state' ? dropdownInputRef : null}
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable && dropdownState.currentDropdown === 'state' && (
+                          <div
+                            ref={dropdownTableRef}
+                            className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md right-0"
+                          >
+                            <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownConfigs.state.columns}
+                                data={dropdownState.data}
+                                onClickRow={onClickRow}
+                              />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="invoiceType"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>E-Invoice Type:</FormLabel>
+                    <FormControl>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}>
+                        <SelectTrigger className="h-7.5 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="None">None</SelectItem>
+                          <SelectItem value="Consolidate">Consolidate</SelectItem>
+                          <SelectItem value="E-Invoice">E-Invoice</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

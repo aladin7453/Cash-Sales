@@ -1,0 +1,403 @@
+"use client";
+
+import { endOfMonth } from "date-fns";
+import moment from "moment";
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+
+import { DEFAULT_DATA_TABLE_PAGE_SIZE, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+
+import {
+  CustomerDueDocumentListingColumns,
+  CustomerDueDocumentListingTaxColumns,
+  CustomerOverdueLetterColumns,
+} from "./Generate/columns";
+import CustomerDueDocumentListingDataTable from "./Generate/DataTable";
+import CustomerDueDocumentListingForm from "./Report/CustomerDueDocumentListingForm";
+import SummaryForm from "./Report/SummaryForm";
+
+import type { ColumnFiltersState, SortingState } from "@tanstack/react-table";
+
+const COLUMN_FILTERS_KEY = "customer-due-document-listing.table.filters";
+const PAGINATION_KEY = "customer-due-document-listing.table.pagination";
+const SORTING_KEY = "customer-due-document-listing.table.sorting";
+
+export default function CustomerDueDocumentListingPage() {
+  const [tempGeneratedReportList, setTempGeneratedReportList] = useState<any[]>([]);
+  const [showReportTable, setShowReportTable] = useState(false);
+  const [previewPDF, setPreviewPDF] = useState<any>(null);
+  const [salesReportData, setSalesReportData] = useState<any>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+  const [totalCounts, setTotalCounts] = useState<{ total: number }>({ total: 0 });
+
+  const [columnFilters, setColumnFilters] = useLocalStorage<ColumnFiltersState>(
+    COLUMN_FILTERS_KEY,
+    [],
+  );
+
+  const [pagination, setPagination] = useLocalStorage(PAGINATION_KEY, {
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+  });
+
+  const [sorting, setSorting] = useLocalStorage<SortingState>(SORTING_KEY, []);
+
+  const headers = getAuthHeaders();
+
+  const filterFields = [
+    "columnFilterDocType",
+    "docNo",
+    "customerName",
+    "customerCodeCode",
+    "columnFilterStatus",
+    "docDate",
+    "netTotal",
+    "creditTermCode",
+    "docDueDate",
+    "paidAmount",
+    "outstandingAmount",
+    "age",
+  ];
+
+  const validDocTypes = [
+    "salesInvoice",
+    "customerDueSalesInvoiceListing",
+    "customerDueSalesInvoiceListingLv1TaxDate",
+    "customerDueSalesInvoiceListingLv2DocNo",
+    "salesDebitNote",
+    "customerDueSalesDebitNoteListing",
+    "customerDueSalesDebitNoteListingLv1TaxDate",
+    "customerDueSalesDebitNoteListingLv2DocNo",
+    "customerOverdueLetter",
+  ];
+
+  const form = useForm({
+    defaultValues: {
+      customerCode: "",
+      customerCodeCode: "",
+      customerGroup: "",
+      customerGroupName: "",
+      status: "undue",
+      // startDate: Math.floor(startOfMonth(new Date()).getTime() / 1000).toString(),
+      endDate: Math.floor(endOfMonth(new Date()).getTime() / 1000).toString(),
+      docType: "salesInvoice",
+      valid: "1",
+    },
+  });
+
+  const generateReport = async (formData: any) => {
+    try {
+      const docType = formData.docType;
+
+      if (!validDocTypes.includes(docType)) {
+        throw new Error("Invalid document type");
+      }
+
+      const allFormValues = form.getValues();
+
+      const filterObject: Record<string, any> = {};
+
+      filterFields.forEach((key) => {
+        if ((allFormValues as any)[key]) {
+          let filterKey = key;
+          let filterValue = (allFormValues as any)[key];
+
+          if (key === "columnFilterDocType") {
+            filterKey = "docType";
+          } else if (key === "columnFilterStatus") {
+            filterKey = "status";
+          } else if (key === "docDate" || key === "docDueDate") {
+            // Convert Unix timestamp to YYYY-MM-DD format
+            filterValue = moment.unix(filterValue).format("YYYY-MM-DD");
+            filterKey = key === "docDate" ? "docDateFormat" : "docDueDateFormat";
+          }
+
+          filterObject[filterKey] = filterValue;
+        }
+      });
+
+      const params = new FormData();
+
+      params.append(
+        "param[filter]",
+        Object.keys(filterObject).length > 0 ? JSON.stringify(filterObject) : "{}",
+      );
+
+      params.append("param[offset]", `${pagination.pageIndex * pagination.pageSize}`);
+
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "docDate");
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc",
+      );
+
+      const validFormValues = form.getValues();
+
+      const validfilterFields = ["valid"];
+
+      const validfilterObject: Record<string, any> = {};
+
+      validfilterFields.forEach((key) => {
+        if ((validFormValues as any)[key]) {
+          validfilterObject[key] = (validFormValues as any)[key];
+        }
+      });
+
+      if (validFormValues.valid) {
+        params.append("param[valid]", validFormValues.valid);
+      }
+
+      params.append("sales[status]", formData.status || "");
+
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value && key !== "docType" && key !== "status") {
+          params.append(`sales[${key}]`, value as string);
+        }
+      });
+
+      const response = await fetch(
+        `${ORIGIN}/sales_report/api/sales-report/generate-report?docType=${docType}&reportType=customerDueDocument`,
+        {
+          method: "POST",
+          headers,
+          body: params,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate report");
+      }
+
+      const result = await response.json();
+      const rows = result.rows || [];
+
+      setTotalCounts({ total: result.total ?? rows.length });
+
+      form.setValue("total", result.total ?? "0");
+      form.setValue("totalNetTotal", result.summary.totalNetTotal ?? "0.00");
+      form.setValue("totalPaidAmount", result.summary.totalPaidAmount ?? "0.00");
+      form.setValue("totalOutstandingAmount", result.summary.totalOutstandingAmount ?? "0.00");
+
+      setTempGeneratedReportList(result.rows || []);
+      setShowReportTable(true);
+    } catch (error) {
+      console.error("Error generating report:", error);
+    }
+  };
+
+  const [formDataState, setFormDataState] = useState<any>(null);
+  const [salesReportColumns, setSalesReportColumns] = useState<any>(null);
+
+  const previewReport = async (formData: any) => {
+    setFormDataState(formData);
+    setPreviewPDF(null);
+    setIsPreviewLoading(true);
+
+    try {
+      let reportName = null;
+
+      const docType = formData.docType;
+
+      const reportTypeName = formData.reportTypeName;
+
+      if (!validDocTypes.includes(reportTypeName)) {
+        throw new Error("Invalid document type");
+      }
+
+      if (reportTypeName === "customerOverdueLetter") {
+        reportName = `overdueLetter`;
+      }
+
+      const levelMatch = reportTypeName.match(/lv(\d+)/i);
+      const levelMatchTax = /tax/i.test(reportTypeName);
+
+      if (levelMatch) {
+        if (levelMatchTax) {
+          reportName = `level${levelMatch[1]}` + `Tax`;
+        } else {
+          reportName = `level${levelMatch[1]}`;
+        }
+      }
+
+      const allFormValues = form.getValues();
+
+      const filterObject: Record<string, any> = {};
+
+      filterFields.forEach((key) => {
+        if ((allFormValues as any)[key]) {
+          let filterKey = key;
+          let filterValue = (allFormValues as any)[key];
+
+          if (key === "columnFilterDocType") {
+            filterKey = "docType";
+          } else if (key === "columnFilterStatus") {
+            filterKey = "status";
+          } else if (key === "docDate" || key === "docDueDate") {
+            // Convert Unix timestamp to YYYY-MM-DD format
+            filterValue = moment.unix(filterValue).format("YYYY-MM-DD");
+            filterKey = key === "docDate" ? "docDateFormat" : "docDueDateFormat";
+          }
+
+          filterObject[filterKey] = filterValue;
+        }
+      });
+
+      const params = new FormData();
+
+      params.append(
+        "param[filter]",
+        Object.keys(filterObject).length > 0 ? JSON.stringify(filterObject) : "{}",
+      );
+
+      if (reportTypeName === "customerOverdueLetter") {
+        params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "docDueDate");
+      } else {
+        params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "docDate");
+      }
+
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc",
+      );
+
+      const validFormValues = form.getValues();
+
+      const validfilterFields = ["valid"];
+
+      const validfilterObject: Record<string, any> = {};
+
+      validfilterFields.forEach((key) => {
+        if ((validFormValues as any)[key]) {
+          validfilterObject[key] = (validFormValues as any)[key];
+        }
+      });
+
+      if (validFormValues.valid) {
+        params.append("param[valid]", validFormValues.valid);
+      }
+
+      params.append("sales[status]", formData.status || "");
+
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value && key !== "docType" && key !== "status") {
+          params.append(`sales[${key}]`, value as string);
+        }
+      });
+
+      if (reportName && reportName !== "overdueLetter") {
+        if (reportName === "level1Tax") {
+          params.append("sales[groupBy][0]", "docDateFormat");
+        } else {
+          // const hasItemCode = /itemcode/i.test(reportTypeName);
+
+          params.append("sales[groupBy][0]", "docDateFormat");
+          params.append("sales[groupBy][1]", "docNo");
+          // params.append("sales[groupBy][1]", hasItemCode ? "itemCode" : "docNo");
+        }
+      }
+
+      const baseUrl = `${ORIGIN}/sales_report/api/sales-report/preview-pdf`;
+
+      let url = "";
+      if (reportTypeName === "customerOverdueLetter") {
+        url = `${baseUrl}?docType=customer&reportType=customerDueDocument`;
+      } else {
+        url = `${baseUrl}?docType=${docType}&reportType=customerDueDocument`;
+      }
+
+      if (reportName) {
+        url += `&reportName=${reportName}`;
+      }
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: params,
+      });
+
+      // const response = await fetch(
+      //   `${ORIGIN}/sales_report/api/sales-report/preview-pdf?docType=${docType}&reportType=customerDueDocument`,
+      //   {
+      //     method: "POST",
+      //     headers,
+      //     body: params,
+      //   }
+      // );
+
+      if (!response.ok) {
+        throw new Error("Failed to preview report");
+      }
+
+      const result = await response.json();
+      const rows = result.rows || [];
+
+      setTotalCounts({ total: result.total ?? rows.length });
+
+      // form.setValue("total", result.total ?? "0");
+      // form.setValue("totalNetTotal", result.summary.totalNetTotal ?? "0.00");
+      // form.setValue("totalPaidAmount", result.summary.totalPaidAmount ?? "0.00");
+      // form.setValue("totalOutstandingAmount", result.summary.totalOutstandingAmount ?? "0.00");
+
+      setPreviewPDF(result);
+      setSalesReportData(formData);
+    } catch (error) {
+      console.error("Error previewing report:", error);
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  const onSubmit = (data: any) => {
+    setTempGeneratedReportList([]);
+    setShowReportTable(false);
+    generateReport(data);
+  };
+
+  useEffect(() => {
+    if (formDataState) {
+      if (formDataState.reportTypeName === "customerOverdueLetter") {
+        setSalesReportColumns(CustomerOverdueLetterColumns);
+      } else if (formDataState.reportTypeName === "customerDueSalesInvoiceListingLv1TaxDate") {
+        setSalesReportColumns(CustomerDueDocumentListingTaxColumns);
+      } else {
+        setSalesReportColumns(CustomerDueDocumentListingColumns);
+      }
+    }
+  }, [formDataState]);
+
+  return (
+    <>
+      <CustomerDueDocumentListingForm
+        form={form}
+        onSubmit={onSubmit}
+        onPreview={previewReport}
+        previewPDF={previewPDF}
+        salesReportData={salesReportData}
+        generatedReport={tempGeneratedReportList}
+        isPreviewLoading={isPreviewLoading}
+        salesReportColumns={salesReportColumns}
+        filterFields={filterFields}
+        sorting={sorting}
+      />
+      <SummaryForm form={form} onSubmit={onSubmit} />
+      {showReportTable && (
+        <CustomerDueDocumentListingDataTable
+          columns={CustomerDueDocumentListingColumns}
+          data={tempGeneratedReportList}
+          revalidateCustomerDueDocumentListing={() => generateReport(form.getValues())}
+          columnFilters={columnFilters}
+          setColumnFilters={setColumnFilters}
+          pagination={pagination}
+          setPagination={setPagination}
+          sorting={sorting}
+          setSorting={setSorting}
+          formData={form.getValues()}
+          totalNumOfRows={+totalCounts.total}
+        />
+      )}
+    </>
+  );
+}

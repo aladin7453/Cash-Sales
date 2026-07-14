@@ -1,0 +1,135 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type ActiveCustomerReport = {
+  UUID?: string;
+  customerCode?: string;
+  customerName?: string;
+  totalInvoice?: string;
+  totalAmount?: string;
+  totalPaidAmount?: string;
+  outstandingAmountAmount?: string;
+  totalCreationDays?: string;
+  daysSinceLastInvoice?: string;
+};
+
+// Helper to format decimals
+const formatDecimal = (value: any) => {
+  if (value === undefined || value === null || value === "") return "0.00";
+
+  const num = parseFloat(value);
+
+  return isNaN(num) ? "0.00" : num.toFixed(2);
+};
+
+export const activeCustomerReportColumns: ColumnDef<ActiveCustomerReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "customerCode",
+    id: "customerCode",
+    header: "Customer Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "totalInvoice",
+    id: "totalInvoice",
+    header: "Total Invoice",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{row.original.totalInvoice}</div>
+    ),
+  },
+  {
+    accessorKey: "totalAmount",
+    id: "totalAmount",
+    header: "Total Amount",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.totalAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "totalPaidAmount",
+    id: "totalPaidAmount",
+    header: "Total Paid",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.totalPaidAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "outstandingAmountAmount",
+    id: "outstandingAmountAmount",
+    header: "Total Outstanding Amount",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.outstandingAmountAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "totalCreationDays",
+    id: "totalCreationDays",
+    header: "Total Creation Days",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{row.original.totalCreationDays}</div>
+    ),
+  },
+  {
+    accessorKey: "daysSinceLastInvoice",
+    id: "daysSinceLastInvoice",
+    header: "Days Since Last Invoice",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{row.original.daysSinceLastInvoice}</div>
+    ),
+  },
+];

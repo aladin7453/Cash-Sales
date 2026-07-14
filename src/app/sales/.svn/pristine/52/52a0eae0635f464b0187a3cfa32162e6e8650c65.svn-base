@@ -1,0 +1,412 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import React, { useState, useEffect, useRef } from "react";
+import { z } from "zod";
+import { notFound, useSearchParams } from "next/navigation";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import ResetButton from "./Reset";
+import SaveButton from "./Save";
+import { useToast } from "@/components/ui/use-toast";
+import { FaFileCirclePlus } from "react-icons/fa6";
+import { ORIGIN, getAuthHeaders } from "@/lib/constants";
+import { FaCircleXmark } from "react-icons/fa6";
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useRouter } from "next/navigation";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+import type { Dispatch, SetStateAction } from "react";
+
+import type { DeliveryLocationDetails } from "../delivery-location-details/columns";
+
+type Props = {
+  open: boolean;
+  setOpen: Dispatch<SetStateAction<boolean>>;
+  setTempRowAttachments: ([]) => void;
+  revalidateDeliveryLocationDetails:()=>void;
+  setCustomerData: Dispatch<SetStateAction<DeliveryLocationDetails[]>>;
+  
+};
+
+const deliveryLocationDetailsFormSchema = z.object({
+  UUID: z.union([z.string(), z.literal('')]),
+  deliveryLocation: z.union([z.string(), z.literal('')]),
+  contact: z.union([z.string(), z.literal('')]),
+  phoneNo: z.union([z.string(), z.literal('')]),
+  deliveryAddress: z.union([z.string(), z.literal('')]),
+  description: z.union([z.string(), z.literal('')]),
+  attachment: z.custom((value) => {
+    if (!value || !value[0]) {
+      return 'Attachment is required.';
+    }
+    return true;
+  }),
+  valid: z.union([z.string(), z.literal('')]),
+});
+
+
+export default function DeliveryLocationDetailsFormPopover({ open, setOpen,row, setTempRowAttachments, setTempRowDeliveryLocationDetailsData,revalidateDeliveryLocationDetails }: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const data = row;
+  const { toast } = useToast();
+  const headers = getAuthHeaders();
+  
+  const [showTableContact, setShowTableContact] = useState(false); 
+  const [contactDropdownTableData, setContactDropdownTableData] = useState([]);
+  const dropdownContactColumns = [ { accessorKey: "fullName", header: "FullName", }, { accessorKey: "description", header: "Description",  cell: ({ row }) => <DescriptionCellTooltip row={row} />,}, ];
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target) && inputRef.current !== event.target) {
+      setShowTableContact(false);
+    }
+  };
+
+      useEffect(() => {
+        document.body.addEventListener('click', handleClickOutside);
+            
+        return () => {
+          document.body.removeEventListener('click', handleClickOutside);
+        };
+      }, []);
+  
+      const toggleTableContact = async () => {
+  
+        const formData = new FormData();
+        const user = "user";
+        formData.append('table[]', user);
+  
+        if (!showTableContact) {
+          try {
+            const response = await fetch(
+              `${ORIGIN}/universal/get-all-drop-down-table-data`,
+              {
+                method: "POST",
+                headers,
+                body: formData,
+              }
+            );
+            if (!response.ok) {
+              throw new Error("Failed to fetch account drop-down data");
+            }
+            const accountData = await response.json();
+  
+            setContactDropdownTableData(accountData.rows);
+            setShowTableContact(true);
+          } catch (error) {
+            console.error("Error fetching account drop-down data:", error);
+          }
+        } else {
+          setShowTableContact(false);
+        }
+      };
+
+      const [ deliveryLocationFiles, setDeliveryLocationFiles] = useState([])
+      const fileInputRef = useRef(null);
+
+      const handleChooseFileClick = () => {
+        fileInputRef.current.click();
+      };
+
+      useEffect(() => {
+   
+        if(data && data.attachmentLink){
+          setDeliveryLocationFiles(data.attachmentLink)
+        }
+        if(data && data.attachmentFiles){
+          setDeliveryLocationFiles(data.attachmentFiles)
+        }
+      
+        return () => {
+          
+        }
+      }, [data])
+    
+      const handleFileChange = (event) => {
+        const fileList = Array.from(event.target.files);
+        const mergeArray:any=[...deliveryLocationFiles, ...fileList]
+        setDeliveryLocationFiles(mergeArray)
+      };
+    
+      function handleDeleteFile(index){
+        var newDeliveryLocationFiles = [...deliveryLocationFiles];
+        newDeliveryLocationFiles.splice(index, 1);
+        setDeliveryLocationFiles(newDeliveryLocationFiles)
+      }
+
+
+
+  const form = useForm<z.infer<typeof deliveryLocationDetailsFormSchema>>({
+    resolver: zodResolver(deliveryLocationDetailsFormSchema),
+    defaultValues: {
+      UUID: data?.UUID || "",
+      deliveryLocation: data?.deliveryLocation || "",
+      contact: data?.contact || "",
+      phoneNo: data?.phoneNo || "",
+      deliveryAddress: data?.deliveryAddress || "",
+      description: data?.description || "",
+      attachment: data?.attachment ? [new File([], data.attachment)] : null,
+      valid: data?.valid ?? "1",
+    },
+  });
+
+  const updateDeliveryLocation = async (data) => {
+    var counter = 0;
+    try {
+      const formData = new FormData();
+      for (var key in data) {
+        if(key !=="attachment"){
+          formData.append(`customerHasDeliveryLocation[${key}]`, data[key]);
+        }
+      }
+  
+      for (const fileData of deliveryLocationFiles) {
+        if(fileData.size){
+          var base64 = await getFileToBase64(fileData);
+          formData.append(`customerHasDeliveryLocation[attachment][${counter}][Name]`, fileData.name);
+          formData.append(`customerHasDeliveryLocation[attachment][${counter}][File]`, base64);
+        }else{
+          formData.append(`customerHasDeliveryLocation[attachment][${counter}][Name]`, fileData.name);
+          formData.append(`customerHasDeliveryLocation[attachment][${counter}][File]`, " ");
+        }
+     
+      
+        counter++;
+      }
+
+      const response = await fetch(
+        `${ORIGIN}/customer/api/customer/update-customer-has-delivery-location-data?id=${id}`,
+        {
+          method: 'POST',
+          headers,
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+          if (response.status === 403) {
+            toast({
+              title: errorData.message,
+              duration:2000
+            });
+          }
+          throw new Error('Failed to fetch data');
+      }
+      const responseData = await response.json();
+      if(responseData){
+        toast({
+          title: responseData.message,
+          duration:2000
+        });
+      }
+
+    } catch (error) {
+      console.error('Error updating delivery location data:', error);
+    }
+  };
+
+  const onSubmit = async (values) => {
+    if (!values) return; 
+
+    const newData:any = { ...values };
+
+    if(id){
+      await updateDeliveryLocation(newData);
+      revalidateDeliveryLocationDetails()
+    }else{
+      newData.attachmentFiles = deliveryLocationFiles
+      setTempRowDeliveryLocationDetailsData(newData) 
+    } 
+    setOpen(false); 
+  };  
+
+  const handleReset = () => {
+    form.reset({
+      UUID:"",
+      deliveryLocation: "",
+      contact: "",
+      phoneNo:  "",
+      deliveryAddress: "",
+      description: "",
+    });
+  };
+
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-3xl bg-erp-blue-3 p-2">
+        <Form {...form}>
+          <form className="space-y-2" onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="flex items-center justify-between pr-4">
+              <div className="grid auto-cols-fr grid-flow-col gap-x-1.5">
+                <SaveButton />
+                <ResetButton onClick={handleReset}/>
+                <DialogClose asChild>
+                  <CancelButton />
+                </DialogClose>
+              </div>
+              <FormField
+                control={form.control}
+                name="valid"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-x-2 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value === "1"}
+                        onCheckedChange={(state) => field.onChange(state ? 1 : 0)}
+                      />
+                    </FormControl>
+                    <FormLabel>Valid</FormLabel>
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="space-y-2.5 bg-white p-3 pt-2">
+              <h2 className="text-sm font-bold">Contact</h2>
+              <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-3">
+              
+              <FormField
+                      control={form.control}
+                      name="UUID"
+                      render={({ field }) => (
+                        <FormItem className="col-span-4 row-span-1 grid h-full hidden grid-rows-[auto_1fr] space-y-1">
+                          <FormLabel>UUID:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7" {...field}  readOnly={true}/>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+              <FormField
+                  control={form.control}
+                  name="deliveryLocation"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Delivery Location:</FormLabel>
+                      <FormControl>
+                       <Input className="h-7" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+              />
+
+              <FormField
+                  control={form.control}
+                  name="contact"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Contact:</FormLabel>
+                      <FormControl>
+                       <Input className="h-7" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+              />
+
+              <FormField
+                  control={form.control}
+                  name="phoneNo"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Phone No.:</FormLabel>
+                      <FormControl>
+                       <Input className="h-7" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+              />
+                </div>
+                <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="deliveryAddress"
+                  render={({ field }) => (
+                    <FormItem className="col-span-3 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Delivery Address:</FormLabel>
+                      <FormControl>
+                        <Textarea className="h-7" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                </div>
+                <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem className="col-span-3 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Description:</FormLabel>
+                      <FormControl>
+                        <Textarea className="h-7" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                </div>
+              <FormField
+                  control={form.control}
+                  name="attachment"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                          Attachment: <button type="button" onClick={handleChooseFileClick} ><FaFileCirclePlus style={{ marginLeft: '5px' }} className="text-erp-blue-14"/></button>
+                        </div></FormLabel>
+             
+                      <FormControl>
+                        <Input id="attachments" type="file" multiple onChange={handleFileChange} ref={fileInputRef} className="hidden" />
+                      </FormControl>
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* You can render the files here */}
+                {deliveryLocationFiles && deliveryLocationFiles.map((file, index) => (
+                   <div key={index}>
+                   <a href={file.link} target="_blank" rel="noopener noreferrer"  style={{ color: 'blue' }}>
+                     {file.name}
+                   </a>
+                   <button type="button" onClick={() => handleDeleteFile(index)} style={{ color: 'red' }}>
+                    <FaCircleXmark  style={{verticalAlign:"bottom",marginLeft:"2px",marginTop:"2px"}} title={"Remove"}/>
+                  </button>
+                 </div>
+                ))}
+              </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

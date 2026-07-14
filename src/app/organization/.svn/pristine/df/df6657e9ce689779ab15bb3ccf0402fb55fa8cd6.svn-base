@@ -1,0 +1,123 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type basicAction = {
+  description: string;
+  view: string;
+  create: string;
+  update: string;
+  throw: string;
+  restore: string;
+  delete: string;
+  export: string;
+  "transfer-to": string;
+  "transfer-from": string;
+  preview: string;
+  confirm: string;
+  verify: string;
+  "generate-qr-code": string;
+  disable: string;
+  download: string;
+  print: string;
+  assignment: string;
+  progress: string;
+};
+
+export const columns: ColumnDef<basicAction>[] = [
+  {
+    accessorKey: "description",
+    header: "Description",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "view",
+    header: "Access",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "create",
+    header: "Create",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "update",
+    header: "Edit",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "throw",
+    header: "Trash",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "restore",
+    header: "Restore",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "delete",
+    header: "Delete",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "preview",
+    header: "Preview",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "transfer-from",
+    header: "Transfer From",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "transfer-to",
+    header: "Transfer To",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "export",
+    header: "Export",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "confirm",
+    header: "Confirm",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "verify",
+    header: "Verify",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "assignment",
+    header: "Assignment",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "progress",
+    header: "Progress",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "generate-qr-code",
+    header: "Generate QR",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "disable",
+    header: "Disable",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "download",
+    header: "Download",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "print",
+    header: "Print",
+    filterFn: "includesString",
+  },
+];

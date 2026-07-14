@@ -1,0 +1,264 @@
+"use client";
+
+import React from "react";
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type ItemList = {
+  UUID: string;
+  quotation: string;
+  item: string;
+  type: number;
+  description: string;
+  "2ndDescription": string;
+  moreDescription: string;
+  itemGroup: string;
+  itemCategory: string;
+  tariff: string;
+  classification: string;
+  permitNo: string;
+  project: string;
+  quantity: number;
+  quantity2?: number;
+  quantity3?: number;
+  UOM: string;
+  UOMDropdown2?: any[];
+  UOMDropdown3?: any[];
+  price: number;
+  discountRate: number;
+  discountAmount: number;
+  tax: string;
+  deliveryDate: string;
+  billingFrequency: number;
+  billingInterval: string;
+  startAt: string;
+  endAt: string;
+  remark1: string;
+  remark2: string;
+  serviceName: string;
+  serviceCode: string;
+  createdAt: string;
+  createdBy: string;
+  updatedBy: string;
+  updatedAt: string;
+  valid: string; 
+};
+
+export const ServiceColumns: ColumnDef<ItemList>[] = [
+  {
+    id: "serviceCode",
+    accessorKey: "serviceCode",
+    header: "Item",
+  },
+  {
+    id: "serviceName",
+    accessorKey: "serviceName",
+    header: "Item Name",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+  },
+  {
+    id: "2ndDescription",
+    accessorKey: "2ndDescription",
+    header: "2nd Description",
+  },
+  {
+    id: "moreDescription",
+    accessorKey: "moreDescription",
+    header: "More Description",
+  },
+  {
+    id: "serviceGroupCodeCode",
+    accessorKey: "serviceGroupCodeCode",
+    header: "Group",
+  },
+  {
+    id: "serviceCategoryCodeCode",
+    accessorKey: "serviceCategoryCodeCode",
+    header: "Category",
+  },
+  {
+    id: "tariffCode",
+    accessorKey: "tariffCode",
+    header: "Tariff",
+  },
+  {
+    id: "classificationCodeCode",
+    accessorKey: "classificationCodeCode",
+    header: "Classification",
+  },
+  {
+    id: "quantity",
+    accessorKey: "quantity",
+    header: "Quantity",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.quantity}</p>
+    ),
+  },
+  {
+    id: "UOM",
+    accessorKey: "UOM",
+    header: "UOM",
+  },
+  {
+    id: "rate",
+    accessorKey: "rate",
+    header: "Rate",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.rate}</p>
+    ),
+  },
+  {
+    id: "price",
+    accessorKey: "price",
+    header: "Price",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.price}</p>
+    ),
+  },
+  {
+    id: "billingFrequency",
+    accessorKey: "billingFrequency",
+    header: "Billing Frequency",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.billingFrequency}</p>
+    ),
+  },
+  {
+    id: "billingInterval",
+    accessorKey: "billingInterval",
+    header: "Billing Interval",
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+  },
+  {
+    id: "createdByUsername",
+    accessorKey: "createdByUsername",
+    header: "Created by",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+  },
+  {
+    id: "updatedByUsername",
+    accessorKey: "updatedByUsername",
+    header: "Updated by",
+  },
+];
+
+export const StockColumns: ColumnDef<ItemList>[] = [
+  {
+    id: "stockCode",
+    accessorKey: "stockCode",
+    header: "Item",
+  },
+  {
+    id: "stock",
+    accessorKey: "stock",
+    header: "Item Name",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+  },
+  {
+    id: "2ndDescription",
+    accessorKey: "2ndDescription",
+    header: "2nd Description",
+  },
+  {
+    id: "moreDescription",
+    accessorKey: "moreDescription",
+    header: "More Description",
+  },
+  {
+    id: "stockGroupCodeCode",
+    accessorKey: "stockGroupCodeCode",
+    header: "Group Code",
+  },
+  {
+    id: "stockCategoryCodeCode",
+    accessorKey: "stockCategoryCodeCode",
+    header: "Category Code",
+  },
+  {
+    id: "tariffCodeCode",
+    accessorKey: "tariffCodeCode",
+    header: "Tariff",
+  },
+  {
+    id: "classificationCodeCode",
+    accessorKey: "classificationCodeCode",
+    header: "Classification",
+  },
+  {
+    id: "quantity",
+    accessorKey: "quantity",
+    header: "Quantity",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.quantity}</p>
+    ),
+  },
+  {
+    id: "UOM",
+    accessorKey: "UOM",
+    header: "UOM",
+  },
+  {
+    id: "rate",
+    accessorKey: "rate",
+    header: "Rate",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.rate}</p>
+    ),
+  },
+  {
+    id: "refPrice",
+    accessorKey: "refPrice",
+    header: "Price",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.refPrice}</p>
+    ),
+  },
+  {
+    id: "billingFrequency",
+    accessorKey: "billingFrequency",
+    header: "Billing Frequency",
+    cell: ({row}) => (
+      <p className="text-right">{row.original.billingFrequency}</p>
+    ),
+  },
+  {
+    id: "billingInterval",
+    accessorKey: "billingInterval",
+    header: "Billing Interval",
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+  },
+  {
+    id: "createdByUsername",
+    accessorKey: "createdByUsername",
+    header: "Created by",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+  },
+  {
+    id: "updatedByUsername",
+    accessorKey: "updatedByUsername",
+    header: "Updated by",
+  },
+];

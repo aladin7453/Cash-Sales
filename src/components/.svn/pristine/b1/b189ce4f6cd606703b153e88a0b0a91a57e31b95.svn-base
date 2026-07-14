@@ -1,0 +1,4464 @@
+import { pdf, PDFDownloadLink, PDFViewer } from "@react-pdf/renderer";
+import axios from "axios";
+import React, { useEffect, useState } from "react";
+import { Form } from "react-hook-form";
+import useSWRImmutable from "swr/immutable";
+
+import EInvoice from "@/components/eInvoiceTemplate";
+import { SVGPreview } from "@/components/icons/svg-repo/SVGPreview";
+import PreviewPDF from "@/components/previewTemplate";
+import PreviewPDFCP from "@/components/previewTemplateCP";
+import SimplifiedPDF from "@/components/simplifiedTemplate";
+import CargoManifest from "@/components/templates/cargo-shipping/cargoManifest";
+import InwardManifest from "@/components/templates/cargo-shipping/inwardManifest";
+import BillOfLadingPreviewTemplate from "@/components/templates/cargo-shipping/previewTemplate";
+import CargoPreviewTemplate1 from "@/components/templates/cargo-shipping/previewTemplate1";
+import CargoPreviewTemplate2 from "@/components/templates/cargo-shipping/previewTemplate2";
+import PreviewItemizedServiceTemplate from "@/components/templates/sales/itemizedServiceTemplate";
+import PreviewDOItemizedTemplate1 from "@/components/templates/sales/previewDOItemizedTemplate1";
+import PreviewDOItemizedTemplate2 from "@/components/templates/sales/previewDOItemizedTemplate2";
+import PreviewNormal2 from "@/components/templates/sales/previewNormal2";
+import PreviewTemplate1 from "@/components/templates/sales/previewTemplate1";
+import PreviewPDF2 from "@/components/templates/sales/previewTemplateCP2";
+import PreviewQuotationTemplate from "@/components/templates/sales/quotationTemplate";
+import PreviewSummaryService5Template from "@/components/templates/sales/summaryService5Template";
+import PreviewSummaryServiceByMonthTemplate from "@/components/templates/sales/summaryServiceByMonthTemplateForm";
+import PreviewSummaryServiceTemplate from "@/components/templates/sales/summaryServiceTemplate";
+import PreviewSummaryServiceTemplate2 from "@/components/templates/sales/summaryServiceTemplate2";
+import PreviewSummaryServiceTemplate2Tax from "@/components/templates/sales/summaryServiceTemplate2Tax";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/use-toast";
+import { checkAccessToken, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+
+import LoadingUI from "../../LoadingUI";
+import TemplateViewer from "./TemplateViewer";
+
+type Props = {
+  previewType: string;
+  module: string;
+  model: string;
+  doc_id: string;
+  showEInvoiceButton?: boolean;
+  data?: any;
+};
+
+const fetcher = async (url: string) => {
+  const headers = getAuthHeaders();
+
+  const res = await fetch(url, { headers });
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new Error("Session expired");
+    } else {
+      const error: any = new Error("Failed to fetch data");
+      error.status = res.status;
+      throw error;
+    }
+  }
+
+  return res.json();
+};
+
+const canShowEInvoice = (documentType: string): boolean => {
+  const allowedTypes = [
+    "SALES INVOICE",
+    "SALES CREDIT NOTE",
+    "SALES DEBIT NOTE",
+    "CONSOLIDATED INVOICE",
+    "PURCHASE INVOICE",
+    "PURCHASE DEBIT NOTE",
+    "PURCHASE CREDIT NOTE",
+    "CASH SALES",
+  ];
+  return allowedTypes.includes(documentType);
+};
+
+const canShowItemizedService = (documentType: string): boolean => {
+  const allowedTypes = ["CASH SALES", "SALES INVOICE", "CONSOLIDATED INVOICE"];
+  return allowedTypes.includes(documentType);
+};
+
+const canShowSummaryService = (documentType: string): boolean => {
+  const allowedTypes = ["CASH SALES", "SALES INVOICE", "CONSOLIDATED INVOICE"];
+  return allowedTypes.includes(documentType);
+};
+
+const canShowSummaryService2 = (documentType: string): boolean => {
+  const allowedTypes = ["CASH SALES", "SALES INVOICE", "CONSOLIDATED INVOICE"];
+  return allowedTypes.includes(documentType);
+};
+
+const canShowProformaInvoice = (documentType: string): boolean => {
+  const allowedTypes = ["SALES ORDER"];
+
+  return allowedTypes.includes(documentType);
+};
+
+const canShowCargoManifest = (documentType: string): boolean => {
+  return documentType === "BILL OF LADING";
+};
+
+const canShowInwardManifest = (documentType: string): boolean => {
+  return documentType === "BILL OF LADING";
+};
+
+const canShowTemplate1 = (documentType: string): boolean => {
+  const allowedTypes = ["SALES INVOICE", "SALES DELIVERY ORDER", "CONSOLIDATED INVOICE"];
+
+  return allowedTypes.includes(documentType);
+};
+
+const canShowQuotationMultiUOM = (documentType: string): boolean => {
+  const allowedTypes = ["QUOTATION"];
+
+  return allowedTypes.includes(documentType);
+};
+
+const canShowCargoTemplate1 = (documentType: string): boolean => {
+  const allowedTypes = ["BOOKING"];
+
+  return allowedTypes.includes(documentType);
+};
+
+const canShowCargoTemplate2 = (documentType: string): boolean => {
+  const allowedTypes = ["BOOKING"];
+
+  return allowedTypes.includes(documentType);
+};
+
+const canShowItemizedBalance = (documentType: string): boolean => {
+  const allowedTypes = ["SALES DELIVERY ORDER"];
+
+  return allowedTypes.includes(documentType);
+};
+
+const canShowNormal = (documentType: string): boolean => {
+  const allowedTypes = ["CUSTOMER PAYMENT"];
+
+  return allowedTypes.includes(documentType);
+};
+
+export default function PreviewButton({
+  module,
+  model,
+  doc_id,
+  previewType,
+  showEInvoiceButton = true,
+  data,
+}: Props) {
+  const headers = getAuthHeaders();
+
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [showPreviewPDFDialog, setShowPreviewPDFDialog] = useState(false);
+  const [showDefault1ItemizedCG, setShowDefault1ItemizedCG] = useState(false);
+  const [showEInvoiceDialog, setShowEInvoiceDialog] = useState(false);
+  const [showSummaryService, setShowSummaryService] = useState(false);
+  const [showService2SummaryRemark1, setShowService2SummaryRemark1] = useState(false);
+  const [showService4SummaryRemark1TIN, setShowService4SummaryRemark1TIN] = useState(false);
+  const [showService3SummaryRemark2, setShowService3SummaryRemark2] = useState(false);
+  const [showService2SummaryIDRemark1, setShowService2SummaryIDRemark1] = useState(false);
+  const [showService5Summary, setShowService5Summary] = useState(false);
+  const [showSummaryService2, setShowSummaryService2] = useState(false);
+  const [showService2SummaryBRN, setShowService2SummaryBRN] = useState(false);
+  const [showService2Summary, setShowService2Summary] = useState(false);
+  const [showService2TaxSummary, setShowService2TaxSummary] = useState(false);
+  const [showItemizedService, setShowItemizedService] = useState(false);
+  const [showService1Itemized, setShowService1Itemized] = useState(false);
+  const [showService1ItemizedRelationship, setShowService1ItemizedRelationship] = useState(false);
+  const [showSimplifiedPDFDialog, setShowSimplifiedPDFDialog] = useState(false);
+  const [showCargoManifestDialog, setShowCargoManifestDialog] = useState(false);
+  const [showInwardManifestDialog, setShowInwardManifestDialog] = useState(false);
+  const [showTemplate1Dialog, setShowTemplate1Dialog] = useState(false);
+  const [showDefault2ItemizedCG, setShowDefault2ItemizedCG] = useState(false);
+  const [showTemplate2Dialog, setShowTemplate2Dialog] = useState(false);
+  const [showNormal2Dialog, setShowNormal2Dialog] = useState(false);
+  const [showDefault1SummaryCG, setShowDefault1SummaryCG] = useState(false);
+  const [showCargoTemplate1Dialog, setShowCargoTemplate1Dialog] = useState(false);
+  const [showCargoTemplate2Dialog, setShowCargoTemplate2Dialog] = useState(false);
+  const [showTemplate3Dialog, setShowTemplate3Dialog] = useState(false);
+  const [showQuotationMultiUOMDialog, setShowQuotationMultiUOMDialog] = useState(false);
+  const [showPreviewNormalPDFDialog, setShowPreviewNormalPDFDialog] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(1);
+  const [currentBankAccount, setCurrentBankAccount] = useState(null);
+  const [eInvoiceData, setEInvoiceData] = useState(null);
+  const [previewData, setPreviewData] = useState(null);
+  const [itemsData, setItemsData] = useState(null);
+  const [currentCompanyData, setCurrentCompanyData] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [PDFPreviewType, setPDFPreviewType] = useState(null);
+  const [QrCode, setQrCode] = useState(null);
+  const [isProformaInvoice, setIsProformaInvoice] = useState(false);
+  const [eInvoiceStatus, setEInvoiceStatus] = useState(null);
+  const [previewTemplatePDFData, setPreviewTemplatePDFData] = useState(null);
+  const [isPreviewTemplatePDFOpen, setIsPreviewTemplatePDFOpen] = useState(false);
+  const [isPDFLoading, setIsPDFLoading] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [documentType, setDocumentType] = useState("");
+
+  const [showDOItemizedBalance1, setShowDOItemizedBalance1] = useState(false);
+  const [showDOItemizedBalance1CG, setShowDOItemizedBalance1CG] = useState(false);
+
+  const [showDOItemizedBalance2, setShowDOItemizedBalance2] = useState(false);
+  const [showDOItemizedBalance2CG, setShowDOItemizedBalance2CG] = useState(false);
+
+  const [totalVolume, setTotalVolume] = useState<string | null>(null);
+  const [totalWeight, setTotalWeight] = useState<string | null>(null);
+
+  const currentAccount = JSON.parse(localStorage.getItem("currentAccount") || "null");
+  const currentCompany = JSON.parse(localStorage.getItem("currentCompany") || "null");
+
+  // Loading states
+  const [isLoadingEInvoice, setIsLoadingEInvoice] = useState(false);
+  const [isLoadingPDFPreview, setIsLoadingPDFPreview] = useState(false);
+  const [isLoadingSimplifiedPDF, setIsLoadingSimplifiedPDF] = useState(false);
+  const [isLoadingCargoManifest, setIsLoadingCargoManifest] = useState(false);
+  const [isLoadingInwardManifest, setIsLoadingInwardManifest] = useState(false);
+  const [isLoadingTemplate1, setIsLoadingTemplate1] = useState(false);
+  const [isLoadingTemplate2, setIsLoadingTemplate2] = useState(false);
+  const [isLoadingTemplate3, setIsLoadingTemplate3] = useState(false);
+  const [isLoadingNormal2, setIsLoadingNormal2] = useState(false);
+  const [isLoadingCargoTemplate1, setIsLoadingCargoTemplate1] = useState(false);
+  const [isLoadingCargoTemplate2, setIsLoadingCargoTemplate2] = useState(false);
+  const [isLoadingQuotationMultiUOM, setIsLoadingQuotationMultiUOM] = useState(false);
+
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+
+  useEffect(() => {
+    const ua = navigator.userAgent || "";
+
+    const hasTouch = navigator.maxTouchPoints > 0 || "ontouchstart" in window;
+
+    const smallScreen = window.screen.width <= 1280;
+
+    const isDesktopUA = /Windows NT|Macintosh|X11|Linux x86_64/i.test(ua);
+
+    // Treat touch devices with small screens as mobile/POS
+    const isMobileOrPOS = hasTouch && smallScreen;
+
+    setIsMobileDevice(isMobileOrPOS);
+
+    console.log({
+      ua,
+      hasTouch,
+      smallScreen,
+      isDesktopUA,
+      isMobileOrPOS,
+      width: window.screen.width,
+      height: window.screen.height,
+      maxTouchPoints: navigator.maxTouchPoints,
+    });
+  }, []);
+
+  let username: string = "";
+  let authToken: string = "";
+  let loginUser: string = "";
+  username = JSON.parse(localStorage.getItem("username") || '""');
+  authToken = JSON.parse(localStorage.getItem("authToken") || '""');
+  loginUser = JSON.parse(localStorage.getItem("userFullName") || '"');
+
+  const { toast } = useToast();
+
+  const displayMessage = (response: any) => {
+    if (response.status === 403) {
+      toast({
+        variant: "destructive",
+        title: "Access Denied",
+        description: "You do not have access towards this content.",
+      });
+    }
+  };
+
+  // Add state for description preferences
+  const [descriptionPreferences, setDescriptionPreferences] = useState(() => {
+    try {
+      const saved = localStorage.getItem("preview.description.preference");
+      return saved
+        ? JSON.parse(saved)
+        : {
+            description: true,
+            secondDescription: true,
+            moreDescription: true,
+          };
+    } catch {
+      return {
+        description: true,
+        secondDescription: true,
+        moreDescription: true,
+      };
+    }
+  });
+
+  // Add state for agent preferences
+  const [agentPreferences, setAgentPreferences] = useState(() => {
+    try {
+      const saved = localStorage.getItem("preview.agent.preference");
+      return saved
+        ? JSON.parse(saved)
+        : {
+            salesAgent: true,
+            servicingAgent: true,
+            collectionAgent: true,
+          };
+    } catch {
+      return {
+        salesAgent: true,
+        servicingAgent: true,
+        collectionAgent: true,
+      };
+    }
+  });
+
+  const {
+    data: documentList,
+    error,
+    isLoading,
+  } = useSWRImmutable(
+    currentAccount && currentCompany
+      ? `https://1ofis.infollective.com/application/backend/site/api/site/get-update-module-has-template-data?module=${previewType}&account=${currentAccount?.account}&company=${currentCompany.UUID}`
+      : null,
+    fetcher,
+    {
+      shouldRetryOnError: false,
+    },
+  );
+
+  useEffect(() => {
+    if (isPreviewTemplatePDFOpen && previewTemplatePDFData) {
+      setIsPDFLoading(true);
+      generatePdf();
+    }
+  }, [isPreviewTemplatePDFOpen, previewTemplatePDFData]);
+
+  const generatePdf = async () => {
+    const blob = new Blob([previewTemplatePDFData], { type: "application/pdf" });
+    setPdfUrl(window.URL.createObjectURL(blob));
+    setIsPDFLoading(false);
+  };
+
+  // Effect to save default preferences when dialog opens and no preference exists
+  useEffect(() => {
+    if (showPreviewDialog) {
+      const savedDescription = localStorage.getItem("preview.description.preference");
+      const savedAgent = localStorage.getItem("preview.agent.preference");
+
+      if (!savedDescription) {
+        const defaultPreferences = {
+          description: true,
+          secondDescription: true,
+          moreDescription: true,
+        };
+        localStorage.setItem("preview.description.preference", JSON.stringify(defaultPreferences));
+      }
+
+      if (!savedAgent) {
+        const defaultAgentPreferences = {
+          salesAgent: true,
+          servicingAgent: true,
+          collectionAgent: true,
+        };
+        localStorage.setItem("preview.agent.preference", JSON.stringify(defaultAgentPreferences));
+      }
+    }
+  }, [showPreviewDialog]);
+
+  const previewTemplatePDF = async (documentType: string, documentName: string) => {
+    setDocumentType(documentName);
+    setIsPreviewTemplatePDFOpen(true);
+    setIsPDFLoading(true);
+
+    var form_data = new FormData();
+
+    const previewData = {
+      ...data,
+      loginUser: loginUser,
+    };
+
+    form_data.append("previewData", JSON.stringify(previewData));
+    form_data.append("UUIDs", "");
+    form_data.append("docDate", "");
+
+    const response = await axios.post(
+      `https://1ofis.infollective.com/application/backend/site/api/site/preview-pdf-new?module=${previewType}&account=${currentAccount?.account}&company=${currentCompany.UUID}&fileName=${documentType}`,
+      form_data,
+      {
+        method: "GET",
+        responseType: "arraybuffer",
+        auth: {
+          username: username,
+          password: authToken,
+        },
+      },
+    );
+
+    if (isMobileDevice) {
+      const blob = new Blob([response.data], {
+        type: "application/pdf",
+      });
+
+      const url = URL.createObjectURL(blob);
+
+      setPdfUrl(url);
+      setIsPDFLoading(false);
+    } else {
+      setPreviewTemplatePDFData(response.data);
+    }
+  };
+
+  // Function to handle checkbox changes
+  const handlePreferenceChange = (key: string, checked: boolean) => {
+    const newPreferences = {
+      ...descriptionPreferences,
+      [key]: checked,
+    };
+    setDescriptionPreferences(newPreferences);
+    localStorage.setItem("preview.description.preference", JSON.stringify(newPreferences));
+  };
+
+  // Function to handle agent checkbox changes
+  const handleAgentPreferenceChange = (key: string, checked: boolean) => {
+    const newPreferences = {
+      ...agentPreferences,
+      [key]: checked,
+    };
+    setAgentPreferences(newPreferences);
+    localStorage.setItem("preview.agent.preference", JSON.stringify(newPreferences));
+  };
+
+  var form_data = new FormData();
+  form_data.append("UUIDs[]", doc_id);
+
+  const previewEInvoice = async () => {
+    setShowEInvoiceDialog(true);
+    setIsLoadingEInvoice(true);
+
+    try {
+      const response = await fetch(
+        `${
+          module.includes("purchase") || module.includes("supplier")
+            ? `${ORIGIN}/${module}/api/${model}/preview-pdf?id=${doc_id}&type=EInvoice`
+            : `${ORIGIN}/${module}/api/${model}/preview-pdf?type=EInvoice`
+        }`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        },
+      );
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setEInvoiceData(responseData.data);
+      setItemsData(responseData.itemsData);
+      setQrCode(responseData.qrCode);
+      setCurrentCompanyData(responseData.currentCompany);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingEInvoice(false);
+    }
+  };
+
+  const previewItemizedServiceTemplate = async (variant: number) => {
+    switch (variant) {
+      case 1:
+        setShowItemizedService(true);
+        break;
+      case 2:
+        setShowService1Itemized(true);
+        break;
+      case 3:
+        setShowService1ItemizedRelationship(true);
+        break;
+    }
+    setIsLoadingPDFPreview(true);
+
+    try {
+      const response = await fetch(
+        variant === 3
+          ? `${ORIGIN}/${module}/api/${model}/preview-pdf?type=itemizedRelationshipServiceTemplate`
+          : `${ORIGIN}/${module}/api/${model}/preview-pdf?type=itemizedServiceTemplate`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        },
+      );
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(
+        previewType === "BILL OF LADING"
+          ? {
+              ...responseData.previewData.billOfLading,
+              ...responseData.previewData.billOfLadingHasParty,
+            }
+          : responseData.data,
+      );
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+      setQrCode(responseData.qrCode);
+      setEInvoiceStatus(responseData.eInvoiceStatus);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingPDFPreview(false);
+    }
+  };
+
+  const previewSummaryServiceTemplate = async (variant: number) => {
+    switch (variant) {
+      case 1:
+        setShowSummaryService(true);
+        break;
+      case 2:
+        setShowService2SummaryRemark1(true);
+        break;
+      case 3:
+        setShowService4SummaryRemark1TIN(true);
+        break;
+      case 4:
+        setShowService3SummaryRemark2(true);
+        break;
+      case 5:
+        setShowService2SummaryIDRemark1(true);
+        break;
+      case 6:
+        setShowService5Summary(true);
+        break;
+    }
+    setIsLoadingPDFPreview(true);
+
+    try {
+      const response = await fetch(
+        `${ORIGIN}/${module}/api/${model}/preview-pdf?type=summaryServiceTemplate1`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        },
+      );
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(
+        previewType === "BILL OF LADING"
+          ? {
+              ...responseData.previewData.billOfLading,
+              ...responseData.previewData.billOfLadingHasParty,
+            }
+          : responseData.data,
+      );
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+      setQrCode(responseData.qrCode);
+      setEInvoiceStatus(responseData.eInvoiceStatus);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingPDFPreview(false);
+    }
+  };
+
+  const previewSummaryServiceTemplate2 = async (variant: number) => {
+    switch (variant) {
+      case 1:
+        setShowSummaryService2(true);
+        break;
+      case 2:
+        setShowService2SummaryBRN(true);
+        break;
+      case 3:
+        setShowService2Summary(true);
+        break;
+      case 4:
+        setShowService2TaxSummary(true);
+    }
+    setIsLoadingPDFPreview(true);
+
+    try {
+      const response = await fetch(
+        `${ORIGIN}/${module}/api/${model}/preview-pdf?type=summaryServiceTemplate2`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        },
+      );
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(
+        previewType === "BILL OF LADING"
+          ? {
+              ...responseData.previewData.billOfLading,
+              ...responseData.previewData.billOfLadingHasParty,
+            }
+          : responseData.data,
+      );
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+      setQrCode(responseData.qrCode);
+      setEInvoiceStatus(responseData.eInvoiceStatus);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingPDFPreview(false);
+    }
+  };
+
+  const previewPDFTemplate = async (variant: number) => {
+    variant === 1 ? setShowPreviewPDFDialog(true) : setShowDefault1ItemizedCG(true);
+    setIsLoadingPDFPreview(true);
+
+    try {
+      const response = await fetch(
+        // temporarily not enable multiple preview for job and purchase
+        `${module.includes("purchase") || module.includes("supplier") ? `${ORIGIN}/${module}/api/${model}/preview-pdf?id=${doc_id}&type=EInvoice` : `${ORIGIN}/${module}/api/${model}/preview-pdf?type=EInvoice`}`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        },
+      );
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(
+        previewType === "BILL OF LADING"
+          ? {
+              ...responseData.previewData.billOfLading,
+              ...responseData.previewData.billOfLadingHasParty,
+            }
+          : responseData.data,
+      );
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+      setEInvoiceData(responseData.eInvoiceData);
+      setQrCode(responseData.qrCode);
+      setEInvoiceStatus(responseData.eInvoiceStatus);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingPDFPreview(false);
+    }
+  };
+
+  const previewPDFDOItemizedTemplate1 = async (variant: number) => {
+    variant === 1 ? setShowDOItemizedBalance1(true) : setShowDOItemizedBalance1CG(true);
+    setIsLoadingPDFPreview(true);
+
+    try {
+      const response = await fetch(`${ORIGIN}/${module}/api/${model}/preview-pdf?type=EInvoice`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(responseData.data);
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+      setEInvoiceData(responseData.eInvoiceData);
+      setQrCode(responseData.qrCode);
+      setEInvoiceStatus(responseData.eInvoiceStatus);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingPDFPreview(false);
+    }
+  };
+
+  const previewPDFDOItemizedTemplate2 = async (variant: number) => {
+    variant === 1 ? setShowDOItemizedBalance2(true) : setShowDOItemizedBalance2CG(true);
+    setIsLoadingPDFPreview(true);
+
+    try {
+      const response = await fetch(`${ORIGIN}/${module}/api/${model}/preview-pdf?type=EInvoice`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(responseData.data);
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+      setEInvoiceData(responseData.eInvoiceData);
+      setQrCode(responseData.qrCode);
+      setEInvoiceStatus(responseData.eInvoiceStatus);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingPDFPreview(false);
+    }
+  };
+
+  const simplifiedPDFTemplate = async () => {
+    setShowSimplifiedPDFDialog(true);
+    setIsLoadingSimplifiedPDF(true);
+
+    try {
+      const response = await fetch(`${ORIGIN}/${module}/api/${model}/preview-pdf`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+      const responseData = await response.json();
+
+      setPDFPreviewType("Invoice");
+      setPreviewData(responseData.data);
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingSimplifiedPDF(false);
+    }
+  };
+
+  const previewProformaInvoice = async () => {
+    setShowPreviewPDFDialog(true);
+    setIsProformaInvoice(true);
+    setIsLoadingPDFPreview(true);
+
+    try {
+      const response = await fetch(`${ORIGIN}/${module}/api/${model}/preview-pdf`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType("PROFORMA INVOICE");
+      setPreviewData(responseData.data);
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingPDFPreview(false);
+    }
+  };
+
+  const previewCargoManifest = async () => {
+    setShowCargoManifestDialog(true);
+    setIsLoadingCargoManifest(true);
+
+    try {
+      const response = await fetch(
+        `${ORIGIN}/${module}/api/${model}/preview-pdf-template-1?id=${doc_id}`,
+        {
+          method: "POST",
+          headers,
+        },
+      );
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType("CARGO MANIFEST");
+      setPreviewData({
+        ...responseData.previewData.billOfLading,
+        ...responseData.previewData.billOfLadingHasParty,
+      });
+      setItemsData(responseData.previewData.billOfLadingHasDetails);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingCargoManifest(false);
+    }
+  };
+
+  const previewInwardManifest = async () => {
+    setShowInwardManifestDialog(true);
+    setIsLoadingInwardManifest(true);
+
+    try {
+      const response = await fetch(`${ORIGIN}/${module}/api/${model}/preview-pdf?id=${doc_id}`, {
+        method: "POST",
+        headers,
+      });
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType("INWARD MANIFEST");
+      setPreviewData(responseData.data);
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingInwardManifest(false);
+    }
+  };
+
+  const previewTemplate1 = async (variant: number) => {
+    variant === 1 ? setShowTemplate1Dialog(true) : setShowDefault2ItemizedCG(true);
+    setIsLoadingTemplate1(true);
+
+    try {
+      const response = await fetch(`${ORIGIN}/${module}/api/${model}/preview-pdf?type=EInvoice`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(responseData.data);
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+      setEInvoiceData(responseData.eInvoiceData);
+      setQrCode(responseData.qrCode);
+      setEInvoiceStatus(responseData.eInvoiceStatus);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingTemplate1(false);
+    }
+  };
+
+  const quotationPreviewTemplate2 = async () => {
+    setShowTemplate2Dialog(true);
+    setIsLoadingTemplate2(true);
+
+    try {
+      const response = await fetch(`${ORIGIN}/${module}/api/${model}/preview-pdf`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(responseData.data);
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingTemplate2(false);
+    }
+  };
+
+  const previewNormal2 = async (variant: number) => {
+    variant === 1 ? setShowNormal2Dialog(true) : setShowDefault1SummaryCG(true);
+    setIsLoadingNormal2(true);
+
+    try {
+      const response = await fetch(
+        // temporarily not enable multiple preview for job and purchase
+        `${module.includes("purchase") || module.includes("supplier") ? `${ORIGIN}/${module}/api/${model}/preview-pdf?id=${doc_id}&type=EInvoice` : `${ORIGIN}/${module}/api/${model}/preview-pdf?type=EInvoice`}`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        },
+      );
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(
+        previewType === "BILL OF LADING"
+          ? {
+              ...responseData.previewData.billOfLading,
+              ...responseData.previewData.billOfLadingHasParty,
+            }
+          : responseData.data,
+      );
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+      setEInvoiceData(responseData.eInvoiceData);
+      setQrCode(responseData.qrCode);
+      setEInvoiceStatus(responseData.eInvoiceStatus);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingNormal2(false);
+    }
+  };
+
+  const cargoPreviewTemplate1 = async () => {
+    setShowCargoTemplate1Dialog(true);
+    setIsLoadingCargoTemplate1(true);
+
+    try {
+      const response = await fetch(`${ORIGIN}/${module}/api/${model}/preview-pdf?id=${doc_id}`, {
+        method: "POST",
+        headers,
+      });
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(responseData.booking);
+      setItemsData(responseData.bookingHasDetails);
+      setCurrentCompanyData(responseData.currentCompany);
+      setTotalWeight(responseData.totalWeight);
+      setTotalVolume(responseData.totalVolume);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingCargoTemplate1(false);
+    }
+  };
+
+  const cargoPreviewTemplate2 = async () => {
+    setShowCargoTemplate2Dialog(true);
+    setIsLoadingCargoTemplate2(true);
+
+    try {
+      const response = await fetch(`${ORIGIN}/${module}/api/${model}/preview-pdf?id=${doc_id}`, {
+        method: "POST",
+        headers,
+      });
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(responseData.booking);
+      setItemsData(responseData.bookingHasDetails);
+      setCurrentCompanyData(responseData.currentCompany);
+      setTotalWeight(responseData.totalWeight);
+      setTotalVolume(responseData.totalVolume);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingCargoTemplate2(false);
+    }
+  };
+
+  const quotationPreviewTemplate3 = async () => {
+    setShowTemplate3Dialog(true);
+    setIsLoadingTemplate3(true);
+
+    try {
+      const response = await fetch(`${ORIGIN}/${module}/api/${model}/preview-pdf`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(responseData.data);
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingTemplate3(false);
+    }
+  };
+
+  const quotationMultiUOMPreview = async () => {
+    setShowQuotationMultiUOMDialog(true);
+    setIsLoadingQuotationMultiUOM(true);
+
+    try {
+      const response = await fetch(`${ORIGIN}/${module}/api/${model}/preview-pdf`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      displayMessage(response);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(responseData.data);
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoadingQuotationMultiUOM(false);
+    }
+  };
+
+  const previewNormalPDFTemplate = async (template = 1) => {
+    setSelectedTemplate(template);
+    setShowPreviewNormalPDFDialog(true);
+
+    var form_data = new FormData();
+    form_data.append("UUIDs[]", doc_id);
+
+    try {
+      const response = await fetch(`${ORIGIN}/${module}/api/${model}/preview-pdf`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      const responseData = await response.json();
+
+      setPDFPreviewType(previewType);
+      setPreviewData(responseData.data);
+      setItemsData(responseData.itemsData);
+      setCurrentCompanyData(responseData.currentCompany);
+      setCurrentUser(responseData.currentUser);
+      setCurrentBankAccount(responseData.currentBankAccount);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  const handleEInvoicePreview = async () => {
+    const blob = await pdf(
+      <EInvoice
+        eInvoiceData={eInvoiceData}
+        itemsData={itemsData}
+        QrCode={QrCode}
+        currentCompanyData={currentCompanyData}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleItemizedPreview = async () => {
+    let blob;
+
+    if (PDFPreviewType === "BILL OF LADING") {
+      blob = await pdf(
+        <BillOfLadingPreviewTemplate
+          previewData={previewData}
+          itemsData={itemsData}
+          currentCompanyData={currentCompanyData}
+          currentUser={currentUser}
+        />,
+      ).toBlob();
+    } else {
+      blob = await pdf(
+        <PreviewPDF
+          previewData={previewData}
+          itemsData={itemsData}
+          currentCompanyData={currentCompanyData}
+          currentUser={currentUser}
+          PDFPreviewType={PDFPreviewType}
+          isProformaInvoice={isProformaInvoice}
+          descriptionPreferences={descriptionPreferences}
+          agentPreferences={agentPreferences}
+          QrCode={QrCode}
+          eInvoiceData={eInvoiceData}
+          showDefault1ItemizedCG={showDefault1ItemizedCG}
+          eInvoiceStatus={eInvoiceStatus}
+        />,
+      ).toBlob();
+    }
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleDefault1ItemizedCGPreview = async () => {
+    const blob = await pdf(
+      <PreviewPDF
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        eInvoiceData={eInvoiceData}
+        showDefault1ItemizedCG={showDefault1ItemizedCG}
+        eInvoiceStatus={eInvoiceStatus}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleItemizedNoCodePreview = async () => {
+    const blob = await pdf(
+      <PreviewNormal2
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        eInvoiceData={eInvoiceData}
+        showDefault1SummaryCG={showDefault1SummaryCG}
+        eInvoiceStatus={eInvoiceStatus}
+        removeDisplayUOM={true}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleDefault1SummaryCGPreview = async () => {
+    const blob = await pdf(
+      <PreviewNormal2
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        eInvoiceData={eInvoiceData}
+        showDefault1SummaryCG={showDefault1SummaryCG}
+        eInvoiceStatus={eInvoiceStatus}
+        removeDisplayUOM={undefined}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleSimplifiedReceiptPreview = async () => {
+    const blob = await pdf(
+      <SimplifiedPDF
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handlePreviewTemplate1Preview = async () => {
+    const blob = await pdf(
+      <CargoPreviewTemplate1
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        totalVolume={totalVolume}
+        totalWeight={totalWeight}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handlePreviewTemplate2Preview = async () => {
+    const blob = await pdf(
+      <CargoPreviewTemplate2
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        totalVolume={totalVolume}
+        totalWeight={totalWeight}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleDefault2ItemizedPreview = async () => {
+    const blob = await pdf(
+      <PreviewTemplate1
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        eInvoiceData={eInvoiceData}
+        showDefault2ItemizedCG={showDefault2ItemizedCG}
+        eInvoiceStatus={eInvoiceStatus}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleDefault2ItemizedCGPreview = async () => {
+    const blob = await pdf(
+      <PreviewTemplate1
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        eInvoiceData={eInvoiceData}
+        showDefault2ItemizedCG={showDefault2ItemizedCG}
+        eInvoiceStatus={eInvoiceStatus}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleItemizedServiceTemplatePreview = async () => {
+    const blob = await pdf(
+      <PreviewItemizedServiceTemplate
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        showService1Itemized={showService1Itemized}
+        showService1ItemizedRelationship={showService1ItemizedRelationship}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleService1ItemizedPreview = async () => {
+    const blob = await pdf(
+      <PreviewItemizedServiceTemplate
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        showService1Itemized={showService1Itemized}
+        showService1ItemizedRelationship={showService1ItemizedRelationship}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleService1ItemizedRelationshipPreview = async () => {
+    const blob = await pdf(
+      <PreviewItemizedServiceTemplate
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        showService1Itemized={showService1Itemized}
+        showService1ItemizedRelationship={showService1ItemizedRelationship}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleSummaryServiceTemplate1Preview = async () => {
+    const blob = await pdf(
+      <PreviewSummaryServiceTemplate
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        showService2SummaryRemark1={showService2SummaryRemark1}
+        showService4SummaryRemark1TIN={showService4SummaryRemark1TIN}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleService2SummaryRemark1Preview = async () => {
+    const blob = await pdf(
+      <PreviewSummaryServiceTemplate
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        showService2SummaryRemark1={showService2SummaryRemark1}
+        showService4SummaryRemark1TIN={showService4SummaryRemark1TIN}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleService4SummaryRemark1TINPreview = async () => {
+    const blob = await pdf(
+      <PreviewSummaryServiceTemplate
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        showService2SummaryRemark1={showService2SummaryRemark1}
+        showService4SummaryRemark1TIN={showService4SummaryRemark1TIN}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleService3SummaryRemark2Preview = async () => {
+    const blob = await pdf(
+      <PreviewSummaryServiceByMonthTemplate
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        showService2SummaryIDRemark1={showService2SummaryIDRemark1}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleService2SummaryIDRemark1Preview = async () => {
+    const blob = await pdf(
+      <PreviewSummaryServiceByMonthTemplate
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        showService2SummaryIDRemark1={showService2SummaryIDRemark1}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleService5SummaryPreview = async () => {
+    const blob = await pdf(
+      <PreviewSummaryService5Template
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleSummaryServiceTemplate2Preview = async () => {
+    const blob = await pdf(
+      <PreviewSummaryServiceTemplate2
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        showService2SummaryBRN={showService2SummaryBRN}
+        showService2Summary={showService2Summary}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleService2SummaryBRNPreview = async () => {
+    const blob = await pdf(
+      <PreviewSummaryServiceTemplate2
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        showService2SummaryBRN={showService2SummaryBRN}
+        showService2Summary={showService2Summary}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleService2SummaryPreview = async () => {
+    const blob = await pdf(
+      <PreviewSummaryServiceTemplate2
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        showService2SummaryBRN={showService2SummaryBRN}
+        showService2Summary={showService2Summary}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleService2SummarySST6Preview = async () => {
+    const blob = await pdf(
+      <PreviewSummaryServiceTemplate2Tax
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handle3UOMPreview = async () => {
+    const blob = await pdf(
+      <PreviewPDF
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        template2Mode={true}
+        QrCode={undefined}
+        eInvoiceData={undefined}
+        showDefault1ItemizedCG={undefined}
+        eInvoiceStatus={undefined}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleItemizedOptionNoCodePreview = async () => {
+    const blob = await pdf(
+      <PreviewQuotationTemplate
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        descriptionPreferences={descriptionPreferences}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handle3UOMOptionNoCodePreview = async () => {
+    const blob = await pdf(
+      <PreviewQuotationTemplate
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        descriptionPreferences={descriptionPreferences}
+        showMultipleUOM={true}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleDefault2ItemizedSingleBalancePreview = async () => {
+    const blob = await pdf(
+      <PreviewDOItemizedTemplate1
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        eInvoiceData={eInvoiceData}
+        showDOItemizedBalance1CG={showDOItemizedBalance1CG}
+        eInvoiceStatus={eInvoiceStatus}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleDefault2ItemizedSingleBalanceCGPreview = async () => {
+    const blob = await pdf(
+      <PreviewDOItemizedTemplate1
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        eInvoiceData={eInvoiceData}
+        showDOItemizedBalance1CG={showDOItemizedBalance1CG}
+        eInvoiceStatus={eInvoiceStatus}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleDefault2ItemizedMultipleBalancePreview = async () => {
+    const blob = await pdf(
+      <PreviewDOItemizedTemplate2
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        eInvoiceData={eInvoiceData}
+        showDOItemizedBalance2CG={showDOItemizedBalance2CG}
+        eInvoiceStatus={eInvoiceStatus}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleDefault2ItemizedMultipleBalanceCGPreview = async () => {
+    const blob = await pdf(
+      <PreviewDOItemizedTemplate2
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+        PDFPreviewType={PDFPreviewType}
+        isProformaInvoice={isProformaInvoice}
+        descriptionPreferences={descriptionPreferences}
+        agentPreferences={agentPreferences}
+        QrCode={QrCode}
+        eInvoiceData={eInvoiceData}
+        showDOItemizedBalance2CG={showDOItemizedBalance2CG}
+        eInvoiceStatus={eInvoiceStatus}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleNormalPreview = async () => {
+    let blob;
+
+    if (selectedTemplate === 2) {
+      blob = await pdf(
+        <PreviewPDF2
+          previewData={previewData}
+          itemsData={itemsData}
+          currentCompanyData={currentCompanyData}
+          currentUser={currentUser}
+          PDFPreviewType={PDFPreviewType}
+          currentBankAccount={currentBankAccount}
+        />,
+      ).toBlob();
+    } else {
+      blob = await pdf(
+        <PreviewPDFCP
+          previewData={previewData}
+          itemsData={itemsData}
+          currentCompanyData={currentCompanyData}
+          currentUser={currentUser}
+          PDFPreviewType={PDFPreviewType}
+          currentBankAccount={currentBankAccount}
+        />,
+      ).toBlob();
+    }
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleCargoManifestPreview = async () => {
+    const blob = await pdf(
+      <CargoManifest
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  const handleInwardManifestPreview = async () => {
+    const blob = await pdf(
+      <InwardManifest
+        previewData={previewData}
+        itemsData={itemsData}
+        currentCompanyData={currentCompanyData}
+        currentUser={currentUser}
+      />,
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, "_blank");
+  };
+
+  return (
+    <>
+      <AlertDialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+        <AlertDialogTrigger asChild>
+          <button
+            className="group flex flex-col items-center gap-y-1 disabled:cursor-not-allowed"
+            onClick={() => setShowPreviewDialog(true)}
+          >
+            <div className="size-4.5 text-erp-blue-11">
+              <SVGPreview />
+            </div>
+            <span className="text-[11px]/none font-medium">Preview</span>
+          </button>
+        </AlertDialogTrigger>
+        <AlertDialogContent className="w-auto min-w-[600px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Preview - {previewType}</AlertDialogTitle>
+          </AlertDialogHeader>
+
+          <div className="mb-4 h-[300px] space-y-1 overflow-auto border border-gray-300 bg-white px-1 py-1">
+            {isLoading ? (
+              <LoadingUI />
+            ) : currentAccount?.account !== "1_tridentmed" ? (
+              (Array.isArray(documentList) ? documentList : []).map((item, index) => (
+                <div
+                  key={index}
+                  onClick={() => {
+                    previewTemplatePDF(item.filePath, item.fileName);
+                  }}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  {item.fileName}
+                </div>
+              ))
+            ) : null}
+
+            {previewType !== "BOOKING" &&
+              previewType !== "MEETING AGENDA" &&
+              currentAccount?.account === "1_tridentmed" &&
+              [{ id: 1, name: "Itemized", action: () => previewPDFTemplate(1) }].map((item) => (
+                <div
+                  key={item.id}
+                  onClick={item.action}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  {item.name}
+                </div>
+              ))}
+
+            {previewType === "QUOTATION" &&
+              currentAccount?.account === "1_tridentmed" &&
+              [{ id: 2, name: "Itemized Option No Code", action: quotationPreviewTemplate3 }].map(
+                (item) => (
+                  <div
+                    key={item.id}
+                    onClick={item.action}
+                    className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                  >
+                    {item.name}
+                  </div>
+                ),
+              )}
+
+            {previewType !== "BOOKING" &&
+              previewType !== "QUOTATION" &&
+              previewType !== "MEETING AGENDA" &&
+              currentAccount?.account === "1_tridentmed" &&
+              [
+                { id: 3, name: "Default 1 (Itemized + CG)", action: () => previewPDFTemplate(2) },
+              ].map((item) => (
+                <div
+                  key={item.id}
+                  onClick={item.action}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  {item.name}
+                </div>
+              ))}
+
+            {previewType !== "BOOKING" &&
+              previewType !== "MEETING AGENDA" &&
+              currentAccount?.account === "1_tridentmed" &&
+              [{ id: 4, name: "Itemized + No Code", action: () => previewNormal2(1) }].map(
+                (item) => (
+                  <div
+                    key={item.id}
+                    onClick={item.action}
+                    className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                  >
+                    {item.name}
+                  </div>
+                ),
+              )}
+
+            {previewType !== "BOOKING" &&
+              previewType !== "QUOTATION" &&
+              previewType !== "MEETING AGENDA" &&
+              currentAccount?.account === "1_tridentmed" &&
+              [{ id: 5, name: "Default 1 (Summary + CG)", action: () => previewNormal2(2) }].map(
+                (item) => (
+                  <div
+                    key={item.id}
+                    onClick={item.action}
+                    className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                  >
+                    {item.name}
+                  </div>
+                ),
+              )}
+
+            {canShowTemplate1(previewType) &&
+              currentAccount?.account === "1_tridentmed" &&
+              [
+                { id: 6, name: "Default 2 (Itemized)", action: () => previewTemplate1(1) },
+                { id: 7, name: "Default 2 (Itemized + CG)", action: () => previewTemplate1(2) },
+              ].map((item) => (
+                <div
+                  key={item.id}
+                  onClick={item.action}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  {item.name}
+                </div>
+              ))}
+
+            {canShowEInvoice(previewType) &&
+              showEInvoiceButton &&
+              currentAccount?.account === "1_tridentmed" && (
+                <div
+                  onClick={previewEInvoice}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  E Invoice
+                </div>
+              )}
+
+            {canShowItemizedService(previewType) &&
+              currentAccount?.account === "1_tridentmed" &&
+              [
+                {
+                  id: 8,
+                  name: "Itemized Service Template",
+                  action: () => previewItemizedServiceTemplate(1),
+                },
+              ].map((item) => (
+                <div
+                  key={item.id}
+                  onClick={item.action}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  {item.name}
+                </div>
+              ))}
+
+            {canShowSummaryService(previewType) &&
+              currentAccount?.account === "1_tridentmed" &&
+              [
+                {
+                  id: 9,
+                  name: "Summary Service Template 1",
+                  action: () => previewSummaryServiceTemplate(1),
+                },
+              ].map((item) => (
+                <div
+                  key={item.id}
+                  onClick={item.action}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  {item.name}
+                </div>
+              ))}
+
+            {canShowSummaryService2(previewType) &&
+              currentAccount?.account === "1_tridentmed" &&
+              [
+                {
+                  id: 10,
+                  name: "Summary Service Template 2",
+                  action: () => previewSummaryServiceTemplate2(1),
+                },
+              ].map((item) => (
+                <div
+                  key={item.id}
+                  onClick={item.action}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  {item.name}
+                </div>
+              ))}
+
+            {canShowItemizedService(previewType) &&
+              currentAccount?.account === "1_tridentmed" &&
+              [
+                {
+                  id: 11,
+                  name: "Service 1 (Itemized)",
+                  action: () => previewItemizedServiceTemplate(2),
+                },
+                {
+                  id: 12,
+                  name: "Service 1 (Itemized + Relationship)",
+                  action: () => previewItemizedServiceTemplate(3),
+                },
+              ].map((item) => (
+                <div
+                  key={item.id}
+                  onClick={item.action}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  {item.name}
+                </div>
+              ))}
+
+            {canShowSummaryService(previewType) &&
+              currentAccount?.account === "1_tridentmed" &&
+              [
+                {
+                  id: 13,
+                  name: "Service 2 (Summary + Remark 1)",
+                  action: () => previewSummaryServiceTemplate(2),
+                },
+                {
+                  id: 14,
+                  name: "Service 2 (Summary + ID + Remark 1)",
+                  action: () => previewSummaryServiceTemplate(5),
+                },
+              ].map((item) => (
+                <div
+                  key={item.id}
+                  onClick={item.action}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  {item.name}
+                </div>
+              ))}
+
+            {canShowSummaryService2(previewType) &&
+              currentAccount?.account === "1_tridentmed" &&
+              [
+                {
+                  id: 15,
+                  name: "Service 2 (Summary + BRN)",
+                  action: () => previewSummaryServiceTemplate2(2),
+                },
+                {
+                  id: 16,
+                  name: "Service 2 (Summary)",
+                  action: () => previewSummaryServiceTemplate2(3),
+                },
+                {
+                  id: 17,
+                  name: "Service 2 (Summary + SST 6%)",
+                  action: () => previewSummaryServiceTemplate2(4),
+                },
+              ].map((item) => (
+                <div
+                  key={item.id}
+                  onClick={item.action}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  {item.name}
+                </div>
+              ))}
+
+            {canShowSummaryService(previewType) &&
+              currentAccount?.account === "1_tridentmed" &&
+              [
+                {
+                  id: 18,
+                  name: "Service 3 (Summary + Remark 2)",
+                  action: () => previewSummaryServiceTemplate(4),
+                },
+                {
+                  id: 19,
+                  name: "Service 4 (Summary + Remark 1 + TIN)",
+                  action: () => previewSummaryServiceTemplate(3),
+                },
+                {
+                  id: 20,
+                  name: "Service 5 (Summary)",
+                  action: () => previewSummaryServiceTemplate(6),
+                },
+              ].map((item) => (
+                <div
+                  key={item.id}
+                  onClick={item.action}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  {item.name}
+                </div>
+              ))}
+
+            {previewType === "QUOTATION" &&
+              currentAccount?.account === "1_tridentmed" &&
+              [{ id: 21, name: "3 UOM", action: quotationPreviewTemplate2 }].map((item) => (
+                <div
+                  key={item.id}
+                  onClick={item.action}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  {item.name}
+                </div>
+              ))}
+
+            {canShowQuotationMultiUOM(previewType) &&
+              currentAccount?.account === "1_tridentmed" && (
+                <div
+                  onClick={quotationMultiUOMPreview}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  3 UOM Option No Code
+                </div>
+              )}
+
+            {previewType === "CASH SALES" && currentAccount?.account === "1_tridentmed" && (
+              <div
+                onClick={simplifiedPDFTemplate}
+                className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+              >
+                Simplified
+              </div>
+            )}
+
+            {canShowProformaInvoice(previewType) && currentAccount?.account === "1_tridentmed" && (
+              <div
+                onClick={previewProformaInvoice}
+                className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+              >
+                Proforma Invoice
+              </div>
+            )}
+
+            {canShowCargoManifest(previewType) && currentAccount?.account === "1_tridentmed" && (
+              <div
+                onClick={previewCargoManifest}
+                className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+              >
+                Cargo Manifest
+              </div>
+            )}
+
+            {canShowInwardManifest(previewType) && currentAccount?.account === "1_tridentmed" && (
+              <div
+                onClick={previewInwardManifest}
+                className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+              >
+                Inward Manifest
+              </div>
+            )}
+
+            {canShowCargoTemplate1(previewType) && currentAccount?.account === "1_tridentmed" && (
+              <div
+                onClick={cargoPreviewTemplate1}
+                className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+              >
+                Template 1
+              </div>
+            )}
+
+            {canShowCargoTemplate2(previewType) && currentAccount?.account === "1_tridentmed" && (
+              <div
+                onClick={cargoPreviewTemplate2}
+                className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+              >
+                Template 2
+              </div>
+            )}
+
+            {canShowItemizedBalance(previewType) &&
+              currentAccount?.account === "1_tridentmed" &&
+              [
+                {
+                  id: 22,
+                  name: "Default 2 (Itemized + Single Balance)",
+                  action: () => previewPDFDOItemizedTemplate1(1),
+                },
+                {
+                  id: 23,
+                  name: "Default 2 (Itemized + Single Balance + CG)",
+                  action: () => previewPDFDOItemizedTemplate1(2),
+                },
+                {
+                  id: 24,
+                  name: "Default 2 (Itemized + Multi Balance)",
+                  action: () => previewPDFDOItemizedTemplate2(1),
+                },
+                {
+                  id: 25,
+                  name: "Default 2 (Itemized + Multi Balance + CG)",
+                  action: () => previewPDFDOItemizedTemplate2(2),
+                },
+              ].map((item) => (
+                <div
+                  key={item.id}
+                  onClick={item.action}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  {item.name}
+                </div>
+              ))}
+
+            {canShowNormal(previewType) &&
+              currentAccount?.account === "1_tridentmed" &&
+              [
+                {
+                  id: 26,
+                  name: "Normal",
+                  action: () => previewNormalPDFTemplate(1),
+                },
+                {
+                  id: 27,
+                  name: "Normal [2]",
+                  action: () => previewNormalPDFTemplate(2),
+                },
+              ].map((item) => (
+                <div
+                  key={item.id}
+                  onClick={item.action}
+                  className="cursor-pointer px-3 py-1 text-sm hover:bg-blue-100"
+                >
+                  {item.name}
+                </div>
+              ))}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Card collapsible defaultCollapsed={true} className="mx-1">
+              <CardHeader>
+                <CardTitle className="text-sm">Charges Description Type</CardTitle>
+              </CardHeader>
+
+              <CardContent className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="description"
+                    checked={descriptionPreferences.description}
+                    onChange={(e) => handlePreferenceChange("description", e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                  />
+                  <label htmlFor="description" className="cursor-pointer text-sm font-medium">
+                    Description
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="secondDescription"
+                    checked={descriptionPreferences.secondDescription}
+                    onChange={(e) => handlePreferenceChange("secondDescription", e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                  />
+                  <label htmlFor="secondDescription" className="cursor-pointer text-sm font-medium">
+                    2nd Description
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="moreDescription"
+                    checked={descriptionPreferences.moreDescription}
+                    onChange={(e) => handlePreferenceChange("moreDescription", e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                  />
+                  <label htmlFor="moreDescription" className="cursor-pointer text-sm font-medium">
+                    More Description
+                  </label>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card collapsible defaultCollapsed={true} className="mx-1">
+              <CardHeader>
+                <CardTitle className="text-sm">Agent Type</CardTitle>
+              </CardHeader>
+
+              <CardContent className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="salesAgent"
+                    checked={agentPreferences.salesAgent}
+                    onChange={(e) => handleAgentPreferenceChange("salesAgent", e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                  />
+                  <label htmlFor="salesAgent" className="cursor-pointer text-sm font-medium">
+                    Sales Agent
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="servicingAgent"
+                    checked={agentPreferences.servicingAgent}
+                    onChange={(e) =>
+                      handleAgentPreferenceChange("servicingAgent", e.target.checked)
+                    }
+                    className="h-4 w-4 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                  />
+                  <label htmlFor="servicingAgent" className="cursor-pointer text-sm font-medium">
+                    Servicing Agent
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="collectionAgent"
+                    checked={agentPreferences.collectionAgent}
+                    onChange={(e) =>
+                      handleAgentPreferenceChange("collectionAgent", e.target.checked)
+                    }
+                    className="h-4 w-4 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                  />
+                  <label htmlFor="collectionAgent" className="cursor-pointer text-sm font-medium">
+                    Collection Agent
+                  </label>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <AlertDialogFooter className="flex justify-end p-4">
+            <AlertDialogCancel className="h-9 w-24" onClick={() => setShowPreviewDialog(false)}>
+              Close
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={isPreviewTemplatePDFOpen} onOpenChange={setIsPreviewTemplatePDFOpen}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>
+            {documentType} Preview - {previewType}
+          </DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+            {!isPDFLoading && !isMobileDevice && pdfUrl && (
+              <iframe src={pdfUrl} className="h-full w-full" title="pdf" />
+            )}
+
+            {!isPDFLoading && isMobileDevice && pdfUrl && (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={() => window.open(pdfUrl, "_blank")}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <a
+              href={pdfUrl}
+              download={`${data?.data?.docNo + "-" + data?.data?.customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              Download PDF
+            </a>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowItemizedService(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEInvoiceDialog} onOpenChange={setShowEInvoiceDialog}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>E Invoice Preview - {previewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingEInvoice && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <EInvoice
+                  eInvoiceData={eInvoiceData}
+                  itemsData={itemsData}
+                  QrCode={QrCode}
+                  currentCompanyData={currentCompanyData}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleEInvoicePreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <EInvoice
+                  eInvoiceData={eInvoiceData}
+                  itemsData={itemsData}
+                  QrCode={QrCode}
+                  currentCompanyData={currentCompanyData}
+                />
+              }
+              fileName={`${eInvoiceData?.[0].docNo + "-" + eInvoiceData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowEInvoiceDialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showItemizedService}
+        onOpenChange={(open) => {
+          setShowItemizedService(open);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Itemized Service Template - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewItemizedServiceTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService1Itemized={showService1Itemized}
+                  showService1ItemizedRelationship={showService1ItemizedRelationship}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleItemizedServiceTemplatePreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewItemizedServiceTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService1Itemized={showService1Itemized}
+                  showService1ItemizedRelationship={showService1ItemizedRelationship}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowItemizedService(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showService1Itemized}
+        onOpenChange={(open) => {
+          setShowService1Itemized(open);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Service 1 (Itemized) - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewItemizedServiceTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService1Itemized={showService1Itemized}
+                  showService1ItemizedRelationship={showService1ItemizedRelationship}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleService1ItemizedPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewItemizedServiceTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService1Itemized={showService1Itemized}
+                  showService1ItemizedRelationship={showService1ItemizedRelationship}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowService1Itemized(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showService1ItemizedRelationship}
+        onOpenChange={(open) => {
+          setShowService1ItemizedRelationship(open);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Service 1 (Itemized + Relationship) - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewItemizedServiceTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService1Itemized={showService1Itemized}
+                  showService1ItemizedRelationship={showService1ItemizedRelationship}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleService1ItemizedRelationshipPreview}>
+                  Open PDF Preview
+                </Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewItemizedServiceTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService1Itemized={showService1Itemized}
+                  showService1ItemizedRelationship={showService1ItemizedRelationship}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowService1ItemizedRelationship(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showSummaryService}
+        onOpenChange={(open) => {
+          setShowSummaryService(open);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Summary Service Template 1 - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewSummaryServiceTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryRemark1={showService2SummaryRemark1}
+                  showService4SummaryRemark1TIN={showService4SummaryRemark1TIN}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleSummaryServiceTemplate1Preview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewSummaryServiceTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryRemark1={showService2SummaryRemark1}
+                  showService4SummaryRemark1TIN={showService4SummaryRemark1TIN}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowSummaryService(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showService2SummaryRemark1}
+        onOpenChange={(open) => {
+          setShowService2SummaryRemark1(open);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Service 2 (Summary + Remark 1) - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewSummaryServiceTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryRemark1={showService2SummaryRemark1}
+                  showService4SummaryRemark1TIN={showService4SummaryRemark1TIN}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleService2SummaryRemark1Preview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewSummaryServiceTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryRemark1={showService2SummaryRemark1}
+                  showService4SummaryRemark1TIN={showService4SummaryRemark1TIN}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowService2SummaryRemark1(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showService4SummaryRemark1TIN}
+        onOpenChange={(open) => {
+          setShowService4SummaryRemark1TIN(open);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Service 4 (Summary + Remark 1 + TIN) - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewSummaryServiceTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryRemark1={showService2SummaryRemark1}
+                  showService4SummaryRemark1TIN={showService4SummaryRemark1TIN}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleService4SummaryRemark1TINPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewSummaryServiceTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryRemark1={showService2SummaryRemark1}
+                  showService4SummaryRemark1TIN={showService4SummaryRemark1TIN}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowService4SummaryRemark1TIN(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showService3SummaryRemark2}
+        onOpenChange={(open) => {
+          setShowService3SummaryRemark2(open);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Service 3 (Summary + Remark 2) - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!setIsMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewSummaryServiceByMonthTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryIDRemark1={showService2SummaryIDRemark1}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleService3SummaryRemark2Preview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewSummaryServiceByMonthTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryIDRemark1={showService2SummaryIDRemark1}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowService3SummaryRemark2(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showService2SummaryIDRemark1}
+        onOpenChange={(open) => {
+          setShowService2SummaryIDRemark1(open);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Service 2 (Summary + ID + Remark 1) - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewSummaryServiceByMonthTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryIDRemark1={showService2SummaryIDRemark1}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleService2SummaryIDRemark1Preview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewSummaryServiceByMonthTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryIDRemark1={showService2SummaryIDRemark1}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowService2SummaryIDRemark1(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showService5Summary}
+        onOpenChange={(open) => {
+          setShowService5Summary(open);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Service 5 (Summary) - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewSummaryService5Template
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleService5SummaryPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewSummaryService5Template
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowService2SummaryIDRemark1(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showSummaryService2}
+        onOpenChange={(open) => {
+          setShowSummaryService2(open);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Summary Service Template 2 - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewSummaryServiceTemplate2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryBRN={showService2SummaryBRN}
+                  showService2Summary={showService2Summary}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleSummaryServiceTemplate2Preview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewSummaryServiceTemplate2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryBRN={showService2SummaryBRN}
+                  showService2Summary={showService2Summary}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowSummaryService2(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showService2SummaryBRN}
+        onOpenChange={(open) => {
+          setShowService2SummaryBRN(open);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Service 2 (Summary + BRN) - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewSummaryServiceTemplate2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryBRN={showService2SummaryBRN}
+                  showService2Summary={showService2Summary}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleService2SummaryBRNPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewSummaryServiceTemplate2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryBRN={showService2SummaryBRN}
+                  showService2Summary={showService2Summary}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowService2SummaryBRN(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showService2Summary}
+        onOpenChange={(open) => {
+          setShowService2Summary(open);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Service 2 (Summary) - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewSummaryServiceTemplate2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryBRN={showService2SummaryBRN}
+                  showService2Summary={showService2Summary}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleService2SummaryPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewSummaryServiceTemplate2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  showService2SummaryBRN={showService2SummaryBRN}
+                  showService2Summary={showService2Summary}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowService2Summary(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showService2TaxSummary}
+        onOpenChange={(open) => {
+          setShowService2TaxSummary(open);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Service 2 (Summary + SST 6%) - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewSummaryServiceTemplate2Tax
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleService2SummarySST6Preview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewSummaryServiceTemplate2Tax
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowService2TaxSummary(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showPreviewPDFDialog}
+        onOpenChange={(open) => {
+          setShowPreviewPDFDialog(open);
+          if (!open) setIsProformaInvoice(false);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Itemized - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                {PDFPreviewType === "BILL OF LADING" ? (
+                  <BillOfLadingPreviewTemplate
+                    previewData={previewData}
+                    itemsData={itemsData}
+                    currentCompanyData={currentCompanyData}
+                    currentUser={currentUser}
+                  />
+                ) : (
+                  <PreviewPDF
+                    previewData={previewData}
+                    itemsData={itemsData}
+                    currentCompanyData={currentCompanyData}
+                    currentUser={currentUser}
+                    PDFPreviewType={PDFPreviewType}
+                    isProformaInvoice={isProformaInvoice}
+                    descriptionPreferences={descriptionPreferences}
+                    agentPreferences={agentPreferences}
+                    QrCode={QrCode}
+                    eInvoiceData={eInvoiceData}
+                    showDefault1ItemizedCG={showDefault1ItemizedCG}
+                    eInvoiceStatus={eInvoiceStatus}
+                  />
+                )}
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleItemizedPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                PDFPreviewType === "BILL OF LADING" ? (
+                  <BillOfLadingPreviewTemplate
+                    previewData={previewData}
+                    itemsData={itemsData}
+                    currentCompanyData={currentCompanyData}
+                    currentUser={currentUser}
+                  />
+                ) : (
+                  <PreviewPDF
+                    previewData={previewData}
+                    itemsData={itemsData}
+                    currentCompanyData={currentCompanyData}
+                    currentUser={currentUser}
+                    PDFPreviewType={PDFPreviewType}
+                    isProformaInvoice={isProformaInvoice}
+                    descriptionPreferences={descriptionPreferences}
+                    agentPreferences={agentPreferences}
+                    QrCode={QrCode}
+                    eInvoiceData={eInvoiceData}
+                    showDefault1ItemizedCG={showDefault1ItemizedCG}
+                    eInvoiceStatus={eInvoiceStatus}
+                  />
+                )
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowPreviewPDFDialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showDefault1ItemizedCG}
+        onOpenChange={(open) => {
+          setShowDefault1ItemizedCG(open);
+          if (!open) setIsProformaInvoice(false);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Default 1 (Itemized + CG) Preview - {PDFPreviewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewPDF
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDefault1ItemizedCG={showDefault1ItemizedCG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleDefault1ItemizedCGPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewPDF
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDefault1ItemizedCG={showDefault1ItemizedCG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowDefault1ItemizedCG(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showNormal2Dialog} onOpenChange={setShowNormal2Dialog}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Itemized + No Code Preview - {previewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingNormal2 && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewNormal2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDefault1SummaryCG={showDefault1SummaryCG}
+                  eInvoiceStatus={eInvoiceStatus}
+                  removeDisplayUOM={true}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleItemizedNoCodePreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewNormal2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDefault1SummaryCG={showDefault1SummaryCG}
+                  eInvoiceStatus={eInvoiceStatus}
+                  removeDisplayUOM={true}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowNormal2Dialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDefault1SummaryCG} onOpenChange={setShowDefault1SummaryCG}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Default 1 (Summary + CG) Preview - {previewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingNormal2 && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewNormal2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDefault1SummaryCG={showDefault1SummaryCG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleDefault1SummaryCGPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewNormal2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDefault1SummaryCG={showDefault1SummaryCG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowDefault1SummaryCG(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSimplifiedPDFDialog} onOpenChange={setShowSimplifiedPDFDialog}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Simplified Receipt - {previewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingSimplifiedPDF && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <SimplifiedPDF
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleSimplifiedReceiptPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <SimplifiedPDF
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowSimplifiedPDFDialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCargoManifestDialog} onOpenChange={setShowCargoManifestDialog}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Cargo Manifest - {previewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingCargoManifest && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <CargoManifest
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleCargoManifestPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <CargoManifest
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowInwardManifestDialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showInwardManifestDialog} onOpenChange={setShowInwardManifestDialog}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Inward Manifest - {previewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingInwardManifest && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <InwardManifest
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleInwardManifestPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <InwardManifest
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowInwardManifestDialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showTemplate1Dialog} onOpenChange={setShowTemplate1Dialog}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Default 2 (Itemized) Preview - {previewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingTemplate1 && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewTemplate1
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDefault2ItemizedCG={showDefault2ItemizedCG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleDefault2ItemizedPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewTemplate1
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDefault2ItemizedCG={showDefault2ItemizedCG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowTemplate1Dialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDefault2ItemizedCG} onOpenChange={setShowDefault2ItemizedCG}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Default 2 (Itemized + CG) Preview - {previewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingTemplate1 && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewTemplate1
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDefault2ItemizedCG={showDefault2ItemizedCG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleDefault2ItemizedCGPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewTemplate1
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDefault2ItemizedCG={showDefault2ItemizedCG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowDefault2ItemizedCG(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showTemplate2Dialog} onOpenChange={setShowTemplate2Dialog}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>3 UOM Preview - {previewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingTemplate2 && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewPDF
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  template2Mode={true}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handle3UOMPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewPDF
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  template2Mode={true}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowTemplate2Dialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showTemplate3Dialog} onOpenChange={setShowTemplate3Dialog}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Itemized Option No Code Preview - {previewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingTemplate3 && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewQuotationTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  descriptionPreferences={descriptionPreferences}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleItemizedOptionNoCodePreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewQuotationTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  descriptionPreferences={descriptionPreferences}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowTemplate3Dialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showQuotationMultiUOMDialog} onOpenChange={setShowQuotationMultiUOMDialog}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>3 UOM Option No Code Preview - {previewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingQuotationMultiUOM && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewQuotationTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  descriptionPreferences={descriptionPreferences}
+                  showMultipleUOM={true}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handle3UOMOptionNoCodePreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewQuotationTemplate
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  descriptionPreferences={descriptionPreferences}
+                  showMultipleUOM={true}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowQuotationMultiUOMDialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCargoTemplate1Dialog} onOpenChange={setShowCargoTemplate1Dialog}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Preview Template 1 - {previewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingCargoTemplate1 && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <CargoPreviewTemplate1
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  totalVolume={totalVolume}
+                  totalWeight={totalWeight}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handlePreviewTemplate1Preview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <CargoPreviewTemplate1
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  totalVolume={totalVolume}
+                  totalWeight={totalWeight}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowCargoTemplate1Dialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCargoTemplate2Dialog} onOpenChange={setShowCargoTemplate2Dialog}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Preview Template 2 - {previewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingCargoTemplate2 && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <CargoPreviewTemplate2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  totalVolume={totalVolume}
+                  totalWeight={totalWeight}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handlePreviewTemplate2Preview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <CargoPreviewTemplate2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  totalVolume={totalVolume}
+                  totalWeight={totalWeight}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowCargoTemplate2Dialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showDOItemizedBalance1}
+        onOpenChange={(open) => {
+          setShowDOItemizedBalance1(open);
+          if (!open) setIsProformaInvoice(false);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>
+            Default 2 (Itemized + Single Balance) Preview - {PDFPreviewType}
+          </DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewDOItemizedTemplate1
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDOItemizedBalance1CG={showDOItemizedBalance1CG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleDefault2ItemizedSingleBalancePreview}>
+                  Open PDF Preview
+                </Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewDOItemizedTemplate1
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDOItemizedBalance1CG={showDOItemizedBalance1CG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowPreviewPDFDialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showDOItemizedBalance1CG}
+        onOpenChange={(open) => {
+          setShowDOItemizedBalance1CG(open);
+          if (!open) setIsProformaInvoice(false);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>
+            Default 2 (Itemized + Single Balance + CG) Preview - {PDFPreviewType}
+          </DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewDOItemizedTemplate1
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDOItemizedBalance1CG={showDOItemizedBalance1CG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleDefault2ItemizedSingleBalanceCGPreview}>
+                  Open PDF Preview
+                </Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewDOItemizedTemplate1
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDOItemizedBalance1CG={showDOItemizedBalance1CG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowPreviewPDFDialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showDOItemizedBalance2}
+        onOpenChange={(open) => {
+          setShowDOItemizedBalance2(open);
+          if (!open) setIsProformaInvoice(false);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>
+            Default 2 (Itemized + Multiple Balance) Preview - {PDFPreviewType}
+          </DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewDOItemizedTemplate2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDOItemizedBalance2CG={showDOItemizedBalance2CG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleDefault2ItemizedMultipleBalancePreview}>
+                  Open PDF Preview
+                </Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewDOItemizedTemplate2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDOItemizedBalance2CG={showDOItemizedBalance2CG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowPreviewPDFDialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showDOItemizedBalance2CG}
+        onOpenChange={(open) => {
+          setShowDOItemizedBalance2CG(open);
+          if (!open) setIsProformaInvoice(false);
+        }}
+      >
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>
+            Default 2 (Itemized + Multiple Balance + CG) Preview - {PDFPreviewType}
+          </DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isLoadingPDFPreview && <LoadingUI />}
+
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <PreviewDOItemizedTemplate2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDOItemizedBalance2CG={showDOItemizedBalance2CG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleDefault2ItemizedMultipleBalanceCGPreview}>
+                  Open PDF Preview
+                </Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <PreviewDOItemizedTemplate2
+                  previewData={previewData}
+                  itemsData={itemsData}
+                  currentCompanyData={currentCompanyData}
+                  currentUser={currentUser}
+                  PDFPreviewType={PDFPreviewType}
+                  isProformaInvoice={isProformaInvoice}
+                  descriptionPreferences={descriptionPreferences}
+                  agentPreferences={agentPreferences}
+                  QrCode={QrCode}
+                  eInvoiceData={eInvoiceData}
+                  showDOItemizedBalance2CG={showDOItemizedBalance2CG}
+                  eInvoiceStatus={eInvoiceStatus}
+                />
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowPreviewPDFDialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPreviewNormalPDFDialog} onOpenChange={setShowPreviewNormalPDFDialog}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle>Preview PDF - {previewType}</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {!isMobileDevice ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                {selectedTemplate === 2 ? (
+                  <PreviewPDF2
+                    previewData={previewData}
+                    itemsData={itemsData}
+                    currentCompanyData={currentCompanyData}
+                    currentUser={currentUser}
+                    PDFPreviewType={PDFPreviewType}
+                    currentBankAccount={currentBankAccount}
+                  />
+                ) : (
+                  <PreviewPDFCP
+                    previewData={previewData}
+                    itemsData={itemsData}
+                    currentCompanyData={currentCompanyData}
+                    currentUser={currentUser}
+                    PDFPreviewType={PDFPreviewType}
+                    currentBankAccount={currentBankAccount}
+                  />
+                )}
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={handleNormalPreview}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                selectedTemplate === 2 ? (
+                  <PreviewPDF2
+                    previewData={previewData}
+                    itemsData={itemsData}
+                    currentCompanyData={currentCompanyData}
+                    currentUser={currentUser}
+                    PDFPreviewType={PDFPreviewType}
+                    currentBankAccount={currentBankAccount}
+                  />
+                ) : (
+                  <PreviewPDFCP
+                    previewData={previewData}
+                    itemsData={itemsData}
+                    currentCompanyData={currentCompanyData}
+                    currentUser={currentUser}
+                    PDFPreviewType={PDFPreviewType}
+                    currentBankAccount={currentBankAccount}
+                  />
+                )
+              }
+              fileName={`${previewData?.[0].docNo + "-" + previewData?.[0].customerName || "Document"}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowPreviewPDFDialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

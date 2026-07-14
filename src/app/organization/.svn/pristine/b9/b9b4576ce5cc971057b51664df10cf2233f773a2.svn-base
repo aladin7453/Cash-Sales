@@ -1,0 +1,40 @@
+"use client";
+
+import { useState } from "react";
+import { flattenTree } from "react-accessible-treeview";
+
+import { AccessControlContext } from "./AccessControlContext";
+import { modules } from "./modules";
+import { React } from "react"
+import type { NodeId } from "react-accessible-treeview";
+
+const data = flattenTree(modules);
+
+export default function AccessControlContextProvider({ children }: { children: React.ReactNode }) {
+  const [selectedIds, setSelectedIds] = useState<NodeId[]>([]);
+  const [unselectedIds, setUnselectedIds] = useState<NodeId[]>([]);
+
+  const handleGrantAll = () => {
+    const allIds = data.map((item) => item.id);
+    setSelectedIds(allIds);
+  };
+
+  const handleDenyAll = () => {
+    setSelectedIds([]);
+  };
+
+  return (
+    <AccessControlContext.Provider
+      value={{
+        selectedIds,
+        setSelectedIds,
+        unselectedIds,
+        setUnselectedIds,
+        handleGrantAll,
+        handleDenyAll,
+      }}
+    >
+      {children}
+    </AccessControlContext.Provider>
+  );
+}

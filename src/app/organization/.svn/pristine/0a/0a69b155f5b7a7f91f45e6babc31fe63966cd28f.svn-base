@@ -1,0 +1,1359 @@
+"use client";
+
+import { useSearchParams } from "next/navigation";
+import React, { useEffect, useRef, useState } from "react";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  getAuthHeaders,
+  getCurrentAcc,
+  getCurrentAccount,
+  getCurrentCompany,
+  getCurrentCompanyUUID,
+  ORIGIN,
+} from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+
+import { Company } from "../../../columns";
+
+import type { Dispatch, SetStateAction } from "react";
+
+import type { LogoAttachment } from "../../page";
+
+type Params = {
+  company?: Company | null;
+  form: any;
+  slug: string;
+  tempCompanyLogo?: LogoAttachment;
+  setTempCompanyLogo: Dispatch<SetStateAction<LogoAttachment | File | undefined | null>>;
+  defaultCollapsed?: boolean;
+};
+
+export function CompanyForm({
+  company,
+  form,
+  slug,
+  tempCompanyLogo,
+  setTempCompanyLogo,
+  defaultCollapsed = false,
+}: Params) {
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  const currentAcc = getCurrentAcc();
+
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [selectedLogo, setSelectedLogo] = useState<string | null>(null);
+
+  const [showTableAccount, setShowTableAccount] = useState(false);
+  const [showTableCompany, setShowTableCompany] = useState(false);
+  const [showTableAttention, setShowTableAttention] = useState(false);
+  const [showTableMSICCode, setShowTableMSICCode] = useState(false);
+  const [showTableState, setShowTableState] = useState(false);
+  const [showTableCountry, setShowTableCountry] = useState(false);
+
+  const [accountDropdownTableData, setAccountDropdownTableData] = useState([]);
+  const [companyDropdownTableData, setCompanyDropdownTableData] = useState([]);
+  const [attentionDropdownTableData, setAttentionDropdownTableData] = useState([]);
+  const [MSICCodeDropdownTableData, setMSICCodeDropdownTableData] = useState([]);
+
+  const [companyFilter, setCompanyFilter] = useState("");
+  const [msicFilter, setMSICFilter] = useState("");
+  const [attentionFilter, setAttentionFilter] = useState("");
+  const [stateFilter, setStateFilter] = useState("");
+  const [countryFilter, setCountryFilter] = useState("");
+
+  const [stateDropdownTableData, setStateDropdownTableData] = useState([]);
+  const [countryDropdownTableData, setCountryDropdownTableData] = useState([]);
+
+  const dropdownAccountColumns = [
+    { accessorKey: "code", header: "Account Code" },
+    { accessorKey: "account", header: "Account" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const dropdownCompanyColumns = [
+    { accessorKey: "company", header: "Company" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const dropdownAttentionColumns = [
+    { accessorKey: "fullName", header: "Full Name" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const dropdownMSICCodeColumns = [
+    { accessorKey: "code", header: "MSIC code" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const dropdownStateColumns = [
+    { accessorKey: "code", header: "State Code" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+  const dropdownCountryColumns = [
+    { accessorKey: "code", header: "Country Code" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableAccount(false);
+      setShowTableCompany(false);
+      setShowTableAttention(false);
+      setShowTableMSICCode(false);
+      setShowTableCountry(false);
+      setShowTableState(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (tempCompanyLogo?.link) {
+      const newLink = tempCompanyLogo.link.replace(/\/view.*$/, "/preview");
+      setImageSrc(newLink);
+    }
+  }, [tempCompanyLogo]);
+
+  const handleImageChange = async (files: FileList | null) => {
+    const selectedFiles = files ? Array.from(files) : [];
+    if (selectedFiles.length > 0) {
+      const selectedFile = selectedFiles[0];
+      const logoUrl = URL.createObjectURL(selectedFile);
+      setTempCompanyLogo(selectedFile);
+      setImageSrc(logoUrl);
+    }
+  };
+
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+
+  const handleImageClick = () => {
+    if (imageSrc) {
+      setImageDialogOpen(true);
+    } else {
+      document.getElementById("fileInput")?.click();
+    }
+  };
+
+  const handleCompanySearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCompanyFilter(value);
+    form.setValue("parentCompanyName", value);
+
+    if (!showTableCompany) setShowTableCompany(true);
+  };
+
+  const handleMSICSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setMSICFilter(value);
+    form.setValue("MISCCodeCode", value);
+
+    if (!showTableMSICCode) setShowTableMSICCode(true);
+  };
+
+  const handleAttentionSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setAttentionFilter(value);
+    form.setValue("attentionName", value);
+
+    if (!showTableAttention) setShowTableAttention(true);
+  };
+
+  const handleStateSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setStateFilter(value);
+    form.setValue("stateCode", value);
+
+    if (!showTableState) setShowTableState(true);
+  };
+
+  const handleCountrySearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCountryFilter(value);
+    form.setValue("countryOfOriginCode", value);
+
+    if (!showTableCountry) setShowTableCountry(true);
+  };
+
+  const toggleTableAccount = async () => {
+    const formData = new FormData();
+    const account = "account";
+    formData.append("table[]", account);
+
+    if (!showTableAccount) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch account drop-down data");
+        }
+        const accountData = await response.json();
+
+        setAccountDropdownTableData(accountData.rows);
+        setShowTableAccount(true);
+      } catch (error) {
+        console.error("Error fetching account drop-down data:", error);
+      }
+    } else {
+      setShowTableAccount(false);
+    }
+  };
+
+  const toggleTableCompany = async () => {
+    const formData = new FormData();
+    const company = "company";
+    formData.append("table[]", company);
+
+    if (!showTableCompany) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch company drop-down data");
+        }
+
+        const companyData = await response.json();
+
+        setCompanyDropdownTableData(companyData.rows);
+        setShowTableCompany(true);
+      } catch (error) {
+        console.error("Error fetching company drop-down data:", error);
+      }
+    } else {
+      setShowTableCompany(false);
+    }
+  };
+
+  const toggleTableState = async () => {
+    const formData = new FormData();
+    const state = "state";
+    formData.append("table[]", state);
+
+    if (!showTableState) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch state drop-down data");
+        }
+
+        const stateData = await response.json();
+        setStateDropdownTableData(stateData.rows);
+        setShowTableState(true);
+      } catch (error) {
+        console.error("Error fetching  state  drop-down data:", error);
+      }
+    } else {
+      setShowTableState(false);
+    }
+  };
+
+  const toggleTableCountry = async () => {
+    const formData = new FormData();
+    const country = "countryOfOrigin";
+    formData.append("table[]", country);
+
+    if (!showTableCountry) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch country drop-down data");
+        }
+
+        const countryData = await response.json();
+
+        setCountryDropdownTableData(countryData.rows);
+        setShowTableCountry(true);
+      } catch (error) {
+        console.error("Error fetching country drop-down data:", error);
+      }
+    } else {
+      setShowTableCountry(false);
+    }
+  };
+
+  const toggleTableAttention = async () => {
+    const formData = new FormData();
+    const user = "user";
+    formData.append("table[]", user);
+
+    if (!showTableAttention) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch attention drop-down data");
+        }
+
+        const GLCodeData = await response.json();
+
+        setAttentionDropdownTableData(GLCodeData.rows);
+        setShowTableAttention(true);
+      } catch (error) {
+        console.error("Error fetching attention drop-down data:", error);
+      }
+    } else {
+      setShowTableAttention(false);
+    }
+  };
+
+  const toggleTableMSICCode = async () => {
+    const formData = new FormData();
+    const MSICCode = "MISCCode";
+    formData.append("table[]", MSICCode);
+
+    if (!showTableMSICCode) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch agent drop-down data");
+        }
+
+        const MSICCodeData = await response.json();
+
+        setMSICCodeDropdownTableData(MSICCodeData.rows);
+        setShowTableMSICCode(true);
+      } catch (error) {
+        console.error("Error fetching MSICCode drop-down data:", error);
+      }
+    } else {
+      setShowTableMSICCode(false);
+    }
+  };
+
+  const onClickRowAccountCode = (row) => {
+    form.setValue("account", row.UUID);
+    form.setValue("accountName", row.account);
+    setShowTableAccount(false);
+  };
+
+  const onClickRowCompanyCode = (row) => {
+    form.setValue("parentCompany", row.UUID);
+    form.setValue("parentCompanyName", row.company);
+    setShowTableCompany(false);
+  };
+
+  const onClickRowAttention = (row) => {
+    form.setValue("attention", row.UUID);
+    form.setValue("attentionName", row.fullName);
+    setShowTableAttention(false);
+  };
+
+  const onClickRowMSICCode = (row) => {
+    form.setValue("MISCCode", row.UUID);
+    form.setValue("MISCCodeCode", row.code);
+    form.setValue("businessNature", row.description);
+    setShowTableMSICCode(false);
+  };
+
+  const onClickRowState = (row) => {
+    form.setValue("state", row.UUID);
+    form.setValue("stateCode", row.description ? `${row.description}(${row.code})` : row.code);
+    setShowTableState(false);
+  };
+
+  const onClickRowCountry = (row) => {
+    form.setValue("country", row.UUID);
+    form.setValue("countryOfOriginCode", `${row.description}(${row.code})`);
+
+    setShowTableCountry(false);
+  };
+
+  const verifyField = async (field: "company" | "BRN" | "BRNOld" |"TIN" | "SSTNo", value: string) => {
+    form.clearErrors(field);
+
+    if (!value) {
+      form.setError(field, {
+        type: "custom",
+        message: "This field is empty.",
+      });
+      return;
+    } else if (value.startsWith(" ") || value.endsWith(" ")) {
+      form.setError(field, {
+        type: "custom",
+        message: "This field must not start or end with a space.",
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append(`company[${field}]`, value);
+
+    try {
+      const res = await fetch(
+        id
+          ? `${ORIGIN}/company/api/company/verify?id=${id}`
+          : `${ORIGIN}/company/api/company/verify`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        },
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        if (res.status === 403) {
+          toast({
+            title: "Error",
+            description: errorData.message,
+            variant: "destructive",
+          });
+        }
+        throw new Error(errorData.message);
+      }
+
+      const exists: boolean = await res.json();
+      if (exists) {
+        form.setError(field, {
+          type: "custom",
+          message: `"${value}" already exists.`,
+        });
+      } else {
+        if (
+          value === company?.company ||
+          value === company?.BRN ||
+          value === company?.TIN ||
+          value === company?.SSTNo
+        ) {
+          return;
+        } else {
+          form.setError(field, {
+            type: "success",
+            message: `"${value}" is available.`,
+          });
+        }
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  return (
+    <>
+      <Card className="shadow" collapsible={true} defaultCollapsed={defaultCollapsed}>
+        <CardHeader>
+          <CardTitle className="text-lg font-bold">General Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form className="space-y-8">
+              <div className="space-y-2.5">
+                <h2 className="mb-2 font-bold">Logo:</h2>
+                <div className="flex flex-col md:flex-row md:space-x-8">
+                  <FormField
+                    control={form.control}
+                    name="logo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <div className="relative mt-0.5 w-full max-w-[400px] border-2 border-dashed border-gray-300 md:h-[360px] md:w-[300px]">
+                            {imageSrc ? (
+                              <div className="group relative h-[360px] w-full overflow-auto">
+                                <iframe
+                                  src={imageSrc}
+                                  className="pointer-events-auto h-full w-full object-cover"
+                                />
+                                <div
+                                  onClick={handleImageClick}
+                                  className="absolute bottom-[15px] left-0 right-[15px] top-0 flex cursor-pointer items-center justify-center bg-black/40 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                >
+                                  Change Logo
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                onClick={handleImageClick}
+                                className="absolute inset-0 flex cursor-pointer items-center justify-center bg-white/70"
+                              >
+                                <span className="px-2 text-center text-gray-400">
+                                  Click to upload Logo
+                                </span>
+                              </div>
+                            )}
+                            <input
+                              id="fileInput"
+                              type="file"
+                              accept="image/*"
+                              style={{ display: "none" }}
+                              onChange={(e) => handleImageChange(e.target.files)}
+                            />
+                          </div>
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex w-full flex-col space-y-2 md:mt-[-28px]">
+                    <div className="grid-col-1 grid gap-x-8 gap-y-2 md:grid-cols-4">
+                      <FormField
+                        control={form.control}
+                        name="company"
+                        render={({ field }) => (
+                          <FormItem className="space-y-1 md:col-span-2">
+                            <FormLabel
+                              className={
+                                form.formState.errors.company?.type === "required"
+                                  ? "text-red-500"
+                                  : ""
+                              }
+                            >
+                              Company: <span className="text-red-500">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                className="h-7.5 w-full"
+                                {...field}
+                                onBlur={() => {
+                                  if (field.value && field.value.trim()) {
+                                    verifyField("company", field.value);
+                                  }
+                                }}
+                                moduleName="company"
+                                fieldName="company"
+                                columnName="Company"
+                              />
+                            </FormControl>
+                            <FormMessage
+                              className={
+                                form.formState.errors.company?.type === "success"
+                                  ? "mt-1 w-60 text-sm text-green-500"
+                                  : "mt-1 w-60 text-sm text-red-500"
+                              }
+                            />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="parentCompany"
+                        render={({ field }) => (
+                          <FormItem className="hidden">
+                            <FormLabel>UUID:</FormLabel>
+                            <FormControl>
+                              <Input className="h-7" {...field} readOnly={true} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="parentCompanyName"
+                        render={({ field }) => (
+                          <FormItem className="space-y-1 md:col-span-2">
+                            <FormLabel>Main Company:</FormLabel>
+                            <FormControl className="relative">
+                              <div className="relative">
+                                <Input
+                                  className="h-7.5 w-full"
+                                  {...field}
+                                  onClick={() => toggleTableCompany()}
+                                  onChange={handleCompanySearchChange}
+                                  ref={inputRef}
+                                  autoComplete="off"
+                                />
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                  <FaMagnifyingGlass className="text-gray-400" />
+                                </div>
+                                {showTableCompany && (
+                                  <div
+                                    ref={dropdownRef}
+                                    className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                                  >
+                                    <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                      <DropdownTable
+                                        columns={dropdownCompanyColumns}
+                                        data={companyDropdownTableData}
+                                        onClickRow={onClickRowCompanyCode}
+                                        filterValue={companyFilter}
+                                      />
+                                    </ScrollArea>
+                                  </div>
+                                )}
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid-col-1 grid gap-x-8 gap-y-2 md:grid-cols-6">
+                      <FormField
+                        control={form.control}
+                        name="BRN"
+                        render={({ field }) => (
+                          <FormItem className="space-y-1">
+                            <FormLabel>BRN (New):</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="h-7.5 w-full"
+                                {...field}
+                                onBlur={() => {
+                                  if (field.value && field.value.trim()) {
+                                    verifyField("BRN", field.value);
+                                  }
+                                }}
+                                moduleName="company"
+                                fieldName="BRN"
+                                columnName="BRN"
+                              />
+                            </FormControl>
+                            <FormMessage
+                              className={
+                                form.formState.errors.BRN?.type === "success"
+                                  ? "mt-1 w-60 text-sm text-green-500"
+                                  : "mt-1 w-60 text-sm text-red-500"
+                              }
+                            />
+                          </FormItem>
+                        )}
+                      />
+
+                       <FormField
+                        control={form.control}
+                        name="BRNOld"
+                        render={({ field }) => (
+                          <FormItem className="space-y-1">
+                            <FormLabel>BRN (Old):</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="h-7.5 w-full"
+                                {...field}
+                                onBlur={() => {
+                                  if (field.value && field.value.trim()) {
+                                    verifyField("BRNOld", field.value);
+                                  }
+                                }}
+                                moduleName="company"
+                                fieldName="BRNOld"
+                                columnName="BRNOld"
+                              />
+                            </FormControl>
+                            <FormMessage
+                              className={
+                                form.formState.errors.BRNOld?.type === "success"
+                                  ? "mt-1 w-60 text-sm text-green-500"
+                                  : "mt-1 w-60 text-sm text-red-500"
+                              }
+                            />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="TIN"
+                        render={({ field }) => (
+                          <FormItem className="space-y-1">
+                            <FormLabel>Tin:</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="h-7.5 w-full"
+                                {...field}
+                                onBlur={() => {
+                                  if (field.value && field.value.trim()) {
+                                    verifyField("TIN", field.value);
+                                  }
+                                }}
+                                moduleName="company"
+                                fieldName="TIN"
+                                columnName="Tin"
+                              />
+                            </FormControl>
+                            <FormMessage
+                              className={
+                                form.formState.errors.TIN?.type === "success"
+                                  ? "mt-1 w-60 text-sm text-green-500"
+                                  : "mt-1 w-60 text-sm text-red-500"
+                              }
+                            />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="SSTNo"
+                        render={({ field }) => (
+                          <FormItem className="col-span-1 space-y-1">
+                            <FormLabel>SST No.:</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="h-7.5"
+                                {...field}
+                                onChange={(e) => {
+                                  const value = e.target.value.replace(/[^a-zA-Z0-9-]/g, "");
+                                  field.onChange(value);
+                                }}
+                                onBlur={() => {
+                                  if (field.value && field.value.trim()) {
+                                    verifyField("SSTNo", field.value);
+                                  }
+                                }}
+                                moduleName="company"
+                                fieldName="SSTNo"
+                                columnName="SST No."
+                              />
+                            </FormControl>
+                            <FormMessage
+                              className={
+                                form.formState.errors.SSTNo?.type === "success"
+                                  ? "mt-1 w-60 text-sm text-green-500"
+                                  : "mt-1 w-60 text-sm text-red-500"
+                              }
+                            />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="TTxNo"
+                        render={({ field }) => (
+                          <FormItem className="col-span-1 space-y-1">
+                            <FormLabel>TTX No.:</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="h-7.5"
+                                {...field}
+                                onChange={(e) => {
+                                  const value = e.target.value.replace(/[^a-zA-Z0-9-]/g, "");
+                                  field.onChange(value);
+                                }}
+                                moduleName="company"
+                                fieldName="TTxNo"
+                                columnName="TTX No."
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="faxNo"
+                        render={({ field }) => (
+                          <FormItem className="space-y-1">
+                            <FormLabel>Fax No:</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="h-7.5 w-full"
+                                {...field}
+                                moduleName="company"
+                                fieldName="faxNo"
+                                columnName="Fax No"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid-col-1 grid gap-x-8 gap-y-2 md:grid-cols-5">
+                      <FormField
+                        control={form.control}
+                        name="phoneNo"
+                        render={({ field }) => (
+                          <FormItem className="space-y-1">
+                            <FormLabel>Phone No:</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="h-7.5 w-full"
+                                {...field}
+                                moduleName="company"
+                                fieldName="phoneNo"
+                                columnName="Phone No"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="MISCCodeCode"
+                        render={({ field }) => (
+                          <FormItem className="space-y-1">
+                            <FormLabel>MSIC:</FormLabel>
+                            <FormControl className="relative">
+                              <div className="relative">
+                                <Input
+                                  className="h-7.5 w-full pr-8"
+                                  {...field}
+                                  onClick={() => toggleTableMSICCode()}
+                                  onChange={handleMSICSearchChange}
+                                  ref={inputRef}
+                                  autoComplete="off"
+                                />
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                  <FaMagnifyingGlass className="text-gray-400" />
+                                </div>
+                                {showTableMSICCode && (
+                                  <div
+                                    ref={dropdownRef}
+                                    className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                                  >
+                                    <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                      <DropdownTable
+                                        columns={dropdownMSICCodeColumns}
+                                        data={MSICCodeDropdownTableData}
+                                        onClickRow={onClickRowMSICCode}
+                                        filterValue={msicFilter}
+                                      />
+                                    </ScrollArea>
+                                  </div>
+                                )}
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="businessNature"
+                        render={({ field }) => (
+                          <FormItem className="col-span-1 space-y-1 md:col-span-3">
+                            <FormLabel>Business Nature:</FormLabel>
+                            <FormControl>
+                              <Input className="h-7.5 w-full" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-3">
+                      <FormField
+                        control={form.control}
+                        name="website"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Website:</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="h-7.5 w-full"
+                                {...field}
+                                moduleName="company"
+                                fieldName="website"
+                                columnName="Website"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email:</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="h-7.5 w-full"
+                                {...field}
+                                moduleName="company"
+                                fieldName="email"
+                                columnName="Email"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="attentionName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Attention:</FormLabel>
+                            <FormControl className="relative">
+                              <div className="relative">
+                                <Input
+                                  className="h-7.5 w-full pr-8"
+                                  {...field}
+                                  onClick={() => toggleTableAttention()}
+                                  onChange={handleAttentionSearchChange}
+                                  ref={inputRef}
+                                  autoComplete="off"
+                                />
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                  <FaMagnifyingGlass className="text-gray-400" />
+                                </div>
+                                {showTableAttention && (
+                                  <div
+                                    ref={dropdownRef}
+                                    className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                                  >
+                                    <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                      <DropdownTable
+                                        columns={dropdownAttentionColumns}
+                                        data={attentionDropdownTableData}
+                                        onClickRow={onClickRowAttention}
+                                        filterValue={attentionFilter}
+                                      />
+                                    </ScrollArea>
+                                  </div>
+                                )}
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="attention"
+                      render={({ field }) => (
+                        <FormItem className="hidden">
+                          <FormLabel>UUID:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7" {...field} readOnly={true} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-5">
+                      <FormField
+                        control={form.control}
+                        name="address"
+                        render={({ field }) => (
+                          <FormItem className="col-span-5 grid h-full grid-rows-[auto_1fr] space-y-1">
+                            <FormLabel>Address:</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                className="h-14"
+                                {...field}
+                                moduleName="company"
+                                fieldName="address"
+                                columnName="Address"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-5">
+                      <FormField
+                        control={form.control}
+                        name="postcode"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col space-y-1">
+                            <FormLabel>Post Code:</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="h-7.5"
+                                {...field}
+                                moduleName="company"
+                                fieldName="postcode"
+                                columnName="Post Code"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="city"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col space-y-1">
+                            <FormLabel>City:</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="h-7.5"
+                                {...field}
+                                moduleName="company"
+                                fieldName="city"
+                                columnName="City"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="state"
+                        render={({ field }) => (
+                          <FormItem className="col-span-4 row-span-1 grid hidden h-full grid-rows-[auto_1fr] space-y-1">
+                            <FormLabel>UUID:</FormLabel>
+                            <FormControl>
+                              <Input className="h-7" {...field} readOnly={true} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="stateCode"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col space-y-1">
+                            <FormLabel>State:</FormLabel>
+                            <FormControl className="relative">
+                              <div className="relative">
+                                <Input
+                                  className="h-7.5 pr-8"
+                                  {...field}
+                                  onClick={() => toggleTableState()}
+                                  onChange={handleStateSearchChange}
+                                  ref={inputRef}
+                                  autoComplete="off"
+                                />
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                  <FaMagnifyingGlass className="text-gray-400" />
+                                </div>
+                                {showTableState && (
+                                  <div
+                                    ref={dropdownRef}
+                                    className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                                  >
+                                    <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                      <DropdownTable
+                                        columns={dropdownStateColumns}
+                                        data={stateDropdownTableData}
+                                        onClickRow={onClickRowState}
+                                        filterValue={stateFilter}
+                                      />
+                                    </ScrollArea>
+                                  </div>
+                                )}
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="country"
+                        render={({ field }) => (
+                          <FormItem className="hidden">
+                            <FormLabel>UUID:</FormLabel>
+                            <FormControl>
+                              <Input className="h-7" {...field} readOnly={true} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="countryOfOriginCode"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col space-y-1">
+                            <FormLabel>Country:</FormLabel>
+                            <FormControl className="relative">
+                              <div className="relative">
+                                <Input
+                                  className="h-7.5 pr-8"
+                                  {...field}
+                                  onClick={() => toggleTableCountry()}
+                                  onChange={handleCountrySearchChange}
+                                  ref={inputRef}
+                                  autoComplete="off"
+                                />
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                  <FaMagnifyingGlass className="text-gray-400" />{" "}
+                                  {/* Using the search icon */}
+                                </div>
+                                {showTableCountry && (
+                                  <div
+                                    ref={dropdownRef}
+                                    className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                                  >
+                                    <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+                                      <DropdownTable
+                                        columns={dropdownCountryColumns}
+                                        data={countryDropdownTableData}
+                                        onClickRow={onClickRowCountry}
+                                        filterValue={countryFilter}
+                                      />
+                                    </ScrollArea>
+                                  </div>
+                                )}
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="coordinate"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col space-y-1">
+                            <FormLabel>Coordinate:</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="h-7.5"
+                                {...field}
+                                moduleName="company"
+                                fieldName="coordinate"
+                                columnName="Coordinate"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+                <div className="grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-5">
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem className="col-span-5 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                        <FormLabel>Description:</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            className="h-7"
+                            {...field}
+                            moduleName="company"
+                            fieldName="description"
+                            columnName="Description"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+                <div className="mt-2.5 grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-5">
+                  <FormField
+                    control={form.control}
+                    name="account"
+                    render={({ field }) => (
+                      <FormItem className="hidden">
+                        <FormLabel>Account UUID:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7" {...field} readOnly={true} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="accountName"
+                    render={({ field }) => (
+                      <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                        <FormLabel>Sys Acc:</FormLabel>
+                        <FormControl className="relative">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                            value={currentAcc}
+                            readOnly={true}
+                            ref={inputRef}
+                            autoComplete="off"
+                            style={{
+                              backgroundColor: "#f2f2f2",
+                              color: "gray",
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="UUID"
+                    render={({ field }) => (
+                      <FormItem className="col-span-1 row-span-1 grid hidden h-full grid-rows-[auto_1fr] space-y-1">
+                        <FormLabel>UUID:</FormLabel>
+                        <FormControl className="relative">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                            value={slug === "clone" ? "" : field.value}
+                            readOnly={true}
+                            ref={inputRef}
+                            autoComplete="off"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <LogoImageDialog
+        open={imageDialogOpen}
+        setOpen={setImageDialogOpen}
+        imageSrc={imageSrc}
+        setImageSrc={setImageSrc}
+        setTempLogoImage={setTempCompanyLogo}
+      />
+    </>
+  );
+}
+
+function LogoImageDialog({
+  open,
+  setOpen,
+  imageSrc,
+  setImageSrc,
+  setTempLogoImage,
+}: {
+  open: boolean;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  imageSrc: string | null;
+  setImageSrc: Dispatch<SetStateAction<string | null>>;
+  setTempLogoImage: Dispatch<SetStateAction<LogoAttachment | File | null | undefined>>;
+}) {
+  if (!imageSrc) return;
+
+  const onClickRemoveImage = () => {
+    setImageSrc(null);
+    setTempLogoImage(null);
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen} className="m-2">
+      <DialogContent className="w-fit max-w-6xl">
+        <DialogHeader>
+          <DialogTitle>Logo Image</DialogTitle>
+        </DialogHeader>
+        <div className="flex justify-center">
+          <iframe src={imageSrc} />
+        </div>
+        <DialogFooter className="sm:justify-center">
+          <Button onClick={onClickRemoveImage} type="button" variant="destructive">
+            Remove Image
+          </Button>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Close
+            </Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

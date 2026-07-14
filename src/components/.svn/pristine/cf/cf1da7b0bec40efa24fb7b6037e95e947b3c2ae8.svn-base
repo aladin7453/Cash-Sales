@@ -1,0 +1,349 @@
+import React from 'react';
+import { Document, Page, Text, View, StyleSheet, Image, Font } from '@react-pdf/renderer';
+
+const isDev = process.env.NODE_ENV === 'development';
+
+Font.register({
+  family: 'NotoSansSC',
+  src: isDev
+    ? '/fonts/NotoSansSC-Regular.ttf'
+    : '/view/fonts/NotoSansSC-Regular.ttf',
+});
+
+Font.register({
+  family: 'NotoSansSC-Bold',
+  src: isDev
+    ? '/fonts/NotoSansSC-Bold.ttf'
+    : '/view/fonts/NotoSansSC-Bold.ttf',
+});
+
+const styles = StyleSheet.create({
+  page: {
+    width: '70mm',
+    paddingTop: 10,
+    paddingBottom: 10,
+    paddingHorizontal: 15,
+    fontSize: 8,
+    fontFamily: 'NotoSansSC',
+    orientation: 'portrait',
+    minHeight: '230pt',
+  },
+  container: {
+    width: '100%',
+  },
+  header: {
+    marginBottom: 2,
+    textAlign: 'center',
+    position: 'relative',
+  },
+  companyName: {
+    fontSize: 6,
+    marginBottom: 2,
+    width: '60%',
+    alignSelf: 'center',
+  },
+  companyDetails: {
+    fontSize: 6,
+    marginBottom: 1,
+    width: '60%',
+    alignSelf: 'center',
+  },
+  previewTypeText: {
+    textAlign: 'center',
+    fontSize: 10,
+    marginBottom: 1,
+    fontFamily: 'NotoSansSC-Bold',
+    paddingTop: 5,
+  },
+  referenceNumber: {
+    fontSize: 6,
+    textAlign: 'right',
+  },
+  addressLine: {
+    fontSize: 6,
+    marginBottom: 5,
+    width: '60%',
+    alignSelf: 'center',
+  },
+  divider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+    marginVertical: 2,
+  },
+  receiptInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  receiptInfoItem: {
+    fontSize: 7,
+  },
+  itemsHeader: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+    paddingBottom: 2,
+    marginBottom: 2,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    marginBottom: 2,
+  },
+  itemName: {
+    flex: 8,
+    fontSize: 7,
+  },
+  itemQty: {
+    flex: 2,
+    fontSize: 7,
+    textAlign: 'right',
+  },
+  itemPrice: {
+    flex: 3,
+    fontSize: 7,
+    textAlign: 'right',
+  },
+  taxAmount: {
+    flex: 3,
+    fontSize: 7,
+    textAlign: 'right',
+  },
+  totals: {
+    marginTop: 5,
+    marginBottom: 5,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    fontSize: 7,
+    marginBottom: 1,
+  },
+  totalLabel: {
+    textAlign: 'right',
+    fontSize: 7,
+  },
+  totalValue: {
+    textAlign: 'right',
+    width: 60,
+    marginRight: 40,
+    fontSize: 7,
+  },
+  totalValueBold: {
+    textAlign: 'right',
+    width: 60,
+    fontSize: 8,
+  },
+  footer: {
+    marginTop: 10,
+    fontSize: 7,
+    textAlign: 'center',
+  },
+  logoContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    marginBottom: 5,
+    marginLeft: 5,
+  },
+  logoImage: {
+    width: 30,
+    height: 30,
+    objectFit: 'fill',
+  },
+  paymentSummaryTable: {
+    marginTop: 10,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderStyle: 'dashed',
+  },
+  paymentSummaryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 5,
+    borderBottomWidth: 1,
+    borderBottomStyle: 'dashed',
+    borderBottomColor: '#000000',
+  },
+  paymentSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 5,
+  },
+  paymentSummaryLabel: {
+    fontSize: 7,
+    flex: 1,
+    textAlign: 'left',
+  },
+  paymentSummaryAmount: {
+    fontSize: 7,
+    textAlign: 'right',
+    width: 80,
+  },
+  boldText: {
+    fontFamily: 'NotoSansSC-Bold',
+  },
+});
+
+const SimplifiedPDF = ({
+  previewData,
+  itemsData,
+  currentCompanyData,
+  currentUser
+}) => {
+ 
+  if (!previewData || !currentCompanyData) {
+    return (
+      <Document>
+        <Page size={[226.8, Math.max(230, 'auto')]} style={styles.page} orientation="portrait">
+          <View style={styles.container}>
+            <Text>Loading data...</Text>
+          </View>
+        </Page>
+      </Document>
+    );
+  }
+  const pages = Array.isArray(previewData) ? previewData : [previewData];//Check for multiple data passed in for preview
+  const itemArray = Array.isArray(itemsData) ? itemsData : [];
+  const image64 = currentCompanyData.logoLink && currentCompanyData.logoLink[0]?.base64;
+
+  const formatDate = (timestamp) => {
+    const date = new Date(timestamp * 1000);
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  };
+
+  return (
+    <Document>
+      {/* <Page size={[226.8, Math.max(230, 'auto')]} style={styles.page} orientation="portrait"> */}
+
+      {pages.map((previewDoc, index) => {// map it in case there are multiple documents data passed in for preview
+
+        const itemArray = Array.isArray(previewData) ? previewDoc.itemsData : itemsData ? itemsData : [];// get the item array for each document
+
+        return (<Page size={[226.8, Math.max(230, 'auto')]} key={index} style={styles.page} orientation="portrait">
+
+
+          <View style={styles.container}>
+            {/* Header */}
+            <View style={styles.header}>
+              {image64 && (
+                <View style={styles.logoContainer}>
+                  <Image src={{ uri: image64, method: "GET", headers: { "Cache-Control": "no-cache" }, body: "" }} style={styles.logoImage} />
+                </View>
+              )}
+              <Text style={styles.companyName}>{currentCompanyData.company || ''}</Text>
+              <Text style={styles.addressLine}>{currentCompanyData.address || ''}</Text>
+              <Text style={styles.companyDetails}>
+                {currentCompanyData.phoneNo ? `Tel: ${currentCompanyData.phoneNo}` : ''}
+                {currentCompanyData.faxNo ? `   Fax: ${currentCompanyData.faxNo}` : ''}
+              </Text>
+              <Text style={styles.previewTypeText}>Invoice</Text>
+              <Text style={styles.referenceNumber}>No.: {previewDoc.docNo || ''}</Text>
+              <Text style={styles.referenceNumber}>Date: {previewDoc.docDate ? formatDate(previewDoc.docDate) : ''}</Text>
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* Items Header */}
+            <View style={styles.itemsHeader}>
+              <Text style={styles.itemName}></Text>
+              <Text style={styles.itemQty}>Qty</Text>
+              <Text style={styles.itemPrice}>{previewDoc.currencySymbol}</Text>
+              <Text style={styles.taxAmount}>Tax</Text>
+            </View>
+
+            {/* Items */}
+            {itemArray.map((item, index) => (
+              <View key={index} style={styles.itemRow}>
+                <Text style={styles.itemName}>{item.itemName || item.itemCode || item.description || ''}</Text>
+                <Text style={styles.itemQty}>{item.quantity || ''}</Text>
+                <Text style={styles.itemPrice}>{Number(item.price || 0).toFixed(2)}</Text>
+                <Text style={styles.taxAmount}>{Number(item.taxAmount || 0).toFixed(2)}</Text>
+              </View>
+            ))}
+
+            <View style={styles.divider} />
+
+            {/* Totals */}
+            <View style={styles.totals}>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total Amount:</Text>
+                <Text style={styles.totalValue}>{Number(previewDoc.totalAmount || 0).toFixed(2)}</Text>
+              </View>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total Discount:</Text>
+                <Text style={styles.totalValue}>{Number(previewDoc.totalDiscount || 0).toFixed(2)}</Text>
+              </View>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total Tax:</Text>
+                <Text style={styles.totalValue}>{Number(previewDoc.totalTax || 0).toFixed(2)}</Text>
+              </View>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total Amt. Inc Tax:</Text>
+                <Text style={styles.totalValue}>
+                  {(
+                    Number(previewDoc.totalAmount || 0) -
+                    Number(previewDoc.totalDiscount || 0) +
+                    Number(previewDoc.totalTax || 0)
+                  ).toFixed(2)}
+                </Text>
+              </View>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Rounding Adjustment:</Text>
+                <Text style={styles.totalValue}>{Number(previewDoc.roundingAmount || 0).toFixed(2)}</Text>
+              </View>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total Payable:</Text>
+                <Text style={styles.totalValue}>{Number(previewDoc.totalPayable || 0).toFixed(2)}</Text>
+              </View>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Paid Amount:</Text>
+                <Text style={styles.totalValue}>{Number(previewDoc.paidAmount || 0).toFixed(2)}</Text>
+              </View>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Change:</Text>
+                <Text style={styles.totalValue}>{Number((previewDoc.paidAmount - previewDoc.totalPayable) || 0).toFixed(2)}</Text>
+              </View>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total Qty Tender:</Text>
+                <Text style={styles.totalValue}>{Number(previewDoc.totalQuantity || 0)}</Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* Footer - Payment Summary Table with proper table structure */}
+            <View style={styles.paymentSummaryTable}>
+              <View style={styles.paymentSummaryHeader}>
+                <Text style={styles.paymentSummaryLabel}>Payment Summary</Text>
+                <Text style={styles.paymentSummaryAmount}>Doc Amount ({previewDoc.currencySymbol})</Text>
+              </View>
+              <View style={styles.paymentSummaryRow}>
+                <Text style={styles.paymentSummaryLabel}>{previewDoc.paymentMethodName || ''} ({previewDoc.paymentMethodCode || ''})</Text>
+                <Text style={styles.paymentSummaryAmount}>{Number(previewDoc.totalPayable || 0).toFixed(2)}</Text>
+              </View>
+            </View>
+
+            <View style={styles.footer}>
+              {/* Thank you message or other footer content here */}
+            </View>
+          </View>
+        </Page>)
+
+
+
+      })}
+
+    </Document>
+  );
+};
+export default React.memo(SimplifiedPDF);

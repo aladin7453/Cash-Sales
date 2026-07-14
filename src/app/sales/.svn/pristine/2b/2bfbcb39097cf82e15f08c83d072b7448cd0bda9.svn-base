@@ -1,0 +1,311 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+
+import TransferButton from "@/components/features/transfer/TransferButton";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import CloneButton from "@/components/form/ActionButton/Clone";
+import DeleteButton from "@/components/form/ActionButton/Delete";
+import LayoutToggleButton from "@/components/form/ActionButton/LayoutToggleButton";
+import NewButton from "@/components/form/ActionButton/New";
+import PreviewButton from "@/components/form/ActionButton/Preview";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+// Mobile View (Imports)
+import MobileFormActionGroup from "@/components/form/MobileFormActionGroup";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+import { deliveryOrderTransferFromConfig } from "../transfer/transferFrom/config";
+import { deliveryOrderTransferToConfig } from "../transfer/transferTo/config";
+import { ApprovalStatusIcon } from "./ApprovalStatusIcon";
+import { useDateRestriction } from "@/components/custom/DateRestrictionContext";
+
+import type { DeliveryOrder } from "../columns";
+
+type TopActionBarProps = {
+  deliveryOrder?: DeliveryOrder | null;
+  approvalStatus?: DeliveryOrder | null;
+  POD?: DeliveryOrder | null;
+  jobAssignment?: DeliveryOrder | null;
+  handleSubmit: () => void;
+  resetForm: () => void;
+  slug: string;
+  onSubmit: (values: any) => void;
+  action: string;
+  deliveryOrderData?: any;
+  layout: "new" | "old";
+  onLayoutChange: (layout: "new" | "old") => void;
+};
+
+export default function TopActionBar({
+  deliveryOrder,
+  approvalStatus,
+  jobAssignment,
+  POD,
+  form,
+  handleSubmit,
+  action,
+  slug,
+  deliveryOrderData,
+  layout,
+  onLayoutChange,
+}: TopActionBarProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  useEffect(() => {
+    form.reset(deliveryOrder || {});
+  }, [deliveryOrder, form]);
+
+  const handleReset = () => {
+    // Reset form to original sales delivery order data for existing records or fallback to default values
+    if (deliveryOrder) {
+      // Convert null values to empty strings for proper form reset
+      const resetValues = Object.keys(deliveryOrder).reduce((acc, key) => {
+        acc[key] = deliveryOrder[key] === null ? "" : deliveryOrder[key];
+        return acc;
+      }, {});
+
+      form.reset(resetValues);
+    } else {
+      // Fallback: reset to form's original default values
+      form.reset();
+    }
+  };
+
+  // Change layout button condition (HardCode)
+  const systemAccount = JSON.parse(localStorage.getItem("system-account") || "{}");
+
+  const canChangeLayout = ["infollective", "infollectivetesting", "dev"].includes(systemAccount);
+
+
+  const handleSave = async () => {
+    handleSubmit();
+  };
+
+  // Dropdown Filter Configuration
+  const getTransferFromFilters = () => {
+    const filters = [];
+
+    // Add customer filter if customer is selected
+    const customerName = form.getValues("customerName");
+
+    if (customerName) {
+      filters.push({
+        column: "customerName",
+        value: customerName,
+      });
+    }
+
+    // You can add more filters here based on other form values
+    // const projectCode = form.getValues("projectCode");
+    // if (projectCode) {
+    //   filters.push({
+    //     column: "projectCode",
+    //     value: projectCode
+    //   });
+    // }
+
+    return filters;
+  };
+
+  const { allowPastRecord, setAllowPastRecord } = useDateRestriction();
+
+  return (
+    <div className="flex h-full w-full items-center justify-between bg-erp-gray-3 py-2">
+      <div className="flex space-x-3">
+        {/* Mobile View (Action Buttons) */}
+        <MobileFormActionGroup
+          config={{
+            onSave: handleSubmit,
+            onReset: handleReset,
+            onCancel: () => router.push(`/sales/sales-delivery-order/`),
+            newDestination: "/sales/sales-delivery-order/new",
+            cloneDestination: `/sales/sales-delivery-order/clone?id=${id}`,
+            deleteConfig:
+              id && slug !== "clone"
+                ? {
+                  module: "delivery_order",
+                  model: "delivery-order",
+                  id: `${id}`,
+                  indexPath: `/sales/sales-delivery-order/`,
+                }
+                : undefined,
+            showNew: !!(id && slug !== "clone"),
+            showClone: !!(id && slug !== "clone"),
+            showDelete: !!(id && slug !== "clone"),
+          }}
+        >
+          {/* Additional Actions (Other than Save, New, Clone, Reset, Delete, and Cancel) */}
+          {deliveryOrder && slug === "edit" && (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <PreviewButton
+                previewType={"SALES DELIVERY ORDER"}
+                module={"delivery_order"}
+                model={"delivery-order"}
+                doc_id={deliveryOrder.UUID}
+                data={deliveryOrderData}
+              />
+            </DropdownMenuItem>
+          )}
+          {/* Transfer From (Mobile View) */}
+          {slug === "new" ? (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <TransferButton
+                transferFromProps={{
+                  id: id,
+                  slug: slug,
+                  config: deliveryOrderTransferFromConfig,
+                  filterConfig: getTransferFromFilters(),
+                }}
+                showTransferTo={false}
+              />
+            </DropdownMenuItem>
+          ) : (
+            ""
+          )}
+          {/* Transfer To (Mobile View) */}
+          {slug === "new" ? (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <TransferButton
+                transferToProps={{
+                  id: id,
+                  config: deliveryOrderTransferToConfig,
+                }}
+                showTransferFrom={false}
+              />
+            </DropdownMenuItem>
+          ) : (
+            ""
+          )}
+        </MobileFormActionGroup>
+
+        {/* Web View (Action Buttons) */}
+        <div className="hidden space-x-3 md:flex">
+          <SaveButton onSubmit={handleSave} />
+          {id && action !== "clone" && <NewButton destination="/sales/sales-delivery-order/new" />}
+          {id && action !== "clone" && (
+            <CloneButton destination={`/sales/sales-delivery-order/clone?id=${id}`} />
+          )}
+          <ResetButton onClick={handleReset} />
+          {id && action !== "clone" && (
+            <DeleteButton
+              module={"delivery_order"}
+              model={"delivery-order"}
+              id={`${id}`}
+              indexPath={`/sales/sales-delivery-order/`}
+            />
+          )}
+          {/* PreviewButton integration */}
+          {deliveryOrder && slug === "edit" && (
+            <PreviewButton
+              previewType={"SALES DELIVERY ORDER"}
+              module={"delivery_order"}
+              model={"delivery-order"}
+              doc_id={deliveryOrder.UUID}
+              data={deliveryOrderData}
+            />
+          )}
+          {/* Transfer From (Web View) */}
+          {slug === "new" ? (
+            <TransferButton
+              transferFromProps={{
+                id: id,
+                slug: slug,
+                config: deliveryOrderTransferFromConfig,
+                filterConfig: getTransferFromFilters(),
+              }}
+              showTransferTo={false}
+            />
+
+          ) : (
+            ""
+          )}
+          {/* Transfer To (Web View) */}
+          {slug === "edit" && id && action !== "clone" ? (
+            <TransferButton
+              transferToProps={{
+                id: id,
+                config: deliveryOrderTransferToConfig,
+              }}
+              showTransferFrom={false}
+            />
+          ) : (
+            ""
+          )}
+          <CancelButton onClick={() => router.push(`/sales/sales-delivery-order/`)} />
+
+          {/* Change Layout button */}
+          {canChangeLayout && <LayoutToggleButton layout={layout} onChange={onLayoutChange} />}
+        </div>
+      </div>
+      <Form id="topActionBarForm" {...form}>
+        <div className="flex items-center gap-x-4 px-3">
+          <FormField
+            control={form.control}
+            name="valid"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-x-2 space-y-0 px-3">
+                {approvalStatus?.approvalStatus &&
+                  (approvalStatus.approvalStatus === "Rejected" ? (
+                    <TooltipProvider delayDuration={0}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <ApprovalStatusIcon status={approvalStatus.approvalStatus} />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p>{approvalStatus.rejectReason || "No reason provided"}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    <ApprovalStatusIcon status={approvalStatus.approvalStatus} />
+                  ))}
+                <FormControl>
+                  <Checkbox
+                    checked={field.value === "1"}
+                    onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                  />
+                </FormControl>
+                <FormLabel>Valid</FormLabel>
+              </FormItem>
+            )}
+          />
+
+          {/* Past Record checkbox */}
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex items-center gap-x-2 mr-2">
+                  <Checkbox
+                    id="allowPastRecord"
+                    checked={allowPastRecord}
+                    onCheckedChange={(state) => setAllowPastRecord(state === true)}
+                  />
+                  <label
+                    htmlFor="allowPastRecord"
+                    className="cursor-pointer select-none text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Past Record
+                  </label>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>Allow backdated date / time entry on this record</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </Form>
+    </div>
+  );
+}

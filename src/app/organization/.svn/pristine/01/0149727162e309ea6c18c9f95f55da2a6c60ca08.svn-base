@@ -1,0 +1,68 @@
+// Validity.tsx
+"use client";
+
+import { FaBoxArchive } from "react-icons/fa6";
+
+import { TOOLTIP_DELAY_DURATION } from "@/lib/constants";
+
+// Import Button from the correct path
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+import type { Table } from "@tanstack/react-table";
+
+type Props<TData> = {
+  table: Table<TData>;
+};
+
+export default function Validity<TData>({ table }: Props<TData>) {
+  return (
+    <DropdownMenu>
+      <TooltipProvider delayDuration={TOOLTIP_DELAY_DURATION}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hover:text-erp-blue-14 aria-expanded:bg-erp-blue-14 aria-expanded:text-white"
+              >
+                <FaBoxArchive className="size-5.5" />
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="font-medium">Toggle valid</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Toggle valid</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup
+          value={(table.getColumn("valid")?.getFilterValue() as string) ?? ""}
+          onValueChange={(value) => table.getColumn("valid")?.setFilterValue(value)}
+        >
+          <DropdownMenuRadioItem value="" onSelect={(e) => e.preventDefault()}>
+            All
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="1" onSelect={(e) => e.preventDefault()}>
+            Valid
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="0" onSelect={(e) => e.preventDefault()}>
+            Invalid
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

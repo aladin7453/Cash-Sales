@@ -1,0 +1,59 @@
+"use client";
+import type { Table } from "@tanstack/react-table";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import Refresh from "@/components/data-table/Refresh";
+
+// Mobile View (Imports)
+import MobileFormTableActionGroupEnd from "@/components/form/MobileFormTableActionGroupEnd";
+
+type Props<TData> = {
+  table: Table<TData>;
+  isMobile?: boolean;
+  revalidateKnockOffDetailsData: () => void;
+};
+
+export default function KnockOffDetailsDataTableToolbar<TData>({
+  table,
+  isMobile,
+  revalidateKnockOffDetailsData,
+}: Props<TData>) {
+  return (
+    <>
+      {/* Card Section (blue container) */}
+      <div className="flex items-center justify-center px-2">
+        {/* Web View Action Buttons */}
+
+        <div className="flex items-center justify-center gap-x-4 text-erp-blue-14">
+
+          {/* Refresh */}
+          <div className="[&_button]:!size-6 [&_svg]:!size-4">
+            <Refresh refreshTable={revalidateKnockOffDetailsData} />
+          </div>
+
+          {/* Columns */}
+          <div className={isMobile ? "hidden" : "[&_button]:!size-6 [&_svg]:!size-4"}>
+            <ColumnVisibilityToggle table={table} />
+          </div>
+        </div>
+
+        {/* Mobile View (End Action Buttons) */}
+        <MobileFormTableActionGroupEnd
+          table={table}
+          config={{
+            search: {
+              column: "docNo",
+              placeholder: "Search Doc. No.",
+            },
+            sort: {
+              column: "docNo"
+            }
+          }}
+        >
+          <Export table={table} />
+
+        </MobileFormTableActionGroupEnd>
+      </div>
+    </>
+  );
+}

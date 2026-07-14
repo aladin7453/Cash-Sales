@@ -1,0 +1,25 @@
+import type { StockIssuedDetails } from "./columns";
+
+export const stockDetailsData: StockIssuedDetails[] = [
+  {
+    docNo: "AG0012001",
+    docDate: "2001-01-01",
+    description: "Sample agreement",
+    attachment: "",
+    validity: 1,
+  },
+  {
+    docNo: "AG0012005",
+    docDate: "2005-01-01",
+    description: "",
+    attachment: "",
+    validity: 0,
+  },
+  {
+    docNo: "AG0012009",
+    docDate: "2009-01-01",
+    description: "Sample agreement",
+    attachment: "",
+    validity: 1,
+  },
+];

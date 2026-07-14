@@ -1,0 +1,146 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import { notFound, useSearchParams, useRouter } from "next/navigation";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+
+type Params = {
+  form: any;
+};
+
+export function ShippingRecipientDetailsForm({ form }: Params) {
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Shipping Recipient Details</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form>
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6">
+              <FormField
+                control={form.control}
+                name="recipient"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Name:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        moduleName="consolidatedInvoice" 
+                        fieldName="recipient" 
+                        columnName="Name" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="recipientTIN"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>TIN:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="recipientSSTNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>SST No.:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="recipientBRN"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>BRN:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6 mt-4">
+              <FormField
+                control={form.control}
+                name="recipientAddress"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 md:col-span-6">
+                    <FormLabel>Address:</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        className="h-7.5 resize-none" 
+                        {...field} 
+                        moduleName="consolidatedInvoice" 
+                        fieldName="recipientAddress" 
+                        columnName="Address" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

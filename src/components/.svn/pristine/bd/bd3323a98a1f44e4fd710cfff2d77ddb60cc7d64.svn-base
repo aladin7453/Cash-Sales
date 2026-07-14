@@ -1,0 +1,735 @@
+"use client";
+
+import React, {
+  useCallback, useEffect, useImperativeHandle,
+  useRef, useState, forwardRef,
+} from "react";
+import { FaCheck, FaImage, FaPaperclip, FaTimes } from "react-icons/fa";
+import { CalendarIcon, ChevronDown } from "lucide-react";
+import moment from "moment";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DATE_FORMAT } from "@/lib/constants";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import TextEditorInline from "@/components/custom/TextEditorInline";
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+import { MdDelete } from "react-icons/md";
+import { cn } from "@/lib/utils/cn";
+
+export type CustomFieldType =
+  | "Attachments" | "Check Box" | "Color Picker" | "Date"
+  | "Images" | "Medium Text" | "Options" | "Short Text" | "Text Editor";
+
+export interface CustomFieldDefinition {
+  fieldKey: string;
+  dataName: string;
+  dataType: CustomFieldType;
+  defaultValue?: string;
+}
+
+export interface CustomFieldHandle {
+  save: () => Promise<void>;
+}
+
+interface CustomFieldProps {
+  form: any;
+  module?: "sales" | "purchase";
+  isActive?: boolean;
+  docUUID?: string;
+  docType?: string;
+  docNo?: string;
+}
+
+const CARD_CONFIG = [
+  { key: "basic", label: "Basic Info", types: new Set<CustomFieldType>(["Short Text", "Date", "Medium Text"]) },
+  { key: "pickers", label: "Selections", types: new Set<CustomFieldType>(["Color Picker", "Check Box", "Options"]) },
+  { key: "rich", label: "Rich Content", types: new Set<CustomFieldType>(["Text Editor", "Images", "Attachments"]) },
+] as const;
+
+function colSpan(type: CustomFieldType): 1 | 3 {
+  return type === "Short Text" || type === "Date" ? 1 : 3;
+}
+
+function parseDefaultValue(field: CustomFieldDefinition): unknown {
+  switch (field.dataType) {
+    case "Check Box": return field.defaultValue === "true";
+    case "Date":
+      if (field.defaultValue && field.defaultValue !== "today") {
+        const num = Number(field.defaultValue);
+        if (!isNaN(num)) return field.defaultValue;
+        return String(Math.floor(new Date(field.defaultValue).getTime() / 1000));
+      }
+      return String(Math.floor(Date.now() / 1000));
+    case "Color Picker": return String(field.defaultValue ?? "#FFFFFF");
+    case "Options": {
+      const opts = (field.defaultValue ?? "1,2,3").split(",").map((s) => s.trim());
+      return opts[0] ?? "";
+    }
+    case "Images":
+    case "Attachments": return [];
+    default: return field.defaultValue ?? "";
+  }
+}
+
+interface FieldRendererProps {
+  definition: CustomFieldDefinition;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}
+
+function ShortTextField({ definition, value, onChange }: FieldRendererProps) {
+  return (
+    <TooltipProvider delayDuration={1000}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Input
+            className="h-7 rounded-lg px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+            value={(value as string) ?? ""}
+            maxLength={45}
+            placeholder={definition.dataName}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start">{definition.dataName}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+function MediumTextField({ definition, value, onChange }: FieldRendererProps) {
+  return (
+    <Textarea
+      className="h-[60px] resize-none px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+      value={(value as string) ?? ""}
+      maxLength={200}
+      placeholder={definition.dataName}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
+function TextEditorField({ definition, value, onChange }: FieldRendererProps) {
+  return (
+    <div className="w-full min-w-0 h-[240px]">
+      <TextEditorInline
+        value={typeof value === "string" ? value : ""}
+        onChange={(val) => onChange(val)}
+        className="h-[190px]"
+      />
+    </div>
+  );
+}
+
+function CheckBoxField({ definition, value, onChange }: FieldRendererProps) {
+  const checked = Boolean(value);
+  return (
+    <TooltipProvider delayDuration={1000}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-x-2">
+            <button
+              type="button"
+              aria-label={definition.dataName}
+              onClick={() => onChange(!checked)}
+              className={cn(
+                "flex h-[18px] w-[18px] items-center justify-center rounded border transition-all duration-200",
+                checked
+                  ? "border-blue-400 bg-blue-400 text-white"
+                  : "border-gray-300 bg-white text-transparent hover:border-blue-300",
+              )}
+            >
+              <FaCheck className="size-2.5" />
+            </button>
+            <span className="text-[12px] text-gray-500">{checked ? "Yes" : "No"}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start">{definition.dataName}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+function DateField({ definition, value, onChange }: FieldRendererProps) {
+  const resolveTimestamp = (): number => {
+    if (!value || value === "today") return Math.floor(Date.now() / 1000);
+    const num = Number(value);
+    return isNaN(num) ? Math.floor(Date.now() / 1000) : num;
+  };
+  const timestamp = resolveTimestamp();
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            "h-7 w-full justify-between rounded-lg px-2 text-[11px] font-normal outline-none transition-all duration-300 ease-in-out",
+            !value && "text-muted-foreground",
+          )}
+          size="sm"
+        >
+          {moment.unix(timestamp).format(DATE_FORMAT)}
+          <CalendarIcon className="size-3 text-gray-400" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={moment.unix(timestamp).toDate()}
+          onSelect={(date) => {
+            if (!date) return;
+            onChange(String(Math.floor(date.getTime() / 1000)));
+          }}
+          initialFocus
+          defaultMonth={moment.unix(timestamp).toDate()}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ColorPickerField({ value, onChange }: FieldRendererProps) {
+  const hex = String(value ?? "#FFFFFF");
+  return (
+    <div className="flex items-center gap-x-2">
+      <div className="relative h-4.5 w-4.5 overflow-hidden rounded border border-gray-200">
+        <div className="absolute inset-[2px] rounded" style={{ background: hex }} />
+        <input
+          type="color"
+          value={hex}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute inset-[-4px] h-[calc(100%+8px)] w-[calc(100%+8px)] cursor-pointer border-none opacity-0"
+        />
+      </div>
+      <span className="font-mono text-[11px] text-gray-500">{hex.toUpperCase()}</span>
+    </div>
+  );
+}
+
+function OptionsField({ definition, value, onChange }: FieldRendererProps) {
+  const options = (definition.defaultValue ?? "1,2,3")
+    .split(",").map((s) => s.trim()).filter(Boolean);
+  const selected = value as string;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {options.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => onChange(opt)}
+          className={cn(
+            "rounded-full border px-2.5 py-0.5 text-[11px] transition-all duration-200",
+            selected === opt
+              ? "border-blue-400 bg-blue-300 text-white"
+              : "border-gray-200 bg-white text-gray-600 hover:border-blue-200 hover:bg-blue-50",
+          )}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AttachmentsField({ value, onChange }: FieldRendererProps) {
+  const files: any[] = (value as any[]) ?? [];
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [objectUrls, setObjectUrls] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    const urls: Record<number, string> = {};
+    files.forEach((file, idx) => {
+      if (file instanceof File) urls[idx] = URL.createObjectURL(file);
+    });
+    setObjectUrls(urls);
+    return () => { Object.values(urls).forEach(URL.revokeObjectURL); };
+  }, [value]);
+
+  const getHref = (file: any, idx: number) => file.link ?? objectUrls[idx] ?? undefined;
+
+  const handleAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange([...files, ...Array.from(e.target.files ?? [])]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  return (
+    <div className="flex w-full flex-col gap-y-2">
+      {/* Upload Area */}
+      <label className="flex w-full cursor-pointer flex-col items-center justify-center gap-y-2 rounded-xl border-2 border-dashed border-gray-300 bg-white py-4 shadow-sm transition-colors duration-200 hover:border-blue-400">
+        <FaPaperclip className="size-6 text-gray-400" />
+        <span className="text-[12px] font-normal text-gray-500">Click to attach file</span>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleAdd}
+        />
+      </label>
+
+      {/* File List */}
+      {files.length > 0 && (
+        <div className="flex flex-col">
+          {files.map((file: any, idx) => (
+            <div key={idx} className="flex min-w-0 items-center gap-x-1.5 py-1">
+              <FaPaperclip className="size-3 shrink-0 text-gray-400" />
+              <a
+                href={getHref(file, idx)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 truncate text-[12px] text-blue-600 hover:text-blue-800 hover:underline"
+                title={file.name}
+              >
+                {file.name}
+              </a>
+              <button
+                type="button"
+                onClick={() => onChange(files.filter((_, i) => i !== idx))}
+                className="flex-shrink-0 text-red-500 transition-all duration-300 ease-in-out hover:text-red-700"
+              >
+                <MdDelete className="size-4" title="Remove" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ImagesField({ value, onChange }: FieldRendererProps) {
+  const files: any[] = (value as any[]) ?? [];
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [objectUrls, setObjectUrls] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    const urls: Record<number, string> = {};
+    files.forEach((file, idx) => {
+      if (file instanceof File) urls[idx] = URL.createObjectURL(file);
+    });
+    setObjectUrls(urls);
+    return () => { Object.values(urls).forEach(URL.revokeObjectURL); };
+  }, [value]);
+
+  const getHref = (file: any, idx: number) => file.link ?? objectUrls[idx] ?? undefined;
+
+  const handleAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange([...files, ...Array.from(e.target.files ?? [])]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  return (
+    <div className="flex w-full flex-col gap-y-2">
+      {/* Upload Area */}
+      <label className="flex w-full cursor-pointer flex-col items-center justify-center gap-y-2 rounded-xl border-2 border-dashed border-gray-300 bg-white py-4 shadow-sm transition-colors duration-200 hover:border-blue-400">
+        <FaImage className="size-6 text-gray-400" />
+        <span className="text-[12px] font-normal text-gray-500">Click to attach image</span>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={handleAdd}
+        />
+      </label>
+
+      {/* File List */}
+      {files.length > 0 && (
+        <div className="flex flex-col">
+          {files.map((file: any, idx) => (
+            <div key={idx} className="flex min-w-0 items-center gap-x-1.5 py-1">
+              <FaImage className="size-3 shrink-0 text-gray-400" />
+              <a
+                href={getHref(file, idx)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 truncate text-[12px] text-blue-600 hover:text-blue-800 hover:underline"
+                title={file.name}
+              >
+                {file.name}
+              </a>
+              <button
+                type="button"
+                onClick={() => onChange(files.filter((_, i) => i !== idx))}
+                className="flex-shrink-0 text-red-500 transition-all duration-300 ease-in-out hover:text-red-700"
+              >
+                <MdDelete className="size-4" title="Remove" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FieldRenderer(props: FieldRendererProps) {
+  switch (props.definition.dataType) {
+    case "Short Text": return <ShortTextField {...props} />;
+    case "Medium Text": return <MediumTextField {...props} />;
+    case "Text Editor": return <TextEditorField {...props} />;
+    case "Check Box": return <CheckBoxField {...props} />;
+    case "Date": return <DateField {...props} />;
+    case "Color Picker": return <ColorPickerField {...props} />;
+    case "Options": return <OptionsField {...props} />;
+    case "Images": return <ImagesField {...props} />;
+    case "Attachments": return <AttachmentsField {...props} />;
+    default: return null;
+  }
+}
+
+function FieldItem({ definition, value, onChange }: {
+  definition: CustomFieldDefinition;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col space-y-1">
+      <span className="text-[11px] text-gray-500">{definition.dataName}</span>
+      <FieldRenderer definition={definition} value={value} onChange={onChange} />
+    </div>
+  );
+}
+
+function FieldItemRow({ definition, value, onChange }: {
+  definition: CustomFieldDefinition;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  return (
+    <div className="flex items-center gap-x-3 border-b border-gray-100 py-1.5 last:border-b-0">
+      <span className="w-28 shrink-0 truncate text-[11px] text-gray-500">{definition.dataName}</span>
+      <div className="flex-1">
+        <FieldRenderer definition={definition} value={value} onChange={onChange} />
+      </div>
+    </div>
+  );
+}
+
+function SectionCard({ label, count, children, defaultOpen = true }: {
+  label: string;
+  count: number;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between border-b border-gray-100 bg-gray-50/60 px-3 py-1.5 text-left transition-colors hover:bg-gray-100/60"
+      >
+        <div className="flex items-center gap-x-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{label}</span>
+          <span className="rounded-full border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-400">{count}</span>
+        </div>
+        <ChevronDown className={cn("size-3.5 text-gray-400 transition-transform duration-200", !open && "-rotate-90")} />
+      </button>
+      {open && <div className="px-3 py-2">{children}</div>}
+    </div>
+  );
+}
+
+function BasicInfoContent({ fields, fieldValues, onFieldChange }: {
+  fields: CustomFieldDefinition[];
+  fieldValues: Record<string, unknown>;
+  onFieldChange: (key: string, val: unknown) => void;
+}) {
+  const rows: CustomFieldDefinition[][] = [];
+  let currentRow: CustomFieldDefinition[] = [];
+  let currentCols = 0;
+  fields.forEach((def) => {
+    const span = colSpan(def.dataType);
+    if (span === 3) {
+      if (currentRow.length > 0) { rows.push(currentRow); currentRow = []; currentCols = 0; }
+      rows.push([def]);
+    } else {
+      if (currentCols + span > 3) { rows.push(currentRow); currentRow = []; currentCols = 0; }
+      currentRow.push(def);
+      currentCols += span;
+    }
+  });
+  if (currentRow.length > 0) rows.push(currentRow);
+  return (
+    <div className="flex flex-col gap-y-1.5">
+      {rows.map((row, rowIdx) => {
+        const isWideRow = row.length === 1 && colSpan(row[0].dataType) === 3;
+        return (
+          <div key={rowIdx} className={cn("grid gap-x-2", isWideRow ? "grid-cols-1" : "grid-cols-3")}>
+            {row.map((def) => (
+              <FieldItem key={def.fieldKey} definition={def} value={fieldValues[def.fieldKey]} onChange={(v) => onFieldChange(def.fieldKey, v)} />
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SelectionsContent({ fields, fieldValues, onFieldChange }: {
+  fields: CustomFieldDefinition[];
+  fieldValues: Record<string, unknown>;
+  onFieldChange: (key: string, val: unknown) => void;
+}) {
+  return (
+    <div className="flex flex-col">
+      {fields.map((def) => (
+        <FieldItemRow key={def.fieldKey} definition={def} value={fieldValues[def.fieldKey]} onChange={(v) => onFieldChange(def.fieldKey, v)} />
+      ))}
+    </div>
+  );
+}
+
+function RichContentContent({ fields, fieldValues, onFieldChange }: {
+  fields: CustomFieldDefinition[];
+  fieldValues: Record<string, unknown>;
+  onFieldChange: (key: string, val: unknown) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-y-2">
+      {fields.map((def) => (
+        <FieldItem key={def.fieldKey} definition={def} value={fieldValues[def.fieldKey]} onChange={(v) => onFieldChange(def.fieldKey, v)} />
+      ))}
+    </div>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="overflow-hidden rounded-lg border border-gray-100 bg-white">
+      <div className="h-8 animate-pulse bg-gray-100" />
+      <div className="flex flex-col gap-y-2 p-3">
+        <div className="grid grid-cols-3 gap-x-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex animate-pulse flex-col gap-y-1">
+              <div className="h-2.5 w-14 rounded bg-gray-200" />
+              <div className="h-7 rounded-lg bg-gray-100" />
+            </div>
+          ))}
+        </div>
+        <div className="flex animate-pulse flex-col gap-y-1">
+          <div className="h-2.5 w-20 rounded bg-gray-200" />
+          <div className="h-[60px] rounded-lg bg-gray-100" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export const DisplayCustomField = forwardRef<CustomFieldHandle, CustomFieldProps>(
+  function DisplayCustomField({ form, module = "sales", isActive, docUUID, docType, docNo }, ref) {
+    const headers = getAuthHeaders();
+    const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+    const [fieldDefs, setFieldDefs] = useState<CustomFieldDefinition[]>([]);
+    const [fieldValues, setFieldValues] = useState<Record<string, unknown>>({});
+    const hasFetched = useRef(false);
+
+    const fetchFieldDefinitions = useCallback(async () => {
+      if (hasFetched.current) return;
+      hasFetched.current = true;
+      setStatus("loading");
+
+      const prefApiPath =
+        module === "sales"
+          ? `${ORIGIN}/sales_preference/api/sales-preference/get-index-sales-preference`
+          : `${ORIGIN}/purchase_preference/api/purchase-preference/get-index-purchase-preference`;
+
+      try {
+        const res = await fetch(prefApiPath, { method: "GET", headers });
+        if (!res.ok) throw new Error("Failed to fetch preference");
+
+        const data = await res.json();
+        const raw = data?.data?.customDIYFields ?? data?.customDIYFields ?? [];
+        const rawFields: CustomFieldDefinition[] = (() => {
+          try {
+            const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+            return Array.isArray(parsed) ? parsed : [];
+          } catch { return []; }
+        })();
+
+        setFieldDefs(rawFields);
+
+        let savedData: Record<string, unknown> = {};
+        if (docUUID) {
+          try {
+            const savedRes = await fetch(
+              `${ORIGIN}/custom_d_i_y_field_data/api/custom-d-i-y-field-data/get-update-custom-d-i-y-field-data?id=${docUUID}&module=${module}`,
+              { method: "GET", headers }
+            );
+            if (savedRes.ok) {
+              const savedJson = await savedRes.json();
+              const rawSaved = savedJson?.data?.customFieldData ?? savedJson?.customFieldData;
+              if (rawSaved) {
+                savedData = typeof rawSaved === "string" ? JSON.parse(rawSaved) : rawSaved;
+              }
+            }
+          } catch { }
+        }
+
+        const initValues: Record<string, unknown> = {};
+        rawFields.forEach((def) => {
+          const existing = form.getValues(`customFields.${def.fieldKey}`);
+          if (existing !== undefined) {
+            initValues[def.fieldKey] = existing;
+            return;
+          }
+
+          const saved = savedData[def.fieldKey];
+          if (saved !== undefined) {
+            if (
+              saved !== null &&
+              typeof saved === "object" &&
+              !Array.isArray(saved) &&
+              "value" in (saved as object)
+            ) {
+              initValues[def.fieldKey] = (saved as { dataType: string; value: unknown }).value;
+            } else if (Array.isArray(saved)) {
+              initValues[def.fieldKey] = (saved as any[]).map((item: any) => {
+                if (item instanceof File) return item;
+                const link = item.link ?? item.attachmentLink?.[0]?.link ?? null;
+                return { ...item, link };
+              });
+            } else {
+              initValues[def.fieldKey] = saved;
+            }
+            return;
+          }
+
+          initValues[def.fieldKey] = parseDefaultValue(def);
+        });
+
+        setFieldValues(initValues);
+        setStatus("done");
+      } catch (err) {
+        console.error("CustomField: failed to fetch", err);
+        setStatus("error");
+      }
+    }, [headers, module, form, docUUID]);
+
+    useEffect(() => {
+      if (isActive) fetchFieldDefinitions();
+    }, [isActive, fetchFieldDefinitions]);
+
+    useImperativeHandle(ref, () => ({
+      save: async () => {
+        if (!docUUID || !docType || !docNo) return;
+
+        const customFieldData: Record<string, unknown> = {};
+        const fileFields: Record<string, any[]> = {};
+
+        Object.entries(fieldValues).forEach(([key, val]) => {
+          const def = fieldDefs.find((d) => d.fieldKey === key);
+          if (!def) return;
+
+          if (Array.isArray(val)) {
+            if ((val as any[]).length > 0) {
+              fileFields[key] = val as any[];
+              customFieldData[key] = (val as any[]).map((item: any) => ({
+                dataType: def.dataType,
+                name: item.name ?? "",
+                ...(item.link ? { link: item.link } : {}),
+              }));
+            }
+          } else {
+            customFieldData[key] = { dataType: def.dataType, value: val };
+          }
+        });
+
+        const formData = new FormData();
+        formData.append("customDIYFieldData[docType]", docType);
+        formData.append("customDIYFieldData[docNo]", docNo);
+        formData.append("customDIYFieldData[docUUID]", docUUID);
+        formData.append(
+          "customDIYFieldData[customFieldData]",
+          JSON.stringify(customFieldData)
+        );
+
+        // Merge all file fields (Images + Attachments) under a single "attachment" key
+        let attachmentIndex = 0;
+
+        for (const [fieldKey, files] of Object.entries(fileFields)) {
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i] as any;
+
+            if (file.link) {
+              formData.append(`customDIYFieldData[attachment][${attachmentIndex}][Name]`, file.name ?? "");
+              formData.append(`customDIYFieldData[attachment][${attachmentIndex}][File]`, "");
+            } else if (file instanceof File) {
+              const base64 = await getFileToBase64(file);
+              formData.append(`customDIYFieldData[attachment][${attachmentIndex}][Name]`, file.name);
+              formData.append(`customDIYFieldData[attachment][${attachmentIndex}][File]`, base64);
+            }
+
+            attachmentIndex++;
+          }
+        }
+
+        const res = await fetch(
+          `${ORIGIN}/custom_d_i_y_field_data/api/custom-d-i-y-field-data/update-custom-d-i-y-field-data?id=${docUUID}&module=${module}`,
+          { method: "POST", headers, body: formData }
+        );
+
+        if (!res.ok) throw new Error("CustomField: failed to save");
+      },
+    }), [docUUID, docType, docNo, module, fieldValues, headers]);
+
+    const handleChange = (key: string, val: unknown) => {
+      setFieldValues((prev) => ({ ...prev, [key]: val }));
+      form.setValue(`customFields.${key}`, val, { shouldDirty: true });
+    };
+
+    if (status === "idle" || (status === "loading" && fieldDefs.length === 0)) {
+      return <div className="mt-1.5 flex flex-col gap-y-2"><SkeletonCard /></div>;
+    }
+
+    if (status === "error") {
+      return (
+        <div className="mt-2 flex flex-col items-center gap-y-2 py-6 text-center">
+          <span className="text-[12px] text-red-400">Failed to load custom fields.</span>
+          <Button type="button" variant="outline" size="sm"
+            onClick={() => { hasFetched.current = false; fetchFieldDefinitions(); }}>
+            Retry
+          </Button>
+        </div>
+      );
+    }
+
+    if (fieldDefs.length === 0) {
+      return (
+        <div className="mt-2 flex flex-col items-center gap-y-1 py-6 text-center">
+          <span className="text-[12px] text-gray-400">No custom fields configured.</span>
+          <span className="text-[11px] text-gray-300">Add fields in Sales / Purchase Preference → Custom DIY Fields.</span>
+        </div>
+      );
+    }
+
+    const basicFields = fieldDefs.filter((f) => CARD_CONFIG[0].types.has(f.dataType));
+    const pickerFields = fieldDefs.filter((f) => CARD_CONFIG[1].types.has(f.dataType));
+    const richFields = fieldDefs.filter((f) => CARD_CONFIG[2].types.has(f.dataType));
+
+    return (
+      <div className="mt-1.5 flex flex-col gap-y-2 pr-1">
+        {basicFields.length > 0 && (
+          <SectionCard label="Basic Info" count={basicFields.length}>
+            <BasicInfoContent fields={basicFields} fieldValues={fieldValues} onFieldChange={handleChange} />
+          </SectionCard>
+        )}
+        {pickerFields.length > 0 && (
+          <SectionCard label="Selections" count={pickerFields.length}>
+            <SelectionsContent fields={pickerFields} fieldValues={fieldValues} onFieldChange={handleChange} />
+          </SectionCard>
+        )}
+        {richFields.length > 0 && (
+          <SectionCard label="Rich Content" count={richFields.length}>
+            <RichContentContent fields={richFields} fieldValues={fieldValues} onFieldChange={handleChange} />
+          </SectionCard>
+        )}
+      </div>
+    );
+  }
+);

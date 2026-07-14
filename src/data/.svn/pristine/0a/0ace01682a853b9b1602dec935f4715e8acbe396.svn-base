@@ -1,0 +1,358 @@
+import { FaFileInvoiceDollar } from "react-icons/fa6";
+
+import type { MenuItem } from "@/lib/types";
+
+export const salesModule: MenuItem = {
+  title: "Sales",
+  ruleId: "SALES",
+  shortName: "Sales",
+  icon: FaFileInvoiceDollar,
+  subMenu: [
+    {
+      title: "Quotation",
+      href: "/sales/quotation",
+      ruleId: "view-quotation",
+    },
+    {
+      title: "Sales Order",
+      href: "/sales/sales-order",
+      ruleId: "view-sales-order",
+    },
+    {
+      title: "Sales Delivery Order",
+      href: "/sales/sales-delivery-order",
+      ruleId: "view-delivery-order",
+    },
+    {
+      title: "Sales Invoice",
+      href: "/sales/sales-invoice",
+      ruleId: "view-sales-invoice",
+    },
+    {
+      title: "Sales Credit Note",
+      href: "/sales/sales-credit-note",
+      ruleId: "view-sales-credit-note",
+    },
+    {
+      title: "Sales Debit Note",
+      href: "/sales/sales-debit-note",
+      ruleId: "view-sales-debit-note",
+    },
+
+    {
+      title: "Customer Payment",
+      href: "/sales/customer-payment",
+      ruleId: "view-customer-payment",
+    },
+    {
+      title: "Customer Contra",
+      href: "/sales/sales-purchase-contra",
+      ruleId: "view-customer-contra",
+    },
+    {
+      title: "Consolidated e-Invoice",
+      href: "/sales/consolidated-invoice",
+      ruleId: "view-consolidated-invoice",
+    },
+    {
+      title: "Cash Sales",
+      href: "/sales/cash-sales",
+      ruleId: "view-cash-sales",
+    },
+    {
+      title: "Auto Billing Config",
+      href: "/sales/auto-billing-config",
+      ruleId: "view-auto-billing-config",
+    },
+    // {
+    //   title: "Cash In/Cash Out",
+    //   href: "/sales/cash-in-cash-out",
+    //   ruleId: "view-cash-in-cash-out",
+    // },
+    // {
+    //   title: "Opening/Closing Balance",
+    //   href: "/sales/opening-closing-balance",
+    //   ruleId: "view-opening-closing-balance",
+    // },
+    {
+      title: "Customer",
+      href: "/sales/customer",
+      ruleId: "view-customer",
+    },
+    {
+      title: "Customer Category",
+      href: "/sales/customer-category",
+      ruleId: "view-customer-category",
+    },
+    {
+      title: "Customer Group",
+      href: "/sales/customer-group",
+      ruleId: "view-customer-group",
+    },
+    {
+      title: "Agent",
+      href: "/sales/agent",
+      ruleId: "view-agent",
+    },
+    {
+      title: "Agent Type",
+      href: "/sales/agent-type",
+      ruleId: "view-agent-type",
+    },
+    {
+      title: "Customer Tag",
+      href: "/sales/customer-tag",
+      ruleId: "view-customer-tag",
+    },
+    {
+      title: "DIY Field",
+      href: "/sales/DIY-field",
+      ruleId: "view-sales-preference",
+    },
+    {
+      title: "Sales Preference",
+      href: "/sales/sales-preference",
+      ruleId: "view-sales-preference",
+    },
+    // {
+    //   title: "Promotion",
+    //   subMenu: [
+    //     {
+    //       title: "Free Gift",
+    //       href: "/sales/Promotion/Free-Gift",
+    //     },
+    //     {
+    //       title: "Coupon",
+    //       href: "/sales/Promotion/Coupon",
+    //     },
+    //     {
+    //       title: "Purchase with Purchase",
+    //       href: "/sales/Promotion/Purchase-with-Purchase",
+    //     },
+    //     {
+    //       title: "Gift with Purchase",
+    //       href: "/sales/Promotion/Gift-with-Purchase",
+    //     },
+    //   ],
+    // },
+    // {
+    //   title: "Customer Deposit",
+    //   href: "/sales/customer-deposit",
+    // },
+
+    // {
+    //   title: "POS (Retail)",
+    //   href: "/sales/pos-retail",
+    // },
+    {
+      title: "Sales Report",
+      subMenu: [
+        {
+          title: "Customer Monthly Sales Report",
+          href: "/sales/sales-report/customer-monthly-sales-report",
+          ruleId: "view-customer-monthly-sales-report",
+        },
+        {
+          title: "Sales Collection Report",
+          href: "/sales/sales-report/sales-collection-report",
+          ruleId: "view-sales-collection-report",
+        },
+        {
+          title: "Sales Document Listing",
+          href: "/sales/sales-report/sales-document-listing",
+          ruleId: "view-sales-document-listing",
+        },
+        {
+          title: "Outstanding Sales Document Listing",
+          href: "/sales/sales-report/outstanding-sales-document-listing",
+          ruleId: "view-outstanding-sales-document-listing-report",
+        },
+        {
+          title: "Customer Due Document Listing",
+          href: "/sales/sales-report/customer-due-document-listing",
+          ruleId: "view-customer-due-document-listing",
+        },
+        {
+          title: "Customer Post Dated Cheque Listing",
+          href: "/sales/sales-report/customer-post-dated-cheque-listing",
+          ruleId: "view-customer-post-dated-cheque-listing",
+        },
+        {
+          title: "Customer Listing",
+          href: "/sales/sales-report/customer-listing",
+          ruleId: "view-customer-listing-report",
+        },
+        {
+          title: "Customer Document Listing",
+          href: "/sales/sales-report/customer-document-listing",
+          ruleId: "view-customer-document-listing",
+        },
+        {
+          title: "Customer Bills and Collection Analysis",
+          href: "/sales/sales-report/customer-bills-and-collection-analysis",
+          ruleId: "view-customer-bills-and-collection-analysis",
+        },
+        {
+          title: "Customer Analysis By Document",
+          href: "/sales/sales-report/customer-analysis-by-document",
+          ruleId: "view-customer-analysis-by-document",
+        },
+        {
+          title: "Sales Analysis By Document",
+          href: "/sales/sales-report/sales-analysis-by-document",
+          ruleId: "view-sales-analysis-by-document",
+        },
+        {
+          title: "Statement of Account (SOA)",
+          href: "/sales/sales-report/statement-of-account",
+          ruleId: "view-statement-of-account",
+        },
+        {
+          title: "Sales Price History Report",
+          href: "/sales/sales-report/sales-price-history-report",
+          ruleId: "view-price-history-report",
+        },
+        {
+          title: "Active Customer Report",
+          href: "/sales/sales-report/active-customer-report",
+          ruleId: "view-active-customer-report",
+        },
+        {
+          title: "Customer Balance Report",
+          href: "/sales/sales-report/customer-balance-report",
+          ruleId: "view-customer-balance-report",
+        },
+        {
+          title: "Sales Profit/Loss Report",
+          href: "/sales/sales-report/sales-profit-loss-report",
+          ruleId: "view-sales-profit-loss-report",
+        },
+        {
+          title: "Sales S/N Profit/Loss Report",
+          href: "/sales/sales-report/sales-s-n-profit-loss-report",
+          ruleId: "view-sales-s-n-profit-loss-report",
+        },
+        {
+          title: "Sales Picking List Report",
+          href: "/sales/sales-report/sales-picking-list-report",
+          ruleId: "view-sales-picking-list-report",
+        },
+        {
+          title: "Customer Aging Report",
+          href: "/sales/sales-report/customer-aging-report",
+          ruleId: "view-customer-aging-report",
+        },
+        {
+          title: "Customer Statement Report",
+          href: "/sales/sales-report/customer-statement-report",
+          ruleId: "view-customer-statement-report",
+        },
+        {
+          title: "Yearly Sales Analysis",
+          href: "/sales/sales-report/yearly-sales-analysis",
+          ruleId: "view-yearly-sales-report",
+        },
+        // {
+        //   title: "Sales Summary Report",
+        //   href: "/sales/sales-report/sales-summary-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Top-Selling Items Report",
+        //   href: "/sales/sales-report/top-selling-items-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Sales by Product Category",
+        //   href: "/sales/sales-report/sales-by-product-category",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Sales by Region/Branch",
+        //   href: "/sales/sales-report/sales-by-region-branch",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Salesperson Performance Report",
+        //   href: "/sales/sales-report/salesperson-performance-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Sales Return Report",
+        //   href: "/sales/sales-report/sales-return-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Profit Margin Report",
+        //   href: "/sales/sales-report/profit-margin-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Pending or Draft Sales Report",
+        //   href: "/sales/sales-report/pending-or-draft-sales-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Customer Purchase History",
+        //   href: "/sales/sales-report/customer-purchase-history",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Daily Sales Report",
+        //   href: "/sales/sales-report/daily-sales-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Quotation vs Actual Sales Report",
+        //   href: "/sales/sales-report/quotation-vs-actual-sales-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Sales Order Fulfilment Report",
+        //   href: "/sales/sales-report/sales-order-fulfilment-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Aging Sales Invoice Report",
+        //   href: "/sales/sales-report/aging-sales-invoice-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Promotion Effectiveness Report",
+        //   href: "/sales/sales-report/promotion-effectiveness-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Repeat Customer Report",
+        //   href: "/sales/sales-report/repeat-customer-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Sales Forecast Report",
+        //   href: "/sales/sales-report/sales-forecast-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Cancelled Voided Sales Report",
+        //   href: "/sales/sales-report/cancelled-voided-sales-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Sales Tax Report",
+        //   href: "/sales/sales-report/sales-tax-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Delivery vs Sales Report",
+        //   href: "/sales/sales-report/delivery-vs-sales-report",
+        //   ruleId: "view-sales-report-document",
+        // },
+        // {
+        //   title: "Sales by Payment Method",
+        //   href: "/sales/sales-report/sales-by-payment-method",
+        //   ruleId: "view-sales-report-document",
+        // },
+      ],
+    },
+  ],
+};

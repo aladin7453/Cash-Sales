@@ -1,0 +1,800 @@
+"use client";
+
+import { useEffect, useState, memo } from "react";
+import { FaSort, FaSortDown, FaSortUp } from "react-icons/fa6";
+import type { ColumnDef, Row, SortingState, ColumnFiltersState, PaginationState } from "@tanstack/react-table";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+
+import { useSearchParams } from "next/navigation";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useToast } from "@/components/ui/use-toast";
+
+import { DEFAULT_DATA_TABLE_PAGE_SIZE, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { cn } from "@/lib/utils/cn";
+
+import ItemPopoverToolbar from "./itemPopoverToolbar";
+import { SalesInvoiceColumns, PurchaseInvoiceColumns } from "./itemColumns";
+import type { SalesInvoice, PurchaseInvoice } from "./itemColumns";
+
+// Mobile View (Imports)
+import MobilePopoverDataTable from "@/components/form/MobilePopoverDataTable";
+import moment from "moment"; // Add moment.js for date formatting
+
+// Column Drag and Drop and Resize (Imports)
+import type { MouseEvent } from "react";
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import { DATA_TABLE_DEFAULT_COLUMN_SIZING } from "@/lib/constants";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import getExcludedColumns from "@/lib/utils/data-table/getExcludedColumns";
+import handleDndDragEnd from "@/lib/utils/data-table/handleDndDragEnd";
+import type {
+  ColumnOrderState,
+  ColumnSizingState,
+  Table as TableType,
+  VisibilityState,
+} from "@tanstack/react-table";
+
+type ItemPopoverProps = {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  setTempRowCustomerContraDetailsListData: (data: any, overwrite: boolean) => void;
+  revalidateCustomerContraDetails: () => void;
+  form: any;
+  slug: string;
+};
+
+// Column Drag and Drop and Resize (Local Storage Keys)
+const SALES_COLUMN_ORDERING_KEY = "sales-purchase-contra.sales-invoice.bs.table.ordering";
+const SALES_COLUMN_SIZING_KEY = "sales-purchase-contra.sales-invoice.bs.table.sizing";
+const PURCHASE_COLUMN_ORDERING_KEY = "sales-purchase-contra.purchase-invoice.bs.table.ordering";
+const PURCHASE_COLUMN_SIZING_KEY = "sales-purchase-contra.purchase-invoice.bs.table.sizing";
+const COLUMN_VISIBILITY_KEY = "sales-purchase-contra.invoice.bs.table.columns";
+
+export default function ItemPopover({
+  open,
+  setOpen,
+  setTempRowCustomerContraDetailsListData,
+  revalidateCustomerContraDetails,
+  form,
+  slug,
+}: ItemPopoverProps) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+
+  const [itemType, setItemType] = useState<"salesInvoice" | "purchaseInvoice">("salesInvoice");
+  const [salesInvoiceData, setSalesInvoiceData] = useState<SalesInvoice[]>([]);
+  const [purchaseInvoiceData, setPurchaseInvoiceData] = useState<PurchaseInvoice[]>([]);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+  });
+  const [selectedRow, setSelectedRow] = useState<Row | null>(null);
+  const [saveDisabled, setSaveDisabled] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Selection Order (State)
+  const [selectionOrder, setSelectionOrder] = useState<string[]>([]);
+
+  // Column Drag and Drop and Resize (State)
+  const salesInitialColumnOrder = SalesInvoiceColumns?.filter(column => column?.id).map((column) => column.id!) || [];
+  const purchaseInitialColumnOrder = PurchaseInvoiceColumns?.filter(column => column?.id).map((column) => column.id!) || [];
+  
+  const [salesColumnOrder, setSalesColumnOrder] = useLocalStorage<ColumnOrderState>(
+    SALES_COLUMN_ORDERING_KEY,
+    salesInitialColumnOrder
+  );
+  const [salesColumnSizing, setSalesColumnSizing] = useLocalStorage<ColumnSizingState>(
+    SALES_COLUMN_SIZING_KEY,
+    {}
+  );
+  const [purchaseColumnOrder, setPurchaseColumnOrder] = useLocalStorage<ColumnOrderState>(
+    PURCHASE_COLUMN_ORDERING_KEY,
+    purchaseInitialColumnOrder
+  );
+  const [purchaseColumnSizing, setPurchaseColumnSizing] = useLocalStorage<ColumnSizingState>(
+    PURCHASE_COLUMN_SIZING_KEY,
+    {}
+  );
+
+  const salesDefaultColumns: Array<keyof SalesInvoice> = [
+    "docNo",
+    "docDateFormat",
+    "customerName",
+    "totalPayable",
+  ];
+  const purchaseDefaultColumns: Array<keyof PurchaseInvoice> = [
+    "docNo",
+    "docDateFormat",
+    "supplierName",
+    "totalPayable",
+  ];
+
+  const salesDefaultColumnVisibility: VisibilityState = getExcludedColumns(
+    SalesInvoiceColumns || [],
+    salesDefaultColumns
+  );
+  const purchaseDefaultColumnVisibility: VisibilityState = getExcludedColumns(
+    PurchaseInvoiceColumns || [],
+    purchaseDefaultColumns
+  );
+
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    COLUMN_VISIBILITY_KEY,
+    itemType === "salesInvoice" ? salesDefaultColumnVisibility : purchaseDefaultColumnVisibility
+  );
+
+  const currentData = itemType === "salesInvoice" ? salesInvoiceData : purchaseInvoiceData;
+  const currentColumns = itemType === "salesInvoice" ? SalesInvoiceColumns : PurchaseInvoiceColumns;
+  const currentColumnOrder = itemType === "salesInvoice" ? salesColumnOrder : purchaseColumnOrder;
+  const currentColumnSizing = itemType === "salesInvoice" ? salesColumnSizing : purchaseColumnSizing;
+  const setCurrentColumnOrder = itemType === "salesInvoice" ? setSalesColumnOrder : setPurchaseColumnOrder;
+  const setCurrentColumnSizing = itemType === "salesInvoice" ? setSalesColumnSizing : setPurchaseColumnSizing;
+
+  const table = useReactTable({
+    columns: currentColumns,
+    data: currentData || [],
+    state: { 
+      sorting, 
+      columnVisibility, 
+      columnFilters, 
+      pagination,
+      columnOrder: currentColumnOrder,
+      columnSizing: currentColumnSizing,
+    },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnFiltersChange: setColumnFilters,
+    onPaginationChange: setPagination,
+    onColumnOrderChange: setCurrentColumnOrder,
+    onColumnSizingChange: setCurrentColumnSizing,
+    manualPagination: true,
+    manualSorting: true,
+    manualFiltering: true,
+    pageCount: Math.ceil(totalCount / pagination.pageSize),
+    autoResetPageIndex: false,
+    columnResizeMode: "onChange",
+    defaultColumn: DATA_TABLE_DEFAULT_COLUMN_SIZING,
+    enableColumnResizing: true,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      },
+      columnVisibility: JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}"),
+    },
+  });
+
+  const sensors = useDndSensors();
+  const columnSizeVars = useColumnSizeVars(table);
+
+  useEffect(() => {
+    localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
+
+  usePreventShiftTextSelect();
+
+  const fetchInvoiceData = async (type: "salesInvoice" | "purchaseInvoice" = itemType, tableState = null) => {
+    try {
+      const customerUUID = form.getValues('customerCode');
+      
+      if (!customerUUID) {
+        toast({
+          title: "Customer Required",
+          description: "Please select a customer first before adding invoices.",
+          variant: "destructive",
+          duration: 3000,
+        });
+
+        setOpen(false);
+
+        return;
+      }
+
+      setIsLoading(true);
+
+      // Get current state or use defaults
+      const currentColumnFilters = tableState?.getState?.()?.columnFilters || columnFilters || [];
+      const currentSorting = tableState?.getState?.()?.sorting || sorting || [];
+      const currentPagination = tableState?.getState?.()?.pagination || pagination || {
+        pageIndex: 0,
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      };
+
+      const columnFiltersWithoutValid = currentColumnFilters.filter(
+        (filter) => filter.id !== "valid"
+      );
+
+      const params = new FormData();
+
+      params.append("param[limit]", `${currentPagination.pageSize}`);
+      params.append(
+        "param[offset]",
+        `${currentPagination.pageIndex * currentPagination.pageSize}`
+      );
+      params.append(
+        "param[filter]",
+        columnFiltersWithoutValid.length > 0
+          ? JSON.stringify(
+              columnFiltersWithoutValid.reduce((acc, curr) => {
+                acc[curr.id] = curr.value;
+                return acc;
+              }, {})
+            )
+          : "{}"
+      );
+      params.append(
+        "param[order]",
+        currentSorting.length > 0 ? (currentSorting[0].desc ? "desc" : "asc") : "desc"
+      );
+      params.append(
+        "param[valid]",
+        currentColumnFilters.length > 0
+          ? `${currentColumnFilters.find((row) => row.id === "valid")?.value || ""}`
+          : ""
+      );
+      params.append(
+        "param[sort]",
+        currentSorting.length > 0 ? currentSorting[0].id : "createdAt"
+      );
+      
+      // Add currency parameter from form
+      const currencyValue = form.getValues('currency') || '';
+      params.append("param[currency]", currencyValue);
+
+      const response = await fetch(
+        `${ORIGIN}/sales_purchase_contra/api/sales-purchase-contra/get-invoices?customerUUID=${customerUUID}&id=${id}&module=sales`,
+        {
+          method: "POST",
+          headers,
+          body: params,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch invoice data");
+      }
+
+      const responseData = await response.json();
+      
+      // Extract data based on invoice type
+      const invoiceData = responseData[type];
+      const rows = invoiceData?.rows || [];
+      const total = invoiceData?.total || 0;
+      
+      // Handle total count properly - convert string to number if needed
+      const totalCount = typeof total === 'string' ? parseInt(total, 10) : total;
+
+      setItemType(type);
+      setTotalCount(totalCount);
+      
+      if (type === "salesInvoice") {
+        setSalesInvoiceData(rows);
+      } else {
+        setPurchaseInvoiceData(rows);
+      }
+
+      setIsLoading(false);
+    } catch (error) {
+      console.error(`Failed to fetch ${type} data:`, error);
+      toast({
+        title: "Error",
+        description: `Failed to fetch ${type === "salesInvoice" ? "sales invoice" : "purchase invoice"} data.`,
+        variant: "destructive",
+        duration: 3000,
+      });
+      setIsLoading(false);
+    }
+  };
+
+  // Add the calculation function
+  const calculateBalanceOutstandingAndContraAmount = (data: any[]) => {
+    if (!Array.isArray(data) || data.length === 0) return data;
+
+    // Ensure docType is set for new records
+    const dataWithDocType = data.map((item) => ({
+      ...item,
+      docType: item.docType || (item.salesInvoice ? "salesInvoice" : "purchaseInvoice"),
+    }));
+
+    // Create a sorted copy for calculation purposes only
+    const sortedDataForCalculation = [...dataWithDocType].sort((a, b) => {
+      // Use docDate (as Unix timestamp string) for sorting, fall back to createdAt
+      let dateA: number;
+      let dateB: number;
+
+      if (a.docDate && b.docDate) {
+        dateA = parseInt(a.docDate || "0");
+        dateB = parseInt(b.docDate || "0");
+      } else {
+        dateA = parseInt(a.createdAt || "0");
+        dateB = parseInt(b.createdAt || "0");
+      }
+      
+      return dateA - dateB;
+    });
+
+    // Separate sales and purchase invoices from sorted data
+    const salesInvoices = sortedDataForCalculation.filter((item) => item.docType === "salesInvoice");
+    const purchaseInvoices = sortedDataForCalculation.filter((item) => item.docType === "purchaseInvoice");
+
+    // Calculate total outstanding amounts
+    const totalSalesOutstanding = salesInvoices.reduce((sum, item) => sum + (Number(item.outstanding) || 0), 0);
+    const totalPurchaseOutstanding = purchaseInvoices.reduce((sum, item) => sum + (Number(item.outstanding) || 0), 0);
+
+    // Determine the maximum contra amount possible (minimum of the two totals)
+    const maxContraAmount = Math.min(totalSalesOutstanding, totalPurchaseOutstanding);
+
+    let remainingContraAmount = maxContraAmount;
+
+    // Create a map to store calculated values by item identifier
+    const calculatedValues = new Map();
+
+    // For CUSTOMER CONTRA: Prioritize sales invoices first, then purchase invoices
+    // Process sales invoices first
+    salesInvoices.forEach((item) => {
+      const outstanding = Number(item.outstanding) || 0;
+      let balanceOutstanding = outstanding;
+      let contraAmount = 0;
+
+      if (remainingContraAmount > 0) {
+        const contraForThisItem = Math.min(outstanding, remainingContraAmount);
+        contraAmount = contraForThisItem;
+        balanceOutstanding = outstanding - contraForThisItem;
+        remainingContraAmount -= contraForThisItem;
+      }
+
+      const itemKey = item.UUID || item.id || `${item.docNo}_${item.docDate}`;
+      calculatedValues.set(itemKey, {
+        balanceOutstanding: balanceOutstanding.toFixed(2),
+        contraAmount: contraAmount.toFixed(2),
+      });
+    });
+
+    // Process purchase invoices second
+    purchaseInvoices.forEach((item) => {
+      const outstanding = Number(item.outstanding) || 0;
+      let balanceOutstanding = outstanding;
+      let contraAmount = 0;
+
+      if (remainingContraAmount > 0) {
+        const contraForThisItem = Math.min(outstanding, remainingContraAmount);
+        contraAmount = contraForThisItem;
+        balanceOutstanding = outstanding - contraForThisItem;
+        remainingContraAmount -= contraForThisItem;
+      }
+
+      const itemKey = item.UUID || item.id || `${item.docNo}_${item.docDate}`;
+      calculatedValues.set(itemKey, {
+        balanceOutstanding: balanceOutstanding.toFixed(2),
+        contraAmount: contraAmount.toFixed(2),
+      });
+    });
+
+    // Apply calculated values back to the original data order
+    const calculatedData = data.map((item) => {
+      const itemKey = item.UUID || item.id || `${item.docNo}_${item.docDate}`;
+      const calculations = calculatedValues.get(itemKey) || {
+        balanceOutstanding: (Number(item.outstanding) || 0).toFixed(2),
+        contraAmount: "0.00",
+      };
+
+      return {
+        ...item,
+        balanceOutstanding: calculations.balanceOutstanding,
+        contraAmount: calculations.contraAmount,
+      };
+    });
+
+    return calculatedData;
+  };
+
+  const updateItem = async (prop) => {
+    try {
+      const formData = new FormData();
+
+      let selectedRowModel = Array(0);
+      if (prop.table) {
+        // Selection Order (Logic)
+        if (prop.selectionOrder && prop.selectionOrder.length > 0) {
+          // Create a map of selected rows for quick lookup
+          const selectedRowsMap = new Map(
+            prop.table.getSelectedRowModel().rows.map(row => [row.id, row])
+          );
+          // Reorder selected rows based on selection order
+          selectedRowModel = prop.selectionOrder
+            .filter(rowId => selectedRowsMap.has(rowId))
+            .map(rowId => selectedRowsMap.get(rowId));
+        } else {
+          // Fallback to default table order if no selection order is provided
+          selectedRowModel = prop.table.getSelectedRowModel().rows;
+        }
+      } else {
+        selectedRowModel.push(prop.row);
+      }
+
+      if (prop.isUpdate) {
+        // Update existing items - apply calculations to the single item
+        const itemData = [{
+          ...prop.row.original,
+          docType: prop.row.original.docType || (prop.row.original.salesInvoice ? "salesInvoice" : "purchaseInvoice"),
+        }];
+        
+        const calculatedItems = calculateBalanceOutstandingAndContraAmount(itemData);
+        const calculatedItem = calculatedItems[0];
+
+        Object.entries(calculatedItem).forEach((field) => {
+          formData.append(`salesPurchaseContraHasDetails[0][${field[0]}]`, `${field[1]}`);
+        });
+      } else {
+        // Add selected items in selection order - apply calculations to all items
+        const itemsData = selectedRowModel.map((row, index) => {
+          const selectedInvoice = row.original;
+          return {
+            UUID: "",
+            seq: (index + 1).toString(),
+            salesPurchaseContra: "",
+            salesInvoice: itemType === "salesInvoice" ? selectedInvoice.UUID : "",
+            purchaseInvoice: itemType === "purchaseInvoice" ? selectedInvoice.UUID : "",
+            docNo: selectedInvoice.docNo,
+            docDateFormat: selectedInvoice.docDateFormat,
+            docDate: selectedInvoice.docDate,
+            description: selectedInvoice.description || "",
+            outstanding: Number(selectedInvoice.totalPayable || 0),
+            contraAmount: Number(selectedInvoice.totalPayable || 0),
+            valid: "1",
+            docType: itemType, // Add docType field
+          };
+        });
+
+        // Apply calculations to get correct balanceOutstanding and contraAmount
+        const calculatedItems = calculateBalanceOutstandingAndContraAmount(itemsData);
+
+        calculatedItems.forEach((item, index) => {
+          Object.entries(item).forEach((field) => {
+            formData.append(`salesPurchaseContraHasDetails[${index}][${field[0]}]`, `${field[1]}`);
+          });
+        });
+      }
+
+      const response = await fetch(
+        `${ORIGIN}/sales_purchase_contra/api/sales-purchase-contra/update-sales-purchase-contra-has-details?id=${id}`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 403) {
+          toast({
+            title: errorData.message,
+            duration: 2000,
+          });
+        }
+        throw new Error("Failed to update data");
+      }
+      
+      const responseData = await response.json();
+      
+      toast({
+        title: "Success",
+        description: prop.isUpdate ? "Details updated successfully." : "Details added successfully.",
+        duration: 2000,
+      });
+
+      revalidateCustomerContraDetails();
+    } catch (error) {
+      console.error("Error updating customer contra details:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update customer contra details.",
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+  };
+
+  const onSave = async (prop) => {
+    // if (id && slug !== "clone") {
+    //   // Selection Order (Pass Selection Order)
+    //   await updateItem({
+    //     ...prop,
+    //     selectionOrder: selectionOrder, // Pass selection order to updateItem
+    //   });
+      
+    //   revalidateCustomerContraDetails();
+    // } else {
+      // Handle new records (creating new contra)
+      let selectedRows = Array(0);
+
+      // Selection Order (Logic)
+      if (prop.table) {
+        const selectedRowsMap = new Map(
+          prop.table.getSelectedRowModel().rows.map(row => [row.id, row])
+        );
+
+        selectedRows = selectionOrder
+          .filter(rowId => selectedRowsMap.has(rowId))
+          .map(rowId => selectedRowsMap.get(rowId));
+      } else {
+        selectedRows.push(prop.row);
+      }
+
+      // Selection Order (Add items in selection order)
+      selectedRows.forEach((row, index) => {
+        const selectedInvoice = row.original;
+        const newRow = {
+          UUID: "",
+          seq: (index + 1).toString(),
+          salesPurchaseContra: "",
+          salesInvoice: itemType === "salesInvoice" ? selectedInvoice.UUID : "",
+          purchaseInvoice: itemType === "purchaseInvoice" ? selectedInvoice.UUID : "",
+          docNo: selectedInvoice.docNo,
+          docDateFormat: selectedInvoice.docDateFormat,
+          docDate: selectedInvoice.docDate,
+          description: selectedInvoice.description || "",
+          outstanding: Number(selectedInvoice.totalPayable || 0),
+          contraAmount: Number(selectedInvoice.totalPayable || 0),
+          valid: "1",
+          docType: itemType, // Add docType field
+        };
+
+        setTempRowCustomerContraDetailsListData(newRow, false);
+      });
+
+      toast({
+        title: "Success",
+        description: `${selectedRows.length} ${itemType === "salesInvoice" ? "sales invoice(s)" : "purchase invoice(s)"} added successfully.`,
+        duration: 2000,
+      });
+   // }
+
+    if (prop.table) {
+      prop.table.resetRowSelection();
+
+      // Selection Order (Reset)
+      setSelectionOrder([]);
+    }
+
+    setOpen(false);
+  };
+
+  // Selection Order (Handler)
+  const onInvoiceRowSelection = (row: Row<SalesInvoice | PurchaseInvoice>) => (event: React.MouseEvent) => {
+    const isSelected = row.getIsSelected();
+    
+    // Handle selection order
+    if (isSelected) {
+      // Deselecting - remove from order
+      setSelectionOrder(prev => prev.filter(id => id !== row.id));
+    } else {
+      // Selecting - add to end of order
+      setSelectionOrder(prev => [...prev, row.id]);
+    }
+
+    row.toggleSelected();
+  };
+
+  // Initial load when dialog opens
+  useEffect(() => {
+    if (open) {
+      fetchInvoiceData(itemType);
+    }
+  }, [open]);
+
+  // Handle table state changes (pagination, sorting, filtering) - but not item type changes
+  useEffect(() => {
+    if (open) {
+      fetchInvoiceData(itemType, table);
+    }
+  }, [pagination, sorting, columnFilters]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen} className="mx-2">
+      <DialogContent className="min-h-[75vh] min-w-[75vw] max-w-3xl bg-erp-blue-3 p-2">
+        <div className="flex flex-row">
+          <div className="h-[73cqh] w-full p-2">
+            <div className="flex h-[70cqh] flex-col bg-erp-blue-3 @container-[size]">
+              <h2 className="text-sm font-bold">
+                Select Item
+              </h2>
+              <ItemPopoverToolbar
+                table={table}
+                itemType={itemType}
+                setItemType={setItemType}
+                fetchInvoiceData={(type) => {
+                  // Only fetch if type is actually different
+                  if (type !== itemType) {
+                    setItemType(type);
+                    fetchInvoiceData(type);
+                  }
+                }}
+                onSelect={() => {}}
+                selectedRows={table.getSelectedRowModel().rows}
+                setOpen={setOpen}
+                handleSave={onSave}
+                revalidateCustomerContraDetails={() => fetchInvoiceData(itemType, table)}
+                setSelectedRow={setSelectedRow}
+                saveDisabled={saveDisabled}
+                setSaveDisabled={setSaveDisabled}
+                isLoading={isLoading}
+                totalCount={totalCount}
+              />
+              <Separator className="bg-erp-blue-11" />
+              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                {/* Mobile View (Data Table) */}
+                <MobilePopoverDataTable
+                  table={table}
+                  headerFields={["docNo", itemType === "salesInvoice" ? "customerName" : "supplierName"]}
+                  initialVisibleFields={4}
+                  excludeFromGrid={["docNo"]}
+                  showSelection={true}
+                  selectionLabel="Select"
+                />
+
+                {/* Web View (Data Table) */}
+                <div className="hidden md:block">
+                  {/* Column Drag and Drop and Resize (DND Context) */}
+                  <DndContext
+                    collisionDetection={closestCenter}
+                    modifiers={[restrictToHorizontalAxis]}
+                    onDragEnd={(event) => handleDndDragEnd(event, setCurrentColumnOrder)}
+                    sensors={sensors}
+                  >
+                    {/* Column Drag and Drop and Resize (Table) */}
+                    <Table 
+                      className="table-fixed border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1"
+                      style={{ ...columnSizeVars, width: table.getTotalSize() }}
+                    >
+                      <TableHeader className="sticky top-0 z-10">
+                        {table.getHeaderGroups().map((headerGroup) => (
+                          <TableRow key={headerGroup.id}>
+                            {/* Column Drag and Drop and Resize (Sortable Context) */}
+                            <SortableContext
+                              items={currentColumnOrder}
+                              strategy={horizontalListSortingStrategy}
+                            >
+                              {headerGroup.headers.map((header) => (
+                                // Column Drag and Drop and Resize (Dragable Table Head)
+                                <DragableTableHead
+                                  key={header.id}
+                                  header={header}
+                                  className="bg-erp-blue-11 font-normal"
+                                  style={{
+                                    width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                                  }}
+                                >
+                                  {header.column.id === "valid" ? (
+                                    <TableHeadValidityFilter table={table} />
+                                  ) : (
+                                    <TableHeadColumnTextFilter column={header.column} table={table} />
+                                  )}
+                                  <ColumnResizer header={header} />
+                                </DragableTableHead>
+                              ))}
+                            </SortableContext>
+                          </TableRow>
+                        ))}
+                      </TableHeader>
+                      {/* Column Drag and Drop and Resize (Table Body) */}
+                      {table.getState().columnSizingInfo.isResizingColumn ? (
+                        <MemoizedTableBody
+                          table={table}
+                          onInvoiceRowSelection={onInvoiceRowSelection}
+                          isLoading={isLoading}
+                          currentColumns={currentColumns}
+                        />
+                      ) : (
+                        <NonMemoizedTableBody
+                          table={table}
+                          onInvoiceRowSelection={onInvoiceRowSelection}
+                          isLoading={isLoading}
+                          currentColumns={currentColumns}
+                        />
+                      )}
+                    </Table>
+                  </DndContext>
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Column Drag and Drop and Resize (Table Body)
+type TableBodyProps = {
+  table: TableType<SalesInvoice | PurchaseInvoice>;
+  onInvoiceRowSelection: (
+    row: Row<SalesInvoice | PurchaseInvoice>
+  ) => (event: MouseEvent<HTMLTableRowElement>) => void;
+  isLoading: boolean;
+  currentColumns: ColumnDef<SalesInvoice | PurchaseInvoice>[];
+};
+
+function NonMemoizedTableBody({ table, onInvoiceRowSelection, isLoading, currentColumns }: TableBodyProps) {
+  return (
+    <TableBody>
+      {isLoading ? (
+        <TableRow>
+          <TableCell colSpan={currentColumns.length} className="h-24 text-center">
+            Loading...
+          </TableCell>
+        </TableRow>
+      ) : table.getRowModel().rows?.length ? (
+        table.getRowModel().rows.map((row) => (
+          <TableRow
+            className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+            data-state={row.getIsSelected() && "selected"}
+            onClick={onInvoiceRowSelection(row)}
+            key={row.id}
+          >
+            {row.getVisibleCells().map((cell) => (
+              <TableCell 
+                key={cell.id}
+                className="truncate"
+                title={(cell.getValue() ?? "").toString()}
+                style={{
+                  width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                  minWidth: cell.column.columnDef.minSize,
+                }}
+              >
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </TableCell>
+            ))}
+          </TableRow>
+        ))
+      ) : (
+        <NoResultsTableRow columns={currentColumns} />
+      )}
+    </TableBody>
+  );
+}
+
+const MemoizedTableBody = memo(
+  NonMemoizedTableBody,
+  (prev, next) => prev.table.options.data === next.table.options.data
+) as typeof NonMemoizedTableBody;

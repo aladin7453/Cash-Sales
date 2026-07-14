@@ -1,0 +1,154 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
+import { data as agreementData } from "../Agreement/data";
+
+import type { Dispatch, SetStateAction } from "react";
+
+import type { Agreement } from "../Agreement/columns";
+
+type Props = {
+  open: boolean;
+  setOpen: Dispatch<SetStateAction<boolean>>;
+  rowId?: string;
+};
+
+const agreementFormSchema = z.object({
+  docNo: z.string().min(2, {
+    message: "Doc. No. must be at least 2 characters.",
+  }),
+  docDate: z.string().min(2, {
+    message: "Please select a date.",
+  }),
+  description: z.string().min(2, {
+    message: "Description must be at least 2 characters.",
+  }),
+  validity: z.union([z.literal(0), z.literal(1)]).default(1),
+});
+
+function getAgreementDetailsById(id: string): Agreement | undefined {
+  return agreementData.find((agreement) => agreement.docNo === id);
+}
+
+export default function AgreementDetailsFormPopover({
+  open,
+  setOpen,
+  rowId,
+}: Props) {
+  const data = rowId !== undefined ? getAgreementDetailsById(rowId) : null;
+  const form = useForm<z.infer<typeof agreementFormSchema>>({
+    resolver: zodResolver(agreementFormSchema),
+    defaultValues: {
+      docNo: data?.docNo ?? "",
+      docDate: data?.docDate ?? "",
+      description: data?.description ?? "",
+      validity: data?.validity ?? 1,
+    },
+  });
+
+  const onSubmit = (values: z.infer<typeof agreementFormSchema>) => {};
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen} className="m-2">
+      <DialogContent className="max-w-6xl bg-erp-blue-3 p-2">
+        <Form {...form}>
+          <form className="space-y-2" onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="flex items-center justify-between pr-4">
+              <div className="grid auto-cols-fr grid-flow-col gap-x-1.5">
+                <SaveButton />
+                <ResetButton />
+                <DialogClose asChild>
+                  <CancelButton />
+                </DialogClose>
+              </div>
+              <FormField
+                control={form.control}
+                name="validity"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-x-1.5 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value === 1}
+                        onCheckedChange={(state) =>
+                          field.onChange(state ? 1 : 0)
+                        }
+                      />
+                    </FormControl>
+                    <FormLabel>Valid</FormLabel>
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="space-y-2.5 bg-white p-3 pt-2">
+              <h2 className="text-sm font-bold">Agreement Details</h2>
+              <div className="grid grid-flow-col-dense grid-cols-2 grid-rows-2 gap-x-6 gap-y-2.5">
+                <FormField
+                  control={form.control}
+                  name="docNo"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Doc. No.:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="docDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Doc. Date.:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem className="row-span-2 flex flex-col space-y-1">
+                      <FormLabel>Description:</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          className="h-full"
+                          defaultValue={field.value}
+                          maxLength={100}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

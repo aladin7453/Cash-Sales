@@ -1,0 +1,88 @@
+import * as React from "react";
+import { cn } from "@/lib/utils/cn";
+import { toast } from "@/components/ui/use-toast";
+import { ORIGIN, getAuthHeaders } from "@/lib/constants";
+import { getColumnLength } from "./columnLengthService";
+
+export interface TextareaProps
+  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  charLimit?: number;
+  moduleName?: string;
+  fieldName?: string;
+  columnName?: string;
+}
+
+const cache: Record<string, Record<string, number>> = {};
+const promiseCache: Record<string, Promise<void> | undefined> = {};
+const headers = getAuthHeaders();
+
+const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
+  (
+    {
+      className,
+      charLimit = 2000,
+      moduleName,
+      fieldName,
+      columnName,
+      ...props
+    },
+    ref
+  ) => {
+    const isDev = process.env.NODE_ENV === "development";
+    const [maxLength, setMaxLength] = React.useState<number | undefined>(
+      charLimit
+    );
+
+    React.useEffect(() => {
+      if (!moduleName || !fieldName) return;
+
+      getColumnLength(moduleName, headers).then((data) => {
+        const length = data[fieldName];
+
+        if (length === "text") {
+          setMaxLength(undefined); // no limit
+        } else {
+          setMaxLength(length ?? charLimit);
+        }
+      });
+    }, [moduleName, fieldName]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      if (maxLength && e.target.value.length > maxLength) {
+        const errorMessage =
+          !moduleName || !fieldName
+            ? `Exceeded the maximum length of ${maxLength} characters. Please shorten it and try again.`
+            : `The "${columnName}" exceeds the maximum length of ${maxLength} characters. Please shorten it and try again.`;
+
+        toast({
+          title: "Truncation Error",
+          description: errorMessage,
+          variant: "destructive",
+          duration: 4000,
+        });
+
+        e.target.value = e.target.value.substring(0, maxLength);
+      }
+
+      if (props.onChange) {
+        props.onChange(e);
+      }
+    };
+
+    return (
+      <textarea
+        className={cn(
+          "flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50",
+          className
+        )}
+        ref={ref}
+        {...props}
+        onChange={handleChange}
+      />
+    );
+  }
+);
+
+Textarea.displayName = "Textarea";
+
+export { Textarea };

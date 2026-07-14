@@ -1,0 +1,26 @@
+import { assetSection } from "./sections/asset";
+import { jobSection } from "./sections/job";
+import { organizationSection } from "./sections/organization";
+import { purchaseSection } from "./sections/purchase";
+import { salesSection } from "./sections/sales";
+import { serviceSection } from "./sections/service";
+import { stockSection } from "./sections/stock";
+
+import type { Action } from "./DataTable";
+
+export type Section = {
+  access: string;
+  hasScope?: boolean;
+  allowedActions?: Array<Action>;
+  children?: Section[];
+};
+
+export const sections: Section[] = [
+  organizationSection,
+  salesSection,
+  jobSection,
+  purchaseSection,
+  assetSection,
+  stockSection,
+  serviceSection,
+];

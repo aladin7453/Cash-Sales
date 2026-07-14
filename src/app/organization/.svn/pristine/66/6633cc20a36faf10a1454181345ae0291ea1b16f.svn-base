@@ -1,0 +1,1005 @@
+"use client";
+
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { arrayMove, horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { CalendarIcon } from "lucide-react";
+import moment from "moment";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { FaCircleInfo, FaMagnifyingGlass, FaSort, FaSortDown, FaSortUp } from "react-icons/fa6";
+
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { DATE_FORMAT, DEFAULT_DATA_TABLE_PAGE_SIZE, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { cn } from "@/lib/utils/cn";
+
+import AssetAssignmentLogPopover from "./AssetAssignmentLogPopover";
+import AssetAssignmentDetailsDataTableToolbar from "./DataTableToolbar";
+
+import type { ColumnDef, Row, SortingState } from "@tanstack/react-table";
+
+import type { AssetAssignmentDetails } from "./columns";
+
+type AssetAssignmentDetailsDataTableProps = {
+  slug: string;
+  columns: ColumnDef<AssetAssignmentDetails>[];
+  tempRowAssetAssignmentDetails: AssetAssignmentDetails[];
+  data: AssetAssignmentDetails[];
+  setTempRowAssetAssignmentDetails: (data: any) => void;
+  revalidateAssetAssignmentDetails: () => void;
+};
+
+const COLUMN_VISIBILITY_KEY = "asset-assignment.details.bs.table.columns";
+const COLUMN_ORDER_KEY = "asset-assignment.details.bs.table.ordering";
+const COLUMN_SIZING_KEY = "asset-assignment.details.bs.table.sizing";
+
+export default function AssetAssignmentDetailsDataTable({
+  slug,
+  columns,
+  data,
+  tempRowAssetAssignmentDetails,
+  setTempRowAssetAssignmentDetails,
+  revalidateAssetAssignmentDetails,
+}: AssetAssignmentDetailsDataTableProps) {
+  // DnD and column sizing state
+  const initialColumnOrder =
+    columns?.filter((column) => column?.id).map((column) => column.id!) || [];
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      return JSON.parse(
+        localStorage.getItem(COLUMN_ORDER_KEY) || JSON.stringify(initialColumnOrder),
+      );
+    }
+    return initialColumnOrder;
+  });
+  const [columnSizing, setColumnSizing] = useState<Record<string, number>>(() => {
+    if (typeof window !== "undefined") {
+      return JSON.parse(localStorage.getItem(COLUMN_SIZING_KEY) || "{}");
+    }
+    return {};
+  });
+  const headers = getAuthHeaders();
+  const [showTableAssetCode, setShowTableAssetCode] = useState(false); // State to control visibility of the table
+  const [showTableLocationCode, setShowTableLocationCode] = useState(false);
+  const [showTableStockBatch, setShowTableStockBatch] = useState(false);
+  const [showTableProjectCode, setShowTableProjectCode] = useState(false);
+  const [showTableAssignee, setShowTableAssignee] = useState(false);
+  const [showTableAssetAssign, setShowTableAssetAssign] = useState(false);
+
+  const [assetCodeDropdownTableData, setAssetCodeDropdownTableData] = useState([]);
+  const [projectCodeDropdownTableData, setProjectCodeDropdownTableData] = useState([]);
+  const [assigneeDropdownTableData, setAssigneeDropdownTableData] = useState([]);
+  const [locationCodeDropdownData, setLocationCodeDropdownData] = useState([]);
+  const [stockBatchDropdownData, setStockBatchDropdownData] = useState([]);
+  const [assetAssignDropdownData, setAssetAssignDropdownData] = useState([]);
+
+  const [logTableData, setLogTableData] = useState([]);
+
+  const dropdownAssetCodeColumns = [
+    { accessorKey: "assetCode", header: "Asset Code" },
+    { accessorKey: "asset", header: "Asset Name" },
+    { accessorKey: "description", header: "Description" },
+  ];
+  const dropdownProjectCodeColumns = [
+    { accessorKey: "projectCode", header: "Project Code" },
+    { accessorKey: "description", header: "Description" },
+  ];
+  const dropdownAssigneeColumns = [
+    { accessorKey: "fullName", header: "Name" },
+    { accessorKey: "description", header: "Description" },
+  ];
+  const dropdownLocationCodeColumns = [
+    { accessorKey: "locationCode", header: "Location Code" },
+    { accessorKey: "description", header: "Description" },
+  ];
+  const dropdownStockBatchColumns = [
+    { accessorKey: "stockBatchCode", header: "Stock Batch Code" },
+    { accessorKey: "description", header: "Description" },
+  ];
+  const dropdownAssetAssignColumns = [
+    { accessorKey: "docNo", header: "Asset Assignment" },
+    { accessorKey: "docDateFormat", header: "Doc Date" },
+    { accessorKey: "description", header: "Description" },
+  ];
+
+  const inputRef = useRef(null);
+  const assetCodeDropdownRef = useRef(null);
+  const projectCodeDropdownRef = useRef(null);
+  const locationCodeDropdownRef = useRef(null);
+  const assigneeDropdownRef = useRef(null);
+  const stockBatchDropdownRef = useRef(null);
+  const assetAssignDropdownRef = useRef(null);
+
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  const handleClickOutside = (event) => {
+    if (
+      assetCodeDropdownRef.current &&
+      !assetCodeDropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableAssetCode(false);
+    }
+    if (
+      projectCodeDropdownRef.current &&
+      !projectCodeDropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableProjectCode(false);
+    }
+    if (
+      locationCodeDropdownRef.current &&
+      !locationCodeDropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableLocationCode(false);
+    }
+    if (
+      stockBatchDropdownRef.current &&
+      !stockBatchDropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableStockBatch(false);
+    }
+    if (
+      assigneeDropdownRef.current &&
+      !assigneeDropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableAssignee(false);
+    }
+    if (
+      assetAssignDropdownRef.current &&
+      !assetAssignDropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableAssetAssign(false);
+    }
+  };
+
+  const [showAssignmentLogForm, setShowAssignmentLogForm] = useState(false);
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (slug !== "clone" || !data?.length) return;
+
+    setTempRowAssetAssignmentDetails((prev) => {
+      const isAlreadyCleared = prev.every((row) => !row.UUID && !row.user && !row.fullName);
+      if (isAlreadyCleared) return prev;
+
+      return data.map((row) => ({
+        ...row,
+        UUID: "",
+        user: "",
+        fullName: "",
+      }));
+    });
+  }, [slug, data]);
+
+  const toggleTableAssetCode = async (index) => {
+    setShowTableAssetCode((prevState) => {
+      const newState = [...(prevState || [])];
+      newState[index] = !newState[index];
+      return newState;
+    });
+    setAssetCodeDropdownTableData([]);
+    if (!showTableAssetCode[index]) {
+      // const formData = new FormData();
+      // const asset = "asset";
+      // formData.append('table[]', asset);
+
+      // console.log(selectedTempAsset)
+      try {
+        const link = id
+          ? `${ORIGIN}/asset_assign/api/asset-assign/get-asset-drop-down?id=${id}`
+          : `${ORIGIN}/asset_assign/api/asset-assign/get-asset-drop-down`;
+        const response = await fetch(link, {
+          method: "POST",
+          headers,
+          // body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch stock drop-down data");
+        }
+        const assetData = await response.json();
+        const selectedTempAsset = tempRowAssetAssignmentDetails.map((item) => {
+          return item.asset;
+        });
+        const filteredDataSelected = assetData.rows.filter(
+          (item: { UUID: any }) => !selectedTempAsset.includes(item.UUID),
+        ); //prevent select same asset again
+        setAssetCodeDropdownTableData(filteredDataSelected);
+      } catch (error) {
+        console.error("Error fetching stock drop-down data:", error);
+      }
+    }
+  };
+
+  const toggleTableProjectCode = async (index) => {
+    setShowTableProjectCode((prevState) => {
+      const newState = [...(prevState || [])];
+      newState[index] = !newState[index];
+      return newState;
+    });
+
+    if (!showTableProjectCode[index]) {
+      const formData = new FormData();
+      const project = "project";
+      formData.append("table[]", project);
+
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch stock drop-down data");
+        }
+        const projectData = await response.json();
+        setProjectCodeDropdownTableData(projectData.rows);
+      } catch (error) {
+        console.error("Error fetching stock drop-down data:", error);
+      }
+    }
+  };
+
+  const toggleTableLocationCode = async (index) => {
+    setShowTableLocationCode((prevState) => {
+      const newState = [...(prevState || [])];
+      newState[index] = !newState[index];
+      return newState;
+    });
+
+    if (!showTableLocationCode[index]) {
+      const formData = new FormData();
+      const location = "location";
+      formData.append("table[]", location);
+
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch stock drop-down data");
+        }
+        const locationData = await response.json();
+        setLocationCodeDropdownData(locationData.rows);
+      } catch (error) {
+        console.error("Error fetching stock drop-down data:", error);
+      }
+    }
+  };
+
+  const toggleTableAssignee = async (index) => {
+    setShowTableAssignee((prevState) => {
+      const newState = [...(prevState || [])];
+      newState[index] = !newState[index];
+      return newState;
+    });
+
+    if (!showTableProjectCode[index]) {
+      const formData = new FormData();
+      const user = "user";
+      formData.append("table[]", user);
+
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch stock drop-down data");
+        }
+        const assigneeData = await response.json();
+        setAssigneeDropdownTableData(assigneeData.rows);
+      } catch (error) {
+        console.error("Error fetching stock drop-down data:", error);
+      }
+    }
+  };
+
+  const toggleTableAssetAssign = async (index) => {
+    setShowTableAssetAssign((prevState) => {
+      const newState = [...(prevState || [])];
+      newState[index] = !newState[index];
+      return newState;
+    });
+
+    if (!showTableAssetAssign[index]) {
+      const formData = new FormData();
+      const assetAssign = "assetAssign";
+      formData.append("table[]", assetAssign);
+
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch asset assign drop-down data");
+        }
+        const assetAssignData = await response.json();
+        setAssetAssignDropdownData(assetAssignData.rows);
+      } catch (error) {
+        console.error("Error fetching asset assign drop-down data:", error);
+      }
+    }
+  };
+
+  const onClickRowAssetCode = (row, rowIndex) => {
+    // Create an object to hold the selected row data
+    // const decodedAttch = row.attachment ? JSON.parse(row.attachment) : [];
+    // const decodedAttchString = decodedAttch
+    //   .map((item) => {
+    //     return item.Name;
+    //   })
+    //   .join(",");
+
+    const selectedRowAsssetCodeData = {
+      UUID: "",
+      asset: row.UUID,
+      assetCode: row.assetCode,
+      // attachment: decodedAttchString,
+      locationCode: row.location,
+      condition: row.condition,
+      locationCodeCode: row.locationCode,
+      // quantity: row.quantity,
+      // remark1: row.remark1,
+      // remark2: row.remark2,
+    };
+
+    const updatedTempRowAssetAssignmentDetails = (index, newData) => {
+      setTempRowAssetAssignmentDetails((prevData) => {
+        var updatedData = [...prevData];
+        updatedData[index] = { ...updatedData[index], ...newData };
+        return updatedData;
+      });
+    };
+
+    updatedTempRowAssetAssignmentDetails(rowIndex, selectedRowAsssetCodeData);
+    setShowTableAssetCode(false);
+    inputRef.current.value = row.assetCode;
+  };
+
+  const onClickRowProjectCode = (row, rowIndex) => {
+    // Create an object to hold the selected row data
+    const selectedRowProjectData = {
+      projectCode: row.projectCode,
+      project: row.UUID,
+    };
+
+    const updatedTempRowAssetAssignmentDetails = (index, newData) => {
+      setTempRowAssetAssignmentDetails((prevData) => {
+        var updatedData = [...prevData];
+        updatedData[index] = { ...updatedData[index], ...newData };
+        return updatedData;
+      });
+    };
+
+    updatedTempRowAssetAssignmentDetails(rowIndex, selectedRowProjectData);
+    setShowTableProjectCode(false);
+    inputRef.current.value = row.projectCode;
+  };
+
+  const onClickRowAssetAssign = (row, rowIndex) => {
+    // Create an object to hold the selected row data
+    const selectedRowAssetAssignData = {
+      assetAssignment: row.docNo,
+      assetAssign: row.UUID,
+    };
+
+    const updatedTempRowAssetAssignmentDetails = (index, newData) => {
+      setTempRowAssetAssignmentDetails((prevData) => {
+        var updatedData = [...prevData];
+        updatedData[index] = { ...updatedData[index], ...newData };
+        return updatedData;
+      });
+    };
+
+    updatedTempRowAssetAssignmentDetails(rowIndex, selectedRowAssetAssignData);
+    setShowTableAssetAssign(false);
+    inputRef.current.value = row.assetAssignment;
+  };
+
+  const onClickRowAssignee = (row, rowIndex) => {
+    // Create an object to hold the selected row data
+    const selectedRowAssigneeData = {
+      fullName: row.fullName,
+      user: row.UUID,
+    };
+
+    const updatedTempRowAssetAssignmentDetails = (index, newData) => {
+      setTempRowAssetAssignmentDetails((prevData) => {
+        var updatedData = [...prevData];
+        updatedData[index] = { ...updatedData[index], ...newData };
+        return updatedData;
+      });
+    };
+
+    updatedTempRowAssetAssignmentDetails(rowIndex, selectedRowAssigneeData);
+    setShowTableAssignee(false);
+    inputRef.current.value = row.projectCode;
+  };
+
+  const updatedTempRowAssetAssignmentDetailsForInput = (index, newData) => {
+    setTempRowAssetAssignmentDetails((prevData) => {
+      var updatedData = [...prevData];
+      updatedData[index] = newData;
+
+      return updatedData;
+    });
+  };
+
+  const onClickRowLocationCode = (row, rowIndex) => {
+    const selectedRowLocationData = {
+      locationCode: row.UUID,
+      locationCodeCode: row.locationCode,
+    };
+
+    const updatedTempRowAssetAssignmentDetails = (index, newData) => {
+      setTempRowAssetAssignmentDetails((prevData) => {
+        const updatedData = [...prevData];
+        updatedData[index] = { ...updatedData[index], ...newData };
+        return updatedData;
+      });
+    };
+
+    updatedTempRowAssetAssignmentDetails(rowIndex, selectedRowLocationData);
+
+    setShowTableLocationCode(false);
+  };
+
+  function setTempRowAssetAssignmentDetailsData(data: any, overwrite: boolean) {
+    if (overwrite) {
+      setTempRowAssetAssignmentDetails(data);
+    } else {
+      setTempRowAssetAssignmentDetails((tempRowAssetAssignmentDetails) => [
+        ...tempRowAssetAssignmentDetails,
+        data,
+      ]);
+    }
+  }
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
+    if (typeof window !== "undefined") {
+      return JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}");
+    }
+    return {};
+  });
+  const table = useReactTable({
+    columns,
+    data,
+    state: { sorting, columnVisibility, columnOrder, columnSizing },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+    autoResetPageIndex: false,
+    columnResizeMode: "onChange",
+    enableColumnResizing: true,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      columnVisibility: JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}"),
+      columnOrder: JSON.parse(
+        localStorage.getItem(COLUMN_ORDER_KEY) || JSON.stringify(initialColumnOrder),
+      ),
+      columnSizing: JSON.parse(localStorage.getItem(COLUMN_SIZING_KEY) || "{}"),
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      },
+    },
+  });
+
+  useEffect(() => {
+    localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(columnOrder));
+  }, [columnOrder]);
+  useEffect(() => {
+    localStorage.setItem(COLUMN_SIZING_KEY, JSON.stringify(columnSizing));
+  }, [columnSizing]);
+
+  useEffect(() => {
+    localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<string>("");
+
+  usePreventShiftTextSelect();
+
+  const openDialog = (row) => {
+    setSelectedRow(row.original);
+    setDialogOpen(true);
+  };
+  const onDoubleClick = (row: Row<AssetAssignmentDetails>) => {
+    setDialogOpen(false);
+    setSelectedRow("");
+    openDialog(row);
+  };
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  useEffect(() => {
+    if (dialogOpen === false) {
+      setSelectedRow("");
+    }
+  }, [dialogOpen]);
+
+  const onOpenLog = (row) => {
+    toggleAssignmentLog(row);
+    setShowAssignmentLogForm(true);
+  };
+
+  const toggleAssignmentLog = async (row) => {
+    const UUID = row.asset;
+
+    try {
+      const response = await fetch(
+        `${ORIGIN}/asset_assign/api/asset-assign/get-assign-log?id=${id}&assetUUID=${UUID}`,
+        {
+          method: "GET",
+          headers,
+        },
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch asset assign log data");
+      }
+      const logData = await response.json();
+      setLogTableData(logData.rows);
+    } catch (error) {
+      console.error("Error fetching asset assign log data:", error);
+    }
+  };
+
+  return (
+    <Card className="h-auto shadow-md">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg font-bold">Asset Assignment Details</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[55cqh]">
+          <div className="flex h-[55cqh] flex-col bg-erp-blue-3 @container-[size]">
+            <AssetAssignmentDetailsDataTableToolbar
+              table={table}
+              setTempRowAssetAssignmentDetailsData={setTempRowAssetAssignmentDetailsData}
+              setTempRowAssetAssignmentDetails={setTempRowAssetAssignmentDetails}
+              tempRowAssetAssignmentDetails={tempRowAssetAssignmentDetails}
+              revalidateAssetAssignmentDetails={revalidateAssetAssignmentDetails}
+            />
+            <Separator className="bg-erp-blue-11" />
+            <ScrollArea className="h-[90cqh] bg-erp-gray-3">
+              <DndContext
+                collisionDetection={closestCenter}
+                modifiers={[restrictToHorizontalAxis]}
+                onDragEnd={({ active, over }) => {
+                  if (active && over && active.id !== over.id) {
+                    setColumnOrder((prev) => {
+                      const oldIndex = prev.indexOf(active.id as string);
+                      const newIndex = prev.indexOf(over.id as string);
+                      return arrayMove(prev, oldIndex, newIndex);
+                    });
+                  }
+                }}
+                sensors={useDndSensors()}
+              >
+                <Table
+                  className="border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1"
+                  style={{
+                    ...useColumnSizeVars(table),
+                    width: table.getTotalSize(),
+                  }}
+                >
+                  <TableHeader className="sticky top-0">
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id}>
+                        <SortableContext
+                          items={columnOrder}
+                          strategy={horizontalListSortingStrategy}
+                        >
+                          {headerGroup.headers.map((header) => (
+                            <DragableTableHead
+                              key={header.id}
+                              header={header}
+                              className="bg-erp-blue-11 font-normal"
+                              style={{
+                                width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                              }}
+                            >
+                              {header.column.id === "validity" ? (
+                                <TableHeadValidityFilter table={table} />
+                              ) : (
+                                <TableHeadColumnTextFilter column={header.column} table={table} />
+                              )}
+                              <ColumnResizer header={header} />
+                            </DragableTableHead>
+                          ))}
+                        </SortableContext>
+                      </TableRow>
+                    ))}
+                  </TableHeader>
+                  <TableBody>
+                    {table.getRowModel().rows?.length ? (
+                      table.getRowModel().rows.map((row, rowIndex) => (
+                        <TableRow
+                          className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+                          data-state={row.getIsSelected() && "selected"}
+                          onClick={onRowSelection(row)}
+                          key={row.id}
+                        >
+                          {row.getVisibleCells().map((cell, index) => (
+                            <TableCell key={cell.id}>
+                              <div className="relative">
+                                {/* ...existing dropdown and cell logic... */}
+                                {cell.column.id === "assetCode" ? (
+                                  <>
+                                    <Input
+                                      className="h-7.5 pr-8"
+                                      onClick={() => toggleTableAssetCode(rowIndex)}
+                                      value={cell.getValue() ? cell.getValue() : ""}
+                                      ref={inputRef}
+                                      autoComplete="off"
+                                    />
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                      <FaMagnifyingGlass className="text-gray-400" />
+                                    </div>
+                                  </>
+                                ) : cell.column.id === "projectCode" ? (
+                                  <>
+                                    <Input
+                                      className="h-7.5 pr-8"
+                                      onClick={() => toggleTableProjectCode(rowIndex)}
+                                      value={cell.getValue() ? cell.getValue() : ""}
+                                      ref={inputRef}
+                                      autoComplete="off"
+                                    />
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                      <FaMagnifyingGlass className="text-gray-400" />
+                                    </div>
+                                  </>
+                                ) : cell.column.id === "locationCodeCode" ? (
+                                  <>
+                                    <Input
+                                      className="h-7.5 pr-8"
+                                      onClick={() => toggleTableLocationCode(rowIndex)}
+                                      value={cell.getValue() ? cell.getValue() : ""}
+                                      ref={inputRef}
+                                      autoComplete="off"
+                                    />
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                      <FaMagnifyingGlass className="text-gray-400" />
+                                    </div>
+                                  </>
+                                ) : cell.column.id === "assetAssignment" ? (
+                                  <>
+                                    <Input
+                                      className="h-7.5 pr-8"
+                                      onClick={() => toggleTableAssetAssign(rowIndex)}
+                                      value={cell.getValue() ? cell.getValue() : ""}
+                                      ref={inputRef}
+                                      autoComplete="off"
+                                    />
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                      <FaMagnifyingGlass className="text-gray-400" />
+                                    </div>
+                                  </>
+                                ) : cell.column.id === "assignmentLog" ? (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      className="mx-auto flex items-center justify-center"
+                                      onClick={() => {
+                                        onOpenLog(row.original);
+                                      }}
+                                    >
+                                      <FaCircleInfo className="cursor-pointer" />
+                                    </Button>
+                                    <AssetAssignmentLogPopover
+                                      open={showAssignmentLogForm}
+                                      onOpenChange={setShowAssignmentLogForm}
+                                      setOpen={setShowAssignmentLogForm}
+                                      logTableData={logTableData}
+                                    />
+                                  </>
+                                ) : cell.column.id === "fullName" ? (
+                                  <>
+                                    <Input
+                                      className="h-7.5 pr-8"
+                                      onClick={() => toggleTableAssignee(rowIndex)}
+                                      value={cell.getValue() ? cell.getValue() : ""}
+                                      ref={inputRef}
+                                      autoComplete="off"
+                                    />
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                      <FaMagnifyingGlass className="text-gray-400" />
+                                    </div>
+                                  </>
+                                ) : cell.column.id === "assignAt" ? (
+                                  <>
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <Button
+                                          className={cn(
+                                            "flex h-7.5 w-full",
+                                            !cell.getValue() && "text-muted-foreground",
+                                          )}
+                                          variant="outline"
+                                          size="sm"
+                                          // disabled={!!field.value}
+                                        >
+                                          {cell.getValue()
+                                            ? moment.unix(cell.getValue()).format(DATE_FORMAT)
+                                            : "Pick a date"}
+                                          <CalendarIcon className="ml-auto h-4 w-4" />
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                          mode="single"
+                                          // disabled={methodValue === "Lease In"}
+                                          selected={
+                                            cell.getValue()
+                                              ? moment.unix(cell.getValue()).format(DATE_FORMAT)
+                                              : undefined
+                                          }
+                                          onSelect={(date) => {
+                                            const unixTimestamp = date
+                                              ? Math.floor(date.getTime() / 1000)
+                                              : null;
+                                            // field.onChange(unixTimestamp?.toString());
+                                            var rowData = row.original;
+                                            rowData["assignAt"] = unixTimestamp?.toString();
+
+                                            updatedTempRowAssetAssignmentDetailsForInput(
+                                              rowIndex,
+                                              rowData,
+                                            );
+                                          }}
+                                          // disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                          initialFocus
+                                          defaultMonth={
+                                            cell.getValue()
+                                              ? moment.unix(cell.getValue()).format(DATE_FORMAT)
+                                              : undefined
+                                          }
+                                        />
+                                      </PopoverContent>
+                                    </Popover>
+                                  </>
+                                ) : cell.column.id === "condition" ? (
+                                  <>
+                                    <Select
+                                      value={cell.getValue() ? cell.getValue() : ""}
+                                      onValueChange={(e) => {
+                                        const value = e;
+                                        var rowData = row.original;
+                                        rowData["condition"] = value;
+
+                                        updatedTempRowAssetAssignmentDetailsForInput(
+                                          rowIndex,
+                                          rowData,
+                                        );
+
+                                        // updateTempRowAssetAssignmentDetailsData(
+                                        //   latestData
+                                        //   , true);
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-7.5 w-full">
+                                        <SelectValue placeholder="Select Condition" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="New">New</SelectItem>
+                                        <SelectItem value="Good">Good</SelectItem>
+                                        <SelectItem value="Fair">Fair</SelectItem>
+                                        <SelectItem value="Poor">Poor</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </>
+                                ) : cell.column.id === "remark1" ? (
+                                  <>
+                                    <Input
+                                      className="h-7.5 pr-8"
+                                      value={cell.getValue() ? cell.getValue() : ""}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        var rowData = row.original;
+                                        rowData["remark1"] = value;
+
+                                        updatedTempRowAssetAssignmentDetailsForInput(
+                                          rowIndex,
+                                          rowData,
+                                        );
+
+                                        // updateTempRowAssetAssignmentDetailsData(
+                                        //   latestData
+                                        //   , true);
+                                      }}
+                                      autoComplete="off"
+                                      moduleName="assetAssignHasAsset"
+                                      fieldName="reamrk1"
+                                      columnName="Remark 1"
+                                    />
+                                  </>
+                                ) : cell.column.id === "remark2" ? (
+                                  <>
+                                    <Input
+                                      className="h-7.5 pr-8"
+                                      value={cell.getValue() ? cell.getValue() : ""}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        var rowData = row.original;
+                                        rowData["remark2"] = value;
+
+                                        updatedTempRowAssetAssignmentDetailsForInput(
+                                          rowIndex,
+                                          rowData,
+                                        );
+
+                                        // updateTempRowAssetAssignmentDetailsData(
+                                        //   latestData
+                                        //   , true);
+                                      }}
+                                      autoComplete="off"
+                                      moduleName="assetAssignHasAsset"
+                                      fieldName="reamrk2"
+                                      columnName="Remark 2"
+                                    />
+                                  </>
+                                ) : (
+                                  flexRender(cell.column.columnDef.cell, cell.getContext())
+                                )}
+
+                                {/* Dropdowns */}
+                                {cell.column.id === "assetCode" && showTableAssetCode[rowIndex] && (
+                                  <div
+                                    ref={assetCodeDropdownRef}
+                                    className="absolute top-full z-50 h-[100px] rounded border border-gray-200 bg-white shadow-md"
+                                  >
+                                    <ScrollArea className="h-[55cqh] bg-erp-gray-3">
+                                      <DropdownTable
+                                        index={rowIndex}
+                                        columns={dropdownAssetCodeColumns}
+                                        data={assetCodeDropdownTableData}
+                                        onClickRow={onClickRowAssetCode}
+                                      />
+                                    </ScrollArea>
+                                  </div>
+                                )}
+                                {cell.column.id === "assetAssignment" &&
+                                  showTableAssetAssign[rowIndex] && (
+                                    <div
+                                      ref={assetAssignDropdownRef}
+                                      className="absolute top-full z-50 h-[100px] rounded border border-gray-200 bg-white shadow-md"
+                                    >
+                                      <ScrollArea className="h-[55cqh] bg-erp-gray-3">
+                                        <DropdownTable
+                                          index={rowIndex}
+                                          columns={dropdownAssetAssignColumns}
+                                          data={assetAssignDropdownData}
+                                          onClickRow={onClickRowAssetAssign}
+                                        />
+                                      </ScrollArea>
+                                    </div>
+                                  )}
+                                {cell.column.id === "projectCode" &&
+                                  showTableProjectCode[rowIndex] && (
+                                    <div
+                                      ref={projectCodeDropdownRef}
+                                      className="absolute right-0 top-full z-50 h-[100px] rounded border border-gray-200 bg-white shadow-md"
+                                    >
+                                      <ScrollArea className="h-[55cqh] bg-erp-gray-3">
+                                        <DropdownTable
+                                          index={rowIndex}
+                                          columns={dropdownProjectCodeColumns}
+                                          data={projectCodeDropdownTableData}
+                                          onClickRow={onClickRowProjectCode}
+                                        />
+                                      </ScrollArea>
+                                    </div>
+                                  )}
+                                {cell.column.id === "fullName" && showTableAssignee[rowIndex] && (
+                                  <div
+                                    ref={assigneeDropdownRef}
+                                    className="absolute top-full z-50 h-[100px] rounded border border-gray-200 bg-white shadow-md"
+                                  >
+                                    <ScrollArea className="h-[55cqh] bg-erp-gray-3">
+                                      <DropdownTable
+                                        index={rowIndex}
+                                        columns={dropdownAssigneeColumns}
+                                        data={assigneeDropdownTableData}
+                                        onClickRow={onClickRowAssignee}
+                                      />
+                                    </ScrollArea>
+                                  </div>
+                                )}
+                                {cell.column.id === "locationCodeCode" &&
+                                  showTableLocationCode[rowIndex] && (
+                                    <div
+                                      ref={locationCodeDropdownRef}
+                                      className="absolute top-full z-50 h-[100px] rounded border border-gray-200 bg-white shadow-md"
+                                    >
+                                      <ScrollArea className="h-[55cqh] bg-erp-gray-3">
+                                        <DropdownTable
+                                          index={rowIndex}
+                                          columns={dropdownLocationCodeColumns}
+                                          data={locationCodeDropdownData}
+                                          onClickRow={(row) =>
+                                            onClickRowLocationCode(row, rowIndex)
+                                          }
+                                        />
+                                      </ScrollArea>
+                                    </div>
+                                  )}
+                              </div>
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))
+                    ) : (
+                      <NoResultsTableRow columns={columns} />
+                    )}
+                  </TableBody>
+                  <ScrollBar orientation="horizontal" />
+                </Table>
+              </DndContext>
+            </ScrollArea>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

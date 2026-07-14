@@ -1,0 +1,566 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { CalendarIcon } from "lucide-react";
+import { useWatch } from "react-hook-form";
+import SignaturePad from "react-signature-canvas";
+
+import { useSearchParams, useRouter } from "next/navigation";
+
+import { format, fromUnixTime } from "date-fns";
+
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import CalendarPicker from "@/components/form/CalendarPicker";
+import { Input } from "@/components/ui/input";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider
+} from "@/components/ui/tooltip";
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  CardTitle
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { cn } from "@/lib/utils/cn";
+import {
+  ORIGIN,
+  getAuthHeaders,
+  getCurrentAcc,
+  getCurrentAccount,
+  getCurrentCompanyUUID,
+  getCurrentCompany
+} from "@/lib/constants";
+
+import type { Agent } from "../../../columns";
+
+type Params = {
+  agent?: Agent | null;
+};
+
+const nationalityList = [{ label: "Malaysian", value: "Malaysian" }];
+const raceList = [{ label: "Others", value: "Others" }];
+const religionList = [{ label: "Others", value: "Others" }];
+const maritalStatusList = [
+  { label: "Single", value: "Single" },
+  { label: "Married", value: "Married" },
+  { label: "Others", value: "Others" },
+];
+
+export function OtherDetailForm({
+  agent,
+  customInformationData,
+  tempRowCustomInfo,
+  form,
+  pageAction
+}: Params) {
+  const headers = getAuthHeaders();
+  const currentAcc = getCurrentAcc();
+  const currentAccount = getCurrentAccount();
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  const [showTableCompany, setShowTableCompany] = useState(false);
+
+  const [companyDropdownTableData, setCompanyDropdownTableData] = useState([]);
+
+  const dropdownCompanyColumns = [{ accessorKey: "companyID", header: "Company Code", }, { accessorKey: "company", header: "Company", }, { accessorKey: "description", header: "Description", cell: ({ row }) => <DescriptionCellTooltip row={row} />, },];
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const [currentCompanyUUID, setCurrentCompanyUUID] = useState<string | null>(null);
+  const [currentCompany, setCurrentCompany] = useState<string | null>(null);
+  const currentCompanyID = getCurrentCompanyUUID();
+  const currentCompanyName = getCurrentCompany();
+
+  useEffect(() => {
+    const currentCompany = JSON.parse(localStorage.getItem("currentCompany") || "null");
+
+    if (currentCompany && currentCompany.UUID) {
+      form.setValue('company', currentCompany.UUID);
+      form.setValue('companyName', currentCompany.company);
+
+      setCurrentCompanyUUID(currentCompany.UUID);
+      setCurrentCompany(currentCompany.company);
+    } else {
+      setCurrentCompanyUUID(null);
+    }
+  }, [currentCompany]);
+
+  const handleClickOutside = (event) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target) && inputRef.current !== event.target) {
+      setShowTableCompany(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener('click', handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    const currentCompanyID = getCurrentCompanyUUID();
+    const currentCompanyName = getCurrentCompany();
+    if (!form.getValues("company")) {
+      form.setValue('company', currentCompanyID);
+    }
+
+    if (!form.getValues("companyName")) {
+      form.setValue('companyName', currentCompanyName);
+    }
+    // setCurrentCompanyUUID(currentCompanyID);
+    // setCurrentCompany(currentCompanyName);
+  }, []);
+
+
+  const toggleTableCompany = async () => {
+    const formData = new FormData();
+    const company = "company";
+
+    formData.append('table[]', company);
+
+    if (!showTableCompany) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/universal/get-all-drop-down-table-data`,
+          {
+            method: "POST",
+            headers,
+            body: formData,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch company drop-down data");
+        }
+
+        const companyData = await response.json();
+
+        setCompanyDropdownTableData(companyData.rows);
+        setShowTableCompany(true);
+      } catch (error) {
+        console.error("Error fetching company drop-down data:", error);
+      }
+    } else {
+      setShowTableCompany(false);
+    }
+  };
+
+  const onClickRowCompanyCode = (row) => {
+    form.setValue('company', row.UUID);
+    form.setValue('companyName', row.company);
+
+    setShowTableCompany(false);
+  }
+
+  const padRef = useRef<SignaturePad | null>(null);
+  const hasLoadedRef = useRef(false);
+
+  const signature = useWatch({
+    control: form.control,
+    name: "signature",
+  });
+
+  const handleEnd = () => {
+    if (!padRef.current) return;
+
+    if (padRef.current.isEmpty()) {
+      form.setValue("signature", "");
+      return;
+    }
+
+    const base64 = padRef.current.toDataURL("image/png");
+
+    form.setValue("signature", base64, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+
+  useEffect(() => {
+    if (!signature) return;
+    if (!padRef.current) return;
+
+    const pad = padRef.current;
+
+    if (!pad.isEmpty()) return;
+
+    const timer = setTimeout(() => {
+      pad.fromDataURL(signature);
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [signature]);
+
+  const handleClearSignature = () => {
+    padRef.current?.clear();
+    form.setValue("signature", "");
+  };
+
+  return (
+    <Form {...form}>
+      <form>
+        {/* Personal Details Section */}
+        <Card collapsible defaultCollapsed={false} className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold">Personal Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form>
+                <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6">
+                  <FormField
+                    control={form.control}
+                    name="nationality"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Nationality</FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger className="h-7.5 w-full">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {nationalityList &&
+                              nationalityList.map((item) => (
+                                <SelectItem key={item.value} value={item.value}>
+                                  {item.label}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="race"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1.5">
+                        <FormLabel>Race:</FormLabel>
+                        <FormControl>
+                          <Input
+                            className="h-7.5"
+                            {...field}
+                            moduleName="agent"
+                            fieldName="race"
+                            columnName="Race"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="religion"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1.5">
+                        <FormLabel>Religion:</FormLabel>
+                        <FormControl>
+                          <Input
+                            className="h-7.5"
+                            {...field}
+                            moduleName="agent"
+                            fieldName="religion"
+                            columnName="Religion"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="maritalStatus"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Marital Status:</FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger className="h-7.5 w-full">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {maritalStatusList &&
+                              maritalStatusList.map((item) => (
+                                <SelectItem key={item.value} value={item.value}>
+                                  {item.label}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="DOB"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>DOB:</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                className={cn(
+                                  "flex h-7.5 w-full",
+                                  !field.value && "text-muted-foreground",
+                                )}
+                                variant="outline"
+                                size="sm"
+                              >
+                                {field.value
+                                  ? format(fromUnixTime(+field.value), "yyyy-MM-dd")
+                                  : "Pick a date"}
+                                <CalendarIcon className="ml-auto h-4 w-4" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <CalendarPicker field={field} />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="NRIC"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>NRIC No.:</FormLabel>
+                        <FormControl>
+                          <Input
+                            className="h-7.5"
+                            maxLength={12}
+                            {...field}
+                            moduleName="agent"
+                            fieldName="NRIC"
+                            columnName="NRIC No."
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              // Only allow numbers
+                              if (/^\d*$/.test(value)) {
+                                form.setValue("NRIC", value);
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+
+        {/* Other Details Section */}
+        <Card collapsible defaultCollapsed={false} className="shadow-sm mt-2">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold">Other Details</CardTitle>
+          </CardHeader>
+
+          { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+          <CardContent>
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-3">
+              <FormField
+                control={form.control}
+                name="account"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7"
+                        {...field}
+                        value={currentAccount}
+                        readOnly={true}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="accountName"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Sys Acc:</FormLabel>
+                    <FormControl className="relative">
+                      <Input
+                        className="h-7.5 pr-8 bg-erp-gray-1 text-gray-500"
+                        {...field}
+                        value={currentAcc}
+                        readOnly={true}
+                        ref={inputRef}
+                        autoComplete="off"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="company"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} defaultValue={currentCompanyUUID} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="companyName"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <TooltipProvider delayDuration={0}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <FormLabel>Ownership:</FormLabel>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Ownership Company
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8 bg-erp-gray-1 text-gray-500"
+                          {...field}
+                          // onClick={toggleTableCompany}
+                          ref={inputRef}
+                          autoComplete="off"
+                          defaultValue={currentCompanyName}
+                          readOnly={true}
+                        />
+                        {/* <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <FaMagnifyingGlass className="text-gray-400" />
+                      </div>
+                      {showTableCompany && (
+                        <div ref={dropdownRef} className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px]">
+                          <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                            <DropdownTable
+                              columns={dropdownCompanyColumns}
+                              data={companyDropdownTableData}
+                              onClickRow={onClickRowCompanyCode}
+                            />
+                          </ScrollArea>
+                        </div>
+                      )} */}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="UUID"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl className="relative">
+                      <Input
+                        className="h-7.5 pr-8 bg-erp-gray-1 text-gray-500"
+                        {...field}
+                        readOnly={true}
+                        ref={inputRef}
+                        autoComplete="off"
+                        style={{ backgroundColor: '#f2f2f2', color: pageAction === "clone" ? "transparent" : "gray" }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 items-start gap-x-8 gap-y-3 md:grid-cols-[minmax(0,17rem)_1fr_1fr_1fr_1fr]">
+              <FormField
+                control={form.control}
+                name="signature"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <div className="mt-6 border p-4">
+                <p className="mb-2">Signature</p>
+
+                <div className="flex flex-col gap-2">
+                  <div className="h-32 w-60 border bg-white">
+                    <SignaturePad
+                      ref={padRef}
+                      penColor="black"
+                      canvasProps={{ width: 250, height: 120 }}
+                      onEnd={handleEnd}
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="rounded bg-gray-500 px-3 py-1 text-white"
+                      onClick={handleClearSignature}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </form>
+    </Form>
+  );
+}

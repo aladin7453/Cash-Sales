@@ -1,0 +1,2560 @@
+"use client";
+
+import { PDFDownloadLink, PDFViewer } from "@react-pdf/renderer";
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { endOfMonth, set, startOfMonth } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import moment from "moment";
+import React, { useEffect, useRef, useState } from "react";
+import { UseFormReturn } from "react-hook-form";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import ReportPreviewButton from "@/components/form/ActionButton/ReportPreview";
+import SalesReport from "@/components/templates/sales/salesReportTemplate";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DATA_TABLE_DEFAULT_COLUMN_SIZING,
+  DATE_FORMAT,
+  DEFAULT_DATA_TABLE_PAGE_SIZE,
+  getAuthHeaders,
+  ORIGIN,
+} from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+
+import { CollectionReportColumns } from "../../sales-collection-report/Generate/columns";
+import { columnDefinitionsByDocType, columnReportDefinitionsByDocType } from "../Generate/columns";
+import { ServiceColumns, StockColumns } from "./itemColumns";
+import ItemPopover from "./ItemPopover";
+
+import type { SortingState } from "@tanstack/react-table";
+
+interface DocumentListingReport {
+  id: string;
+  name: string;
+}
+
+type DropdownConfig = {
+  tableName: string;
+  columns: { accessorKey: string; header: string; cell? }[];
+  valueField: string;
+  displayField: string;
+  formValueField: string;
+  formDisplayField: string;
+  additionalMappings?: { sourceField: string; targetFormField: string }[];
+};
+
+// Base props interface
+interface ColumnDefinitionsByDocTypeProps {
+  form: UseFormReturn<any>;
+  onSubmit: (data: any) => void;
+  onPreview?: (data: any, isGenerated?: boolean) => void;
+  previewPDF?: any;
+  salesReportData?: any;
+  generatedReport?: any;
+  setSorting?: (s: SortingState) => void;
+  filterFields?: string[];
+  sorting?: any;
+}
+
+interface DocumentListingReportFormProps extends ColumnDefinitionsByDocTypeProps {
+  salesReportColumns?: ColumnDef<DocumentListingReport>[];
+}
+
+const salesDeliveryOrderListingList = [
+  { id: "salesDeliveryOrderListing", name: "Sales Delivery Order Listing" },
+  {
+    id: "salesDeliveryOrderListingMultiLv2DocNo",
+    name: "Sales Multi - Delivery Order Listing - Level 2 (Document No)",
+  },
+];
+
+const salesQuotationListingList = [
+  { id: "salesQuotationListing", name: "Sales Quotation Listing" },
+  {
+    id: "salesQuotationListingMultiLv2DocNo",
+    name: "Sales Multi - Quotation Listing - Level 2 (Document No)",
+  },
+];
+
+const cashSalesListingList = [
+  { id: "cashSalesListing", name: "Cash Sales Listing" },
+  { id: "cashSalesListingLv1", name: "Cash Sales Listing - Level 1" },
+  {
+    id: "cashSalesListingMultiLv2",
+    name: "Sales Multi - Cash Sales Listing - Level 2 (Document No)",
+  },
+];
+
+const salesCreditNoteListingList = [
+  { id: "salesCreditNoteListing", name: "Sales Credit Note Listing" },
+  {
+    id: "salesCreditNoteListingMultiLv2DocNo",
+    name: "Sales Multi - Credit Note Listing - Level 2 (Document No)",
+  },
+];
+
+const salesDebitNoteListingList = [
+  { id: "salesDebitNoteListing", name: "Sales Debit Note Listing" },
+  {
+    id: "salesDebitNoteListingMultiLv2DocNo",
+    name: "Sales Multi - Debit Note Listing - Level 2 (Document No)",
+  },
+];
+
+const salesInvoiceListingList = [
+  { id: "salesInvoiceListing", name: "Sales Invoice Listing" },
+  {
+    id: "salesInvoiceListingMultiLv2DocNo",
+    name: "Sales Multi - Invoice Listing - Level 2 (Document No)",
+  },
+];
+
+const salesOrderListingList = [
+  { id: "salesOrderListing", name: "Sales Order Listing" },
+  {
+    id: "salesOrderListingMultiLv2DocNo",
+    name: "Sales Multi - Sales Order Listing- Level 2 (Document No)",
+  },
+];
+
+export default function DocumentListingReportForm({
+  form,
+  onSubmit,
+  onPreview,
+  previewPDF,
+  salesReportData,
+  salesReportColumns = [],
+  generatedReport,
+  filterFields,
+  sorting,
+}: DocumentListingReportFormProps) {
+  const headers = getAuthHeaders();
+  const systemAccount = JSON.parse(localStorage.getItem("system-account"));
+  const values = form.getValues();
+  const docType = values.docType || "quotation";
+
+  const [dropdownState, setDropdownState] = useState({
+    currentDropdown: null as string | null,
+    data: [] as any[],
+    showTable: false,
+  });
+
+  const [selectedReportList, setSelectedReportList] = useState<any>(salesDeliveryOrderListingList);
+
+  const dropdownInputRef = useRef(null);
+  const dropdownTableRef = useRef(null);
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [activePreviewColumns, setActivePreviewColumns] =
+    useState<ColumnDef<any>[]>(salesReportColumns);
+  const [showOptionDialog, setShowOptionDialog] = useState(false);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [itemType, setItemType] = useState("stock");
+  const [itemData, setItemData] = useState([]);
+  const [itemSorting, setItemSorting] = useState<SortingState>([]);
+  const [itemFilter, setItemFilter] = useState("");
+
+  //Cash sales
+  // const [cashSalesOptionDialog, setCashSalesOptionDialog] = useState(false);
+  //Sales Credit Note
+  // const [salesCreditNoteOptionDialog, setSalesCreditNoteOptionDialog] = useState(false);
+  //Sales Order
+  // const [salesOrderOptionDialog, setSalesOrderOptionDialog] = useState(false);
+  //Sales Invoice
+  // const [salesInvoiceOptionDialog,setSalesInvoiceOptionDialog] = useState(false);
+  //Sales Debit Note
+  // const [salesDebitNoteOptionDialog, setSalesDebitNoteOptionDialog] = useState(false);
+
+  const dropdownConfigs: Record<string, DropdownConfig> = {
+    customer: {
+      tableName: "customer",
+      columns: [
+        { accessorKey: "customerCode", header: "Customer Code" },
+        { accessorKey: "customerGroupCode", header: "Customer Group" },
+        { accessorKey: "customerName", header: "Customer Name" },
+      ],
+      valueField: "UUID",
+      displayField: "customerName",
+      formValueField: "customerCode",
+      formDisplayField: "customerCodeCode",
+    },
+    customerGroup: {
+      tableName: "customerGroup",
+      columns: [
+        { accessorKey: "customerGroupCode", header: "Customer Group Code" },
+        {
+          accessorKey: "description",
+          header: "Description",
+          cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+        },
+      ],
+      valueField: "UUID",
+      displayField: "customerGroupName",
+      formValueField: "customerGroup",
+      formDisplayField: "customerGroupName",
+    },
+  };
+
+  const handleClickOutside = (event: MouseEvent) => {
+    if (
+      dropdownTableRef.current &&
+      !dropdownTableRef.current.contains(event.target) &&
+      dropdownInputRef.current !== event.target
+    ) {
+      setDropdownState((prev) => ({ ...prev, showTable: false }));
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  const fetchDropdownData = async (dropdownKey: string) => {
+    try {
+      const config = dropdownConfigs[dropdownKey];
+
+      if (!config) return;
+
+      const form_data = new FormData();
+
+      form_data.append(`table[0]`, config.tableName);
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${dropdownKey} data`);
+      }
+
+      const data = await response.json();
+
+      setDropdownState({
+        currentDropdown: dropdownKey,
+        data: data.rows,
+        showTable: true,
+      });
+    } catch (error) {
+      console.error(`Error fetching ${dropdownKey} data:`, error);
+
+      throw new Error(`Failed to fetch ${dropdownKey} data`);
+    }
+  };
+
+  const onClickRow = (row: any) => {
+    const config = dropdownConfigs[dropdownState.currentDropdown!];
+
+    if (config) {
+      form.setValue(config.formValueField, row[config.valueField]);
+      form.setValue(config.formDisplayField, row[config.displayField]);
+
+      if (config.additionalMappings) {
+        config.additionalMappings.forEach((mapping) => {
+          if (row[mapping.sourceField]) {
+            form.setValue(mapping.targetFormField, row[mapping.sourceField]);
+          }
+        });
+      }
+    }
+    setDropdownState((prev) => ({ ...prev, showTable: false }));
+  };
+
+  const handleReset = () => {
+    form.reset({
+      customerCode: "",
+      customerCodeCode: "",
+      customerGroup: "",
+      customerGroupName: "",
+      status: "",
+      startDate: Math.floor(startOfMonth(new Date()).getTime() / 1000).toString(),
+      endDate: (() => {
+        const end = endOfMonth(new Date());
+        end.setHours(23, 59, 59, 999);
+        return Math.floor(end.getTime() / 1000).toString();
+      })(),
+      valid: "1",
+      sortAscending: true,
+      item: "",
+      itemType: "",
+      itemCode: "",
+    });
+  };
+
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
+  const [reportType, setReportType] = useState("Sales Document Listing Report");
+  const [columns, setColumns] = useState(columnDefinitionsByDocType); // Note: This may need adjustment
+
+  // Orientation Option (Constant)
+  const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
+
+  const [isVariantAvailable, setIsVariantAvailable] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<string | null>(null);
+
+  const handlePreview = () => {
+    // 1. Validation
+    if (!generatedReport || generatedReport.length === 0) {
+      setIsAlertOpen(true);
+      return false;
+    }
+
+    // 2. Count Checkboxes
+    // const groupByKeys = [
+    //   "groupBy_docNo",
+    //   "groupBy_docDateFormat",
+    //   "groupBy_customerCodeCode",
+    //   "groupBy_customerName",
+    //   "groupBy_description",
+    // ];
+
+    // const selectedCount = groupByKeys.filter((key) => values[key] === true).length;
+
+    //Option dialog setter for  cash sales
+    // if (values.docType === "cashSales") {
+    //   setCashSalesOptionDialog(true);
+    //   return;
+    // }
+
+    //Option dialog setter for  credit note
+    // if(values.docType === "salesCreditNote"){
+    //   setSalesCreditNoteOptionDialog(true);
+    //   return;
+    // }
+
+    //Option dialog setter for sales order
+    // if(values.docType === "salesOrder"){
+    //   setSalesOrderOptionDialog(true);
+    //   return;
+    // }
+
+    //Option dialog setter for sales invoice
+    // if(values.docType === "salesInvoice"){
+    //   setSalesInvoiceOptionDialog(true);
+    //   return;
+    // }
+
+    // if(values.docType ==="salesDebitNote"){
+    //   setSalesDebitNoteOptionDialog(true);
+    //   return;
+    // }
+
+    //column definitions
+    if (values.docType === "quotation") {
+      if (columnReportDefinitionsByDocType.quotation) {
+        setActivePreviewColumns(columnReportDefinitionsByDocType.quotation);
+      }
+      if (onPreview) {
+        onPreview(
+          {
+            ...values,
+            reportTypeName: selectedReport,
+          },
+          false,
+        );
+      }
+      setReportType("Sales Document Listing Report");
+      setShowPreviewDialog(false);
+      setTimeout(() => {
+        setShowPreviewDialog(true);
+      }, 0);
+    } else if (values.docType === "deliveryOrder") {
+      if (columnReportDefinitionsByDocType.deliveryOrder) {
+        setActivePreviewColumns(columnReportDefinitionsByDocType.deliveryOrder);
+      }
+      if (onPreview) {
+        // onPreview(values, false);
+        onPreview(
+          {
+            ...values,
+            reportTypeName: selectedReport,
+          },
+          false,
+        );
+      }
+      setReportType("Sales Document Listing Report");
+      setShowPreviewDialog(false);
+      setTimeout(() => {
+        setShowPreviewDialog(true);
+      }, 0);
+    } else if (values.docType === "cashSales") {
+      if (columnReportDefinitionsByDocType.cashSales) {
+        setActivePreviewColumns(columnReportDefinitionsByDocType.cashSales);
+      }
+      if (onPreview) {
+        // onPreview(values, false);
+        onPreview(
+          {
+            ...values,
+            reportTypeName: selectedReport,
+          },
+          false,
+        );
+      }
+      setReportType("Sales Document Listing Report");
+      setShowPreviewDialog(false);
+      setTimeout(() => {
+        setShowPreviewDialog(true);
+      }, 0);
+    }
+    // if (selectedReport === "cashSalesListingMultiLv2") {
+    //   setActivePreviewColumns(columnDefinitionsByDocType.cashSalesListing);
+    // }
+    else if (values.docType === "salesCreditNote") {
+      if (columnReportDefinitionsByDocType.salesCreditNote) {
+        setActivePreviewColumns(columnReportDefinitionsByDocType.salesCreditNote);
+      }
+      if (onPreview) {
+        // onPreview(values, false);
+        onPreview(
+          {
+            ...values,
+            reportTypeName: selectedReport,
+          },
+          false,
+        );
+      }
+      setReportType("Sales Document Listing Report");
+      setShowPreviewDialog(false);
+      setTimeout(() => {
+        setShowPreviewDialog(true);
+      }, 0);
+    } else if (values.docType === "salesDebitNote") {
+      if (columnReportDefinitionsByDocType.salesDebitNote) {
+        setActivePreviewColumns(columnReportDefinitionsByDocType.salesDebitNote);
+      }
+      if (onPreview) {
+        // onPreview(values, false);
+        onPreview(
+          {
+            ...values,
+            reportTypeName: selectedReport,
+          },
+          false,
+        );
+      }
+      setReportType("Sales Document Listing Report");
+      setShowPreviewDialog(false);
+      setTimeout(() => {
+        setShowPreviewDialog(true);
+      }, 0);
+    }
+    // if(selectedReport === "salesDebitNoteListingMultiLv2DocNo"){
+    //   setActivePreviewColumns(columnDefinitionsByDocType.salesDebitNoteMultiListing);
+    // }
+    else if (values.docType === "salesInvoice") {
+      if (columnReportDefinitionsByDocType.salesInvoice) {
+        setActivePreviewColumns(columnReportDefinitionsByDocType.salesInvoice);
+      }
+      if (onPreview) {
+        // onPreview(values, false);
+        onPreview(
+          {
+            ...values,
+            reportTypeName: selectedReport,
+          },
+          false,
+        );
+      }
+      setReportType("Sales Document Listing Report");
+      setShowPreviewDialog(false);
+      setTimeout(() => {
+        setShowPreviewDialog(true);
+      }, 0);
+    }
+    // if(selectedReport === "salesInvoiceListingMultiLv2DocNo"){
+    //   setActivePreviewColumns(columnDefinitionsByDocType.salesInvoiceListing);
+    // }
+    else if (values.docType === "salesOrder") {
+      if (columnReportDefinitionsByDocType.salesOrder) {
+        setActivePreviewColumns(columnReportDefinitionsByDocType.salesOrder);
+      }
+      if (onPreview) {
+        // onPreview(values, false);
+        onPreview(
+          {
+            ...values,
+            reportTypeName: selectedReport,
+          },
+          false,
+        );
+      }
+      setReportType("Sales Document Listing Report");
+      setShowPreviewDialog(false);
+      setTimeout(() => {
+        setShowPreviewDialog(true);
+      }, 0);
+    }
+
+    // else if(values.docType ==="salesOrder"){
+    //   if (columnDefinitionsByDocType.salesOrder) {
+    //   setActivePreviewColumns(columnDefinitionsByDocType.salesOrder);
+    //   }
+    //   if (onPreview) {onPreview(values, false);}
+    //     setReportType("Sales Document Listing Report");
+    //     setShowPreviewDialog(false);
+    //     setTimeout(() => { setShowPreviewDialog(true); }, 0);
+    //   }
+
+    // else if(values.docType ==="salesInvoice"){
+    //   if (columnDefinitionsByDocType.salesInvoice) {
+    //   setActivePreviewColumns(columnDefinitionsByDocType.salesInvoice);
+    //   }
+    //   if (onPreview) {onPreview(values, false);}
+    //     setReportType("Sales Document Listing Report");
+    //     setShowPreviewDialog(false);
+    //     setTimeout(() => { setShowPreviewDialog(true); }, 0);
+    //   }
+
+    // else if(values.docType ==="cashSales"){
+    //   if (columnDefinitionsByDocType.cashSales) {
+    //   setActivePreviewColumns(columnDefinitionsByDocType.cashSales);
+    //   }
+    //   if (onPreview) {onPreview(values, false);}
+    //     setReportType("Sales Document Listing Report");
+    //     setShowPreviewDialog(false);
+    //     setTimeout(() => { setShowPreviewDialog(true); }, 0);
+    //   }
+
+    // else if(values.docType ==="salesDebitNote"){
+    //   if (columnDefinitionsByDocType.salesDebitNote) {
+    //   setActivePreviewColumns(columnDefinitionsByDocType.salesDebitNote);
+    //   }
+    //   if (onPreview) {onPreview(values, false);}
+    //     setReportType("Sales Document Listing Report");
+    //     setShowPreviewDialog(false);
+    //     setTimeout(() => { setShowPreviewDialog(true); }, 0);
+    //   }
+
+    // else if(values.docType ==="salesCreditNote"){
+    //   if (columnDefinitionsByDocType.salesCreditNote) {
+    //   setActivePreviewColumns(columnDefinitionsByDocType.salesCreditNote);
+    //   }
+    //   if (onPreview) {onPreview(values, false);}
+    //     setReportType("Sales Document Listing Report");
+    //     setShowPreviewDialog(false);
+    //     setTimeout(() => { setShowPreviewDialog(true); }, 0);
+    //   }
+  };
+
+  // const handleSelectLevel1 = () => {
+  // setReportType("Sales Local - Cash Sales Collection Report - Level 1");
+  // setShowLevel1Dialog(true);
+  // setShowPreviewDialog(false);
+  // setShowOptionDialog(false);
+  // };
+
+  //Cash Sales Collection handleselect
+  const handleSelectLevel1cscr = () => {
+    const values = form.getValues();
+    setActivePreviewColumns(columnDefinitionsByDocType.cashSalesCollection);
+    if (onPreview) {
+      onPreview(values, false);
+    }
+    setReportType("Sales Local - Cash Sales Collection Report - Level 1");
+    setShowPreviewDialog(false);
+    setTimeout(() => {
+      setShowPreviewDialog(true);
+    }, 0);
+  };
+
+  //Cash Sales handleSelect
+  const handleSelectLevel0csl = () => {
+    const values = form.getValues();
+    if (columnDefinitionsByDocType.cashSales) {
+      setActivePreviewColumns(columnDefinitionsByDocType.cashSales);
+    }
+    if (onPreview) {
+      onPreview(values, false);
+    }
+    setReportType("Sales Document Listing Report");
+    setShowPreviewDialog(false);
+    setTimeout(() => {
+      setShowPreviewDialog(true);
+    }, 0);
+  };
+  const handleSelectLevel2csl = () => {
+    const values = form.getValues();
+    if (columnDefinitionsByDocType.cashSales) {
+      setActivePreviewColumns(columnDefinitionsByDocType.cashSalesListing);
+    }
+    if (onPreview) {
+      onPreview(values, false);
+    }
+    setReportType("Sales Multi - Cash Sales Listing - Level 2");
+    setShowPreviewDialog(false);
+    setTimeout(() => {
+      setShowPreviewDialog(true);
+    }, 0);
+  };
+
+  //Sales Credit Note handleselect
+  const handleSelectLevel0scn = () => {
+    const values = form.getValues();
+    setActivePreviewColumns(columnDefinitionsByDocType.salesCreditNote);
+    if (onPreview) {
+      onPreview(values, false);
+    }
+    setReportType("Sales Document Listing Report");
+    setShowPreviewDialog(false);
+    setTimeout(() => {
+      setShowPreviewDialog(true);
+    }, 0);
+  };
+
+  const handleSelectLevel2scn = () => {
+    const values = form.getValues();
+    setActivePreviewColumns(columnDefinitionsByDocType.creditNoteListing);
+    if (onPreview) {
+      onPreview(values, false);
+    }
+    setReportType("Sales Multi - Credit Note Listing - Level 2");
+    setShowPreviewDialog(false);
+    setTimeout(() => {
+      setShowPreviewDialog(true);
+    }, 0);
+  };
+
+  //Sales Order handleselect
+  const handleSelectLevel0so = () => {
+    const values = form.getValues();
+    setActivePreviewColumns(columnDefinitionsByDocType.salesOrder);
+    if (onPreview) {
+      onPreview(values, false);
+    }
+    setReportType("Sales Document Listing Report");
+    setShowPreviewDialog(false);
+    setTimeout(() => {
+      setShowPreviewDialog(true);
+    }, 0);
+  };
+
+  const handleSelectLevel2so = () => {
+    const values = form.getValues();
+    setActivePreviewColumns(columnDefinitionsByDocType.salesOrderListing);
+    if (onPreview) {
+      onPreview(values, false);
+    }
+    setReportType("Sales Multi - Sales Order Listing - Level 2");
+    setShowPreviewDialog(false);
+    setTimeout(() => {
+      setShowPreviewDialog(true);
+    }, 0);
+  };
+
+  //Sales Invoice handleselect
+  const handleSelectLevel0si = () => {
+    const values = form.getValues();
+    setActivePreviewColumns(columnDefinitionsByDocType.salesInvoice);
+    if (onPreview) {
+      onPreview(values, false);
+    }
+    setReportType("Sales Document Listing Report");
+    setShowPreviewDialog(false);
+    setTimeout(() => {
+      setShowPreviewDialog(true);
+    }, 0);
+  };
+
+  const handleSelectLevel2si = () => {
+    const values = form.getValues();
+    setActivePreviewColumns(columnDefinitionsByDocType.salesInvoiceListing);
+    if (onPreview) {
+      onPreview(values, false);
+    }
+    setReportType("Sales Multi - Invoice Listing - Level 2");
+    setShowPreviewDialog(false);
+    setTimeout(() => {
+      setShowPreviewDialog(true);
+    }, 0);
+  };
+
+  //Sales Debit Note handleselect
+  const handleSelectLevel0sdn = () => {
+    const values = form.getValues();
+    if (columnDefinitionsByDocType.salesDebitNote) {
+      setActivePreviewColumns(columnDefinitionsByDocType.salesDebitNote);
+    }
+    if (onPreview) {
+      onPreview(values, false);
+    }
+    setReportType("Sales Document Listing Report");
+    setShowPreviewDialog(false);
+    setTimeout(() => {
+      setShowPreviewDialog(true);
+    }, 0);
+  };
+
+  const handleSelectMultiLevel2sdn = () => {
+    const values = form.getValues();
+    if (columnDefinitionsByDocType.salesDebitNote) {
+      setActivePreviewColumns(columnDefinitionsByDocType.salesDebitNoteMultiListing);
+    }
+    if (onPreview) {
+      onPreview(values, false);
+    }
+    setReportType("Sales Multi - Debit Note Listing - Level 2");
+    setShowPreviewDialog(false);
+    setTimeout(() => {
+      setShowPreviewDialog(true);
+    }, 0);
+  };
+
+  const [fromDateOpen, setFromDateOpen] = useState(false);
+  const [toDateOpen, setToDateOpen] = useState(false);
+
+  useEffect(() => {
+    if (docType) {
+      if (docType === "deliveryOrder") {
+        setSelectedReportList(salesDeliveryOrderListingList);
+      } else if (docType === "quotation") {
+        setSelectedReportList(salesQuotationListingList);
+      } else if (docType === "cashSales") {
+        setSelectedReportList(cashSalesListingList);
+      } else if (docType === "salesCreditNote") {
+        setSelectedReportList(salesCreditNoteListingList);
+      } else if (docType === "salesDebitNote") {
+        setSelectedReportList(salesDebitNoteListingList);
+      } else if (docType === "salesInvoice") {
+        setSelectedReportList(salesInvoiceListingList);
+      } else if (docType === "salesOrder") {
+        setSelectedReportList(salesOrderListingList);
+      }
+    }
+  }, [docType]);
+
+  const handleOnAdd = async () => {
+    setDialogOpen(true);
+
+    await fetchItemData(itemType);
+  };
+
+  const itemTable = useReactTable({
+    columns: itemType === "service" ? ServiceColumns : StockColumns,
+    data: itemData,
+    state: { sorting: itemSorting },
+    onSortingChange: setItemSorting,
+    autoResetPageIndex: false,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      },
+    },
+  });
+
+  const fetchItemData = async (itemType: string) => {
+    try {
+      const response = await fetch(
+        `${ORIGIN}/universal/get-all-item-details?itemType=${itemType}&module=sales`,
+        {
+          headers,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to create new service category data");
+      }
+
+      const responseData = await response.json();
+
+      setItemType(itemType);
+      setItemData(responseData.rows);
+    } catch (error) {
+      console.error(`Failed to fetch ${itemType} data`);
+    }
+  };
+
+  return (
+    <div className="mx-auto">
+      <Card collapsible defaultCollapsed={false} className="shadow-md">
+        <CardHeader></CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              <div className="grid grid-flow-row grid-cols-1 items-start gap-x-8 gap-y-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                {/* Row 1 */}
+                <FormField
+                  control={form.control}
+                  name="docType"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Sales Document Type:</FormLabel>
+                      <FormControl>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger className="h-7.5 w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+
+                          <SelectContent>
+                            <SelectItem value="quotation">Quotation</SelectItem>
+                            <SelectItem value="salesOrder">Sales Order</SelectItem>
+                            <SelectItem value="deliveryOrder">Sales Delivery Order</SelectItem>
+                            <SelectItem value="salesInvoice">Sales Invoice</SelectItem>
+                            <SelectItem value="cashSales">Cash Sales</SelectItem>
+                            <SelectItem value="salesDebitNote">Sales Debit Note</SelectItem>
+                            <SelectItem value="salesCreditNote">Sales Credit Note</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="valid"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Validity:</FormLabel>
+                      <FormControl>
+                        <Select
+                          value={field.value ?? "1"}
+                          onValueChange={field.onChange}
+                          defaultValue="1"
+                        >
+                          <SelectTrigger className="h-7.5 w-full">
+                            <SelectValue placeholder="Valid" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All</SelectItem>
+                            <SelectItem value="1">Valid</SelectItem>
+                            <SelectItem value="0">Invalid</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="mt-4 grid grid-flow-row grid-cols-1 items-start gap-x-8 gap-y-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                {/* Row 2 */}
+                <FormField
+                  control={form.control}
+                  name="customerCode"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormLabel>Customer UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="customerCodeCode"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Customer:</FormLabel>
+                      <FormControl className="relative">
+                        <div className="relative">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                            readOnly
+                            onClick={() => fetchDropdownData("customer")}
+                            ref={
+                              dropdownState.currentDropdown === "customer" ? dropdownInputRef : null
+                            }
+                            autoComplete="off"
+                          />
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="text-gray-400" />
+                          </div>
+                          {dropdownState.showTable &&
+                            dropdownState.currentDropdown === "customer" && (
+                              <div
+                                ref={dropdownTableRef}
+                                className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                              >
+                                <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                                  <DropdownTable
+                                    columns={dropdownConfigs.customer.columns}
+                                    data={dropdownState.data}
+                                    onClickRow={onClickRow}
+                                  />
+                                  <ScrollBar orientation="vertical" />
+                                </ScrollArea>
+                              </div>
+                            )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="customerGroup"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormLabel>Customer Group UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="customerGroupName"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Customer Group:</FormLabel>
+                      <FormControl className="relative">
+                        <div className="relative">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                            readOnly
+                            onClick={() => fetchDropdownData("customerGroup")}
+                            ref={
+                              dropdownState.currentDropdown === "customerGroup"
+                                ? dropdownInputRef
+                                : null
+                            }
+                            autoComplete="off"
+                          />
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="text-gray-400" />
+                          </div>
+                          {dropdownState.showTable &&
+                            dropdownState.currentDropdown === "customerGroup" && (
+                              <div
+                                ref={dropdownTableRef}
+                                className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                              >
+                                <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                                  <DropdownTable
+                                    columns={dropdownConfigs.customerGroup.columns}
+                                    data={dropdownState.data}
+                                    onClickRow={onClickRow}
+                                  />
+                                  <ScrollBar orientation="vertical" />
+                                </ScrollArea>
+                              </div>
+                            )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>From Date:</FormLabel>
+                      <Popover open={fromDateOpen} onOpenChange={setFromDateOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              className={cn(
+                                "flex h-7.5 w-full",
+                                !field.value && "text-muted-foreground",
+                              )}
+                              variant="outline"
+                              size="sm"
+                            >
+                              {field.value
+                                ? moment.unix(field.value).format(DATE_FORMAT)
+                                : moment().format(DATE_FORMAT)}
+                              <CalendarIcon className="ml-auto h-4 w-4 text-gray-400" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value ? moment.unix(field.value).toDate() : new Date()}
+                            onSelect={(date) => {
+                              const unixTimestamp = date
+                                ? Math.floor(date.getTime() / 1000)
+                                : Math.floor(Date.now() / 1000);
+                              field.onChange(unixTimestamp.toString());
+                              setFromDateOpen(false); // Close popover after select
+                            }}
+                            initialFocus
+                            defaultMonth={
+                              field.value ? moment.unix(field.value).toDate() : new Date()
+                            }
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>To Date:</FormLabel>
+                      <Popover open={toDateOpen} onOpenChange={setToDateOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              className={cn(
+                                "flex h-7.5 w-full",
+                                !field.value && "text-muted-foreground",
+                              )}
+                              variant="outline"
+                              size="sm"
+                            >
+                              {field.value
+                                ? moment.unix(field.value).format(DATE_FORMAT)
+                                : moment().format(DATE_FORMAT)}
+                              <CalendarIcon className="ml-auto h-4 w-4 text-gray-400" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value ? moment.unix(field.value).toDate() : new Date()}
+                            onSelect={(date) => {
+                              const endOfDay = date ? new Date(date) : new Date();
+                              endOfDay.setHours(23, 59, 59, 999);
+                              const unixTimestamp = Math.floor(endOfDay.getTime() / 1000);
+                              field.onChange(unixTimestamp.toString());
+                              setToDateOpen(false); // Close popover after select
+                            }}
+                            initialFocus
+                            defaultMonth={
+                              field.value ? moment.unix(field.value).toDate() : new Date()
+                            }
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="itemCode"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Item:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5 cursor-pointer pr-7"
+                          onClick={handleOnAdd}
+                          {...field}
+                          readOnly={true}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <input type="hidden" {...form.register("item")} />
+                <input type="hidden" {...form.register("itemType")} />
+              </div>
+
+              {/* Row 3: Show fields based on docType */}
+              {form.watch("docType") === "quotation" && (
+                <>
+                  <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                    <FormField
+                      control={form.control}
+                      name="docNo"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Doc No:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="docDateFormat"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Quotation Date:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="customerName"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Customer:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalAmount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Total Amount:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalDiscount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Discount:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="amountAfterDiscount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Subtotal (After Discount):</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                    <FormField
+                      control={form.control}
+                      name="totalTax"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Tax:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalSubtotalTax"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Subtotal (Tax):</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="docValidityFormat"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Valid Until:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Description:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Row 4: Only show when docType is "salesOrder" */}
+              {form.watch("docType") === "salesOrder" && (
+                <>
+                  <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-5">
+                    <FormField
+                      control={form.control}
+                      name="docNo"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Doc No:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="docDateFormat"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Order Date:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="customerName"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Customer:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalQuantity"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Order Quantity:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalAmount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Total Amount:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalDiscount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Discount:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                    <FormField
+                      control={form.control}
+                      name="amountAfterDiscount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Subtotal (After Discount):</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalTax"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Tax:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalSubtotalTax"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Subtotal (Tax):</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Description:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Row 5: Only show when docType is "deliveryOrder" */}
+              {form.watch("docType") === "deliveryOrder" && (
+                <>
+                  <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                    <FormField
+                      control={form.control}
+                      name="docNo"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Doc No:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="docDateFormat"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Delivery Date:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="customerName"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Customer:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalQuantity"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Quantity Delivered:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalAmount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Total Amount:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalDiscount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Discount:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                    <FormField
+                      control={form.control}
+                      name="amountAfterDiscount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Subtotal (After Discount):</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalTax"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Tax:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalSubtotalTax"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Subtotal (Tax):</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Description:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Row 6: Only show when docType is "salesInvoice" */}
+              {form.watch("docType") === "salesInvoice" && (
+                <>
+                  <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                    <FormField
+                      control={form.control}
+                      name="docNo"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Doc No:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="customerName"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Customer:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="docDateFormat"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Invoice Date:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalSubtotal"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Total:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalAmount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Total Amount:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalDiscount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Discount:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                    <FormField
+                      control={form.control}
+                      name="amountAfterDiscount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Subtotal (After Discount):</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalTax"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Tax:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalSubtotalTax"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Subtotal (Tax):</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Description:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Row 7: Only show when docType is "cashSales" */}
+              {form.watch("docType") === "cashSales" && (
+                <>
+                  <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                    <FormField
+                      control={form.control}
+                      name="docNo"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Doc No:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="docDateFormat"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Sale Date:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="customerName"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Customer:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalAmount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Total Amount:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="paidAmount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Amount Paid:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalDiscount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Discount:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                    <FormField
+                      control={form.control}
+                      name="amountAfterDiscount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Subtotal (After Discount):</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalTax"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Tax:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalSubtotalTax"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Subtotal (Tax):</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="paymentMethodCode"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Payment Method:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Description:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Row 8: Only show when docType is "salesDebitNote" */}
+              {form.watch("docType") === "salesDebitNote" && (
+                <>
+                  <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                    <FormField
+                      control={form.control}
+                      name="docNo"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Doc No:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="docDateFormat"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Date:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="customerName"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Customer:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalAmount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Total Amount:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalDiscount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Discount:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="amountAfterDiscount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Subtotal (After Discount):</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                    <FormField
+                      control={form.control}
+                      name="totalTax"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Tax:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalSubtotalTax"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Subtotal (Tax):</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Description:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Row 9: Only show when docType is "salesCreditNote" */}
+              {form.watch("docType") === "salesCreditNote" && (
+                <>
+                  <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                    <FormField
+                      control={form.control}
+                      name="docNo"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Doc No:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="docDateFormat"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Date:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="customerName"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Customer:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalAmount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Total Amount:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalDiscount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Discount:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="amountAfterDiscount"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Subtotal (After Discount):</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                    <FormField
+                      control={form.control}
+                      name="totalTax"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Tax:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalSubtotalTax"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Subtotal (Tax):</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Description:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5 pr-7" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Last Row for checkbox for level options level-1,level-2*/}
+
+              {/* <div className="mt-6 border-t pt-1 border-gray-200">
+                <FormLabel className="text-base font-semibold text-gray-700">Group / Sort Options:</FormLabel>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mt-3">
+                  <FormField
+                    control={form.control}
+                    name="groupBy_docNo"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            // onCheckedChange={field.onChange}
+                            onCheckedChange={(v) => {
+                              const checked = !!v;
+                              field.onChange(checked);
+                              setSorting?.((prev: any) => {
+                                const currentSorting = Array.isArray(prev) ? prev : [];
+                                const columnId = checkboxToColumnId["groupBy_docNo"]; 
+
+                                if (checked) {
+                                  const asc = !!form.getValues().sortAscending;
+                                  return [...currentSorting, { id: columnId, desc: asc }];
+                                } else {
+                                  return currentSorting.filter((item) => item.id !== columnId);
+                                }
+                              });
+                            }}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel className="font-normal cursor-pointer">
+                            Doc No
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  /> */}
+
+              <div className="mr-16 mt-6 flex flex-row justify-center space-x-4">
+                <Button
+                  type="button"
+                  className="erp-blue-12 w-28 text-white hover:bg-blue-800"
+                  onClick={form.handleSubmit(onSubmit)}
+                >
+                  Generate
+                </Button>
+                <Button
+                  type="button"
+                  className="erp-blue-12 w-28 text-white hover:bg-blue-800"
+                  // onClick={handlePreview}
+                  onClick={() => {
+                    // Temporary put in if else statement, might need to remove later
+                    if (
+                      docType === "deliveryOrder" ||
+                      docType === "quotation" ||
+                      docType === "cashSales" ||
+                      docType === "salesCreditNote" ||
+                      docType === "salesDebitNote" ||
+                      docType === "salesInvoice" ||
+                      docType === "salesOrder"
+                    ) {
+                      if (generatedReport.length == 0) {
+                        setIsAlertOpen(true);
+                        return false;
+                      }
+
+                      setIsVariantAvailable(true);
+                    } else {
+                      handlePreview();
+                    }
+                  }}
+                >
+                  Preview
+                </Button>
+                <Button
+                  type="button"
+                  className="erp-blue-12 w-28 text-white hover:bg-blue-800"
+                  onClick={handleReset}
+                >
+                  Reset
+                </Button>
+                {systemAccount === "dev" || systemAccount === "infollectivetesting" ? (
+                  <>
+                    <ReportPreviewButton
+                      form={form}
+                      formData={values}
+                      previewType={"SALES DOCUMENT LISTING"}
+                      docType={docType}
+                      reportType={"salesDocumentListing"}
+                      modelType={"sales"}
+                      filterFields={filterFields}
+                      sorting={sorting}
+                      generatedReport={generatedReport}
+                      setIsAlertOpen={setIsAlertOpen}
+                      showPreviewDialog={showDialog}
+                      setShowPreviewDialog={setShowDialog}
+                    />
+                  </>
+                ) : null}
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <Dialog open={isVariantAvailable} onOpenChange={setIsVariantAvailable}>
+        <DialogContent className="max-w-l rounded-md bg-white p-6">
+          <Form {...form}>
+            <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+              <h2 className="text-center text-lg font-semibold">Select Report</h2>
+
+              <div className="h-[160px] overflow-auto border border-gray-300 bg-white">
+                {selectedReportList?.map((report) => (
+                  <div
+                    key={report.id}
+                    onClick={() => setSelectedReport(report.id)}
+                    className={`cursor-pointer px-3 py-1 text-sm
+            hover:bg-blue-100
+            ${selectedReport === report.id ? "bg-blue-600 text-white" : ""}`}
+                  >
+                    {report.name}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-[10px] flex justify-center gap-4 p-10">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setIsVariantAvailable(false)}
+                  className="h-10 w-40 bg-erp-blue-14 text-white hover:bg-erp-blue-13 hover:text-white"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handlePreview}
+                  className="h-10 w-40 border border-erp-blue-14 bg-white text-erp-blue-14"
+                >
+                  OK
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dialog */}
+      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+        <DialogContent className="max-w-6xl">
+          {/* Orientation Option (Add to Dialog Title) */}
+          <DialogTitle className="flex items-center justify-between">
+            <span>{reportType} - Report Preview</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Orientation:</span>
+              <Button
+                type="button"
+                variant={orientation === "portrait" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setOrientation("portrait")}
+                className="h-8 px-3"
+              >
+                Portrait
+              </Button>
+              <Button
+                type="button"
+                variant={orientation === "landscape" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setOrientation("landscape")}
+                className="h-8 px-3"
+              >
+                Landscape
+              </Button>
+            </div>
+          </DialogTitle>
+
+          <div className="relative h-[550px] w-full">
+            {previewPDF ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                {/* Orientation Option (Add Orientation Prop) */}
+                <SalesReport
+                  type={reportType}
+                  data={previewPDF}
+                  salesReportData={salesReportData}
+                  salesReportColumns={activePreviewColumns}
+                  generatedReport={generatedReport}
+                  orientation={orientation}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <p className="animate-pulse text-lg">
+                  Loading preview
+                  <span className="ml-1 inline-block">
+                    <span>. </span>
+                    <span className="animation-delay-200">. </span>
+                    <span className="animation-delay-400">.</span>
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                // Orientation Option (Add Orientation Prop)
+                <SalesReport
+                  type={reportType}
+                  data={previewPDF}
+                  salesReportData={salesReportData}
+                  salesReportColumns={activePreviewColumns}
+                  generatedReport={generatedReport}
+                  orientation={orientation}
+                />
+              }
+              fileName={`${previewPDF?.currentCompany?.company || ""} - ${reportType}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              // onClick={() => setShowPreviewDialog(false)}
+              onClick={() => {
+                setShowPreviewDialog(false);
+                setIsVariantAvailable(false);
+              }}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* OPTION DIALOG */}
+
+      {/* Cash Sales Option Dialog */}
+      {/* <Dialog open={cashSalesOptionDialog} onOpenChange={setCashSalesOptionDialog}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Select Report</DialogTitle>
+          <div className="flex flex-col gap-4 py-4">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start text-left h-auto py-3 px-4 border-erp-blue-10 hover:bg-erp-blue-1 hover:text-erp-blue-10"
+              onClick={handleSelectLevel0csl}>
+              Sales Document Listing Report
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start text-left h-auto py-3 px-4 border-erp-blue-10 hover:bg-erp-blue-1 hover:text-erp-blue-10"
+              onClick={handleSelectLevel1cscr}>
+              Sales Local - Cash Sales Collection Report - Level 1
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start text-left h-auto py-3 px-4 border-erp-blue-10 hover:bg-erp-blue-1 hover:text-erp-blue-10"
+              onClick={handleSelectLevel2csl}>
+              Sales Multi - Cash Sales Listing - Level 2
+            </Button>
+          </div>
+          <DialogFooter>
+             <Button variant="ghost" onClick={() => setCashSalesOptionDialog(false)}>
+               Cancel
+             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog> */}
+
+      {/* Sales Credit Note Option Dialog*/}
+      {/* <Dialog open={salesCreditNoteOptionDialog} onOpenChange={setSalesCreditNoteOptionDialog}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Select Report</DialogTitle>
+          <div className="flex flex-col gap-4 py-4">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start text-left h-auto py-3 px-4 border-erp-blue-10 hover:bg-erp-blue-1 hover:text-erp-blue-10"
+              onClick={handleSelectLevel0scn}>
+              Sales Document Listing Report
+            </Button>            
+            <Button 
+              variant="outline" 
+              className="w-full justify-start text-left h-auto py-3 px-4 border-erp-blue-10 hover:bg-erp-blue-1 hover:text-erp-blue-10"
+              onClick={handleSelectLevel2scn}>
+              Sales Multi - Credit Note Listing - Level 2
+            </Button>
+          </div>
+          <DialogFooter>
+             <Button variant="ghost" onClick={() => setSalesCreditNoteOptionDialog(false)}>
+               Cancel
+             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog> */}
+
+      {/* Sales Order Option Dialog */}
+      {/* <Dialog open={salesOrderOptionDialog} onOpenChange={setSalesOrderOptionDialog}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Select Report</DialogTitle>
+          <div className="flex flex-col gap-4 py-4">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start text-left h-auto py-3 px-4 border-erp-blue-10 hover:bg-erp-blue-1 hover:text-erp-blue-10"
+              onClick={handleSelectLevel0so}>
+              Sales Document Listing Report
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start text-left h-auto py-3 px-4 border-erp-blue-10 hover:bg-erp-blue-1 hover:text-erp-blue-10"
+              onClick={handleSelectLevel2so}>
+              Sales Multi - Sales Order Listing - Level 2
+            </Button>
+          </div>
+          <DialogFooter>
+             <Button variant="ghost" onClick={() => setSalesOrderOptionDialog(false)}>
+               Cancel
+             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog> */}
+
+      {/* Sales Invoice Option Dialog */}
+      {/* <Dialog open={salesInvoiceOptionDialog} onOpenChange={setSalesInvoiceOptionDialog}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Select Report</DialogTitle>
+          <div className="flex flex-col gap-4 py-4">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start text-left h-auto py-3 px-4 border-erp-blue-10 hover:bg-erp-blue-1 hover:text-erp-blue-10"
+              onClick={handleSelectLevel0si}>
+              Sales Document Listing Report
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start text-left h-auto py-3 px-4 border-erp-blue-10 hover:bg-erp-blue-1 hover:text-erp-blue-10"
+              onClick={handleSelectLevel2si}>
+              Sales Multi - Invoice Listing - Level 2
+            </Button>
+          </div>
+          <DialogFooter>
+             <Button variant="ghost" onClick={() => setSalesInvoiceOptionDialog(false)}>
+               Cancel
+             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog> */}
+
+      {/* Debit Note Option Dialog */}
+      {/* <Dialog open={salesDebitNoteOptionDialog} onOpenChange={setSalesDebitNoteOptionDialog}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Select Report</DialogTitle>
+          <div className="flex flex-col gap-4 py-4">
+            <Button
+              variant="outline"
+              className="w-full justify-start text-left h-auto py-3 px-4 border-erp-blue-10 hover:bg-erp-blue-1 hover:text-erp-blue-10"
+              onClick={handleSelectLevel0sdn}>
+              Sales Document Listing
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start text-left h-auto py-3 px-4 border-erp-blue-10 hover:bg-erp-blue-1 hover:text-erp-blue-10"
+              onClick={handleSelectMultiLevel2sdn}>
+              Sales Multi - Sales Debit Note - Level 2
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSalesDebitNoteOptionDialog(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>  
+      </Dialog> */}
+
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent className="max-w-sm">
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-md text-center text-erp-blue-14">kindly generate first.</p>
+          </div>
+          <AlertDialogFooter className="mt-2 flex items-center !justify-center justify-center gap-3 [&>*]:m-0">
+            <AlertDialogAction className="h-9 w-24" autoFocus onClick={() => setShowDialog(false)}>
+              Close
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <ItemPopover
+        open={dialogOpen}
+        setOpen={setDialogOpen}
+        columns={itemType === "service" ? ServiceColumns : StockColumns}
+        // setTempRowSalesInvoiceDetailsListData={setTempRowSalesInvoiceDetailsListData}
+        // tempRowSalesInvoiceDetailsList={tempRowSalesInvoiceDetailsList}
+        // revalidateSalesInvoiceDetails={revalidateSalesInvoiceDetails}
+        itemTable={itemTable}
+        fetchItemData={fetchItemData}
+        itemType={itemType}
+        form={form}
+        // updateItem={updateItem}
+        itemData={itemData}
+        // slug={slug}
+        // preferenceData={preferenceData}
+      />
+    </div>
+  );
+}

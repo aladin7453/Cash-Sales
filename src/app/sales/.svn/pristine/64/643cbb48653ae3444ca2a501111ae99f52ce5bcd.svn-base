@@ -1,0 +1,344 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+export type CustomerDueDocumentListing = {
+  docType?: string;
+  docNo: string;
+  customerCode?: string;
+  customerCodeCode?: string;
+  customerName?: string;
+  docDate?: string;
+  netTotal?: string;
+  creditTermCode?: string;
+  docDueDate?: string;
+  localPayment: string;
+  outstandingAmount?: string;
+  age?: string;
+};
+
+// Helper to format decimals
+const formatDecimal = (value: any) => {
+  if (value === undefined || value === null || value === "") return "0.00";
+
+  const num = parseFloat(value);
+
+  return isNaN(num) ? "0.00" : num.toFixed(2);
+};
+
+export const CustomerDueDocumentListingColumns: ColumnDef<CustomerDueDocumentListing>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "docNo",
+    id: "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id: "docDateFormat",
+    header: "Doc Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "netTotal",
+    id: "netTotal",
+    header: "Local Amount",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.netTotal)}</div>
+    ),
+  },
+  {
+    accessorKey: "status",
+    id: "status",
+    header: "Status",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "creditTermCode",
+    id: "creditTermCode",
+    header: "Terms",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "docDueDateFormat",
+    id: "docDueDateFormat",
+    header: "Due Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "outstandingAmount",
+    id: "outstandingAmount",
+    header: "Local Outstanding Amount",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.outstandingAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "age",
+    id: "age",
+    header: "Age",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{row.original.age}</div>
+    ),
+  },
+];
+
+export const CustomerDueDocumentListingTaxColumns: ColumnDef<CustomerDueDocumentListing>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "docNo",
+    id: "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id: "docDateFormat",
+    header: "Doc Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "netTotal",
+    id: "netTotal",
+    header: "Local Amount",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.netTotal)}</div>
+    ),
+  },
+  {
+    accessorKey: "status",
+    id: "status",
+    header: "Status",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "creditTermCode",
+    id: "creditTermCode",
+    header: "Terms",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "docDueDateFormat",
+    id: "docDueDateFormat",
+    header: "Due Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "totalTax",
+    id: "totalTax",
+    header: "Tax Amt",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.totalTax)}</div>
+    ),
+  },
+  {
+    accessorKey: "outstandingAmount",
+    id: "outstandingAmount",
+    header: "Local Outstanding Amount",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.outstandingAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "age",
+    id: "age",
+    header: "Age",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{row.original.age}</div>
+    ),
+  },
+];
+
+export const CustomerOverdueLetterColumns: ColumnDef<CustomerDueDocumentListing>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id: "docDateFormat",
+    header: "Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "docType",
+    id: "docType",
+    header: "Type",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "docNo",
+    id: "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "dueDocDateFormat",
+    id: "dueDocDateFormat",
+    header: "Due Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "age",
+    id: "age",
+    header: "Age",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{row.original.age}</div>
+    ),
+  },
+  {
+    accessorKey: "outstandingAmount",
+    id: "outstandingAmount",
+    header: "Amount",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.outstandingAmount)}</div>
+    ),
+  },
+];

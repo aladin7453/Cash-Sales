@@ -1,0 +1,437 @@
+import { Table } from "@tanstack/react-table";
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+import React, { useEffect, useState } from "react";
+import { IoDocumentsSharp } from "react-icons/io5";
+import useSWR from "swr";
+
+import { useDateRestriction } from "@/components/custom/DateRestrictionContext";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import LoadingProgressDialog from "@/components/data-table/LoadingDialog";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+// Transfer From (Imports)
+import TransferButton from "@/components/features/transfer/TransferButton";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import CloneButton from "@/components/form/ActionButton/Clone";
+import DeleteButton from "@/components/form/ActionButton/Delete";
+import LayoutToggleButton from "@/components/form/ActionButton/LayoutToggleButton";
+import NewButton from "@/components/form/ActionButton/New";
+import PreviewButton from "@/components/form/ActionButton/Preview";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+// Mobile View (Imports)
+import MobileFormActionGroup from "@/components/form/MobileFormActionGroup";
+import { SVGNote2 } from "@/components/icons/svg-repo/SVGNote2";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getAuthHeaders, ORIGIN, TOOLTIP_DELAY_DURATION } from "@/lib/constants";
+
+import { salesDebitNoteTransferFromConfig } from "../transfer/transferFrom/config";
+import { ApprovalStatusIcon } from "./ApprovalStatusIcon";
+import { eInvoiceRecords } from "./e-invoice-record/columns";
+import EInvoiceRecordsDataTable from "./e-invoice-record/DataTable";
+
+import type { SalesDebitNote } from "../columns";
+
+type TopActionBarProps = {
+  SalesDebitNote?: SalesDebitNote | null;
+  approvalStatus?: SalesDebitNote | null;
+  tempRowSalesDebitNoteDetailsList: () => void;
+  handleSubmit: () => void;
+  resetForm: () => void;
+  onSubmit: (values: any) => void;
+  action: string;
+  slug: string;
+  isLoading?: boolean;
+  table: Table<any> | null;
+  isSaving?: boolean;
+  setIsSaving?: (saving: boolean) => void;
+  revalidateSalesDebitNote: () => void;
+  viewEInvoiceDetails?: (row: any) => void;
+  layout: "new" | "old";
+  onLayoutChange: (layout: "new" | "old") => void;
+  salesDebitNoteData?: any;
+};
+
+const fetcher = (url: string) => {
+  const headers = getAuthHeaders();
+  return fetch(url, { headers }).then((res) => res.json());
+};
+
+export default function TopActionBar({
+  SalesDebitNote,
+  approvalStatus,
+  tempRowSalesDebitNoteDetailsList,
+  form,
+  handleSubmit,
+  action,
+  slug,
+  table,
+  revalidateSalesDebitNote,
+  viewEInvoiceDetails,
+  layout,
+  onLayoutChange,
+  salesDebitNoteData,
+}: TopActionBarProps) {
+  const headers = getAuthHeaders();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  const [selectedRowUUID, setSelectedRowUUID] = useState<string | null>(null);
+  const [tempRowEInvoiceRecords, setTempRowEInvoiceRecords] = useState([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [tableInstance, setTableInstance] = useState<Table | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const { allowPastRecord, setAllowPastRecord } = useDateRestriction();
+
+  useEffect(() => {
+    form.reset(SalesDebitNote || {});
+  }, [SalesDebitNote, form]);
+
+  const handleReset = () => {
+    // Reset form to original sales debit note data for existing records or fallback to default values
+    if (SalesDebitNote) {
+      // Convert null values to empty strings for proper form reset
+      const resetValues = Object.keys(SalesDebitNote).reduce((acc, key) => {
+        acc[key] = SalesDebitNote[key] === null ? "" : SalesDebitNote[key];
+        return acc;
+      }, {});
+
+      form.reset(resetValues);
+    } else {
+      // Fallback: reset to form's original default values
+      form.reset();
+    }
+  };
+
+  const handleSave = async () => {
+    if (isSaving) return; // Prevent multiple clicks
+    setIsSaving(true);
+
+    try {
+      await handleSubmit();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDialogToggle = () => {
+    setDialogOpen(!dialogOpen);
+  };
+
+  const handleRowSelect = (rowUUID: string) => {
+    setSelectedRowUUID(rowUUID);
+  };
+
+  const handleTableInstanceReady = (table: Table<any>) => {
+    if (table) {
+      setTableInstance(table);
+    } else {
+      console.error("Table instance is null or undefined");
+    }
+  };
+
+  const eInvoiceStat = form.getValues("eInvoiceStatus");
+  const consolidatedStat = form.getValues("consolidatedInvoiceDocNo");
+
+  const {
+    data: eInvoiceRecordsData,
+    error: eInvoiceRecordError,
+    mutate: mutateEInvoice,
+  } = useSWR(
+    id
+      ? `${ORIGIN}/sales_debit_note/api/sales-debit-note/get-update-sales-debit-note-has-e-invoice-data?id=${id}`
+      : null,
+    fetcher,
+  );
+
+  const revalidateEInvoiceRecordsData = () => {
+    mutateEInvoice();
+  };
+
+  // Dropdown Filter Configuration
+  const getTransferFromFilters = () => {
+    const filters = [];
+
+    // Add customer filter if customer is selected
+    const customerName = form.getValues("customerName");
+
+    if (customerName) {
+      filters.push({
+        column: "customerName",
+        value: customerName,
+      });
+    }
+
+    // You can add more filters here based on other form values
+    // const projectCode = form.getValues("projectCode");
+    // if (projectCode) {
+    //   filters.push({
+    //     column: "projectCode",
+    //     value: projectCode
+    //   });
+    // }
+
+    return filters;
+  };
+
+  // Change layout button condition (HardCode)
+  const systemAccount = JSON.parse(localStorage.getItem("system-account") || "{}");
+  const canChangeLayout = [
+    "infollective",
+    "infollectivetesting",
+    "dev",
+    "mymug",
+    "vminimarket",
+    "tridentmed",
+  ].includes(systemAccount);
+
+  return (
+    <div className="flex h-full w-full items-center justify-between bg-erp-gray-3 py-2">
+      <div className="flex flex-1 space-x-3">
+        {/* Mobile View (Action Buttons) */}
+        <MobileFormActionGroup
+          config={{
+            onSave: handleSubmit,
+            onReset: handleReset,
+            onCancel: () => router.push(`/sales/sales-debit-note/`),
+            newDestination: "/sales/sales-debit-note/new",
+            cloneDestination: `/sales/sales-debit-note/clone?id=${id}`,
+            deleteConfig:
+              id && slug !== "clone"
+                ? {
+                    module: "sales_debit_note",
+                    model: "sales-debit-note",
+                    id: `${id}`,
+                    indexPath: `/sales/sales-debit-note/`,
+                  }
+                : undefined,
+            showNew: !!(id && slug !== "clone"),
+            showClone: !!(id && slug !== "clone"),
+            showDelete: !!(id && slug !== "clone"),
+          }}
+        >
+          {/* Additional Actions (Other than Save, New, Clone, Reset, Delete, and Cancel) */}
+          {SalesDebitNote && slug === "edit" && (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <PreviewButton
+                previewType={"SALES DEBIT NOTE"}
+                module={"sales_debit_note"}
+                model={"sales-debit-note"}
+                doc_id={SalesDebitNote.UUID}
+                data={salesDebitNoteData}
+              />
+            </DropdownMenuItem>
+          )}
+          {/* Transfer From (Mobile View) */}
+          {slug === "new" ? (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <TransferButton
+                transferFromProps={{
+                  id: id,
+                  slug: slug,
+                  config: salesDebitNoteTransferFromConfig,
+                  filterConfig: getTransferFromFilters(),
+                }}
+                showTransferTo={false}
+              />
+            </DropdownMenuItem>
+          ) : (
+            ""
+          )}
+        </MobileFormActionGroup>
+
+        {/* Web View (Action Buttons) */}
+        <div className="hidden space-x-3 md:flex">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <SaveButton
+                    onSubmit={handleSave}
+                    disabled={
+                      !["clone", "transfer-to", "transfer-from"].includes(slug) &&
+                      (isSaving ||
+                        eInvoiceStat == "Valid" ||
+                        eInvoiceStat == "Submitted" ||
+                        consolidatedStat != null)
+                    }
+                  />
+                </span>
+              </TooltipTrigger>
+
+              {consolidatedStat != null && (
+                <TooltipContent side="right">
+                  Edit not allowed. This document has been consolidated.
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+          {id && action !== "clone" && <NewButton destination="/sales/sales-debit-note/new" />}
+          {id && action !== "clone" && (
+            <CloneButton destination={`/sales/sales-debit-note/clone?id=${id}`} />
+          )}
+          <ResetButton onClick={handleReset} />
+          {id && action !== "clone" && (
+            <DeleteButton
+              module={"sales_debit_note"}
+              model={"sales-debit-note"}
+              id={`${id}`}
+              indexPath={`/sales/sales-debit-note/`}
+            />
+          )}
+          {SalesDebitNote && slug === "edit" && (
+            <PreviewButton
+              previewType={"SALES DEBIT NOTE"}
+              module={"sales_debit_note"}
+              model={"sales-debit-note"}
+              doc_id={SalesDebitNote.UUID}
+              data={salesDebitNoteData}
+            />
+          )}
+          {/* Transfer From (Web View) */}
+          {slug === "new" ? (
+            <TransferButton
+              transferFromProps={{
+                id: id,
+                slug: slug,
+                config: salesDebitNoteTransferFromConfig,
+                filterConfig: getTransferFromFilters(),
+              }}
+              showTransferTo={false}
+            />
+          ) : (
+            ""
+          )}
+          <CancelButton onClick={() => router.push(`/sales/sales-debit-note/`)} />
+
+          {/* Change Layout button */}
+          {canChangeLayout && <LayoutToggleButton layout={layout} onChange={onLayoutChange} />}
+        </div>
+      </div>
+
+      <Form id="topActionBarForm" {...form}>
+        <div className="flex items-center justify-center gap-x-5 space-y-0 px-3">
+          {/* Added onSubmit to Form */}
+          {approvalStatus?.approvalStatus &&
+            (approvalStatus.approvalStatus === "Rejected" ? (
+              <TooltipProvider delayDuration={TOOLTIP_DELAY_DURATION}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <ApprovalStatusIcon status={approvalStatus.approvalStatus} />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>{approvalStatus.rejectReason || "No reason provided"}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <ApprovalStatusIcon status={approvalStatus.approvalStatus} />
+            ))}
+
+          {/* E-Invoice Records */}
+          <TooltipProvider delayDuration={TOOLTIP_DELAY_DURATION}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  className="hidden size-8 disabled:hover:bg-transparent md:flex"
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleDialogToggle}
+                  disabled={
+                    form.getValues("invoiceType") == "Consolidate" ||
+                    form.getValues("invoiceType") == "None" ||
+                    form.getValues("invoiceType") == ""
+                  }
+                >
+                  <IoDocumentsSharp className="size-5.5 text-primary" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent
+                className={
+                  form.getValues("invoiceType") == "Consolidate" ||
+                  form.getValues("invoiceType") == "None" ||
+                  form.getValues("invoiceType") == ""
+                    ? "hidden"
+                    : "block"
+                }
+              >
+                E-Invoice Records
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Valid checkbox */}
+          <FormField
+            control={form.control}
+            name="valid"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-x-2.5 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value === "1"}
+                    onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                  />
+                </FormControl>
+                <FormLabel>Valid</FormLabel>
+              </FormItem>
+            )}
+          />
+
+          {/* Past Record Checkbox */}
+          <FormField
+            control={form.control}
+            name="allowPastDates"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-x-2.5 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value === "1"}
+                    onCheckedChange={(state) => {
+                      field.onChange(state ? "1" : "0");
+                      setAllowPastRecord(state === true);
+                    }}
+                  />
+                </FormControl>
+                <FormLabel className="cursor-pointer">Past Record</FormLabel>
+              </FormItem>
+            )}
+          />
+        </div>
+      </Form>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-4xl space-y-2.5 bg-white p-3 pt-2">
+          <span className="text-sm/none font-semibold">e-Invoice Records</span>
+          <div className="max-w-4xl overflow-x-auto rounded-sm bg-erp-blue-3 p-1">
+            <EInvoiceRecordsDataTable
+              columns={eInvoiceRecords}
+              data={
+                id && slug == "edit"
+                  ? eInvoiceRecordsData
+                    ? eInvoiceRecordsData.rows
+                    : []
+                  : tempRowEInvoiceRecords
+              }
+              tempRowEInvoiceRecords={tempRowEInvoiceRecords}
+              setTempRowEInvoiceRecords={setTempRowEInvoiceRecords}
+              revalidateEInvoiceRecordsData={revalidateEInvoiceRecordsData}
+              onRowSelect={handleRowSelect}
+              onTableInstanceReady={handleTableInstanceReady}
+              id={id && slug == "edit" ? id : ""}
+              revalidateSalesDebitNote={revalidateSalesDebitNote}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

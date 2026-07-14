@@ -1,0 +1,724 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+import React, { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { FaClipboard, FaLayerGroup } from "react-icons/fa6";
+import useSWR from "swr";
+import { z } from "zod";
+
+import LoadingUI from "@/components/LoadingUI";
+import { Form } from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { TabsNavigator } from "@/components/ui/TabsNavigator";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { useApi } from "@/lib/hooks/useAPI";
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+
+import { CustomerDetailsFormOld } from "./main-details/customer-details/CustomerDetailsFormOld";
+import { DocumentDetailsFormOld } from "./main-details/document-details/DocumentDetailsFormOld";
+import { CustomerDetailsForm } from "./main-details/customer-details/CustomerDetailsForm";
+import { DocumentDetailsForm } from "./main-details/document-details/DocumentDetailsForm";
+import { SalesOrderColumns } from "./main-details/sales-order-details/columns";
+import SalesOrderDataTableOld from "./main-details/sales-order-details/DataTableOld";
+import SalesOrderDataTable from "./main-details/sales-order-details/DataTable";
+import MoreDetailsForm from "./more-details/more-details/MoreDetailsFormOld";
+import TopActionBar from "./TopActionBar";
+import { DateRestrictionContext } from "@/components/custom/DateRestrictionContext";
+import { CustomFieldHandle, CustomFieldDefinition } from "@/components/DisplayCustomField";
+
+type PageParams = {
+  params: { slug: string };
+};
+
+const validRoutes = ["new", "edit", "clone", "transfer-to", "transfer-from"] as const;
+
+const fetcher = (url: string) => {
+  const headers = getAuthHeaders();
+
+  return fetch(url, { headers }).then((res) => res.json());
+};
+
+type ValidRoute = (typeof validRoutes)[number];
+
+const serviceCategoryFormSchema = z.object({
+  customerCodeCode: z.string().min(1, {
+    message: "Required",
+  }),
+});
+
+function isValidRoute(route: string): route is ValidRoute {
+  return validRoutes.includes(route as ValidRoute);
+}
+
+const tabs = [
+  {
+    id: "mainDetails",
+    name: "Main Details",
+    icon: FaClipboard,
+    shortName: "Main",
+  },
+  {
+    id: "moreDetails",
+    name: "More Details",
+    icon: FaLayerGroup,
+    shortName: "More",
+  },
+];
+
+export default function SalesOrderDetailsPage({ params }: PageParams) {
+  const { toast } = useToast();
+  const slug = params.slug;
+  const router = useRouter();
+  const [tempRowAttachments, setTempRowAttachments] = useState([]);
+  const headers = getAuthHeaders();
+  const customFieldRef = useRef<CustomFieldHandle>(null);
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const [formResetKey, setFormResetKey] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [salesOrderData, setSalesOrderData] = useState({});
+  const [approvalStatus, setApprovalStatus] = useState({});
+  const [tempRowSalesOrderDetailsList, setTempRowSalesOrderDetailsList] = useState([]);
+  const [UOMDetails, setUOMDetails] = useState({});
+  const [allowPastRecord, setAllowPastRecord] = useState(true);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  const mainDetailsRef = useRef(null);
+  const moreDetailsRef = useRef(null);
+
+  if (!isValidRoute(slug)) {
+    notFound();
+  }
+
+  // ─── Layout State ─────────────────────────────────────────────────────────────
+  const [layout, setLayout] = useState<"new" | "old">(() => {
+    if (typeof window === "undefined") return "old";
+    return (localStorage.getItem("Layout") as "new" | "old") || "old";
+  });
+
+  const handleLayoutChange = (newLayout: "new" | "old") => {
+    localStorage.setItem("Layout", newLayout);
+    setLayout(newLayout);
+  };
+
+  const {
+    data: salesOrder,
+    error,
+    isLoading,
+    isValidating,
+    mutate: mutateSalesOrder,
+  } = useApi(
+    id ? `${ORIGIN}/sales_order/api/sales-order/get-update-sales-order-data?id=${id}` : null,
+    { revalidateOnFocus: false },
+  );
+
+  const {
+    data: attachmentData,
+    error: attachmentDataError,
+    mutate: mutateAttachmentData,
+  } = useApi(id ? `${ORIGIN}/sales_order/api/sales-order/load-files?id=${id}` : null, {
+    revalidateOnFocus: false,
+  });
+
+  const isFetching = isLoading || isValidating || isSaving;
+
+  // Preference (State)
+  const [preferenceData, setPreferenceData] = useState<any>(null);
+  const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
+  const [customFieldSavedData, setCustomFieldSavedData] = useState<Record<string, unknown>>({});
+
+  const fetchPreferenceData = async () => {
+    try {
+      const headers = getAuthHeaders();
+
+      const response = await fetch(`${ORIGIN}/universal/get-preference?module=sales`, {
+        method: "GET",
+        headers,
+      });
+      if (!response.ok) throw new Error("Failed to fetch preference data");
+      const data = await response.json();
+      setPreferenceData(data);
+
+      // Fetch custom field definitions
+      const prefRes = await fetch(
+        `${ORIGIN}/sales_preference/api/sales-preference/get-index-sales-preference`,
+        { method: "GET", headers }
+      );
+      if (!prefRes.ok) throw new Error("Failed to fetch custom field preference");
+      const prefData = await prefRes.json();
+      const raw = prefData?.data?.customDIYFields ?? prefData?.customDIYFields ?? [];
+      const rawFields: CustomFieldDefinition[] = (() => {
+        try {
+          const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+          return Array.isArray(parsed) ? parsed : [];
+        } catch { return []; }
+      })();
+      setCustomFieldDefs(rawFields);
+
+    } catch (error) {
+      console.error("Error fetching preference data:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchPreferenceData();
+  }, []);
+
+  useEffect(() => {
+    if (salesOrder && slug !== "transfer-to" && slug !== "transfer-from") {
+      const salesOrderDataCopy = { ...salesOrder.data };
+
+      // Clear docNo if it's a clone page
+      if (slug === "clone") {
+        salesOrderDataCopy.docNo = "";
+        salesOrderDataCopy.docDate = Math.floor(Date.now() / 1000);
+      }
+
+      setSalesOrderData(salesOrderDataCopy);
+      setApprovalStatus(salesOrder.approval);
+      setIsSaving(false);
+
+      const rawSaved = salesOrder?.customDIYFieldData;
+      if (rawSaved) {
+        setCustomFieldSavedData(
+          typeof rawSaved === "string" ? JSON.parse(rawSaved) : rawSaved
+        );
+      } else {
+        setCustomFieldSavedData({});
+      }
+    }
+  }, [salesOrder, slug, preferenceData]);
+
+  useEffect(() => {
+    if (salesOrder?.salesOrderHasDetails && slug !== "transfer-to" && slug !== "transfer-from") {
+      // Preference (Add Preference Data to Table Details)
+      const detailsWithPreferences = salesOrder?.salesOrderHasDetails.rows.map((row) => ({
+        ...row,
+        preferenceData: preferenceData,
+      }));
+
+      setTempRowSalesOrderDetailsList(detailsWithPreferences);
+    }
+  }, [salesOrder?.salesOrderHasDetails, preferenceData]);
+
+  const revalidateSalesOrder = () => {
+    mutateSalesOrder();
+  };
+
+  const revalidateSalesOrderDetails = () => {
+    mutateAttachmentData();
+  }
+    ;
+  useEffect(() => {
+    if (attachmentData) {
+      setTempRowAttachments(attachmentData);
+    }
+  }, [attachmentData]);
+
+  const revalidate = async () => {
+    if (id) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/sales_order/api/sales-order/get-sales-order-has-details?salesOrderUUID=${id}`,
+          {
+            headers,
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch stock details data");
+        }
+
+        const salesOrderDetailsData = await response.json();
+
+        // Preference (Add Preference Data to Table Details)
+        const detailsWithPreferences = (salesOrderDetailsData.rows || []).map((row) => ({
+          ...row,
+          preferenceData: preferenceData,
+        }));
+
+        setTempRowSalesOrderDetailsList(detailsWithPreferences);
+      } catch (error) {
+        console.error("Error fetching sales order details data:", error);
+      }
+    }
+  };
+
+  const form = useForm<z.infer<typeof serviceCategoryFormSchema>>({
+    resolver: zodResolver(serviceCategoryFormSchema),
+    defaultValues: {
+      account: salesOrderData?.account ?? "",
+      company: salesOrderData?.company ?? "",
+      serviceCategoryCode: salesOrderData?.serviceCategoryCode ?? "",
+      description: salesOrderData?.description ?? "",
+      moreDescription: salesOrderData?.moreDescription ?? "",
+      attachment: salesOrderData?.attachment ?? "",
+      valid: salesOrderData?.valid ?? "1",
+      currency: salesOrderData?.currency ?? "",
+      currencyCode: salesOrderData?.currencyCode ?? "",
+      currencyRate: salesOrderData?.currencyRate ?? "",
+    },
+  });
+
+  // Add this useEffect to update form values when salesOrderData changes
+  useEffect(() => {
+    if (salesOrderData && Object.keys(salesOrderData).length > 0) {
+      form.reset({
+        account: salesOrderData?.account ?? "",
+        company: salesOrderData?.company ?? "",
+        serviceCategoryCode: salesOrderData?.serviceCategoryCode ?? "",
+        description: salesOrderData?.description ?? "",
+        moreDescription: salesOrderData?.moreDescription ?? "",
+        attachment: salesOrderData?.attachment ?? "",
+        valid: salesOrderData?.valid ?? "1",
+        customerCodeCode: salesOrderData?.customerCodeCode ?? "",
+        docNo: salesOrderData?.docNo ?? "",
+        docDate: salesOrderData?.docDate ?? "",
+        dueDate: salesOrderData?.dueDate ?? "",
+        referenceDocNo: salesOrderData?.referenceDocNo ?? "",
+        prepaymentAmount: salesOrderData?.prepaymentAmount ?? "",
+        totalFeeAmount: salesOrderData?.totalFeeAmount ?? "",
+        roundingAmount: salesOrderData?.roundingAmount ?? "",
+        notes: salesOrderData?.notes ?? "",
+        ...salesOrderData,
+      });
+    }
+  }, [salesOrderData, form]);
+
+  const onSubmit = async () => {
+    setIsSaving(true);
+
+    setSubmitAttempted(true);
+
+    const ok = await customFieldRef.current?.save();
+    if (ok === false) {
+      setIsSaving(false);
+      return;
+    }
+
+    var form_data = new FormData();
+    var formValues = form.getValues();
+
+    const localNetTotal = document.querySelector(".localNetTotal");
+    const netTotal = document.querySelector(".netTotal");
+
+    var saveType = id
+      ? `${slug === "clone" ? "create-data?c_id=1" : `update-sales-order-data?id=${id}`}`
+      : `create-data`;
+    var transferType = "";
+    var transferData = "";
+
+    if (slug === "transfer-to") {
+      transferData = JSON.parse(localStorage.getItem("transfer-to.sales-order") || "{}");
+    } else if (slug === "transfer-from") {
+      transferData = JSON.parse(localStorage.getItem("transfer-from.sales-order") || "{}");
+    }
+
+    var transferDocType = transferData?.data?.transferDocType;
+
+    // Preference (Get Decimal Places for Calculations)
+    const decimal = preferenceData?.data?.decimal || 2;
+
+    // Ensure all required fields exist and default to 0 if undefined or empty
+    let totalAmount = tempRowSalesOrderDetailsList.reduce((sum, row) => {
+      return sum + (row.amount ? parseFloat(row.amount) : 0);
+    }, 0);
+
+    let totalDiscount = tempRowSalesOrderDetailsList.reduce((sum, row) => {
+      const discount1 = row.discountAmount ? parseFloat(row.discountAmount) : 0;
+      const discount2 = row.discountAmount2 ? parseFloat(row.discountAmount2) : 0;
+      const discount3 = row.discountAmount3 ? parseFloat(row.discountAmount3) : 0;
+
+      return sum + discount1 + discount2 + discount3;
+    }, 0);
+
+    let totalTax = tempRowSalesOrderDetailsList.reduce((sum, row) => {
+      return sum + (row.taxAmount ? parseFloat(row.taxAmount) : 0);
+    }, 0);
+
+    // Fix the calculation of totalSubtotal
+    let totalSubtotal = totalAmount - totalDiscount + totalTax;
+    let totalSubtotalWithoutTax = totalAmount - totalDiscount;
+
+    let prepaymentAmount = parseFloat(formValues.prepaymentAmount) || 0;
+    let totalFeeAmount = parseFloat(formValues.totalFeeAmount) || 0;
+
+    // Calculate subtotal tax (amount after discount + tax)
+    let subtotalTax = totalAmount - totalDiscount + totalTax;
+
+    // Calculate Rounding Amount
+    let roundedSubtotalTax = Math.round(subtotalTax * 20) / 20;
+    let roundingAmount = roundedSubtotalTax - subtotalTax;
+
+    // Correct totalPayable Calculation
+    let totalPayable =
+      totalAmount - totalDiscount + totalTax - prepaymentAmount + totalFeeAmount + roundingAmount;
+
+    // Round totalPayable to the nearest 5 cents
+    totalPayable = Math.round(totalPayable * 20) / 20;
+
+    // Preference (Apply Decimal Formatting to Totals)
+    formValues.totalAmount = totalAmount.toFixed(decimal);
+    formValues.totalDiscount = totalDiscount.toFixed(decimal);
+    formValues.totalTax = totalTax.toFixed(decimal);
+    formValues.totalSubtotal = totalSubtotalWithoutTax.toFixed(decimal);
+    formValues.roundingAmount = roundingAmount.toFixed(decimal);
+    formValues.totalPayable = totalPayable.toFixed(decimal);
+
+    formValues.localNetTotal = localNetTotal?.value;
+    formValues.netTotal = netTotal?.value;
+
+    // Create salesOrder object excluding attachments
+    const salesOrderData = { ...formValues };
+    delete salesOrderData.attachmentLink;
+    delete salesOrderData.attachment;
+
+    // Combine salesOrder and salesOrderHasDetails into single data object
+    const combinedData = {
+      salesOrder: salesOrderData,
+      salesOrderHasDetails: tempRowSalesOrderDetailsList,
+    };
+
+    // Add combined data as JSON string
+    form_data.append("data", JSON.stringify(combinedData));
+
+    if (saveType === "create-data") {
+      var counter = 0;
+
+      for (const file of tempRowAttachments) {
+        const base64 =
+          slug === "transfer-to" || slug === "transfer-from" ? "" : await getFileToBase64(file);
+
+        form_data.append(`salesOrder[attachment][${counter}][Name]`, file.name);
+
+        form_data.append(
+          `salesOrder[attachment][${counter}][File]`,
+          slug === "transfer-to" || slug === "transfer-from" ? "" : base64,
+        );
+
+        counter++;
+      }
+    } else {
+      var counter = 0;
+
+      for (const attachment of tempRowAttachments) {
+        if (attachment.link) {
+          form_data.append(`salesOrder[attachment][${counter}][Name]`, attachment.name);
+          form_data.append(`salesOrder[attachment][${counter}][File]`, "");
+        } else {
+          const base64 = await getFileToBase64(attachment);
+
+          form_data.append(`salesOrder[attachment][${counter}][Name]`, attachment.name);
+          form_data.append(`salesOrder[attachment][${counter}][File]`, base64);
+        }
+
+        counter++;
+      }
+    }
+
+    transferType =
+      slug == "transfer-to" || slug == "transfer-from" ? `?transferFrom=${transferDocType}` : "";
+
+    try {
+      const response = await fetch(
+        `${ORIGIN}/sales_order/api/sales-order/${saveType}${transferType}`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        setIsSaving(false);
+
+        let errorMessage = errorData.message;
+
+        // Error Handling for "Data too long"
+        if (errorMessage.includes("Data too long")) {
+          errorMessage = errorMessage.split("\n")[0];
+        }
+
+        toast({
+          title: errorData.name,
+          description: errorMessage,
+          variant: "destructive",
+          duration: 2000,
+        });
+
+        throw new Error("Failed to fetch data");
+      }
+
+      const responseData = await response.json();
+
+      if (responseData && responseData.item) {
+        if (slug === "transfer-to") localStorage.removeItem("transfer-to.sales-order");
+        else if (slug === "transfer-from") localStorage.removeItem("transfer-from.sales-order");
+
+        if (customFieldRef.current) {
+          try {
+            await customFieldRef.current.save(
+              responseData.data,
+              responseData.item,
+            );
+          } catch (err) {
+            console.error("Failed to save custom fields:", err);
+          }
+        }
+
+        const url = `/sales/sales-order/edit?item=${responseData.item}&id=${responseData.data}`;
+
+        router.push(url);
+
+        if (params.slug == "edit") {
+          mutateSalesOrder();
+          mutateAttachmentData();
+        }
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      } else if (slug === "clone" && id) {
+        router.push(`/sales/sales-order/clone?id=${id}`);
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      console.error("Error creating new sales order data:", error);
+
+      setIsSaving(false);
+
+      toast({
+        title: "Failed",
+        description: `${error.message}`,
+        variant: "destructive",
+        duration: 2000,
+      });
+    }
+  };
+
+  const handleSubmit = async () => {
+    setSubmitAttempted(true);
+    const isFormValid = await form.trigger();
+
+    if (!isFormValid) {
+      const errors = form.formState.errors;
+
+      if (errors.customerCodeCode) {
+        toast({
+          title: "Customer Required",
+          description: "Please select a customer before saving.",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+      return;
+    }
+
+    try {
+      await onSubmit();
+    } catch (error) {
+      console.error("Form submission error:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      let transferData: any = {};
+
+      if (slug === "transfer-to") {
+        transferData = JSON.parse(localStorage.getItem("transfer-to.sales-order") || "{}");
+      } else if (slug === "transfer-from") {
+        transferData = JSON.parse(localStorage.getItem("transfer-from.sales-order") || "{}");
+      }
+
+      // Map salesOrder fields to sales order fields
+      const mappedData = {
+        ...transferData?.data,
+        customerAttentionNameName: transferData?.data?.attentionName,
+        customerAddress: transferData?.data?.address,
+        customerAttentionTel: transferData?.data?.phoneNo,
+        customerAttentionEmail: transferData?.data?.email,
+        salesOrderNo: transferData?.data?.salesOrderDocNo ?? transferData?.data?.salesOrderNo ?? "",
+        description: "",
+        note: "",
+        UUID: "",
+        docDate: Math.floor(Date.now() / 1000),
+      };
+
+      setSalesOrderData(mappedData);
+
+      transferData?.subData?.forEach((detail) => {
+        detail["item"] = detail["item"];
+        detail["itemGroup"] = detail["itemGroupCode"];
+        detail["itemCategory"] = detail["itemCategoryCode"];
+      });
+
+      setTempRowAttachments(transferData?.data?.attachmentLink ?? []);
+      setTempRowSalesOrderDetailsList(transferData?.subData ?? []);
+
+      function beforeUnload(e: BeforeUnloadEvent) {
+        if (slug === "transfer-to") localStorage.removeItem("transfer-to.sales-order");
+        else if (slug === "transfer-from") localStorage.removeItem("transfer-from.sales-order");
+
+        e.preventDefault();
+      }
+
+      window.addEventListener("beforeunload", beforeUnload);
+
+      return () => {
+        window.removeEventListener("beforeunload", beforeUnload);
+      };
+    }
+  }, []);
+
+  //Shared props 
+  const [isExpand, setIsExpand] = useState(false);
+
+  const documentDetailsProps = {
+    key: formResetKey,
+    form,
+    slug,
+    preferenceData,
+    tempRowAttachments,
+    setTempRowAttachments,
+    salesOrderData: salesOrder,
+    id,
+    attachmentData,
+    tempRowSalesOrderDetailsList,
+    isExpand
+  };
+
+  const dataTableProps = {
+    columns: SalesOrderColumns,
+    data: id
+      ? attachmentData
+        ? attachmentData.rows
+        : []
+      : tempRowSalesOrderDetailsList,
+    tempRowSalesOrderDetailsList,
+    setTempRowSalesOrderDetailsList,
+    revalidateSalesOrderDetails,
+    form,
+    salesOrderData,
+    UOMDetails,
+    preferenceData,
+    slug,
+  };
+
+  return (
+    <DateRestrictionContext.Provider value={{ allowPastRecord, setAllowPastRecord }}>
+      <div className="sticky top-0 z-20">
+        <TopActionBar
+          handleSubmit={handleSubmit}
+          salesOrder={salesOrderData}
+          approvalStatus={approvalStatus}
+          form={form}
+          revalidateSalesOrderDetails={revalidate}
+          slug={slug}
+          action={""}
+          salesOrderData={salesOrder}
+          // Layout switcher props
+          layout={layout}
+          onLayoutChange={handleLayoutChange}
+        />
+      </div>
+
+      {/* New Design */}
+      {layout === "new" && (
+        <div className="box-border flex w-full h-full items-center justify-between gap-x-2 p-1.5">
+          <Form {...form}>
+            {/* Left Container */}
+            <div className="flex h-full min-w-[380px] w-[480px] flex-col gap-y-2">
+              <CustomerDetailsForm
+                form={form}
+                setIsExpand={setIsExpand}
+                isExpand={isExpand}
+                id={id}
+                docNo={salesOrderData?.docNo}
+                customFieldRef={customFieldRef}
+                preferenceData={preferenceData}
+                customFieldDefs={customFieldDefs}
+                customFieldSavedData={customFieldSavedData}
+                submitAttempted={submitAttempted}
+              />
+              <DocumentDetailsForm {...documentDetailsProps} />
+            </div>
+
+            {/* Right */}
+            <div className="w-full flex flex-1 flex-col h-full mt-3.5 md:mt-0">
+              <SalesOrderDataTable {...dataTableProps} />
+            </div>
+            {/* Loading */}
+            {isFetching && <LoadingUI />}
+          </Form>
+        </div>
+      )}
+
+      {/* Old Design */}
+      {layout === "old" && (
+        <div className="grid h-full grid-rows-[auto_1fr]">
+          <Form {...form}>
+            <div className="grid h-full grid-cols-[1fr_auto] gap-x-2">
+              <ScrollArea className="h-full">
+                <div id="mainDetails" className="mt-2" ref={mainDetailsRef}>
+                  <DocumentDetailsFormOld
+                    key={formResetKey}
+                    form={form}
+                    slug={slug}
+                    preferenceData={preferenceData}
+                  />
+                </div>
+
+                {/* Preference (Pass preferenceData Prop) */}
+                <div className="mt-2">
+                  <CustomerDetailsFormOld form={form} preferenceData={preferenceData} />
+                </div>
+
+                <div className="mt-2">
+                  <SalesOrderDataTableOld
+                    columns={SalesOrderColumns}
+                    data={tempRowSalesOrderDetailsList}
+                    tempRowSalesOrderDetailsList={tempRowSalesOrderDetailsList}
+                    setTempRowSalesOrderDetailsList={setTempRowSalesOrderDetailsList}
+                    revalidateSalesOrderDetails={revalidate}
+                    form={form}
+                    salesOrderData={salesOrderData}
+                    UOMDetails={UOMDetails}
+                    preferenceData={preferenceData}
+                    slug={slug}
+                  />
+                </div>
+
+                {/* Preference (Pass preferenceData Prop) */}
+                <div id="moreDetails" className="mt-2" ref={moreDetailsRef}>
+                  <MoreDetailsForm
+                    tempRowAttachments={tempRowAttachments}
+                    setTempRowAttachments={setTempRowAttachments}
+                    form={form}
+                    salesOrderData={salesOrderData}
+                    slug={slug}
+                    preferenceData={preferenceData}
+                  />
+                </div>
+              </ScrollArea>
+
+              <TabsNavigator tabs={tabs} initialActiveTabId="mainDetails" stickyTop="top-14" />
+            </div>
+            {isLoading && <LoadingUI />}
+          </Form>
+          {isFetching && <LoadingUI />}
+        </div>
+      )}
+    </DateRestrictionContext.Provider>
+  );
+}

@@ -1,0 +1,154 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { useRouter } from "next/navigation";
+import useSWR from "swr";
+
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { toast } from "@/components/ui/use-toast";
+import LoadingUI from "@/components/LoadingUI";
+import type { CustomFieldDefinition } from "@/components/CustomizeFields";
+import DIYFieldForm from "./DIYFieldForm";
+import ConfirmSaveDialog from "./ConfirmSaveDialog";
+import { DateRestrictionContext } from "@/components/custom/DateRestrictionContext";
+
+const fetcher = async (url) => {
+  const headers = getAuthHeaders();
+  return fetch(url, { headers }).then((res) => {
+    if (!res.ok) throw new Error("Failed to fetch data");
+    return res.json();
+  });
+};
+
+export default function PreferencesPage() {
+  const router = useRouter();
+  const headers = getAuthHeaders();
+
+  const [originalDIYFields, setOriginalDIYFields] = useState<CustomFieldDefinition[]>([]);
+  const [customDIYFields, setCustomDIYFields] = useState<CustomFieldDefinition[]>([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [allowPastRecord, setAllowPastRecord] = useState(false);
+
+  const form = useForm();
+
+  const { data, error, isLoading, mutate } = useSWR(
+    `${ORIGIN}/sales_preference/api/sales-preference/get-index-sales-preference`,
+    fetcher,
+    { revalidateOnFocus: false, shouldRetryOnError: false }
+  );
+
+  // Load customDIYFields from fetched data
+  useEffect(() => {
+    if (!data) return;
+
+    const raw = data?.data?.customDIYFields;
+    if (raw) {
+      try {
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (Array.isArray(parsed)) {
+          setCustomDIYFields(parsed);
+          setOriginalDIYFields(parsed);
+        }
+      } catch (e) {
+        console.error("Failed to parse customDIYFields:", e);
+      }
+    }
+  }, [data]);
+
+  // Handle auth error
+  useEffect(() => {
+    if (!error) return;
+    if (error.status === "401") {
+      setTimeout(() => {
+        mutate(undefined, false);
+        router.push("/login");
+      }, 500);
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Error fetching preferences",
+        description: "There was an error loading your preferences.",
+      });
+    }
+  }, [error]);
+
+  const handleCustomDIYFieldsChange = (fields: CustomFieldDefinition[]) => {
+    setCustomDIYFields(fields);
+  };
+
+  const onSubmit = async () => {
+    try {
+      const formData = new FormData();
+      formData.append("salesPreference[customDIYFields]", JSON.stringify(customDIYFields));
+
+      // Carry over existing preference fields untouched
+      const existing = data?.data ?? {};
+      for (const key in existing) {
+        if (key !== "customDIYFields") {
+          formData.append(`salesPreference[${key}]`, existing[key] ?? "");
+        }
+      }
+
+      const response = await fetch(
+        `${ORIGIN}/sales_preference/api/sales-preference/update-sales-preference`,
+        { headers, method: "POST", body: formData }
+      );
+
+      if (!response.ok) throw new Error("Failed to update preferences");
+
+      setOriginalDIYFields([...customDIYFields]);
+
+      toast({ variant: "default", title: "Success", description: "DIY fields saved successfully." });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error saving",
+        description: error.message || "There was an error saving DIY fields.",
+      });
+    }
+  };
+
+  const getChangedFields = () => {
+    if (JSON.stringify(originalDIYFields) === JSON.stringify(customDIYFields)) return [];
+    return [{
+      field: "customDIYFields",
+      label: "Custom DIY Fields",
+      oldValue: `${originalDIYFields.length} field(s)`,
+      newValue: `${customDIYFields.length} field(s)`,
+    }];
+  };
+
+  const handleSaveClick = () => {
+    const changes = getChangedFields();
+    if (changes.length === 0) {
+      toast({ variant: "default", title: "No Changes", description: "No changes detected to save." });
+      return;
+    }
+    setShowConfirmDialog(true);
+  };
+
+  const maxCustomDIYFieldCreationLimit = data?.maxCustomDIYFieldCreationLimit;
+
+  return (
+    <DateRestrictionContext.Provider value={{ allowPastRecord, setAllowPastRecord }}>
+      {isLoading && <LoadingUI />}
+      <DIYFieldForm
+        form={form}
+        onSubmit={handleSaveClick}
+        tempDIYField={null}
+        setTempDIYField={() => {}}
+        handleChange={() => {}}
+        customDIYFields={customDIYFields}
+        onCustomDIYFieldsChange={handleCustomDIYFieldsChange}
+        maxCustomDIYFields={maxCustomDIYFieldCreationLimit}
+      />
+      <ConfirmSaveDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={() => { setShowConfirmDialog(false); onSubmit(); }}
+        changes={getChangedFields()}
+      />
+    </DateRestrictionContext.Provider>
+  );
+}

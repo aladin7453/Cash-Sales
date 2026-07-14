@@ -1,0 +1,354 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { FaSort, FaSortDown, FaSortUp } from "react-icons/fa6";
+import { ToastAction } from "@radix-ui/react-toast";
+import type { ColumnDef, Row, SortingState } from "@tanstack/react-table";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { buttonVariants } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { cn } from "@/lib/utils/cn";
+import { DEFAULT_DATA_TABLE_PAGE_SIZE, DIRECTORY } from "@/lib/constants";
+
+import { useTransferToAPI } from "./hooks/useTransferToAPI";
+import { useTransferToState } from "./hooks/useTransferToState";
+import TransferToPopoverToolbar from "./TransferToPopoverToolbar";
+import type { TransferToPopoverProps } from "./types";
+
+export default function TransferToPopover({
+  open,
+  setOpen,
+  columns,
+  data,
+  fetchItems,
+  id,
+  docType,
+  config,
+  setOpenDialog,
+}: TransferToPopoverProps) {
+  const isDev = process.env.NODE_ENV === "development";
+  const { transferItems } = useTransferToAPI(config);
+  const { transferQuantities, setTransferQuantities } = useTransferToState();
+  const { toast } = useToast();
+
+  const showTransferFailToast = (items: any[]) => {
+    toast({
+      title: "Transfer Failed",
+      description: `The following record(s) cannot be transferred: ${items
+        .reduce((acc, curr) => acc + curr.itemCode + ", ", "")
+        .slice(0, -2)}`,
+      action: (
+        <ToastAction
+          className={cn(buttonVariants({ variant: "default", size: "sm" }))}
+          altText="OK"
+        >
+          OK
+        </ToastAction>
+      ),
+    });
+  };
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+
+  const table = useReactTable({
+    columns,
+    data,
+    state: { sorting },
+    onSortingChange: setSorting,
+    autoResetPageIndex: false,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      },
+    },
+  });
+
+  // Select all rows when data changes
+  useEffect(() => {
+    if (data.length > 0) {
+      const allRowIds = data.map((_, index) => index.toString());
+      table.setRowSelection(
+        allRowIds.reduce((acc, id) => ({ ...acc, [id]: true }), {})
+      );
+    }
+  }, [data, table]);
+
+  usePreventShiftTextSelect();
+
+  const numberInputCell = ({ row, column: { id } }) => {
+    const onBlur = async () => {
+      if (Number(row.original["quantity"]) - row.original[id] < 0) {
+        row.original[id] = row.original["quantity"];
+        row.original["transferableQuantity"] = "0";
+
+        setTransferQuantities((transferQuantities) => ({
+          ...transferQuantities,
+          [row.id]: row.original["quantity"],
+        }));
+      }
+    };
+
+    const onChange = (e) => {
+      let newValue = Number(e.target.value.replace(/[^0-9]/g, ""));
+
+      row.original[id] = `${newValue}`;
+      row.original["transferableQuantity"] = `${Number(row.original["quantity"]) - newValue}`;
+
+      setTransferQuantities((transferQuantities) => ({
+        ...transferQuantities,
+        [row.id]: `${newValue}`,
+      }));
+    };
+
+    return (
+      <Input
+        className="h-7.5 text-right"
+        value={
+          transferQuantities[row.id] ? transferQuantities[row.id] : row.original.transferQuantity
+        }
+        onChange={onChange}
+        onBlur={onBlur}
+      />
+    );
+  };
+
+  useEffect(() => {
+    setTransferQuantities({});
+  }, [data, setTransferQuantities]);
+
+  const onSave = async (prop: any) => {
+    let selectedRows: any[] = [];
+    let failed: any[] = [];
+
+    if (prop.table) {
+      selectedRows = prop.table.getSelectedRowModel().rows;
+    } else {
+      selectedRows.push(prop.row);
+    }
+
+    try {
+      const subDataKey = config.subDataKey || "subData";
+      const grouped = new Map<string, any[]>();
+      selectedRows.forEach((row) => {
+        const uuid = row.original._sourceDocUUID || id;
+        if (!grouped.has(uuid)) grouped.set(uuid, []);
+        grouped.get(uuid)!.push(row);
+      });
+
+      const groupedKeys = [...grouped.keys()];
+      const allResponses: { response: any; srcUUID: string }[] = [];
+
+      await Promise.all(
+        [...grouped.entries()].map(async ([srcUUID, rows]) => {
+          const response = await transferItems({
+            selectedRows: rows,
+            id: srcUUID,
+            docType,
+          });
+          allResponses.push({ response, srcUUID });
+        })
+      );
+
+      allResponses.sort(
+        (a, b) => groupedKeys.indexOf(a.srcUUID) - groupedKeys.indexOf(b.srcUUID)
+      );
+
+      const baseResponse = allResponses[allResponses.length - 1].response;
+      const firstResponse = allResponses[0].response;
+      const subDataRaw = firstResponse[subDataKey];
+      const isRowsShape = !Array.isArray(subDataRaw) && subDataRaw?.rows;
+
+      const dataToTransfer = {
+        UUID: baseResponse.data?.UUID || "",
+        transferDocType: config.transferDocType,
+        [config.transferDocType]: baseResponse.data?.UUID || "",
+        docNo: "",
+        ...Object.keys(baseResponse.data || {}).reduce((acc, key) => {
+          if (key !== "UUID" && key !== "transferDocType" && key !== "docNo") {
+            acc[key] = baseResponse.data[key] || "";
+          }
+          return acc;
+        }, {} as Record<string, any>),
+      };
+
+      const mergedRows = allResponses.flatMap(({ response, srcUUID }) => {
+        const raw = response[subDataKey];
+        const items = Array.isArray(raw) ? raw : (raw?.rows || []);
+        return items.map((item: any) => ({
+          ...item,
+          _sourceDocUUID: srcUUID,
+          transferFromDocuments: { UUID: srcUUID, docType },
+        }));
+      });
+
+      const mergedSubData = isRowsShape
+        ? { total: mergedRows.length, rows: mergedRows }
+        : mergedRows;
+
+      const combinedPayload = {
+        ...baseResponse,
+        data: dataToTransfer,
+        [subDataKey]: mergedSubData,
+      };
+
+      const route = config.urlMappings[docType];
+      const finalRoute = isDev ? route.devRoute : route.prodRoute;
+      const storageKey = isDev
+        ? `transfer-to.${finalRoute.split("/")[1]}`
+        : `transfer-to.${finalRoute.split("/")[2]}`;
+
+      localStorage.setItem(storageKey, JSON.stringify(combinedPayload));
+
+      const link = document.createElement("a");
+      link.href = `${DIRECTORY}/${finalRoute}/transfer-to`;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+    } catch (error) {
+      failed = selectedRows.map((row) => row.original);
+    }
+
+    if (failed.length > 0) {
+      showTransferFailToast(failed);
+    }
+
+    setOpen(false);
+  };
+
+  const onDoubleClick = (row: Row<any>) => {
+    onSave({ row: row });
+  };
+
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="min-h-[75vh] min-w-[75vw] max-w-3xl bg-erp-blue-3 p-2">
+        <div className="h-[73cqh] w-full p-4">
+          <div className="flex h-[70cqh] flex-col bg-erp-blue-3 @container-[size]">
+            <h2 className="text-sm font-bold">{config.popoverTitle}</h2>
+            <TransferToPopoverToolbar
+              table={table}
+              setOpen={setOpen}
+              fetchItems={fetchItems}
+              setTransferQuantities={setTransferQuantities}
+              onSave={onSave}
+              setOpenDialog={setOpenDialog}
+            />
+            <Separator className="bg-erp-blue-11" />
+            <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+              <Table className="border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1">
+                <TableHeader className="sticky top-0">
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => (
+                        <TableHead className="bg-erp-blue-11 font-normal" key={header.id}>
+                          <div className="flex flex-col gap-y-0.5">
+                            <div
+                              className={cn(
+                                "flex items-center gap-x-0.5 text-white",
+                                header.column.getCanSort() ? "cursor-pointer select-none" : "",
+                              )}
+                              onClick={header.column.getToggleSortingHandler()}
+                            >
+                              <span className="font-bold">
+                                {header.isPlaceholder
+                                  ? null
+                                  : flexRender(header.column.columnDef.header, header.getContext())}
+                              </span>
+                              {{
+                                asc: <FaSortUp />,
+                                desc: <FaSortDown />,
+                              }[header.column.getIsSorted() as string] ?? <FaSort />}
+                            </div>
+                            {header.column.id === "valid" ? (
+                              <TableHeadValidityFilter table={table} />
+                            ) : (
+                              <TableHeadColumnTextFilter column={header.column} table={table} />
+                            )}
+                          </div>
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {table.getRowModel().rows?.length ? (
+                    table.getRowModel().rows.map((row) => (
+                      <TableRow
+                        className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+                        data-state={row.getIsSelected() && "selected"}
+                        onClick={onRowSelection(row)}
+                        key={row.id}
+                      >
+                        {row.getVisibleCells().map((cell) => {
+                          if (cell.column.id === "transferQuantity") {
+                            if (!transferQuantities[cell.row.id]) {
+                              if (Number(cell.row.original.quantity) > 0)
+                                cell.row.original.transferQuantity = cell.row.original.quantity; // Set to max quantity
+                              else cell.row.original.transferQuantity = "0";
+                            }
+                            cell.row.original.transferableQuantity =
+                              Number(cell.row.original.quantity) -
+                              Number(cell.row.original.transferQuantity);
+                            return (
+                              <TableCell key={cell.id} className="" onClick={(e) => e.stopPropagation()}>
+                                {numberInputCell(cell)}
+                              </TableCell>
+                            );
+                          } else {
+                            return (
+                              <TableCell key={cell.id} className="">
+                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              </TableCell>
+                            );
+                          }
+                        })}
+                      </TableRow>
+                    ))
+                  ) : (
+                    <NoResultsTableRow columns={columns} />
+                  )}
+                </TableBody>
+              </Table>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

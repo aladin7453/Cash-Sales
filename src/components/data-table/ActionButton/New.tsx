@@ -1,0 +1,20 @@
+import Link from "next/link";
+import { FaRegSquarePlus } from "react-icons/fa6";
+
+export default function NewButton({
+  destination,
+  isMobile,
+}: {
+  destination: string;
+  isMobile?: boolean;
+}) {
+  return (
+    <a
+      href={destination}
+      className={isMobile? "flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-md" : "group flex flex-col items-center gap-y-1 disabled:cursor-not-allowed"}
+    >
+      <FaRegSquarePlus className={isMobile? "size-4.5 text-erp-blue-11" : "size-5.5 text-erp-blue-11"} />
+      <span className={isMobile? "hidden" : "text-[11px]/none font-medium"}>New</span>
+    </a>
+  );
+}

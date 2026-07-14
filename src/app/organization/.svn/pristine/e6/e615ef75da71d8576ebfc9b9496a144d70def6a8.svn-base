@@ -1,0 +1,124 @@
+"use client";
+
+import { format, parseISO } from "date-fns";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type AssignmentLog = {
+  location: string;
+  assignedAt: string;
+  assignedUserList: string;
+  recentAssigned: string;
+  recentUnassigned: string;
+  condition: string;
+  remark: string;
+  attachmentLink: {
+    name: string;
+    link: string;
+  }[];
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+};
+
+export const assignmentLogColumns: ColumnDef<AssignmentLog>[] = [
+  {
+    id: "locationCodeCode",
+    accessorKey: "locationCodeCode",
+    header: "Assigned Location",
+    filterFn: "includesString",
+  },
+  {
+    id: "assignAtFormat",
+    accessorKey: "assignAtFormat",
+    header: "Assigned/Unassign Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "assignedUserList",
+    accessorKey: "assignedUserList",
+    header: "Assigned User List",
+    filterFn: "includesString",
+  },
+  {
+    id: "fullName",
+    accessorKey: "fullName",
+    header: "Assigned",
+    filterFn: "includesString",
+  },
+  {
+    id: "recentAssigned",
+    accessorKey: "recentUnassigned",
+    header: "Unassigned",
+    filterFn: "includesString",
+  },
+  {
+    id: "remark",
+    accessorKey: "remark",
+    header: "Remark",
+    filterFn: "includesString",
+  },
+  {
+    id: "attachment",
+    accessorKey: "attachment",
+    header: "Attachment (.pdf, .png, .jpg, .jpeg)",
+    cell: ({ row }) => {
+      let attachments = [];
+
+      try {
+        attachments = row.original.attachment ? JSON.parse(row.original.attachment) : [];
+      } catch {
+        attachments = [];
+      }
+
+      const attachmentLinks = row.original.attachmentLink || [];
+
+      return attachments.length > 0 ? (
+        attachments
+          .map((att: { Name: string }, index: number) => {
+            const link = attachmentLinks.find((al: any) => al.name === att.Name);
+
+            return link ? (
+              <a
+                key={index}
+                href={link.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "blue" }}
+              >
+                {att.Name}
+              </a>
+            ) : (
+              <span key={index}>{att.Name}</span>
+            );
+          })
+          .reduce((prev: any, curr: any) => [prev, ", ", curr])
+      ) : (
+        <span>No attachment</span>
+      );
+    },
+  },
+  {
+    id: "condition",
+    accessorKey: "condition",
+    header: "Asset Condition",
+    filterFn: "includesString",
+  },
+  // {
+  //   accessorKey: "createdAtFormat",
+  //   header: "Created at",
+  // },
+  // {
+  //   accessorKey: "createdByUserName",
+  //   header: "Created by",
+  // },
+  // {
+  //   accessorKey: "updatedAtFormat",
+  //   header: "Updated at",
+  // },
+  // {
+  //   accessorKey: "updatedByUserName",
+  //   header: "Updated by",
+  // },
+];

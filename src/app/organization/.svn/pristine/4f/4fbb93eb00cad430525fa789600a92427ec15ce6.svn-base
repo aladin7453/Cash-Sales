@@ -1,0 +1,45 @@
+"use client";
+
+import "react";
+
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+
+// import Validity from "@/components/data-table/Validity";
+
+import type { Table } from "@tanstack/react-table";
+
+type Props<TData> = {
+  table: Table<TData>;
+  revalidateAssignmentLog: () => void;
+  setTempRowAssignmentLogData: (data: any, overwrite: boolean) => void;
+  tempRowAssignmentLog: any;
+  refreshTable: () => void;
+};
+
+export default function AssignmentLogDataTableToolbar<TData>({
+  table,
+  tempRowAssignmentLog,
+  setTempRowAssignmentLogData,
+  revalidateAssignmentLog,
+  refreshTable,
+}: Props<TData>) {
+  return (
+    <>
+      <div className="flex items-center justify-between p-1.5">
+        <div className="flex items-center gap-x-1 pl-2">
+          <span className="text-sm/none font-semibold">Assignment Log</span>
+          <div className="flex items-center text-erp-blue-14"></div>
+        </div>
+        <Pagination table={table} />
+        <div className="flex items-center gap-x-1 text-erp-blue-14">
+          <Export table={table} />
+          <Refresh refreshTable={refreshTable} />
+          <ColumnVisibilityToggle table={table} />
+        </div>
+      </div>
+    </>
+  );
+}

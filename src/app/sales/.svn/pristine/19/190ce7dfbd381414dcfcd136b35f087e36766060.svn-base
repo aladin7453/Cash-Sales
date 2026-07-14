@@ -1,0 +1,279 @@
+"use client";
+
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useEffect, useState } from "react";
+import { FaSort, FaSortDown, FaSortUp } from "react-icons/fa6";
+import { useSearchParams } from "next/navigation";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useToast } from "@/components/ui/use-toast";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { DEFAULT_DATA_TABLE_PAGE_SIZE, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+
+import AgentPopoverToolbar from "./AgentPopoverToolbar";
+
+import type { ColumnDef, Row } from "@tanstack/react-table";
+import type { AgentListPopover } from "./agentColumns";
+
+type Props = {
+  open: boolean;
+  setOpen: (state: boolean) => void;
+  columns: ColumnDef<AgentListPopover>[];
+  setTempRowAgentListData: (data: [], overwrite: boolean) => void;
+  revalidateAgentDetails: () => void;
+  data: AgentListPopover[];
+  selectedRow: Row<AgentListPopover> | null;
+  setSelectedRow: (row: Row<AgentListPopover> | null) => void;
+};
+
+const COLUMN_VISIBILITY_KEY = "package.agent.bs.table.agentColumns";
+
+export default function AgentPopover({
+  open,
+  setOpen,
+  columns,
+  setTempRowAgentListData,
+  revalidateAgentDetails,
+  data,
+  selectedRow,
+  setSelectedRow,
+}: Props) {
+  const [sorting, setSorting] = useState([]);
+  const [columnVisibility, setColumnVisibility] = useState<
+    Record<string, boolean>
+  >(() => {
+    if (typeof window !== "undefined") {
+      return JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}");
+    }
+    return {};
+  });
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+
+  const table = useReactTable({
+    columns,
+    data,
+    state: { sorting, columnVisibility },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    autoResetPageIndex: false,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    enableRowSelection: true,
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+      columnVisibility: JSON.parse(
+        localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}"
+      ),
+    },
+  });
+
+  useEffect(() => {
+    localStorage.setItem(
+      COLUMN_VISIBILITY_KEY,
+      JSON.stringify(columnVisibility)
+    );
+  }, [columnVisibility]);
+
+  const [saveDisabled, setSaveDisabled] = useState(true);
+
+  // Prevent text selection when performing multiple row selection with "shift" + click
+  usePreventShiftTextSelect();
+
+  const onSave = async () => {
+    const selectedRowModel = table.getSelectedRowModel();
+    const selectedRows = selectedRowModel.rows;
+    if (!selectedRows.length) {
+      toast({
+        title: "No agents selected",
+        description: "Please select at least one agent to save.",
+        variant: "destructive",
+        duration: 3000,
+      });
+      return;
+    }
+    if (!id) {
+      // For new customers, update local state and close popover
+      setTempRowAgentListData(selectedRows.map(row => row.original), true);
+      toast({
+        title: "Agents selected",
+        description: "Agents have been added to the new customer.",
+        variant: "default",
+        duration: 2000,
+      });
+      setOpen(false);
+      return;
+    }
+    const params = new FormData();
+    selectedRows.forEach((row, index) => {
+      const original = row.original;
+      for (const key in original) {
+        if (key === "attachment") continue;
+        if (key === "UUID") {
+          params.append(`customerHasAgent[${index}][agent]`, original.UUID || "");
+        } else {
+          params.append(`customerHasAgent[${index}][${key}]`, original[key] ?? "");
+        }
+      }
+    });
+    try {
+      const response = await fetch(
+        `${ORIGIN}/customer/api/customer/update-customer-has-agent?id=${id}`,
+        {
+          method: "POST",
+          headers,
+          body: params,
+        }
+      );
+      if (!response.ok) throw new Error("Failed to save agent selection");
+      toast({
+        title: "Agents saved",
+        description: "Selected agents have been saved.",
+        variant: "default",
+        duration: 2000,
+      });
+      revalidateAgentDetails();
+      setOpen(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+  };
+
+  const onAgentRowSelection = (row) => {
+    row.toggleSelected();
+    setSaveDisabled(table.getSelectedRowModel().rows.length === 0);
+  };
+
+  const handleReset = () => {
+    if (selectedRow) selectedRow.toggleSelected();
+    setSelectedRow(null);
+    revalidateAgentDetails();
+    setSaveDisabled(true);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="min-h-[75vh] min-w-[75vw] max-w-3xl bg-erp-blue-3 p-2">
+        <div className="flex flex-row">
+          <div className="h-[73cqh] w-full p-4">
+            <div className="flex h-[73cqh] flex-col bg-erp-blue-3 @container-[size]">
+              <h2 className="text-sm font-bold">Select Agent</h2>
+              <AgentPopoverToolbar
+                table={table}
+                setOpen={setOpen}
+                handleSave={onSave}
+                revalidateAgentDetails={handleReset}
+                saveDisabled={saveDisabled}
+              />
+              <Separator className="bg-erp-blue-11" />
+              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                <Table className="border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1">
+                  <TableHeader className="sticky top-0 z-10">
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id}>
+                        {headerGroup.headers.map((header) => (
+                          <TableHead
+                            className="bg-erp-blue-11 font-normal"
+                            key={header.id}
+                          >
+                            <div className="flex flex-col gap-y-0.5">
+                              <div
+                                className={cn(
+                                  "flex items-center gap-x-0.5 text-white",
+                                  header.column.getCanSort()
+                                    ? "cursor-pointer select-none"
+                                    : ""
+                                )}
+                                onClick={header.column.getToggleSortingHandler()}
+                              >
+                                <span className="font-bold">
+                                  {header.isPlaceholder
+                                    ? null
+                                    : flexRender(
+                                        header.column.columnDef.header,
+                                        header.getContext()
+                                      )}
+                                </span>
+                                {{
+                                  asc: <FaSortUp />,
+                                  desc: <FaSortDown />,
+                                }[header.column.getIsSorted() as string] ?? (
+                                  <FaSort />
+                                )}
+                              </div>
+                              <TableHeadColumnTextFilter
+                                column={header.column}
+                                table={table}
+                              />
+                            </div>
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableHeader>
+                  <TableBody>
+                    {table.getRowModel().rows?.length ? (
+                      table.getRowModel().rows.map((row) => (
+                        <TableRow
+                          className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+                          data-state={row.getIsSelected() && "selected"}
+                          onClick={() => {
+                            onAgentRowSelection(row);
+                          }}
+                          key={row.id}
+                        >
+                          {row.getVisibleCells().map((cell) => (
+                            <TableCell key={cell.id}>
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext()
+                              )}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))
+                    ) : (
+                      <NoResultsTableRow columns={columns} />
+                    )}
+                  </TableBody>
+                </Table>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

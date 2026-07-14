@@ -1,0 +1,96 @@
+// @/components/data-table/MobilePaginationControl.tsx
+
+"use client";
+
+import { Table } from "@tanstack/react-table";
+import { cn } from "@/lib/utils/cn";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/mobilepagination";
+
+interface MobilePaginationControlProps<T> {
+  table: Table<T>;
+  className?: string;
+}
+
+function getPageNumbers(pageIndex: number, pageCount: number) {
+  const pages: (number | "ellipsis")[] = [];
+
+  if (pageCount <= 5) {
+    return Array.from({ length: pageCount }, (_, i) => i);
+  }
+
+  pages.push(0);
+  if (pageIndex > 2) pages.push("ellipsis");
+
+  const start = Math.max(1, pageIndex - 1);
+  const end = Math.min(pageCount - 2, pageIndex + 1);
+  for (let i = start; i <= end; i++) pages.push(i);
+
+  if (pageIndex < pageCount - 3) pages.push("ellipsis");
+  pages.push(pageCount - 1);
+
+  return pages;
+}
+
+export default function MobilePaginationControl<T>({
+  table,
+  className,
+}: MobilePaginationControlProps<T>) {
+  const pageIndex = table.getState().pagination.pageIndex;
+  const pageCount = table.getPageCount();
+
+  if (pageCount <= 1) return null;
+
+  return (
+    <Pagination className={className}>
+      <PaginationContent className="flex w-full justify-center items-center">
+        <PaginationItem>
+          <PaginationPrevious
+            onClick={() => table.previousPage()}
+            aria-disabled={!table.getCanPreviousPage()}
+            className={cn(
+              "w-11 h-11 text-[12px]",
+              !table.getCanPreviousPage() && "pointer-events-none opacity-50",
+            )}
+          />
+        </PaginationItem>
+
+        {getPageNumbers(pageIndex, pageCount).map((page, i) =>
+          page === "ellipsis" ? (
+            <PaginationItem key={`ellipsis-${i}`}>
+              <PaginationEllipsis />
+            </PaginationItem>
+          ) : (
+            <PaginationItem key={page}>
+              <PaginationLink
+                isActive={page === pageIndex}
+                onClick={() => table.setPageIndex(page)}
+                className="font-normal rounded-3xl text-[11px] w-7 h-7"
+              >
+                {page + 1}
+              </PaginationLink>
+            </PaginationItem>
+          ),
+        )}
+
+        <PaginationItem>
+          <PaginationNext
+            onClick={() => table.nextPage()}
+            aria-disabled={!table.getCanNextPage()}
+            className={cn(
+              "w-11 h-11 text-[12px]",
+              !table.getCanNextPage() && "pointer-events-none opacity-50",
+            )}
+          />
+        </PaginationItem>
+      </PaginationContent>
+    </Pagination>
+  );
+}

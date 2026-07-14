@@ -1,0 +1,1666 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CalendarIcon } from "lucide-react";
+import moment from "moment";
+import React, { useEffect, useRef, useState } from "react";
+import { FormProvider, useForm } from "react-hook-form";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+import { z } from "zod";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input, NumberInputField } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast, useToast } from "@/components/ui/use-toast";
+import { DATE_FORMAT, getAuthHeaders, getCurrentAccount, ORIGIN } from "@/lib/constants";
+import { useVerify } from "@/lib/hooks/useVerify";
+import { cn } from "@/lib/utils/cn";
+
+import type { CustomerPayment } from "../../../columns";
+
+type Params = {
+  customerPayment?: CustomerPayment | null;
+  setCustomerCode?: (customerCode: string) => void;
+  onCurrencyChange?: () => void;
+  slug?: string;
+  form?: any;
+  preferenceData?: any;
+};
+
+type DropdownConfig = {
+  tableName?: string;
+  endpoint?: string;
+  columns: { accessorKey: string; header: string; cell?: any }[];
+  valueField: string;
+  displayField: string;
+  formValueField: string;
+  formDisplayField: string;
+  additionalMappings?: { sourceField: string; targetFormField: string }[];
+  requiresCustomerUUID?: boolean;
+};
+
+interface ContactFormData {
+  contact: string;
+  phoneNo: string;
+  email: string;
+  description: string;
+}
+
+const contactFormSchema = z.object({
+  contact: z.string().min(1, "Contact name is required").trim(),
+  phoneNo: z.string().min(1, "Phone number is required").trim(),
+  email: z.string().optional(),
+  description: z.string().optional(),
+});
+
+export function CustomerPaymentFormOld({
+  customerPayment,
+  form,
+  setCustomerCode,
+  onCurrencyChange,
+  slug,
+  preferenceData,
+}: Params) {
+  const { verifyField } = useVerify(
+    form,
+    "/customer_payment/api/customer-payment/verify",
+    "customerPayment",
+    form.watch("UUID"),
+  );
+  const { toast } = useToast();
+
+  const headers = getAuthHeaders();
+  const currentAccount = getCurrentAccount();
+
+  // Preference (Define Decimal)
+  const decimal = preferenceData?.data?.decimal || 2;
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownTableRef.current &&
+      !dropdownTableRef.current.contains(event.target) &&
+      dropdownInputRef.current !== event.target
+    ) {
+      setDropdownState((prev) => ({ ...prev, showTable: false }));
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  // Customer Filter State
+  const [customerFilter, setCustomerFilter] = useState("");
+
+  // Currency Filter State
+  const [currencyFilter, setCurrencyFilter] = useState("");
+
+  // Attention Filter State
+  const [attentionFilter, setAttentionFilter] = useState("");
+
+  // Payment Method Filter State
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
+
+  // Unified Dropdown State
+  const [dropdownState, setDropdownState] = useState({
+    currentDropdown: null as string | null,
+    data: [] as any[],
+    showTable: false,
+  });
+
+  // Unified Dropdown Refs
+  const dropdownInputRef = useRef(null);
+  const dropdownTableRef = useRef(null);
+
+  // Unified Dropdown Configurations
+  const dropdownConfigs: Record<string, DropdownConfig> = {
+    salesAgent: {
+      tableName: "agent",
+      columns: [
+        { accessorKey: "agentName", header: "Agent Name" },
+        { accessorKey: "agentTypeName", header: "Agent Type" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "agentName",
+      formValueField: "salesAgent",
+      formDisplayField: "salesAgentName",
+    },
+    servicingAgent: {
+      tableName: "agent",
+      columns: [
+        { accessorKey: "agentName", header: "Agent Name" },
+        { accessorKey: "agentTypeName", header: "Agent Type" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "agentName",
+      formValueField: "servicingAgent",
+      formDisplayField: "servicingAgentName",
+    },
+    collectionAgent: {
+      tableName: "agent",
+      columns: [
+        { accessorKey: "agentName", header: "Agent Name" },
+        { accessorKey: "agentTypeName", header: "Agent Type" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "agentName",
+      formValueField: "collectionAgent",
+      formDisplayField: "collectionAgentName",
+    },
+    customerCode: {
+      tableName: "customer",
+      columns: [
+        { accessorKey: "customerCode", header: "Customer Code" },
+        { accessorKey: "customerGroupCode", header: "Customer Group" },
+        { accessorKey: "customerName", header: "Customer Name" },
+      ],
+      valueField: "UUID",
+      displayField: "customerCode",
+      formValueField: "customerCode",
+      formDisplayField: "customerCodeCode",
+      additionalMappings: [
+        { sourceField: "customerName", targetFormField: "customerName" },
+        { sourceField: "BRN", targetFormField: "BRN" },
+        { sourceField: "TIN", targetFormField: "TIN" },
+        { sourceField: "SSTNo", targetFormField: "SSTNo" },
+        { sourceField: "address", targetFormField: "address" },
+      ],
+    },
+    TIN: {
+      tableName: "customer",
+      columns: [
+        { accessorKey: "TIN", header: "TIN", },
+        { accessorKey: "customerCode", header: "Customer Code", },
+        { accessorKey: "customerName", header: "Customer Name", },
+        { accessorKey: "BRN", header: "BRN", },
+      ],
+      valueField: "UUID",
+      displayField: "customerCode",
+      formValueField: "customerCode",
+      formDisplayField: "customerCodeCode",
+      additionalMappings: [
+        { sourceField: "customerName", targetFormField: "customerName" },
+        { sourceField: "BRN", targetFormField: "BRN" },
+        { sourceField: "TIN", targetFormField: "TIN" },
+        { sourceField: "SSTNo", targetFormField: "SSTNo" },
+        { sourceField: "address", targetFormField: "address" },
+      ],
+    },
+    attention: {
+      endpoint: "/universal/get-attention-by-customer",
+      columns: [
+        { accessorKey: "contact", header: "Contact" },
+        { accessorKey: "phoneNo", header: "Phone No." },
+        { accessorKey: "email", header: "Email" },
+        {
+          accessorKey: "description",
+          header: "Description",
+          cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+        },
+      ],
+      valueField: "UUID",
+      displayField: "contact",
+      formValueField: "attention",
+      formDisplayField: "attentionName",
+      additionalMappings: [
+        { sourceField: "phoneNo", targetFormField: "phoneNo" },
+        { sourceField: "email", targetFormField: "email" },
+      ],
+      requiresCustomerUUID: true,
+    },
+    paymentMethod: {
+      tableName: "paymentMethod",
+      columns: [
+        { accessorKey: "paymentMethodCode", header: "Payment Method Code" },
+        {
+          accessorKey: "description",
+          header: "Description",
+          cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+        },
+      ],
+      valueField: "UUID",
+      displayField: "paymentMethodCode",
+      formValueField: "paymentMethod",
+      formDisplayField: "paymentMethodCode",
+    },
+    currencyCode: {
+      tableName: "currency",
+      columns: [
+        { accessorKey: "currencyCode", header: "Currency Code" },
+        {
+          accessorKey: "description",
+          header: "Description",
+          cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+        },
+      ],
+      valueField: "UUID",
+      displayField: "currencyCode",
+      formValueField: "currency",
+      formDisplayField: "currencyCode",
+      additionalMappings: [{ sourceField: "exchangeRateSales", targetFormField: "currencyRate" }],
+    },
+    project: {
+      tableName: "project",
+      columns: [
+        { accessorKey: "projectCode", header: "Project Code" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "projectCode",
+      displayField: "projectCode",
+      formValueField: "paymentProject",
+      formDisplayField: "paymentProject",
+    },
+  };
+
+  // Unified Fetch Dropdown Data
+  const fetchDropdownData = async (dropdownKey: string) => {
+    try {
+      const config = dropdownConfigs[dropdownKey];
+
+      if (!config) return;
+
+      let response;
+
+      if (config.requiresCustomerUUID) {
+        const customerUUID = form.getValues("customerCode");
+
+        if (!customerUUID) {
+          console.warn(`Customer must be selected first for ${dropdownKey}`);
+          return;
+        }
+
+        const formData = new FormData();
+
+        formData.append("table[]", "user");
+
+        response = await fetch(`${ORIGIN}${config.endpoint}?id=${customerUUID}`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+      } else if (config.tableName) {
+        const formData = new FormData();
+
+        formData.append("table[]", config.tableName);
+
+        const apiUrl = currentAccount
+          ? `${ORIGIN}/universal/get-all-drop-down-table-data?byAccount=${currentAccount}`
+          : `${ORIGIN}/universal/get-all-drop-down-table-data`;
+
+        response = await fetch(apiUrl, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+      }
+
+      if (!response || !response.ok) {
+        throw new Error(`Failed to fetch ${dropdownKey} data`);
+      }
+
+      const data = await response.json();
+
+      setDropdownState({
+        currentDropdown: dropdownKey,
+        data: data.rows,
+        showTable: true,
+      });
+    } catch (error) {
+      console.error(`Error fetching ${dropdownKey} data:`, error);
+    }
+  };
+
+  // Unified Row Click Handler
+  const onClickRow = (row: any) => {
+    const config = dropdownConfigs[dropdownState.currentDropdown!];
+    if (config) {
+      form.setValue(config.formValueField, row[config.valueField]);
+      form.setValue(config.formDisplayField, row[config.displayField]);
+
+      // Apply any additional field mappings defined in the config
+      if (config.additionalMappings) {
+        config.additionalMappings.forEach((mapping) => {
+          if (row[mapping.sourceField]) {
+            form.setValue(mapping.targetFormField, row[mapping.sourceField]);
+          }
+        });
+      }
+
+      // Reset customerFilter if the current dropdown is 'customerCode'
+      if (dropdownState.currentDropdown === "customerCode") {
+        if (row.customerHasBillingContacts && row.customerHasBillingContacts.length > 0) {
+          var defaultCheck = row.customerHasBillingContacts?.find((row) => row.default == "1");
+        }
+
+        defaultCheck
+          ? form.setValue("attention", defaultCheck.UUID)
+          : form.setValue("attention", "");
+        defaultCheck
+          ? form.setValue("attentionName", defaultCheck.contact)
+          : form.setValue("attentionName", "");
+        defaultCheck
+          ? form.setValue("phoneNo", defaultCheck.phoneNo)
+          : form.setValue("phoneNo", "");
+        defaultCheck ? form.setValue("email", defaultCheck.email) : form.setValue("email", "");
+
+        setCustomerFilter("");
+      }
+
+      // Reset currencyFilter if the current dropdown is 'currencyCode'
+      if (dropdownState.currentDropdown === "currencyCode") {
+        setCurrencyFilter("");
+      }
+
+      // Reset attentionFilter if the current dropdown is 'attention'
+      if (dropdownState.currentDropdown === "attention") {
+        setAttentionFilter("");
+      }
+
+      // Reset paymentMethodFilter if the current dropdown is 'paymentMethod'
+      if (dropdownState.currentDropdown === "paymentMethod") {
+        setPaymentMethodFilter("");
+      }
+
+      // Special handling for customer code to trigger knock-off details fetch
+      if ( (dropdownState.currentDropdown === "customerCode" || dropdownState.currentDropdown === "TIN")  && setCustomerCode) {
+        setCustomerCode(row[config.valueField]);
+      }
+
+      // Special handling for currency code to trigger knock-off details refresh
+      if (dropdownState.currentDropdown === "currencyCode" && onCurrencyChange) {
+        onCurrencyChange();
+      }
+    }
+
+    setDropdownState((prev) => ({ ...prev, showTable: false }));
+  };
+
+  // Default Payment Method Function
+  const setDefaultPaymentMethod = async () => {
+    if (preferenceData?.data?.customerPaymentMethod && !form.getValues("paymentMethod")) {
+      try {
+        var formData = new FormData();
+
+        formData.append("table[0]", "paymentMethod");
+
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const defaultPaymentMethod = data.rows?.find(
+            (row) => row.UUID === preferenceData.data.customerPaymentMethod,
+          );
+
+          if (defaultPaymentMethod) {
+            form.setValue("paymentMethod", defaultPaymentMethod.UUID);
+            form.setValue("paymentMethodCode", defaultPaymentMethod.paymentMethodCode);
+          }
+        }
+      } catch (error) {
+        console.error("Error setting default payment method:", error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (preferenceData?.data?.currency && slug === "new") {
+      setDefaultPaymentMethod();
+    }
+  }, [preferenceData, slug]);
+
+  // Default Currency Function
+  const setDefaultCurrency = async () => {
+    if (preferenceData?.data?.currency && !form.getValues("currency")) {
+      try {
+        var formData = new FormData();
+
+        formData.append("table[0]", "currency");
+
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const defaultCurrency = data.rows?.find(
+            (row) => row.UUID === preferenceData.data.currency,
+          );
+
+          if (defaultCurrency) {
+            form.setValue("currency", defaultCurrency.UUID);
+            form.setValue("currencyCode", defaultCurrency.currencyCode);
+            form.setValue("currencyRate", defaultCurrency.exchangeRateSales);
+          }
+        }
+      } catch (error) {
+        console.error("Error setting default currency:", error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (preferenceData?.data?.currency && slug === "new") {
+      setDefaultCurrency();
+    }
+  }, [preferenceData, slug]);
+
+  // Initial Load
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  useEffect(() => {
+    if (customerPayment && isInitialLoad) {
+      // Set the unapplied amount from the loaded data
+      if (customerPayment.unappliedAmount) {
+        form.setValue("unappliedAmount", customerPayment.unappliedAmount);
+      }
+
+      setIsInitialLoad(false);
+    }
+  }, [customerPayment, form, isInitialLoad]);
+
+  // Local Paid Amount Calculation
+  const calculateLocalPaidAmount = () => {
+    const paidAmount = parseFloat(form.getValues("paidAmount")) || 0;
+    const currencyRate = parseFloat(form.getValues("currencyRate")) || 0;
+    const localPaidAmount = paidAmount * currencyRate;
+
+    form.setValue("localPaidAmount", localPaidAmount.toFixed(decimal));
+  };
+
+  useEffect(() => {
+    calculateLocalPaidAmount();
+  }, [form.watch("paidAmount"), form.watch("currencyRate")]);
+
+  // Unapplied Amount Calculation
+  const calculateUnappliedAmount = () => {
+    const paidAmount = parseFloat(form.getValues("paidAmount")) || 0;
+    const unappliedAmount = parseFloat(form.getValues("unappliedAmount") || 0);
+
+
+    let updatedPaidAmount = paidAmount - Number(customerPayment?.paidAmount || 0);
+    let updatedUnappliedAmount = updatedPaidAmount + unappliedAmount;
+    // Prevent unapplied amount from being negative
+    updatedUnappliedAmount = Math.max(updatedUnappliedAmount, 0);
+
+    form.setValue("unappliedAmount", updatedUnappliedAmount.toFixed(decimal));
+
+    return updatedUnappliedAmount;
+  };
+
+  const handleBlur = () => {
+    calculateUnappliedAmount();
+  };
+
+  // Function for Adding a New Contact
+  const [showAddAttentionDialog, setShowAddAttentionDialog] = useState(false);
+  const [billingContactFiles, setBillingContactFiles] = useState<File[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [tINFilter, setTINFilter] = useState("");
+
+  const contactForm = useForm<ContactFormData>({
+    resolver: zodResolver(contactFormSchema),
+    defaultValues: {
+      contact: "",
+      phoneNo: "",
+      email: "",
+      description: "",
+    },
+  });
+
+  const handleAddContact = async () => {
+    const isValid = await contactForm.trigger();
+    if (!isValid) return;
+
+    const data = contactForm.getValues();
+    const customerId = form.getValues("customerCode");
+    const formData = new FormData();
+
+    // Append contact data
+    formData.append("customerHasBillingContact[contact]", data.contact);
+    formData.append("customerHasBillingContact[phoneNo]", data.phoneNo);
+    formData.append("customerHasBillingContact[email]", data.email);
+    formData.append("customerHasBillingContact[description]", data.description || "");
+
+    // Append files
+    for (let i = 0; i < billingContactFiles.length; i++) {
+      const file = billingContactFiles[i];
+
+      if (file.size) {
+        try {
+          const base64 = await getFileToBase64(file);
+
+          formData.append(`customerHasBillingContact[attachment][${i}][Name]`, file.name);
+          formData.append(`customerHasBillingContact[attachment][${i}][File]`, base64);
+        } catch (error) {
+          console.error("Error converting file to base64:", error);
+
+          toast({
+            title: "Error",
+            description: "Failed to process file attachment",
+            variant: "destructive",
+          });
+
+          return;
+        }
+      } else {
+        formData.append(`customerHasBillingContact[attachment][${i}][Name]`, file.name);
+        formData.append(`customerHasBillingContact[attachment][${i}][File]`, "");
+      }
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `${ORIGIN}/customer/api/customer/update-customer-has-billing-contact-data?id=${customerId}`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to add new contact");
+      }
+
+      await fetchDropdownData("attention");
+
+      contactForm.reset();
+
+      setBillingContactFiles([]);
+      setShowAddAttentionDialog(false);
+
+      toast({
+        title: "Success",
+        description: "Contact added successfully",
+      });
+    } catch (error) {
+      console.error("Error adding new contact:", error);
+
+      toast({
+        title: "Error",
+        description: "Failed to add new contact",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Form {...form}>
+      <form className="space-y-2">
+        <Card collapsible defaultCollapsed={false} className="shadow-md">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold">Document Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-5">
+              <FormField
+                control={form.control}
+                name="docNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Doc. No.:</FormLabel>
+                    <FormControl>
+                      <div className="relative h-7.5">
+                        <TooltipProvider>
+                          <Tooltip delayDuration={0}>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className={`h-7.5 pr-7 ${slug === "edit" && "bg-erp-gray-3"}`}
+                                {...field}
+                                onBlur={() => {
+                                  if (field.value && field.value.trim()) {
+                                    verifyField("docNo", field.value);
+                                  }
+                                }}
+                                readOnly={slug === "edit" ? true : false}
+                              />
+                            </TooltipTrigger>
+                            {slug === "edit" && (
+                              <TooltipContent>
+                                <p>This field is disabled in edit page.</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="docDate"
+                defaultValue={Math.floor(Date.now() / 1000)} // Set default value as current timestamp
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Doc. Date:</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            className={cn(
+                              "flex h-7.5 w-full",
+                              !field.value && "text-muted-foreground",
+                            )}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {field.value
+                              ? moment.unix(field.value).format(DATE_FORMAT)
+                              : moment().format(DATE_FORMAT)}{" "}
+                            {/* Use current date if value is empty */}
+                            <CalendarIcon className="ml-auto h-4 w-4 text-gray-400" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? moment.unix(field.value).toDate() : new Date()}
+                          onSelect={(date) => {
+                            const unixTimestamp = date
+                              ? Math.floor(date.getTime() / 1000)
+                              : Math.floor(Date.now() / 1000); // Fallback to current timestamp
+                            field.onChange(unixTimestamp.toString());
+                          }}
+                          initialFocus
+                          defaultMonth={new Date()}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Sales Agent UUID (hidden) */}
+              <FormField
+                control={form.control}
+                name="salesAgent"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>Sales Agent UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Sales Agent Name */}
+              <FormField
+                control={form.control}
+                name="salesAgentName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Sales Agent:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          readOnly
+                          onClick={() => fetchDropdownData("salesAgent")}
+                          ref={
+                            dropdownState.currentDropdown === "salesAgent" ? dropdownInputRef : null
+                          }
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable &&
+                          dropdownState.currentDropdown === "salesAgent" && (
+                            <div
+                              ref={dropdownTableRef}
+                              className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownConfigs.salesAgent.columns}
+                                  data={dropdownState.data}
+                                  onClickRow={onClickRow}
+                                />
+                                <ScrollBar orientation="vertical" />
+                              </ScrollArea>
+                            </div>
+                          )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Servicing Agent UUID (hidden) */}
+              <FormField
+                control={form.control}
+                name="servicingAgent"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>Servicing Agent UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Servicing Agent Name */}
+              <FormField
+                control={form.control}
+                name="servicingAgentName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Servicing Agent:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          readOnly
+                          onClick={() => fetchDropdownData("servicingAgent")}
+                          ref={
+                            dropdownState.currentDropdown === "servicingAgent"
+                              ? dropdownInputRef
+                              : null
+                          }
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable &&
+                          dropdownState.currentDropdown === "servicingAgent" && (
+                            <div
+                              ref={dropdownTableRef}
+                              className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownConfigs.servicingAgent.columns}
+                                  data={dropdownState.data}
+                                  onClickRow={onClickRow}
+                                />
+                                <ScrollBar orientation="vertical" />
+                              </ScrollArea>
+                            </div>
+                          )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Collection Agent UUID (hidden) */}
+              <FormField
+                control={form.control}
+                name="collectionAgent"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>Collection Agent UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Collection Agent Name */}
+              <FormField
+                control={form.control}
+                name="collectionAgentName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Collection Agent:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          readOnly
+                          onClick={() => fetchDropdownData("collectionAgent")}
+                          ref={
+                            dropdownState.currentDropdown === "collectionAgent"
+                              ? dropdownInputRef
+                              : null
+                          }
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable &&
+                          dropdownState.currentDropdown === "collectionAgent" && (
+                            <div
+                              ref={dropdownTableRef}
+                              className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownConfigs.collectionAgent.columns}
+                                  data={dropdownState.data}
+                                  onClickRow={onClickRow}
+                                />
+                                <ScrollBar orientation="vertical" />
+                              </ScrollArea>
+                            </div>
+                          )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-4">
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Description:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7"
+                        {...field}
+                        moduleName="customerPayment"
+                        fieldName="description"
+                        columnName="Description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card collapsible defaultCollapsed={false} className="shadow-md">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold">Customer Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-4">
+              <FormField
+                control={form.control}
+                name="customerCode"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="customerCodeCode"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>
+                      Customer Code: <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setCustomerFilter(e.target.value);
+                          }}
+                          onClick={() => fetchDropdownData("customerCode")}
+                          ref={
+                            dropdownState.currentDropdown === "customerCode"
+                              ? dropdownInputRef
+                              : null
+                          }
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable &&
+                          dropdownState.currentDropdown === "customerCode" && (
+                            <div
+                              ref={dropdownTableRef}
+                              className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownConfigs.customerCode.columns}
+                                  data={dropdownState.data}
+                                  onClickRow={onClickRow}
+                                  filterValue={customerFilter}
+                                  filterColumn="customerName"
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="customerName"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Customer Name:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7.5"
+                        {...field}
+                        moduleName="customerPayment"
+                        fieldName="customerName"
+                        columnName="Customer Name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="BRN"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>BRN:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="attention"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="attentionName"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Attention:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onClick={() => fetchDropdownData("attention")}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setAttentionFilter(e.target.value);
+                          }}
+                          ref={
+                            dropdownState.currentDropdown === "attention" ? dropdownInputRef : null
+                          }
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable &&
+                          dropdownState.currentDropdown === "attention" && (
+                            <div
+                              ref={dropdownTableRef}
+                              className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownConfigs.attention.columns}
+                                  data={dropdownState.data}
+                                  onClickRow={onClickRow}
+                                  filterValue={attentionFilter}
+                                  filterColumn="contact"
+                                />
+                              </ScrollArea>
+                              <div className="flex items-center justify-end border-t bg-white p-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setDropdownState((prev) => ({ ...prev, showTable: false }));
+                                    setShowAddAttentionDialog(true);
+                                  }}
+                                >
+                                  + Add
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-4">
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1 md:col-span-2">
+                    <FormLabel>Address:</FormLabel>
+                    <FormControl>
+                      <Textarea className="h-7" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="TIN"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>
+                      TIN:
+                    </FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setTINFilter(e.target.value);
+                          }}
+                          onClick={() => fetchDropdownData("TIN")}
+                          ref={
+                            dropdownState.currentDropdown === "TIN"
+                              ? dropdownInputRef
+                              : null
+                          }
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable &&
+                          dropdownState.currentDropdown === "TIN" && (
+                            <div
+                              ref={dropdownTableRef}
+                              className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownConfigs.TIN.columns}
+                                  data={dropdownState.data}
+                                  onClickRow={onClickRow}
+                                  filterValue={tINFilter}
+                                  filterColumn="TIN"
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="phoneNo"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Phone No.:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="SSTNo"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>SST.No:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Email:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7.5"
+                        {...field}
+                        moduleName="customerPayment"
+                        fieldName="email"
+                        columnName="Email"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card collapsible defaultCollapsed={false} className="shadow-md">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold">Payment Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-5">
+              <FormField
+                control={form.control}
+                name="paymentMethod"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="paymentMethodCode"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Payment Method:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          readOnly
+                          onClick={() => fetchDropdownData("paymentMethod")}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setPaymentMethodFilter(e.target.value);
+                          }}
+                          ref={
+                            dropdownState.currentDropdown === "paymentMethod"
+                              ? dropdownInputRef
+                              : null
+                          }
+                          autoComplete="off"
+                          defaultValue="Cash"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable &&
+                          dropdownState.currentDropdown === "paymentMethod" && (
+                            <div
+                              ref={dropdownTableRef}
+                              className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownConfigs.paymentMethod.columns}
+                                  data={dropdownState.data}
+                                  onClickRow={onClickRow}
+                                  filterValue={paymentMethodFilter}
+                                  filterColumn="paymentMethodCode"
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="currency"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="currencyCode"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Currency Code:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onClick={() => fetchDropdownData("currencyCode")}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setCurrencyFilter(e.target.value);
+                          }}
+                          ref={
+                            dropdownState.currentDropdown === "currencyCode"
+                              ? dropdownInputRef
+                              : null
+                          }
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable &&
+                          dropdownState.currentDropdown === "currencyCode" && (
+                            <div
+                              ref={dropdownTableRef}
+                              className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownConfigs.currencyCode.columns}
+                                  data={dropdownState.data}
+                                  onClickRow={onClickRow}
+                                  filterValue={currencyFilter}
+                                  filterColumn="currencyCode"
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="currencyRate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Currency Rate:</FormLabel>
+                    <FormControl>
+                      <NumberInputField
+                        className="h-7.5"
+                        form={form}
+                        fieldName="currencyRate"
+                        value={field.value || ""}
+                        decimalPlaces={decimal}
+                        constUpdate={true}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="bankCharge"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Bank Charge:</FormLabel>
+                    <FormControl>
+                      <NumberInputField
+                        className="h-7.5"
+                        form={form}
+                        value={field.value || ""}
+                        decimalPlaces={decimal}
+                        moduleName="customerPayment"
+                        fieldName="bankCharge"
+                        columnName="Bank Charge"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="bank"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Bank Name:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-5">
+              <FormField
+                control={form.control}
+                name="chequeNo"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Cheque No.:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7.5"
+                        {...field}
+                        moduleName="customerPayment"
+                        fieldName="chequeNo"
+                        columnName="Cheque No."
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="PDCDate"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>PDC Date:</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            className={cn(
+                              "flex h-7.5 w-full",
+                              !field.value && "text-muted-foreground",
+                            )}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {field.value
+                              ? moment.unix(field.value).format(DATE_FORMAT)
+                              : "Select date"}
+                            <CalendarIcon className="ml-auto h-4 w-4 text-gray-400" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? moment.unix(field.value).toDate() : undefined}
+                          onSelect={(date) => {
+                            const unixTimestamp = date ? Math.floor(date.getTime() / 1000) : null;
+                            field.onChange(unixTimestamp);
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="paidAmount"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Paid Amount:</FormLabel>
+                    <FormControl>
+                      <NumberInputField
+                        className="h-7.5"
+                        form={form}
+                        fieldName="paidAmount"
+                        value={field.value || ""}
+                        onBlur={handleBlur}
+                        decimalPlaces={decimal}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="localPaidAmount"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Local Paid Amount:</FormLabel>
+                    <FormControl>
+                      <NumberInputField
+                        className="h-7.5 bg-erp-gray-1 text-gray-500"
+                        form={form}
+                        readOnly
+                        fieldName="localPaidAmount"
+                        value={field.value || ""}
+                        decimalPlaces={decimal}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="unappliedAmount"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Unapplied Amount:</FormLabel>
+                    <FormControl>
+                      <NumberInputField
+                        className="h-7.5 bg-erp-gray-1 text-gray-500"
+                        form={form}
+                        readOnly
+                        fieldName="unappliedAmount"
+                        value={field.value ?? ""}
+                        decimalPlaces={decimal}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-5">
+              <FormField
+                control={form.control}
+                name="paymentProject"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Payment Project:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          readOnly
+                          onClick={() => fetchDropdownData("project")}
+                          ref={
+                            dropdownState.currentDropdown === "project" ? dropdownInputRef : null
+                          }
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable && dropdownState.currentDropdown === "project" && (
+                          <div
+                            ref={dropdownTableRef}
+                            className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                          >
+                            <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownConfigs.project.columns}
+                                data={dropdownState.data}
+                                onClickRow={onClickRow}
+                              />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Dialog open={showAddAttentionDialog} onOpenChange={setShowAddAttentionDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add New Contact</DialogTitle>
+            </DialogHeader>
+            <FormProvider {...contactForm}>
+              <form>
+                <div className="space-y-4">
+                  <FormField
+                    control={contactForm.control}
+                    name="contact"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Contact Name:</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Contact Name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={contactForm.control}
+                    name="phoneNo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone No.:</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Phone No." />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={contactForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email:</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Email" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={contactForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description:</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Description" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex justify-end space-x-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowAddAttentionDialog(false)}
+                      disabled={isLoading}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="button" onClick={handleAddContact} disabled={isLoading}>
+                      {isLoading ? "Saving..." : "Save"}
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            </FormProvider>
+          </DialogContent>
+        </Dialog>
+      </form>
+    </Form>
+  );
+}

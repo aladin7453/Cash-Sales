@@ -1,0 +1,16 @@
+import React from 'react';
+import { FaGear } from "react-icons/fa6";
+
+const SettingButton = ({ onClick }) => {
+  return (
+    <button
+      onClick={onClick}  // Pass the click handler
+      className="group flex flex-col items-center gap-y-1 disabled:cursor-not-allowed"
+    >
+      <FaGear className="size-5.5 text-erp-blue-11 group-disabled:text-erp-gray-5" />
+      <span className="text-[11px]/none font-medium group-disabled:text-erp-gray-5">Setting</span>
+    </button>
+  );
+};
+
+export default SettingButton;

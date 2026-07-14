@@ -1,0 +1,48 @@
+import type { TransferToConfig } from "@/components/features/transfer/transferTo";
+import { quotationTransferToColumns } from "./columns";
+
+export const quotationTransferToConfig: TransferToConfig = {
+  module: "quotation",
+  model: "quotation",
+  apiNamespace: "sales",
+  transferDocType: "quotation",
+  itemsEndpointSuffix: "get-update-quotation-has-details-data",
+  transferEndpointSuffix: "transfer",
+  queryParam: "id",
+  destinations: [
+    {
+      key: "salesOrder",
+      label: "Sales Order",
+      route: "sales/sales-order",
+    },
+    {
+      key: "jobOrder", 
+      label: "Job Order",
+      route: "job-management/job-order",
+    },
+    {
+      key: "deliveryOrder",
+      label: "Delivery Order", 
+      route: "sales/sales-delivery-order",
+    },
+    {
+      key: "salesInvoice",
+      label: "Sales Invoice",
+      route: "sales/sales-invoice", 
+    },
+    {
+      key: "cashSales",
+      label: "Cash Sales",
+      route: "sales/cash-sales",
+    },
+    {
+      key: "salesDebitNote",
+      label: "Sales Debit Note",
+      route: "sales/sales-debit-note",
+    },
+  ],
+  columns: quotationTransferToColumns,
+  buttonText: "T-To",
+  dialogTitle: "Transfer to",
+  popoverTitle: "Select Item",
+};

@@ -1,0 +1,60 @@
+"use client";
+
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+
+type Props = {
+  table: any;
+  setOpen: any;
+  handleSave: (any) => void;
+  revalidateConsolidateEInvoiceDetails: any;
+  fetchItemData: (itemType: string) => void;
+  itemType: string;
+  setSelectedRow: (row) => void;
+};
+
+export default function ItemPopoverToolbar({
+  table,
+  setOpen,
+  handleSave,
+  revalidateConsolidateEInvoiceDetails,
+  fetchItemData,
+  itemType,
+  setSelectedRow,
+}: Props) {
+  const handleReset = () => {
+    table.getSelectedRowModel().rows.forEach((row) => {
+      row.toggleSelected();
+    });
+    revalidateConsolidateEInvoiceDetails();
+    if (itemType === "service") setSelectedRow(null);
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between p-1.5">
+        <div className="grid auto-cols-fr grid-flow-col gap-x-1.5">
+          <SaveButton
+            onClick={() => {
+              handleSave({ table: table, itemType: itemType });
+            }}
+          />
+          <ResetButton onClick={handleReset} />
+          <CancelButton onClick={() => setOpen(false)} />
+        </div>
+        <Pagination table={table} /> {/* Pagination */}
+        {/* ActionGroupEnd */}
+        <div className="grid grid-cols-2 items-center text-erp-blue-14">
+          {/* <Export table={table} /> */}
+          <Refresh refreshTable={fetchItemData} />
+          <ColumnVisibilityToggle table={table} />
+        </div>
+      </div>
+    </>
+  );
+}

@@ -1,0 +1,380 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { FaCircleXmark, FaFileCirclePlus } from "react-icons/fa6";
+import { z } from "zod";
+
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders,ORIGIN } from "@/lib/constants";
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+
+import type { Dispatch, SetStateAction } from "react";
+
+import type { ActivityLog } from "./columns";
+
+type Props = {
+  open: boolean;
+  setOpen: Dispatch<SetStateAction<boolean>>;
+  row?: ActivityLog;
+  setTempRowActivityLogData: (data: any, overwrite?: boolean) => void;
+  revalidateActivityLogData: () => void;
+};
+
+const activityLogFormSchema = z.object({
+  UUID: z.union([z.string(), z.literal("")]),
+  code: z.union([z.string(), z.literal("")]),
+  name: z
+    .string()
+    .min(2, { message: "Activity Name must be at least 2 characters." })
+    .max(255, { message: "Activity Name must not exceed 255 characters." }),
+  type: z
+    .string()
+    .min(2, { message: "Activity Type must be at least 2 characters." })
+    .max(255, { message: "Activity Type must not exceed 255 characters." }),
+  description: z.string().min(2, {
+    message: "Activity Description must be at least 2 characters.",
+  }),
+  valid: z.union([z.literal("0"), z.literal("1")]).default("1"),
+});
+
+export default function ActivityLogFormPopover({
+  open,
+  setOpen,
+  row,
+  setTempRowActivityLogData,
+  revalidateActivityLogData,
+}: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const data = row;
+  const { toast } = useToast();
+  const headers = getAuthHeaders();
+
+  const [activityLogFiles, setActivityLogFiles] = useState([]);
+  const fileInputRef = useRef(null);
+
+  const handleChooseFileClick = () => {
+    fileInputRef.current.click(); // Trigger click event on file input
+  };
+
+  useEffect(() => {
+    if (data && data.attachmentLink) {
+      setActivityLogFiles(data.attachmentLink);
+    }
+    if (data && data.attachmentFiles) {
+      setActivityLogFiles(data.attachmentFiles);
+    }
+
+    return () => {};
+  }, [data]);
+
+  function handleDeleteFile(index) {
+    var newActivityLogFiles = [...activityLogFiles];
+    newActivityLogFiles.splice(index, 1);
+    setActivityLogFiles(newActivityLogFiles);
+  }
+
+  const handleFileChange = (event) => {
+    const fileList = Array.from(event.target.files);
+    const mergeArray = [...activityLogFiles, ...fileList];
+    setActivityLogFiles(mergeArray);
+  };
+
+  const form = useForm<z.infer<typeof activityLogFormSchema>>({
+    resolver: zodResolver(activityLogFormSchema),
+    defaultValues: {
+      UUID: data?.UUID !== undefined ? data.UUID : "",
+      code: data?.code !== undefined ? data.code : "",
+      name: data?.name !== undefined ? data.name : "",
+      type: data?.type !== undefined ? data.type : "",
+      description: data?.description !== undefined ? data.description : "",
+      attachment: data?.attachment ? [new File([], data.attachment)] : null,
+      valid: data?.valid ?? "1",
+    },
+  });
+
+  const updateActivityLogData = async (data) => {
+    var counter = 0;
+    try {
+      const formData = new FormData();
+      for (var key in data) {
+        if (key !== "attachment") {
+          //exclude attachment first for testing,will add back later
+          formData.append(`customerHasActivityLog[${key}]`, data[key]);
+        }
+      }
+
+      for (const fileData of activityLogFiles) {
+        if (fileData.size) {
+          var base64 = await getFileToBase64(fileData);
+          formData.append(`customerHasActivityLog[attachment][${counter}][Name]`, fileData.name);
+          formData.append(`customerHasActivityLog[attachment][${counter}][File]`, base64);
+        } else {
+          formData.append(`customerHasActivityLog[attachment][${counter}][Name]`, fileData.name);
+          formData.append(`customerHasActivityLog[attachment][${counter}][File]`, " ");
+        }
+
+        counter++;
+      }
+
+      const response = await fetch(
+        `${ORIGIN}/customer/api/customer/update-customer-has-activity-log-data?id=${id}`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 403) {
+          toast({
+            title: errorData.message,
+            duration: 2000,
+            variant: "destructive",
+          });
+        }
+        throw new Error("Failed to fetch data");
+      }
+
+      const responseData = await response.json();
+      if (responseData) {
+        toast({
+          title: "Success",
+          description: responseData.message,
+        });
+        form.reset();
+      }
+    } catch (error) {
+      console.error("Error updating activity log data:", error);
+    }
+  };
+
+  const onSubmit = async (values) => {
+    if (!values) return; // If values are empty or null, return without processing
+
+    // Assuming userListData is an array where you store your user data
+    const newData = { ...values }; // Copy form values
+    // Call the function to update activity log data if newData is valid
+    if (id) {
+      await updateActivityLogData(newData);
+      revalidateActivityLogData();
+    } else {
+      newData.attachmentFiles = activityLogFiles;
+      setTempRowActivityLogData(newData);
+    }
+    setOpen(false); // Close the dialog after submission
+    // Reset files after successful submission
+    setActivityLogFiles([]);
+  };
+  
+  const handleReset = () => {
+    form.reset({
+      UUID: "",
+      code: "",
+      name: "",
+      type: "",
+      description: "",
+      attachment: null,
+      valid: "1",
+    });
+    
+    // Reset the activityLogFiles state
+    setActivityLogFiles([]);
+  };
+
+  useEffect(() => {
+    if (open) {
+      !data && handleReset();
+      !data && setActivityLogFiles([]);
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-3xl bg-erp-blue-3 p-2">
+        <Form {...form}>
+          <form className="space-y-2" onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="flex items-center justify-between pr-4">
+              <div className="grid auto-cols-fr grid-flow-col gap-x-1.5">
+                <SaveButton />
+                <ResetButton onClick={handleReset} />
+                <DialogClose asChild>
+                  <CancelButton />
+                </DialogClose>
+              </div>
+              <FormField
+                control={form.control}
+                name="valid"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-x-1.5 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value === "1"}
+                        onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                      />
+                    </FormControl>
+                    <FormLabel>Valid</FormLabel>
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="space-y-2.5 bg-white p-3 pt-2">
+              <h2 className="text-sm font-bold">Activity Log</h2>
+              <div className="grid grid-cols-3 gap-x-6 gap-y-2.5">
+                <FormField
+                  control={form.control}
+                  name="UUID"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid hidden h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Code:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Name:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Type:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-flow-col-dense  grid-cols-1 items-start gap-x-8 gap-y-2.5 md:grid-cols-3 ">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Description:</FormLabel>
+                      <FormControl>
+                        <Input className="h-14" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div>
+                <FormField
+                  control={form.control}
+                  name="attachment"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          Attachment:{" "}
+                          <button type="button" onClick={handleChooseFileClick}>
+                            <FaFileCirclePlus
+                              style={{ marginLeft: "5px" }}
+                              className="text-erp-blue-14"
+                            />
+                          </button>
+                        </div>
+                      </FormLabel>
+
+                      <FormControl>
+                        <Input
+                          id="attachments"
+                          type="file"
+                          multiple
+                          onChange={handleFileChange}
+                          ref={fileInputRef}
+                          className="hidden"
+                        />
+                      </FormControl>
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* You can render the files here */}
+                {activityLogFiles &&
+                  activityLogFiles.map((file, index) => (
+                    <div key={index}>
+                      <a
+                        href={file.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "blue" }}
+                      >
+                        {file.name}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteFile(index)}
+                        style={{ color: "red" }}
+                      >
+                        <FaCircleXmark
+                          style={{ verticalAlign: "bottom", marginLeft: "2px", marginTop: "2px" }}
+                          title={"Remove"}
+                        />
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

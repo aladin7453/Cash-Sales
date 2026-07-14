@@ -1,0 +1,132 @@
+import React, { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { notFound, useSearchParams, useRouter } from "next/navigation";
+
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+import NewButton from "@/components/form/ActionButton/New";
+import CloneButton from "@/components/form/ActionButton/Clone";
+import DeleteButton from "@/components/form/ActionButton/Delete";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+} from "@/components/ui/form";
+
+import type { CashInCashOut } from "../columns";
+
+type TopActionBarProps = {
+  cashInCashOut?: CashInCashOut | null;
+  handleSubmit: () => void;
+  resetForm: () => void; // Add resetForm prop
+  onSubmit: (values: any) => void;
+  action: string;
+};
+
+export default function TopActionBar({
+  cashInCashOut,
+  form,
+  handleSubmit,
+  action,
+  params,
+}: TopActionBarProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  useEffect(() => {
+    form.reset(cashInCashOut || {});
+  }, [cashInCashOut, form]);
+
+  const handleReset = () => {
+    const excludedKeys = [
+      "account",
+      "accountName",
+      "_actionUUID",
+      "_version",
+      "UUID",
+      "company",
+      "companyName",
+    ];
+
+    if (params.slug == "new") {
+      //new reset all to empty
+      const defaultValues = Object.keys(form.getValues()).reduce((acc, key) => {
+        const originalValue = form.getValues(key); // Get the original value
+
+        if (!excludedKeys.includes(key)) {
+          acc[key] = ""; // Reset to an empty string
+        } else {
+          acc[key] = originalValue; // Keep the original value
+        }
+        return acc;
+      }, {});
+
+      defaultValues.valid = "1";
+
+      form.reset(defaultValues);
+    } else {
+      //reset back to previous data
+      form.reset();
+    }
+  };
+
+  const handleSave = async () => {
+    handleSubmit();
+  };
+
+  return (
+    <div className="-mx-2 -mt-1 flex items-center justify-between bg-erp-gray-3 px-4 py-2">
+      <div className="flex space-x-3">
+        <SaveButton onSubmit={handleSave} />
+        {id && action !== "clone" && (
+          <NewButton destination="/sales/cash-in-cash-out/new" />
+        )}
+        {id && action !== "clone" && (
+          <CloneButton
+            destination={`/sales/cash-in-cash-out/clone?id=${id}`}
+          />
+        )}
+        <ResetButton onClick={handleReset} />
+        {id && action !== "clone" && (
+          <DeleteButton
+            module={"cash_in_cash_out"}
+            model={"cash-in-cash-out"}
+            id={`${id}`}
+            indexPath={`/sales/cash-in-cash-out/`}
+          />
+        )}
+        <CancelButton
+          onClick={() => router.push("/sales/cash-in-cash-out/")}
+        />
+      </div>
+      <Form id="topActionBarForm" {...form}>
+        {" "}
+        {/* Added onSubmit to Form */}
+        <FormField
+          control={form.control}
+          name="valid"
+          render={({ field }) => (
+            <FormItem className="flex items-center gap-x-2 space-y-0">
+              <FormControl>
+                <Checkbox
+                  checked={field.value === "1"}
+                  onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                />
+              </FormControl>
+              <FormLabel>Valid</FormLabel>
+            </FormItem>
+          )}
+        />
+      </Form>
+    </div>
+  );
+}

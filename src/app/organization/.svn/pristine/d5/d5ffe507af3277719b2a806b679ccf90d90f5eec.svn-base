@@ -1,0 +1,109 @@
+"use client";
+
+import { format, parseISO } from "date-fns";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type AssetAssignmentDetails = {
+  stockCode: string;
+  stockDescription: string;
+  stock2ndDescription: string;
+  stockMoreDescription: string;
+  stockGroupCode: string;
+  receivedQuantity: number;
+  UOM: string;
+  project: string;
+  stockBatchCode: any;
+  stockBatchDescription: any;
+};
+
+export const assetAssignmentDetailsColumns: ColumnDef<AssetAssignmentDetails>[] =
+  [
+    {
+      id: "assetCode",
+      accessorKey: "assetCode",
+      header: "Asset",
+      filterFn: "includesString",
+    },
+    {
+      id: "assetAssignment",
+      accessorKey: "assetAssignment",
+      header: "Asset Assignment",
+      filterFn: "includesString",
+    },
+    {
+      id: "quantity",
+      accessorKey: "quantity",
+      header: "Quantity",
+      filterFn: "includesString",
+    },
+    {
+      id: "locationCodeCode",
+      accessorKey: "locationCodeCode",
+      header: "Location",
+      filterFn: "includesString",
+    },
+    {
+      id: "condition",
+      accessorKey: "condition",
+      header: "Condition",
+      filterFn: "includesString",
+    },
+    {
+      id: "fullName",
+      accessorKey: "fullName",
+      header: "Assignee",
+      filterFn: "includesString",
+    },
+    {
+      id: "assignAt",
+      accessorKey: "assignAt",
+      header: "Assign At",
+      filterFn: "includesString",
+    },
+    {
+      id: "remark1",
+      accessorKey: "remark1",
+      header: "Remark 1",
+      filterFn: "includesString",
+    },
+    {
+      id: "remark2",
+      accessorKey: "remark2",
+      header: "Remark 2",
+      filterFn: "includesString",
+    },
+    {
+      id: "projectCode",
+      accessorKey: "projectCode",
+      header: "Project",
+      filterFn: "includesString",
+    },
+    // {
+    //   id: "attachment",
+    //   accessorKey: "attachment",
+    //   header: "Attachment",
+    //   filterFn: "includesString",
+    // },
+    {
+      id: "assignmentLog",
+      accessorKey: "assignmentLog",
+      header: "Assign Log",
+    },
+    // {
+    //   accessorKey: "quantity",
+    //   header: "Received Quantity",
+    // },
+    // {
+    //   accessorKey: "stockUOM",
+    //   header: "UOM",
+    // },
+    // {
+    //   accessorKey: "projectCode",
+    //   header: "Project",
+    // },
+    // {
+    //   accessorKey: "stockBatchCode",
+    //   header: "Stock Batch",
+    // },
+  ];

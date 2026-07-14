@@ -1,0 +1,9 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Customer Analysis By Document",
+};
+
+export default function CustomerAnalysisByDocumentPageLayout({ children }: { children: React.ReactNode }) {
+  return children;
+}

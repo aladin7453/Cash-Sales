@@ -1,0 +1,88 @@
+// components/BarChart.tsx
+"use client";
+
+import {
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Legend,
+  LinearScale,
+  scales,
+  Title,
+  Tooltip,
+} from "chart.js";
+import { useEffect } from "react";
+import { Bar } from "react-chartjs-2";
+
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+
+interface BarChartProps {
+  labels: string[];
+  data: any;
+  yAxis: string;
+}
+
+export default function BarChart({ labels, data, yAxis }: BarChartProps) {
+  const defaultColors = [
+    [
+      "rgba(59, 130, 246, 1)",
+      "rgba(16, 185, 129, 1)",
+      "rgba(245, 158, 11, 1)",
+      "rgba(239, 68, 68, 1)",
+      "rgba(139, 92, 246, 1)",
+      "rgba(14, 165, 233, 1)",
+      "rgba(236, 72, 153, 1)",
+      "rgba(132, 204, 22, 1)",
+      "rgba(251, 146, 60, 1)",
+      "rgba(20, 184, 166, 1)",
+    ],
+  ];
+
+  const colors = defaultColors[0];
+
+  const chartData = {
+    labels,
+    datasets: [
+      {
+        data: data[0]?.data,
+        backgroundColor: data[0]?.data.map((_: any, i: number) => colors[i % colors.length]),
+        borderRadius: 6,
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: "x",
+    plugins: {
+      legend: {
+        display: false,
+        position: "top" as const,
+      },
+      datalabels: {
+        display: false,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: yAxis,
+        },
+      },
+    },
+  };
+
+  return (
+    <div
+      className="ml-4 flex w-full flex-col text-sm"
+      style={{ marginTop: "10px", height: "200px" }}
+    >
+      <Bar data={chartData} options={options} />
+    </div>
+  );
+}

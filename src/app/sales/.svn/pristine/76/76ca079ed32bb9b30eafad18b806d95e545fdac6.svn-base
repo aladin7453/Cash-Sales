@@ -1,0 +1,137 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+export type OpeningClosingBalance = {
+  UUID: string;
+  counterNo: string;
+  date: string;
+  status: string;
+  openingBalance: string;
+  lastOpen: string;
+  openBy: string;
+  closingBalance: string;
+  lastClose: string;
+  closeBy: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  valid: string;
+  createdByUsername: string;
+  updatedByUsername: string;
+  createdAtFormat: string;
+  updatedAtFormat: string;
+  preferenceData?: any;
+};
+
+// Preference (Format Number Function)
+const formatNumber = (value: string | number, decimalPlaces: number = 2): string => {
+  if (value === null || value === undefined || value === '') {
+    return (0).toFixed(decimalPlaces);
+  }
+  
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  
+  if (isNaN(numValue)) {
+    return (0).toFixed(decimalPlaces);
+  }
+  
+  return numValue.toFixed(decimalPlaces);
+};
+
+export const columns: ColumnDef<OpeningClosingBalance>[] = [
+  {
+    id: "counterNo",
+    accessorKey: "counterNo",
+    header: "Counter No",
+    filterFn: "includesString",
+  },
+  {
+    id: "date",
+    accessorKey: "date",
+    header: "Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "status",
+    accessorKey: "status",
+    header: "Current Status",
+    filterFn: "includesString",
+  },
+  {
+    id: "openingBalance",
+    accessorKey: "openingBalance",
+    header: "Opening Balance",
+    filterFn: "includesString",
+  },
+  {
+    id: "lastOpen",
+    accessorKey: "lastOpen",
+    header: "Last Open Time",
+    filterFn: "includesString",
+  },
+  {
+    id: "openBy",
+    accessorKey: "openBy",
+    header: "Opened By",
+    filterFn: "includesString",
+  },
+  {
+    id: "closingBalance",
+    accessorKey: "closingBalance",
+    header: "Closing Balance",
+    filterFn: "includesString",
+  },
+  {
+    id: "lastClose",
+    accessorKey: "lastClose",
+    header: "Last Close Time",
+    filterFn: "includesString",
+  },
+  {
+    id: "closeBy",
+    accessorKey: "closeBy",
+    header: "Closed By",
+    filterFn: "includesString",
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+    filterFn: "includesString",
+  },
+  {
+    id: "createdByUsername",
+    accessorKey: "createdByUsername",
+    header: "Created by",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedByUsername",
+    accessorKey: "updatedByUsername",
+    header: "Updated by",
+    filterFn: "includesString",
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as OpeningClosingBalance["valid"];
+      
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    filterFn: filterWithStringConversion,
+  },
+];

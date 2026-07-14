@@ -1,0 +1,42 @@
+"use client";
+
+import React from "react";
+import type { Table } from "@tanstack/react-table";
+
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import Validity from "@/components/data-table/Validity";
+
+type Props<TData> = {
+  table: Table<TData>;
+  revalidateCollectionReport: () => void;
+  title?: string;
+  totalNumOfRows: number; // Add this line
+};
+
+export default function DataTableToolbar<TData>({
+  table,
+  title,
+  revalidateCollectionReport,
+  totalNumOfRows, // Add this line
+}: Props<TData>) {
+  return (
+    <div className="flex items-center justify-between p-2.2 rounded-t-md">
+      <div className="flex items-center gap-x-1 pl-2">
+        {title && <h1 className="text-lg font-bold">{title}</h1>}
+      </div>
+
+      {/* Pagination Section */}
+      <Pagination table={table} totalNumOfRows={totalNumOfRows} /> {/* Update this line */}
+
+      {/* Action Buttons */}
+      <div className="flex items-center gap-x-3 pr-2 text-erp-blue-14">
+        <Export table={table} />
+        <Refresh refreshTable={revalidateCollectionReport} />
+        <ColumnVisibilityToggle table={table} />
+      </div>
+    </div>
+  );
+}

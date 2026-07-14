@@ -1,0 +1,298 @@
+"use client";
+
+import { endOfMonth, startOfMonth } from "date-fns";
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+
+import LoadingUI from "@/components/LoadingUI";
+import { DEFAULT_DATA_TABLE_PAGE_SIZE, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+
+import { SalesReportColumns } from "./Generate/columns";
+import SalesReportDataTable from "./Generate/DataTable";
+import SalesReportForm from "./Report/SalesReportForm";
+import SummaryForm from "./Report/SummaryForm";
+
+import type { ColumnFiltersState, SortingState } from "@tanstack/react-table";
+
+const COLUMN_FILTERS_KEY = "sales-report.table.filters";
+const PAGINATION_KEY = "sales-report.table.pagination";
+const SORTING_KEY = "sales-report.table.sorting";
+
+export default function SalesReportPage() {
+  const [tempGeneratedReportList, setTempGeneratedReportList] = useState<any[]>([]);
+  const [hasGenerated, setHasGenerated] = useState("0");
+  const [showReportTable, setShowReportTable] = useState(false);
+  const [previewPDF, setPreviewPDF] = useState<any>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [salesReportData, setSalesReportData] = useState<any>(null);
+  const [summaryData, setSummaryData] = useState<any>(null);
+  const [columnFilters, setColumnFilters] = useLocalStorage<ColumnFiltersState>(
+    COLUMN_FILTERS_KEY,
+    [],
+  );
+
+  const [pagination, setPagination] = useLocalStorage(PAGINATION_KEY, {
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+  });
+
+  const [sorting, setSorting] = useLocalStorage<SortingState>(SORTING_KEY, []);
+
+  const [totalCounts, setTotalCounts] = useState<{ total: number }>({ total: 0 });
+
+  const headers = getAuthHeaders();
+
+  const filterFields = [
+    "docNo",
+    "docDateFormat",
+    "customerName",
+    "totalTax",
+    "totalDiscount",
+    "netTotal",
+    "totalPaidAmount",
+    "outstandingAmount",
+    "paymentDateFormat",
+    //"valid",
+  ];
+
+  const form = useForm({
+    defaultValues: {
+      customerCode: "",
+      customerCodeCode: "",
+      customerGroup: "",
+      customerGroupName: "",
+      status: "",
+      startDate: Math.floor(startOfMonth(new Date()).getTime() / 1000).toString(),
+      endDate: Math.floor(endOfMonth(new Date()).getTime() / 1000).toString(),
+      valid: "1",
+    },
+  });
+
+  const generateReport = async (formData: any) => {
+    try {
+      // Get all form values
+      const allFormValues = form.getValues();
+
+      const filterObject = {};
+
+      filterFields.forEach((key) => {
+        if (allFormValues[key]) {
+          filterObject[key] = allFormValues[key];
+        }
+      });
+
+      const params = new FormData();
+
+      params.append(
+        "param[filter]",
+        Object.keys(filterObject).length > 0 ? JSON.stringify(filterObject) : "{}",
+      );
+
+      params.append("param[offset]", `${pagination.pageIndex * pagination.pageSize}`);
+
+      params.append("param[limit]", `${pagination.pageSize}`);
+
+      params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "createdAt");
+
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc",
+      );
+      const validFormValues = form.getValues();
+
+      const validfilterFields = ["valid"];
+
+      const validfilterObject = {};
+
+      validfilterFields.forEach((key) => {
+        if (validFormValues[key]) {
+          validfilterObject[key] = validFormValues[key];
+        }
+      });
+
+      if (validFormValues.valid) {
+        params.append("param[valid]", validFormValues.valid);
+      }
+
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value) params.append(`sales[${key}]`, value as string);
+      });
+
+      const docType = formData.docType || "salesInvoice";
+
+      const response = await fetch(
+        `${ORIGIN}/sales_report/api/sales-report/generate-report?docType=${docType}&reportType=monthlyReport`,
+        {
+          method: "POST",
+          headers,
+          body: params,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate report");
+      }
+
+      const result = await response.json();
+      const rows = result.rows || [];
+
+      setTotalCounts({ total: result.total ?? rows.length });
+
+      // Set summary values from backend response
+      form.setValue("total", result.total ?? "0");
+      form.setValue("totalAmountInvoiced", result.summary.totalNetTotal ?? "0.00");
+      form.setValue("totalPaid", result.summary.totalPaidAmount ?? "0.00");
+      form.setValue("totalOutstanding", result.summary.totalOutstandingAmount ?? "0.00");
+
+      setTempGeneratedReportList(rows || []);
+      setShowReportTable(true);
+      setHasGenerated("1");
+    } catch (error) {
+      console.error("Error generating report:", error);
+    }
+  };
+
+  const previewReport = async (formData: any) => {
+    setPreviewPDF(null);
+
+    try {
+      const allFormValues = form.getValues();
+
+      const filterFields = [
+        "docNo",
+        "docDateFormat",
+        "customerName",
+        "totalTax",
+        "totalDiscount",
+        "netTotal",
+        "totalPaidAmount",
+        "outstandingAmount",
+        "paymentDateFormat",
+        //"valid",
+      ];
+
+      const filterObject = {};
+      filterFields.forEach((key) => {
+        if (allFormValues[key]) {
+          filterObject[key] = allFormValues[key];
+        }
+      });
+
+      const params = new FormData();
+
+      params.append(
+        "param[filter]",
+        Object.keys(filterObject).length > 0 ? JSON.stringify(filterObject) : "{}",
+      );
+
+      params.append("param[offset]", ``);
+
+      // params.append("param[limit]", ``);
+
+      params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "createdAt");
+
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc",
+      );
+
+      const validFormValues = form.getValues();
+
+      // Build filter object from the filter fields
+      const validfilterFields = ["valid"];
+
+      const validfilterObject = {};
+
+      validfilterFields.forEach((key) => {
+        if (validFormValues[key]) {
+          validfilterObject[key] = validFormValues[key];
+        }
+      });
+
+      if (validFormValues.valid) {
+        params.append("param[valid]", validFormValues.valid);
+      }
+
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value) params.append(`sales[${key}]`, value as string);
+      });
+
+      const docType = formData.docType || "salesInvoice";
+
+      const response = await fetch(
+        `${ORIGIN}/sales_report/api/sales-report/preview-pdf?docType=${docType}&reportType=monthlyReport&hasGenerated=${hasGenerated}`,
+        {
+          method: "POST",
+          headers,
+          body: params,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to preview report");
+      }
+
+      const result = await response.json();
+      const rows = result.rows || [];
+
+      setTotalCounts({ total: result.total ?? rows.length });
+
+      // Set summary values from backend response
+      form.setValue("total", result.total ?? "0");
+      form.setValue("totalAmountInvoiced", result.summary.totalNetTotal ?? "0.00");
+      form.setValue("totalPaid", result.summary.totalPaidAmount ?? "0.00");
+      form.setValue("totalOutstanding", result.summary.totalOutstandingAmount ?? "0.00");
+
+      setPreviewPDF(result);
+      setSalesReportData(formData);
+    } catch (error) {
+      console.error("Error previewing report:", error);
+    }
+  };
+
+  const onSubmit = async (data: any) => {
+    try {
+      setIsGenerating(true);
+      await generateReport(data);
+    } catch (error) {
+      console.error("Error generating report:", error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <>
+      <SalesReportForm
+        form={form}
+        onSubmit={onSubmit}
+        onPreview={previewReport}
+        previewPDF={previewPDF}
+        salesReportData={salesReportData}
+        generatedReport={tempGeneratedReportList}
+        salesReportColumns={SalesReportColumns}
+        filterFields={filterFields}
+        sorting={sorting}
+      />
+      <SummaryForm form={form} onSubmit={onSubmit} />
+      {showReportTable && (
+        <SalesReportDataTable
+          columns={SalesReportColumns}
+          data={tempGeneratedReportList}
+          revalidateSalesReport={() => generateReport(form.getValues())}
+          columnFilters={columnFilters}
+          setColumnFilters={setColumnFilters}
+          pagination={pagination}
+          setPagination={setPagination}
+          sorting={sorting}
+          setSorting={setSorting}
+          formData={form.getValues()}
+          salesReportColumns={SalesReportColumns}
+          totalNumOfRows={totalCounts.total}
+        />
+      )}
+      {isGenerating && <LoadingUI />}
+    </>
+  );
+}

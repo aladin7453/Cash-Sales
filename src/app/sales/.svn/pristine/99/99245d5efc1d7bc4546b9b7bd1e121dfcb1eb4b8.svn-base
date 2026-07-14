@@ -1,0 +1,746 @@
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import React, { useEffect, useState } from "react";
+import { FaCreditCard, FaMagnifyingGlass } from "react-icons/fa6";
+import { IoDocumentsSharp } from "react-icons/io5";
+
+//Button
+import PaymentButton from "@/components/form/ActionButton/Payment";
+import TransferButton from "@/components/features/transfer/TransferButton";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import CloneButton from "@/components/form/ActionButton/Clone";
+import DeleteButton from "@/components/form/ActionButton/Delete";
+import NewButton from "@/components/form/ActionButton/New";
+import PreviewButton from "@/components/form/ActionButton/Preview";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+import LayoutToggleButton from "@/components/form/ActionButton/LayoutToggleButton";
+
+// Mobile View (Imports)
+import MobileFormActionGroup from "@/components/form/MobileFormActionGroup";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, ORIGIN, TOOLTIP_DELAY_DURATION } from "@/lib/constants";
+import { useApi } from "@/lib/hooks/useAPI";
+
+import { cashSalesTransferFromConfig } from "../transfer/transferFrom/config";
+import { cashSalesTransferToConfig } from "../transfer/transferTo/config";
+import { ApprovalStatusIcon } from "./ApprovalStatusIcon";
+import { eInvoiceRecords } from "./e-invoice-record/columns";
+import EInvoiceRecordsDataTable from "./e-invoice-record/DataTable";
+import { useDateRestriction } from "@/components/custom/DateRestrictionContext";
+
+import type { Table } from "@tanstack/react-table";
+
+import type { CashSales } from "../columns";
+
+type TopActionBarProps = {
+  cashSales?: CashSales | null;
+  approvalStatus?: CashSales | null;
+  handleSubmit: () => void;
+  resetForm: () => void;
+  onSubmit: (values: any) => void;
+  onPayment?: () => void;
+  tempRowCashSalesDetailsList: any;
+  setTempRowCashSalesDetailsList: any;
+  revalidateCashSalesDetails: () => void;
+  action: string;
+  slug: string;
+  isSaving?: boolean;
+  setIsSaving?: (saving: boolean) => void;
+  revalidateCashSales: () => void;
+  viewEInvoiceDetails?: (row: any) => void;
+  cashSalesData?: any;
+  layout: "new" | "old";
+  onLayoutChange: (layout: "new" | "old") => void;
+};
+
+export default function TopActionBar({
+  cashSales,
+  approvalStatus,
+  form,
+  onPayment,
+  handleSubmit,
+  action,
+  slug,
+  tempRowCashSalesDetailsList,
+  setTempRowCashSalesDetailsList,
+  revalidateCashSalesDetails,
+  revalidateCashSales,
+  viewEInvoiceDetails,
+  cashSalesData,
+  layout,
+  onLayoutChange
+}: TopActionBarProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const id = searchParams.get("id");
+
+  const { toast } = useToast();
+  const headers = getAuthHeaders();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [selectedRowUUID, setSelectedRowUUID] = useState<string | null>(null);
+  const [tempRowEInvoiceRecords, setTempRowEInvoiceRecords] = useState([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [tableInstance, setTableInstance] = useState<Table | null>(null);
+
+  // Remove the topActionDropdownOpen state as it's now handled by the component
+  const canPreview = slug !== "new"; // Only show preview button if not on "new" page
+
+  // Add this ref for the input element
+  const barcodeInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Add this useEffect for auto-focus
+  useEffect(() => {
+    // Focus the barcode input when component mounts
+    if (barcodeInputRef.current) {
+      barcodeInputRef.current.focus();
+    }
+  }, []);
+
+  useEffect(() => {
+    form.reset(cashSales || {});
+  }, [cashSales, form]);
+
+  const handleDialogToggle = () => {
+    setDialogOpen(!dialogOpen);
+  };
+
+  const handleRowSelect = (rowUUID: string) => {
+    setSelectedRowUUID(rowUUID);
+  };
+
+  const handleTableInstanceReady = (table: Table<any>) => {
+    if (table) {
+      setTableInstance(table);
+    } else {
+      console.error("Table instance is null or undefined");
+    }
+  };
+
+  const handleReset = () => {
+    form.reset();
+    // resetForm();
+  };
+
+  const handleSave = async () => {
+    if (isSaving) return; // Prevent multiple clicks
+    setIsSaving(true);
+
+    try {
+      await handleSubmit();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Add item function
+  const handleBarcodeKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const barcode = form.getValues("barcode");
+
+      if (!barcode) {
+        toast({
+          variant: "destructive",
+          title: "Failed",
+          description: "Field is empty",
+        });
+        return;
+      }
+
+      const isNewPage = !cashSales?.UUID;
+      const formData = new FormData();
+      formData.append("barcode", barcode);
+
+      // Calculate totals for the current items before adding new item
+      const totalAmount = tempRowCashSalesDetailsList.reduce(
+        (sum, item) => sum + (item.amount ? parseFloat(item.amount) : 0),
+        0,
+      );
+
+      const rowTotalDiscount = tempRowCashSalesDetailsList.reduce(
+        (sum, item) => sum + (item.discountAmount ? parseFloat(item.discountAmount) : 0),
+        0,
+      );
+
+      const additionalDiscount = form.getValues("additionalDiscount")
+        ? parseFloat(form.getValues("additionalDiscount"))
+        : 0;
+
+      const totalDiscount = rowTotalDiscount + additionalDiscount;
+
+      const totalTax = tempRowCashSalesDetailsList.reduce(
+        (sum, item) => sum + (item.taxAmount ? parseFloat(item.taxAmount) : 0),
+        0,
+      );
+
+      const totalSubtotal = tempRowCashSalesDetailsList.reduce(
+        (sum, item) => sum + (item.amount ? parseFloat(item.amount) : 0),
+        0,
+      );
+
+      const totalFeeAmount = 0; // Set as needed
+      const totalPayable = (totalAmount - totalDiscount + totalTax).toFixed(2);
+
+      // Add total fields to formData
+      if (!isNewPage) {
+        // Only add these for existing cash sales
+        formData.append("cashSales[totalAmount]", totalAmount.toFixed(2));
+        formData.append("cashSales[totalDiscount]", totalDiscount.toFixed(2));
+        formData.append("cashSales[totalTax]", totalTax.toFixed(2));
+        formData.append("cashSales[totalPayable]", totalPayable);
+        formData.append("cashSales[totalFeeAmount]", totalFeeAmount.toFixed(2));
+        formData.append("cashSales[totalSubtotal]", totalSubtotal.toFixed(2));
+        formData.append("cashSales[additionalDiscount]", additionalDiscount.toFixed(2));
+      }
+
+      try {
+        const url = isNewPage
+          ? `${ORIGIN}/cash_sales/api/cash-sales/add-item`
+          : `${ORIGIN}/cash_sales/api/cash-sales/add-item?id=${cashSales.UUID}`;
+
+        const response = await fetch(url, {
+          method: "POST",
+          body: formData,
+          headers,
+        });
+
+        const responseData = await response.json();
+
+        if (response.status === 403) {
+          toast({
+            variant: "destructive",
+            title: "Forbidden",
+            description: responseData.message,
+          });
+        }
+
+        if (responseData.message === "Failed") {
+          toast({
+            variant: "destructive",
+            title: "Failed",
+            description: "Invalid barcode",
+          });
+        } else {
+          if (isNewPage) {
+            // Find the UOM details from the scanned barcode
+            const scannedUOM = responseData.data.UOMDropdown.find(
+              (uom: any) => uom.barcode === barcode,
+            );
+
+            if (!scannedUOM) {
+              toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Invalid barcode",
+              });
+              return;
+            }
+
+            // Find existing item with same item and UOM
+            const existingItemIndex = tempRowCashSalesDetailsList.findIndex(
+              (item: any) =>
+                item.item === responseData.data.item && item.itemUOM === scannedUOM.UOM,
+            );
+
+            if (existingItemIndex !== -1) {
+              // Update existing item quantity and amount
+              setTempRowCashSalesDetailsList((prevList: any) => {
+                const updatedList = [...prevList];
+                const item = updatedList[existingItemIndex];
+                const newQuantity = parseInt(item.quantity) + 1;
+                const newAmount = (parseFloat(item.price) * newQuantity).toFixed(2);
+
+                updatedList[existingItemIndex] = {
+                  ...item,
+                  quantity: newQuantity.toString(),
+                  amount: newAmount,
+                  subtotalTax: newAmount,
+                };
+
+                return updatedList;
+              });
+
+              toast({
+                title: "Success",
+                description: "Item quantity updated",
+              });
+            } else {
+              // Add new item with the specific UOM
+              const newItem = {
+                item: responseData.data.item,
+                itemName: responseData.data.itemName,
+                type: responseData.data.type,
+                description: responseData.data.description,
+                "2ndDescription": responseData.data["2ndDescription"],
+                moreDescription: responseData.data.moreDescription,
+                itemGroup: responseData.data.itemGroup,
+                itemCategory: responseData.data.itemCategory,
+                itemGroupCode: responseData.data.itemGroupCode,
+                itemCategoryCode: responseData.data.itemCategoryCode,
+                tariff: responseData.data.tariff,
+                classification: responseData.data.classification,
+                permitNo: responseData.data.permitNo,
+                project: responseData.data.project,
+                quantity: "1",
+                UOM: scannedUOM.UUID,
+                itemUOM: scannedUOM.UOM,
+                price: responseData.data.price,
+                amount: responseData.data.price,
+                discountRate: responseData.data.discountRate || "0",
+                discountAmount: responseData.data.discountAmount || "0",
+                taxCode: responseData.data.tax,
+                taxRate: responseData.data.taxRate || "0",
+                taxAmount: responseData.data.taxAmount || "0",
+                subtotalTax: responseData.data.price,
+                deliveryDate: responseData.data.deliveryDate,
+                billingFrequency: responseData.data.billingFrequency,
+                billingInterval: responseData.data.billingInterval,
+                startAt: responseData.data.startAt,
+                endAt: responseData.data.endAt,
+                master: responseData.data.master,
+                showTemplate: responseData.data.showTemplate,
+                itemCode: responseData.data.itemCode,
+                valid: "1",
+                taxInclusive: "0",
+                UOMDropdown: responseData.data.UOMDropdown, // Add this line to include UOMDropdown
+              };
+
+              setTempRowCashSalesDetailsList((prevList: any) => {
+                const updatedList = Array.isArray(prevList) ? [...prevList] : [];
+                return [...updatedList, newItem];
+              });
+
+              toast({
+                title: "Success",
+                description: "Item added successfully",
+              });
+            }
+          } else {
+            // Existing non-new page logic
+            const existingItemIndex = tempRowCashSalesDetailsList.findIndex(
+              (item: any) => item.item === responseData.data.item,
+            );
+
+            if (existingItemIndex !== -1) {
+              setTempRowCashSalesDetailsList((prevList: any) => {
+                const updatedList = [...prevList];
+                const item = updatedList[existingItemIndex];
+                const newQuantity = parseInt(item.quantity) + 1;
+                const newAmount = (parseFloat(item.price) * newQuantity).toFixed(2);
+
+                updatedList[existingItemIndex] = {
+                  ...item,
+                  quantity: newQuantity.toString(),
+                  amount: newAmount,
+                  subtotalTax: newAmount,
+                };
+
+                return updatedList;
+              });
+
+              toast({
+                title: "Success",
+                description: "Item quantity updated",
+              });
+            } else {
+              const newItem = {
+                ...responseData.data,
+                valid: "1",
+                taxInclusive: "0",
+              };
+
+              setTempRowCashSalesDetailsList((prevList: any) => {
+                const updatedList = Array.isArray(prevList) ? [...prevList] : [];
+                return [...updatedList, newItem];
+              });
+
+              toast({
+                title: "Success",
+                description: "Item added successfully",
+              });
+            }
+          }
+
+          revalidateCashSalesDetails();
+        }
+
+        form.setValue("barcode", "");
+      } catch (error) { }
+    }
+  };
+
+  const handlePaymentClick = () => {
+    if (onPayment) onPayment();
+  };
+
+  const eInvoiceStat = form.getValues("eInvoiceStatus");
+  const consolidatedStat = form.getValues("consolidatedInvoiceDocNo");
+
+  const {
+    data: eInvoiceRecordsData,
+    error: eInvoiceRecordError,
+    mutate: mutateEInvoice,
+  } = useApi(
+    id
+      ? `${ORIGIN}/cash_sales/api/cash-sales/get-update-cash-sales-has-e-invoice-data?id=${id}`
+      : null,
+    { revalidateOnFocus: false, credentials: "omit" },
+  );
+
+  const revalidateEInvoiceRecordsData = () => {
+    mutateEInvoice();
+  };
+
+  // Dropdown Filter Configuration
+  const getTransferFromFilters = () => {
+    const filters = [];
+
+    // Add customer filter if customer is selected
+    const customerName = form.getValues("customerName");
+
+    if (customerName) {
+      filters.push({
+        column: "customerName",
+        value: customerName,
+      });
+    }
+
+    // You can add more filters here based on other form values
+    // const projectCode = form.getValues("projectCode");
+    // if (projectCode) {
+    //   filters.push({
+    //     column: "projectCode",
+    //     value: projectCode
+    //   });
+    // }
+
+    return filters;
+  };
+
+  const { allowPastRecord, setAllowPastRecord } = useDateRestriction();
+
+  // Change layout button condition (HardCode)
+  const systemAccount = JSON.parse(localStorage.getItem("system-account") || "{}");
+  const canChangeLayout = ["infollective", "infollectivetesting", "dev", "mymug", "vminimarket"].includes(systemAccount);
+
+  return (
+    <div className="flex h-full w-full flex-1 items-center justify-between bg-erp-gray-3 py-2">
+      <div className="flex flex-1 space-x-3">
+        {/* Mobile View (Action Buttons) */}
+        <MobileFormActionGroup
+          config={{
+            onSave: handleSave,
+            onReset: handleReset,
+            onCancel: () => router.push(`/sales/cash-sales/`),
+            newDestination: "/sales/cash-sales/new",
+            cloneDestination: `/sales/cash-sales/clone?id=${id}`,
+            deleteConfig:
+              id && action !== "clone"
+                ? {
+                  module: "cash_sales",
+                  model: "cash-sales",
+                  id: `${id}`,
+                  indexPath: `/sales/cash-sales/`,
+                }
+                : undefined,
+            showNew: !!(id && action !== "clone"),
+            showClone: !!(id && action !== "clone"),
+            showDelete: !!(id && action !== "clone"),
+          }}
+        >
+          {/* Additional Actions (Other than Save, New, Clone, Reset, Delete, and Cancel) */}
+          {cashSales && canPreview && slug === "edit" && (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <PreviewButton
+                previewType={"CASH SALES"}
+                module={"cash_sales"}
+                model={"cash-sales"}
+                doc_id={cashSales.UUID}
+                data={cashSalesData}
+              />
+            </DropdownMenuItem>
+          )}
+          {/* Transfer From (Mobile View) */}
+          {slug === "new" ? (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <TransferButton
+                transferFromProps={{
+                  id: id,
+                  slug: slug,
+                  config: cashSalesTransferFromConfig,
+                  filterConfig: getTransferFromFilters(),
+                }}
+                showTransferTo={false}
+              />
+            </DropdownMenuItem>
+          ) : (
+            ""
+          )}
+          {/* Transfer To (Mobile View) */}
+          {slug === "edit" ? (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <TransferButton
+                transferToProps={{
+                  id: id,
+                  config: cashSalesTransferToConfig,
+                }}
+                showTransferFrom={false}
+              />
+            </DropdownMenuItem>
+          ) : (
+            ""
+          )}
+          <DropdownMenuItem onClick={handlePaymentClick}>
+            <div className="flex items-center gap-x-2">
+              <FaCreditCard className="size-5" />
+              <span>Payment</span>
+            </div>
+          </DropdownMenuItem>
+        </MobileFormActionGroup>
+
+        {/* Web View (Action Buttons) */}
+        <div className="hidden space-x-3 md:flex">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <SaveButton
+                    onSubmit={handleSave}
+                    disabled={
+                      slug !== "clone" &&
+                      (isSaving ||
+                        eInvoiceStat == "Valid" ||
+                        eInvoiceStat == "Submitted" ||
+                        consolidatedStat != null)
+                    }
+                  />
+                </span>
+              </TooltipTrigger>
+
+              {consolidatedStat != null && slug === "edit" && (
+                <TooltipContent side="right">
+                  Edit not allowed. This document has been consolidated.
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* New */}
+          {id && action !== "clone" && <NewButton destination="/sales/cash-sales/new" />}
+
+          {/* Clone */}
+          {id && action !== "clone" && (
+            <CloneButton destination={`/sales/cash-sales/clone?id=${id}`} />
+          )}
+
+          {/* Reset */}
+          <ResetButton onClick={handleReset} />
+
+          {/* Delete */}
+          {id && action !== "clone" && (
+            <DeleteButton
+              module={"cash_sales"}
+              model={"cash-sales"}
+              id={`${id}`}
+              indexPath={`/sales/cash-sales/`}
+            />
+          )}
+
+          {/* Preview */}
+          {cashSales && canPreview && slug === "edit" && (
+            <PreviewButton
+              previewType={"CASH SALES"}
+              module={"cash_sales"}
+              model={"cash-sales"}
+              doc_id={cashSales.UUID}
+              data={cashSalesData}
+            />
+          )}
+
+          {/* Transfer To */}
+          {slug === "new" ? (
+            <TransferButton
+              transferFromProps={{
+                id: id,
+                slug: slug,
+                config: cashSalesTransferFromConfig,
+                filterConfig: getTransferFromFilters(),
+              }}
+              showTransferTo={false}
+            />
+          ) : (
+            ""
+          )}
+
+          {/* Transfer From */}
+          {slug === "edit" ? (
+            <TransferButton
+              transferToProps={{
+                id: id,
+                config: cashSalesTransferToConfig,
+              }}
+              showTransferFrom={false}
+            />
+          ) : (
+            ""
+          )}
+
+          {/* Payment */}
+          <PaymentButton onClick={handlePaymentClick} />
+
+          {/* Cancel */}
+          <CancelButton onClick={() => router.push(`/sales/cash-sales/`)} />
+
+          {/* Switch */}
+          {canChangeLayout && <LayoutToggleButton layout={layout} onChange={onLayoutChange} />}
+        </div>
+      </div>
+
+      <Form id="topActionBarForm" {...form}>
+        {/* Search Bar Code */}
+        <FormField
+          control={form.control}
+          name="barcode"
+          render={({ field }) => (
+            <FormItem className="flex flex-col space-y-1">
+              <FormControl className="relative">
+                <div>
+                  <Input
+                    className="h-8 rounded-2xl px-4 pr-8 text-[12px] outline-none transition-all duration-300 ease-in-out"
+                    {...field}
+                    onKeyDown={handleBarcodeKeyPress}
+                    ref={barcodeInputRef}
+                    placeholder="Search Bar Code"
+                  />
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                    <FaMagnifyingGlass className="size-3 text-gray-400" />
+                  </div>
+                </div>
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <Form id="topActionBarForm" {...form}>
+          {/* Added onSubmit to Form */}
+          <FormField
+            control={form.control}
+            name="valid"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-x-2 space-y-0 px-3">
+                {approvalStatus?.approvalStatus &&
+                  (approvalStatus.approvalStatus === "Rejected" ? (
+                    <TooltipProvider delayDuration={0}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <ApprovalStatusIcon status={approvalStatus.approvalStatus} />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p>{approvalStatus.rejectReason || "No reason provided"}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    <ApprovalStatusIcon status={approvalStatus.approvalStatus} />
+                  ))}
+                <TooltipProvider delayDuration={TOOLTIP_DELAY_DURATION}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        className="hidden size-8 md:flex"
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleDialogToggle}
+                        disabled={
+                          form.getValues("invoiceType") == "Consolidate" ||
+                          form.getValues("invoiceType") == "None" ||
+                          form.getValues("invoiceType") == ""
+                        }
+                      >
+                        <IoDocumentsSharp className="size-5.5 text-primary" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-medium">E-Invoice Records</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <FormControl>
+                  <Checkbox
+                    checked={field.value === "1"}
+                    onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                  />
+                </FormControl>
+                <FormLabel>Valid</FormLabel>
+              </FormItem>
+            )}
+          />
+
+          {/* Past Record checkbox */}
+          <FormField
+            control={form.control}
+            name="allowPastDates"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-x-2 space-y-0 mr-2">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value === "1"}
+                    onCheckedChange={(state) => {
+                      field.onChange(state ? "1" : "0");
+                      setAllowPastRecord(state === true);
+                    }}
+                  />
+                </FormControl>
+                <FormLabel className="cursor-pointer">Past Record</FormLabel>
+              </FormItem>
+            )}
+          />
+        </Form>
+      </Form>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-4xl space-y-2.5 bg-white p-3 pt-2">
+          <span className="text-sm/none font-semibold">e-Invoice Records</span>
+          <div className="max-w-4xl overflow-x-auto rounded-sm bg-erp-blue-3 p-1">
+            <EInvoiceRecordsDataTable
+              columns={eInvoiceRecords}
+              data={
+                id && slug == "edit"
+                  ? eInvoiceRecordsData
+                    ? eInvoiceRecordsData.rows
+                    : []
+                  : tempRowEInvoiceRecords
+              }
+              tempRowEInvoiceRecords={tempRowEInvoiceRecords}
+              setTempRowEInvoiceRecords={setTempRowEInvoiceRecords}
+              revalidateEInvoiceRecordsData={revalidateEInvoiceRecordsData}
+              onRowSelect={handleRowSelect}
+              onTableInstanceReady={handleTableInstanceReady}
+              id={id && slug == "edit" ? id : ""}
+              revalidateCashSales={revalidateCashSales}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

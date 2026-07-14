@@ -1,0 +1,119 @@
+// Validity.tsx
+"use client";
+
+import { FaCoins } from "react-icons/fa6";
+
+import { TOOLTIP_DELAY_DURATION } from "@/lib/constants";
+
+// Import Button from the correct path
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import React, { useState, useEffect } from "react";
+import { Table } from "@tanstack/react-table";
+import AutoBillingMonthFilter from "./AutoBillingMonthFilter";
+import AutoBillingCustomerFilter from "./AutoBillingCustomerFilter";
+import AutoBillingYearFilter from "./AutoBillingYearFilter";
+
+type Props<TData> = {
+  data?: TData[];
+  table: Table<TData>;
+  setVisibleRows?: (visibleRows) => void;
+  quotationDetails: any;
+}
+
+export default function AutoBillingExistence<TData>({ data, table, setVisibleRows, quotationDetails }: Props<TData>) {
+  const [monthFilterValues, setMonthFilterValues] = useState(Array(0))
+  const [yearFilterValues, setYearFilterValues] = useState(Array(0))
+  const [customerFilterValues, setCustomerFilterValues] = useState(Array(0))
+  const monthMap = {
+    0: "JAN",
+    1: "FEB",
+    2: "MAR",
+    3: "APR",
+    4: "MAY",
+    5: "JUN",
+    6: "JUL",
+    7: "AUG",
+    8: "SEP",
+    9: "OCT",
+    10: "NOV",
+    11: "DEC",
+  }
+
+  const findVisibleRows = () => {
+    let filtered = new Array(0)
+    let monthPass = false
+    let yearPass = false
+    let customerPass = false
+
+    data?.forEach((quotation) => {
+      monthPass = false
+      yearPass = false
+      customerPass = false
+      if (quotationDetails[quotation.UUID]) {
+        quotationDetails[quotation.UUID].forEach((detail) => {
+          let startDate = detail.startAt ? new Date(Number(detail.startAt) * 1000) : null
+          let endDate = detail.endAt ? new Date(Number(detail.endAt) * 1000) : null
+          if (!monthPass) monthPass = (monthFilterValues.indexOf(monthMap[startDate ? startDate.getMonth() : 12]) > -1 || monthFilterValues.indexOf(monthMap[endDate ? endDate.getMonth() : 12]) > -1)
+          if (!yearPass) yearPass = (yearFilterValues.indexOf(startDate?.getFullYear().toString()) > -1 || yearFilterValues.indexOf(endDate?.getFullYear().toString()) > -1)
+        })
+        monthPass = (monthFilterValues.length < 1) || monthPass
+        yearPass = (yearFilterValues.length < 1) || yearPass
+        if (!customerPass) customerPass = (customerFilterValues.length < 1) || (customerFilterValues.indexOf(quotation.customerCodeCode) > -1)
+        if (monthPass && yearPass && customerPass) filtered.push(quotation)
+      } else {
+        filtered.push(quotation)
+      }
+    })
+    return filtered
+    // return filtered
+  }
+
+  useEffect(() => {
+    setVisibleRows ? setVisibleRows(findVisibleRows()) : ""
+  }, [data, customerFilterValues, monthFilterValues, yearFilterValues])
+
+  return (
+    <DropdownMenu>
+      <TooltipProvider delayDuration={TOOLTIP_DELAY_DURATION}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <div className="flex flex-col items-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 hover:text-erp-blue-14 aria-expanded:bg-erp-blue-14 aria-expanded:text-white"
+                >
+                  <FaCoins className="size-5.5" />
+                </Button>
+                <span className="text-[11px]/none font-medium text-black">AutoBill</span>
+              </div>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="font-medium">Check Auto-billing Existence</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Check Auto-billing Existence</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <div className="flex flex-col text-sm space-y-2">
+          <AutoBillingMonthFilter monthFilterValues={monthFilterValues} setMonthFilterValues={setMonthFilterValues} />
+          <AutoBillingYearFilter yearFilterValues={yearFilterValues} setYearFilterValues={setYearFilterValues} />
+          <AutoBillingCustomerFilter customerFilterValues={customerFilterValues} setCustomerFilterValues={setCustomerFilterValues} />
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

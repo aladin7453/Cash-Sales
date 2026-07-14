@@ -1,0 +1,103 @@
+"use client";
+
+import { format, parseISO } from "date-fns";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+import React from "react";
+
+export type DeliveryLocationDetails = {
+  UUID: string;
+  deliveryLocation: string;
+  deliverAddress: string;
+  contact: string;
+  phoneNo: number;
+  attachment: string;
+  description: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  valid: string;
+};
+
+export const deliveryLocationDetailsColumns: ColumnDef<DeliveryLocationDetails>[] = [
+  {
+    accessorKey: "deliveryLocation",
+    header: "Delivery Location",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "deliveryAddress",
+    header: "Delivery Address",
+    cell: ({ row }) => {
+      const address = row.original.deliveryAddress || "";
+      const addressStyle = {
+        whiteSpace: "pre-wrap",
+        wordWrap: "break-word",
+      };
+
+      return (
+        <span style={addressStyle}>
+          {address.length > 50 ? `${address}` : address}
+        </span>
+      );
+    },
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "contact",
+    header: "Contact",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "phoneNo",
+    header: "Phone No.",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "attachment",
+    header: "Attachment (.pdf, .png, .jpg, .jpeg)",
+    cell: ({ row }) => {
+      const attachments = JSON.parse(row.original.attachment);
+      const attachmentLinks = row.original.attachmentLink;
+  
+      return attachments && attachments.length > 0 ? (
+        attachments.map((att, index) => {
+          const link = attachmentLinks.find(al => al.name === att.Name);
+          return link ? (
+            <a key={index} href={link.link} target="_blank" rel="noopener noreferrer" style={{ color: 'blue' }}>
+              {att.Name}
+            </a>
+          ) : (
+            <span key={index}>{att.Name}</span>
+          );
+        }).reduce((prev, curr) => [prev, ', ', curr])
+      ) : (
+        <span>No attachment</span>
+      );
+    },
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "description",
+    header: "Remark",
+    filterFn: "includesString"
+  },
+  // {
+  //   accessorKey: "createdAt",
+  //   header: "Created at",
+  // },
+  // {
+  //   accessorKey: "CreatedByUsername",
+  //   header: "Created by",
+  // },
+  // {
+  //   accessorKey: "updatedAt",
+  //   header: "Updated at",
+  // },
+  // {
+  //   accessorKey: "UpdatedByUsername",
+  //   header: "Updated at",
+  // },
+];

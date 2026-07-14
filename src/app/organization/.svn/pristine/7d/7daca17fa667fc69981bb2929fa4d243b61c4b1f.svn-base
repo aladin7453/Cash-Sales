@@ -1,0 +1,126 @@
+import type { Action } from "../DataTable";
+import type { Section } from "../sections";
+
+type BackendModule = {
+  module: string;
+  rules: string[];
+  children?: BackendModule[];
+};
+
+export const ACTION_ALIASES: Record<string, Action> = {
+  view: "View",
+  create: "Create",
+  update: "Update",
+  clone: "Clone",
+  throw: "Throw",
+  restore: "Restore",
+  reset: "Reset",
+  delete: "Delete",
+  download: "Download",
+  auth: "Auth",
+  bill: "Bill",
+  export: "Export",
+  preview: "Preview",
+  print: "Print",
+  confirm: "Confirm",
+  verify: "Verify",
+  compulsary: "Compulsary",
+  "generate-qr-code": "Generate-QR-Code",
+  disable: "Disable",
+  "transfer-to": "Transfer-To",
+  "transfer-from": "Transfer-From",
+  upload: "Upload",
+};
+
+export const normalizeKey = (key: string): string =>
+  key
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "-");
+
+export const parseRule = (rule: string): { action: string; module: string } | null => {
+  const parts = rule.split("-");
+  if (parts.length < 2) return null;
+
+  for (let i = parts.length - 1; i > 0; i--) {
+    const potentialAction = parts.slice(0, i).join("-");
+    if (ACTION_ALIASES[potentialAction]) {
+      return {
+        action: potentialAction,
+        module: parts.slice(i).join("-"),
+      };
+    }
+  }
+
+  return null;
+};
+
+export const buildSectionsFromBackend = (backend: BackendModule[]): Section[] => {
+  const processModule = (mod: BackendModule): Section | null => {
+    const allowedActions = mod.rules
+      .map((rule) => parseRule(rule))
+      .filter(Boolean)
+      .map((r) => ACTION_ALIASES[r!.action])
+      .filter((action): action is Action => Boolean(action));
+
+    const children: Section[] =
+      mod.children?.map(processModule).filter((c): c is Section => !!c) ?? [];
+
+    return {
+      access: normalizeKey(mod.module),
+      allowedActions,
+      hasScope: true,
+      children,
+    };
+  };
+
+  return backend.map(processModule).filter((s): s is Section => !!s);
+};
+
+export const buildPermissionKey = (action: string, access: string) =>
+  `${normalizeKey(action)}-${normalizeKey(access)}`;
+
+export const buildFlatPermissionMap = (backend: BackendModule[]): Record<string, boolean> => {
+  const flatMap: Record<string, boolean> = {};
+
+  const defaultKeys = [
+    "view",
+    "create",
+    "update",
+    "throw",
+    "restore",
+    "delete",
+    "download",
+    "auth",
+    "bill",
+    "print",
+    "preview",
+    "transfer-from",
+    "transfer-to",
+    "export",
+    "confirm",
+    "verify",
+    "compulsary",
+    "assignment",
+    "progress",
+    "generate-qr-code",
+    "disable",
+    "upload",
+  ];
+
+  const traverse = (modules: BackendModule[]) => {
+    modules.forEach((mod) => {
+      const accessKey = normalizeKey(mod.module);
+
+      defaultKeys.forEach((action) => {
+        const key = buildPermissionKey(action, accessKey);
+        flatMap[key] = false;
+      });
+
+      if (mod.children) traverse(mod.children);
+    });
+  };
+
+  traverse(backend);
+  return flatMap;
+};

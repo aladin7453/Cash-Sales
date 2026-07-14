@@ -1,0 +1,48 @@
+import type { TransferFromConfig } from "@/components/features/transfer/transferFrom";
+import { salesDebitNoteDocumentColumns } from "./documentColumns";
+import { salesDebitNoteItemColumns } from "./itemColumns";
+
+export const salesDebitNoteTransferFromConfig: TransferFromConfig = {
+  module: "sales_debit_note",
+  model: "sales-debit-note",
+  apiNamespace: "sales",
+  sources: [
+    {
+      key: "quotation",
+      label: "Quotation",
+      apiDocType: "quotation",
+      transferDocType: "quotation",
+    },
+    {
+      key: "salesOrder",
+      label: "Sales Order",
+      apiDocType: "salesOrder",
+      transferDocType: "sales_order",
+    },
+    {
+      key: "deliveryOrder",
+      label: "Sales Delivery Order",
+      apiDocType: "deliveryOrder",
+      transferDocType: "deliveryOrder",
+    },
+    {
+      key: "salesInvoice",
+      label: "Sales Invoice",
+      apiDocType: "salesInvoice",
+      transferDocType: "salesInvoice",
+    },
+    {
+      key: "jobOrder",
+      label: "Job Order",
+      apiDocType: "jobOrder",
+      transferDocType: "jobOrder",
+    },
+  ],
+  documentColumns: salesDebitNoteDocumentColumns,
+  itemColumns: salesDebitNoteItemColumns,
+  transferEndpointSuffix: "transfer-from",
+  buttonText: "T-From",
+  dialogTitle: "Transfer from",
+  documentPopoverTitle: "Select Document",
+  detailsPopoverTitle: "Transfer Details",
+};

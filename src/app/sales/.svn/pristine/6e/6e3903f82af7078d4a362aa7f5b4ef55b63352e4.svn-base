@@ -1,0 +1,429 @@
+"use client";
+
+import React, { useEffect, useRef, useState } from "react";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+
+type Params = {
+  form: any;
+  salesCreditNoteData?: any;
+};
+
+export function BuyerDetailsForm({ form, salesCreditNoteData }: Params) {
+  const headers = getAuthHeaders();
+
+  // Watch customer fields for real-time sync
+  const watchedEmail = form.watch("email");
+  const watchedPhoneNo = form.watch("phoneNo");
+
+  // Auto-sync buyer fields whenever customer fields change
+  useEffect(() => {
+    form.setValue("buyerEmail", watchedEmail || "");
+    form.setValue("buyerPhoneNo", watchedPhoneNo || "");
+  }, [watchedEmail, watchedPhoneNo, form]);
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableMSICCode(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  // MSIC Code Dropdown
+  const [showTableMSICCode, setShowTableMSICCode] = useState(false);
+  const [MSICCodeDropdownTableData, setMSICCodeDropdownTableData] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredMSICCodeData = MSICCodeDropdownTableData.filter(
+    (row) =>
+      row.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      row.description.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+
+  const dropdownMSICCodeColumns = [
+    { accessorKey: "code", header: "MSIC" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const toggleTableMSICCode = async () => {
+    const formData = new FormData();
+    formData.append("table[]", "MISCCode");
+
+    if (!showTableMSICCode) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch MSIC drop-down data");
+
+        const MSICCodeData = await response.json();
+        setMSICCodeDropdownTableData(MSICCodeData.rows);
+        setShowTableMSICCode(true);
+      } catch (error) {
+        console.error("Error fetching MSICCode drop-down data:", error);
+      }
+    } else {
+      setShowTableMSICCode(false);
+    }
+  };
+
+  const onClickRowMSICCode = (row) => {
+    form.setValue("buyerMSICCode", row.UUID);
+    form.setValue("buyerMISCCodeCode", row.code);
+    form.setValue("buyerBusinessNature", row.description);
+    setSearchTerm(row.code);
+    setShowTableMSICCode(false);
+  };
+
+  return (
+    <Card className="w-full border-none !shadow-none">
+      <div className="flex w-full items-center justify-between px-0.5 pt-1.5">
+        <CardTitle className="text-sm font-bold">Buyer Details</CardTitle>
+      </div>
+      <CardContent className="p-0">
+        <Form {...form}>
+          <form>
+            <div className="flex flex-col gap-y-2.5 pt-1.5">
+              {/* First Row */}
+              <div className="grid grid-cols-2 items-center gap-x-2">
+                {/* Buyer TTX No */}
+                <FormField
+                  control={form.control}
+                  name="buyerTTXNo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md bg-erp-gray-1 border-gray-200 px-2 text-[11px] text-black outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                placeholder="TTx No"
+                                readOnly
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              TTX No
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* MSIC UUID (hidden) */}
+                <FormField
+                  control={form.control}
+                  name="buyerMSICCode"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormLabel>UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* MSIC Code */}
+                <FormField
+                  control={form.control}
+                  name="buyerMISCCodeCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl className="relative">
+                        <div className="relative">
+                          <TooltipProvider delayDuration={1000}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Input
+                                  className="h-7.5 rounded-md bg-erp-gray-1 border-gray-200 px-2 text-[11px] text-black outline-none transition-all duration-300 ease-in-out"
+                                  {...field}
+                                  onClick={toggleTableMSICCode}
+                                  ref={inputRef}
+                                  autoComplete="off"
+                                  placeholder="MSIC"
+                                  readOnly
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" align="center">
+                                MSIC
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Buyer Name */}
+                <FormField
+                  control={form.control}
+                  name="buyerName"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                moduleName="salesInvoice"
+                                fieldName="buyerName"
+                                columnName="Buyer Name"
+                                placeholder="Buyer Name"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Buyer Name
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Buyer TIN */}
+                <FormField
+                  control={form.control}
+                  name="buyerTIN"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                placeholder="Buyer TIN"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Buyer TIN
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Buyer BRN/NRIC */}
+                <FormField
+                  control={form.control}
+                  name="buyerBRN"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                placeholder="Buyer BRN/NRIC"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Buyer BRN/NRIC
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Second Row */}
+              <div className="grid grid-cols-2 items-center gap-x-2">
+                {/* Business Nature */}
+                <FormField
+                  control={form.control}
+                  name="buyerBusinessNature"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md bg-erp-gray-1 border-gray-200 px-2 text-[11px] text-black outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                placeholder="Business Nature"
+                                readOnly
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Business Nature
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Buyer SST No */}
+                <FormField
+                  control={form.control}
+                  name="buyerSSTNo"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                placeholder="Buyer SST No"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Buyer SST No
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Third Row */}
+              <div className="grid grid-cols-2 items-center gap-x-2">
+                {/* Buyer Email */}
+                <FormField
+                  control={form.control}
+                  name="buyerEmail"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                placeholder="Buyer Email"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Buyer Email
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Buyer Phone */}
+                <FormField
+                  control={form.control}
+                  name="buyerPhoneNo"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                placeholder="Buyer Phone"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Buyer Phone
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Buyer Address */}
+              <div className="flex-1">
+                <FormField
+                  control={form.control}
+                  name="buyerAddress"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <Textarea
+                          className="h-[97px] resize-none text-[11px] outline-none transition-all duration-300 ease-in-out"
+                          {...field}
+                          moduleName="salesInvoice"
+                          fieldName="buyerAddress"
+                          columnName="Buyer Address"
+                          placeholder="Buyer Address"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

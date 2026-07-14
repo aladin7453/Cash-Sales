@@ -1,0 +1,51 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type AgentListPopover = {
+  UUID: string;
+  agentCode: string;
+  agentName: string;
+  agentTypeType: string;
+  description: string;
+  contact: string;
+  email: string;
+  phoneNo: string;
+  address: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const AgentColumns: ColumnDef<AgentListPopover>[] = [
+
+  {
+    id: "agentName",
+    accessorKey: "agentName",
+    header: "Agent Name",
+    filterFn: "includesString",
+  },
+    {
+    id: "agentTypeType",
+    accessorKey: "agentTypeType",
+    header: "Agent Type",
+    filterFn: "includesString",
+  },
+  {
+    id: "agentDescription",
+    accessorKey: "agentDescription",
+    header: "Description",
+    filterFn: "includesString",
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created At",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated At",
+    filterFn: "includesString",
+  },
+];

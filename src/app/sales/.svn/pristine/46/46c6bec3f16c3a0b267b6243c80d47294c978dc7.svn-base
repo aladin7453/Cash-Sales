@@ -1,0 +1,525 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { FaClipboard, FaLayerGroup, FaTableList } from "react-icons/fa6";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+
+import useSWR from "swr";
+
+import LoadingUI from "@/components/LoadingUI";
+import { Form } from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/components/ui/use-toast";
+import { TabsNavigator } from "@/components/ui/TabsNavigator";
+import {
+  ColumnFiltersState,
+  PaginationState,
+  SortingState,
+} from "@tanstack/react-table";
+
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+import {
+  getAuthHeaders,
+  getCurrentAcc,
+  getCurrentAccount,
+  ORIGIN,
+  DEFAULT_DATA_TABLE_PAGE_SIZE,
+} from "@/lib/constants";
+
+import { CustomerTagForm } from "./main-details/general-details/CustomerTagForm";
+import TopActionBar from "./TopActionBar";
+import CustomInformationDataTable from "./more-details/custom-information/DataTable";
+import { customInformationColumns } from "./more-details/custom-information/columns";
+import { OtherDetailForm } from "./more-details/custom-information/OtherDetailForm";
+// import { changelogColumns } from "./changelog/columns";
+// import CustomerTagChangelogDataTable from "./changelog/DataTable";
+
+type PageParams = {
+  params: { slug: string };
+};
+
+const validRoutes = ["new", "edit", "clone"] as const;
+
+// Updated fetcher to handle both GET and POST requests
+const fetcher = async (
+  url: string,
+  options: { method?: string; body?: FormData } = {}
+) => {
+  const isValid = await validateToken();
+
+  if (!isValid) {
+    console.error("Session expired. Redirecting to login.");
+    throw new Error("Session expired");
+  }
+
+  const headers = getAuthHeaders();
+
+  return fetch(url, {
+    method: options.method || "GET",
+    headers,
+    ...(options.body ? { body: options.body } : {}),
+  }).then(async (res) => {
+    if (!res.ok) {
+      throw new Error("Failed to fetch data");
+    }
+
+    try {
+      return await res.json();
+    } catch (error) {
+      throw new Error("Failed to parse response JSON");
+    }
+  });
+};
+
+type ValidRoute = (typeof validRoutes)[number];
+
+const customerTagFormSchema = z.object({
+  customerTag: z.string().min(2, {
+    message: "Customer Tag must be at least 2 characters.",
+  }),
+});
+
+// Function to check if a route is valid
+function isValidRoute(route: string): route is ValidRoute {
+  return validRoutes.includes(route as ValidRoute);
+}
+
+export default function CustomerTagDetailsPage({ params }: PageParams) {
+  const slug = params.slug;
+  const router = useRouter();
+  const { toast } = useToast();
+  const headers = getAuthHeaders();
+  const currentAcc = getCurrentAcc();
+  const currentAccount = getCurrentAccount();
+
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const [formResetKey, setFormResetKey] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [customerTagData, setCustomerTagData] = useState({});
+  const [tempRowCustomInfo, setTempRowCustomInfo] = useState([]);
+  const [customerTagChangelogData, setCustomerTagChangelogData] = useState([]);
+
+  // Add state for table parameters - these mirror what's in the DataTable
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+  });
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "createdAt", desc: true },
+  ]);
+
+  const tabs = [
+    {
+      id: "mainDetails",
+      name: "Main Details",
+      shortName: "Main",
+      icon: FaClipboard,
+    },
+    {
+      id: "moreDetails",
+      name: "More Details",
+      shortName: "More",
+      icon: FaLayerGroup,
+    },
+    // ...(slug !== "new"
+    //   ? [
+    //       {
+    //         id: "changelog",
+    //         name: "Changelog",
+    //         shortName: "Changelog",
+    //         icon: FaTableList,
+    //       },
+    //     ]
+    //   : []),
+  ];
+
+  const resetForm = () => {
+    setFormResetKey((prevKey) => prevKey + 1);
+  };
+
+  if (!isValidRoute(slug)) {
+    notFound();
+  }
+
+  const {
+    data: customInformationData,
+    error: customInfoError,
+    mutate: mutateCustomInfo,
+  } = useSWR(
+    id
+      ? [
+        `${ORIGIN}/customer_tag/api/customer-tag/get-update-customer-tag-has-custom-info-data?id=${id}`,
+      ]
+      : null,
+    ([url]) => {
+      const params = new FormData();
+
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append(
+        "param[offset]",
+        `${pagination.pageIndex * pagination.pageSize}`
+      );
+
+      const columnFiltersWithoutValid = columnFilters.filter(
+        (filter) => filter.id !== "valid"
+      );
+      params.append(
+        "param[filter]",
+        columnFiltersWithoutValid.length > 0
+          ? JSON.stringify(
+            columnFiltersWithoutValid.reduce<Record<string, unknown>>(
+              (acc, curr) => {
+                acc[curr.id] = curr.value;
+                return acc;
+              },
+              {}
+            )
+          )
+          : "{}"
+      );
+
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc"
+      );
+      params.append(
+        "param[valid]",
+        columnFilters.length > 0
+          ? `${columnFilters.find((row) => row.id === "valid")?.value}`
+          : ""
+      );
+      params.append(
+        "param[sort]",
+        sorting.length > 0 ? sorting[0].id : "createdAt"
+      );
+
+      return fetcher(url, { method: "POST", body: params });
+    },
+    {
+      revalidateOnFocus: false,
+    }
+  );
+
+  const {
+    data: customerTag,
+    error,
+    mutate: mutateCustomerTag,
+    isValidating,
+    isLoading,
+  } = useSWR(
+    id
+      ? [
+        `${ORIGIN}/customer_tag/api/customer-tag/get-update-customer-tag-data?id=${id}`,
+      ]
+      : null,
+    ([url]) => {
+      // Create form data with the same parameters as in DataTable
+      const params = new FormData();
+
+      // Add pagination parameters
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append(
+        "param[offset]",
+        `${pagination.pageIndex * pagination.pageSize}`
+      );
+
+      // Add filter parameters
+      const columnFiltersWithoutValid = columnFilters.filter(
+        (filter) => filter.id !== "valid"
+      );
+      params.append(
+        "param[filter]",
+        columnFiltersWithoutValid.length > 0
+          ? JSON.stringify(
+            columnFiltersWithoutValid.reduce<Record<string, unknown>>(
+              (acc, curr) => {
+                acc[curr.id] = curr.value;
+                return acc;
+              },
+              {}
+            )
+          )
+          : "{}"
+      );
+
+      // Add sorting parameters
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc"
+      );
+      params.append(
+        "param[valid]",
+        columnFilters.length > 0
+          ? `${columnFilters.find((row) => row.id === "valid")?.value}`
+          : ""
+      );
+      params.append(
+        "param[sort]",
+        sorting.length > 0 ? sorting[0].id : "createdAt"
+      );
+
+      return fetcher(url, { method: "POST", body: params });
+    },
+    {
+      revalidateOnFocus: false,
+    }
+  );
+
+  const isFetching = isLoading || isValidating;
+
+  useEffect(() => {
+    if (error || customInfoError) {
+      toast({
+        variant: "destructive",
+        title: "Session Expired",
+        description: "Your session has expired. Redirecting to login page.",
+      });
+      router.push("/login");
+    }
+  }, [error, router, toast, customInfoError]);
+
+
+
+  useEffect(() => {
+    if (customerTag) {
+      const customerTagDataCopy = { ...customerTag.data };
+      // Clear UUID if it's a clone page
+      if (slug === "clone") {
+        // customerTagDataCopy.UUID = "";
+        customerTagDataCopy.customerTagCode = "";
+      }
+
+      setCustomerTagData(customerTagDataCopy);
+      if (customerTag.customerTagHasCustomInfo?.data) {
+        setTempRowCustomInfo(customerTag.customerTagHasCustomInfo.data);
+      }
+      if (customerTag.historyData) {
+        const historyData = {
+          customerTag: customerTag.historyData.customerTagHistory || {
+            rows: [],
+          },
+          customerTagHasCustomInfo: customerTag.historyData
+            .customerTagHasCustomInfoHistory || { rows: [] },
+        };
+        setCustomerTagChangelogData(historyData);
+      }
+      setIsSaving(false);
+    }
+  }, [customerTag, slug]);
+
+  useEffect(() => {
+    if (customInformationData) {
+      // Set the custom information data from the API response
+      setTempRowCustomInfo(customInformationData.rows || []);
+    }
+  }, [customInformationData]);
+
+  const revalidateCustomInfoData = () => {
+    mutateCustomInfo();
+  };
+
+  const handleSubmit = async () => {
+    try {
+      await form.trigger();
+      await form.handleSubmit(onSubmit)();
+    } catch (error) {
+      console.error("Form submission error:", error);
+    }
+  };
+
+  const form = useForm<z.infer<typeof customerTagFormSchema>>({
+    resolver: zodResolver(customerTagFormSchema),
+    defaultValues: {
+      account: customerTag?.account ?? currentAccount,
+      accountName: customerTag?.accountName ?? currentAcc,
+      companyName: customerTag?.companyName ?? "",
+      customerTagCode: customerTag?.customerTagCode ?? "",
+      customerTag: customerTag?.customerTag ?? "",
+      description: customerTag?.description ?? "",
+      valid: customerTag?.valid ?? "1",
+    },
+  });
+
+  const onSubmit = async () => {
+    setIsSaving(true);
+    var form_data = new FormData();
+    var formValues = form.getValues();
+    var saveType =
+      slug == "clone"
+        ? `create-data?c_id=1`
+        : id
+          ? `update-customer-tag?id=${id}`
+          : `create-data`;
+
+    for (var key in formValues) {
+      form_data.append(
+        `customerTag[${key}]`,
+        formValues[key] ? formValues[key] : ""
+      );
+    }
+
+    if (saveType == "create-data" || saveType === "create-data?c_id=1") {
+      tempRowCustomInfo.forEach((row, index) => {
+        for (const key in row) {
+          if (key !== "attachment") {
+            form_data.append(`customerTagHasCustomInfo[${index}][${key}]`, row[key]);
+          }
+        }
+      });
+
+      for (let i = 0; i < tempRowCustomInfo.length; i++) {
+        const row = tempRowCustomInfo[i];
+
+        var counter = 0;
+        if (row.attachmentFiles) {
+          for (const file of row.attachmentFiles) {
+            const base64 = await getFileToBase64(file);
+
+            form_data.append(`customerTagHasCustomInfo[${i}][attachment][${counter}][Name]`, file.name);
+            form_data.append(`customerTagHasCustomInfo[${i}][attachment][${counter}][File]`, base64);
+
+            counter++;
+          }
+        }
+
+      }
+    }
+
+    try {
+      const response = await fetch(
+        `${ORIGIN}/customer_tag/api/customer-tag/${saveType}`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        }
+      );
+
+      if (response.status === 401) {
+        console.error("Session expired. Redirecting to login.");
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "Your session has expired. Redirecting to login page.",
+        });
+        router.push("/login");
+        throw new Error("Session expired");
+      }
+
+      if (!response.ok) {
+        setIsSaving(false);
+        const errorData = await response.json();
+
+        let errorMessage = errorData.message;
+
+        // Error Handling for "Data too long"
+        if (errorMessage.includes("Data too long")) {
+          errorMessage = errorMessage.split("\n")[0];
+        }
+
+        toast({
+          title: errorData.name,
+          description: errorMessage,
+          variant: "destructive",
+          duration: 2000,
+        });
+
+        throw new Error("Failed to fetch data");
+      }
+
+      const responseData = await response.json();
+
+      if (responseData && responseData.item) {
+        const url = `/sales/customer-tag/edit?item=${responseData.item}&id=${responseData.data}`;
+
+        router.push(url);
+        if (params.slug == "edit") {
+          mutateCustomerTag()
+        }
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      } else if (slug === "clone" && id) {
+        router.push(`/sales/customer-tag/clone?id=${id}`);
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      setIsSaving(false);
+      console.error("Error creating new customer tag data:", error);
+    }
+  };
+
+  const handleTableParamsChange = (
+    newFilters: ColumnFiltersState,
+    newPagination: PaginationState,
+    newSorting: SortingState
+  ) => {
+    setColumnFilters(newFilters);
+    setPagination(newPagination);
+    setSorting(newSorting);
+  };
+
+  return (
+    <>
+      <div className="sticky top-0 z-20">
+        <TopActionBar
+          customerTag={customerTagData}
+          form={form}
+          handleSubmit={handleSubmit}
+          params={params}
+          isSaving={isSaving}
+          setIsSaving={setIsSaving}
+        />
+      </div>
+      <div className="grid h-full grid-rows-[auto_1fr]">
+        <Form {...form}>
+          <div className="grid h-full grid-cols-[1fr_auto] gap-x-2">
+            <ScrollArea className="h-full">
+              <div id="mainDetails" className="mt-2">
+                <CustomerTagForm key={formResetKey} form={form} slug={slug} />
+              </div>
+              <div className="mt-2">
+                <OtherDetailForm form={form} slug={slug} />
+              </div>
+              <div id="moreDetails" className="mt-2">
+                <CustomInformationDataTable
+                  columns={customInformationColumns}
+                  data={tempRowCustomInfo}
+                  tempRowCustomInfo={tempRowCustomInfo}
+                  setTempRowCustomInfo={setTempRowCustomInfo}
+                  revalidateCustomInfoData={revalidateCustomInfoData}
+                />
+              </div>
+              {/* {slug !== "new" && (
+                <div id="changelog" className="mt-2">
+                  <CustomerTagChangelogDataTable
+                    columns={changelogColumns}
+                    initialData={customerTagChangelogData}
+                    onTableParamsChange={handleTableParamsChange}
+                  />
+                </div>
+              )} */}
+            </ScrollArea>
+
+            <TabsNavigator tabs={tabs} initialActiveTabId="mainDetails" stickyTop="top-14" />
+          </div>
+          {isLoading && <LoadingUI />}
+        </Form>
+        {isLoading && <LoadingUI />}
+        {(isFetching || isSaving) && <LoadingUI />}
+      </div>
+    </>
+  );
+}

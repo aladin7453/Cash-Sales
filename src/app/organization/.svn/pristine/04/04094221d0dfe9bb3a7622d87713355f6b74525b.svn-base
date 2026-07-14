@@ -1,0 +1,71 @@
+"use client";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type BankAccountDetails = {
+  accountName: string;
+  bankACName: string;
+  accountNo: string;
+  default: 0 | 1;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  valid: "0" | "1";
+};
+
+export const BankAccountColumns: ColumnDef<BankAccountDetails>[] = [
+  {
+    accessorKey: "name",
+    header: "Bank Name",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "accountName",
+    header: "Bank A/C Name",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "accountNo",
+    header: "Bank A/C No",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "default",
+    header: "Default",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "createdByUsername",
+    header: "Created by",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "updatedByUsername",
+    header: "Updated by",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as BankAccountDetails["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    // Custom filter function that first convert the row's numeric boolean
+    // value to string, then check if the string contains the filterValue
+    filterFn: filterWithStringConversion,
+  },
+];

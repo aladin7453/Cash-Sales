@@ -1,0 +1,13 @@
+"use client";
+
+import React from "react";
+
+import SalesOrderDataTable from "./DataTable";
+
+export default function SalesOrderPage() {
+  return (
+    <div className="h-full">
+      <SalesOrderDataTable />
+    </div>
+  );
+}

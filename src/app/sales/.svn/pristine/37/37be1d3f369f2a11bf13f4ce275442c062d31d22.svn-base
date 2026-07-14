@@ -1,0 +1,170 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+
+import CloneButton from "@/components/data-table/ActionButton/Clone";
+import DeleteButton from "@/components/data-table/ActionButton/Delete";
+import EditButton from "@/components/data-table/ActionButton/Edit";
+import NewButton from "@/components/data-table/ActionButton/New";
+import RestoreButton from "@/components/data-table/ActionButton/Restore";
+import TrashButton from "@/components/data-table/ActionButton/Trash";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import Validity from "@/components/data-table/Validity";
+
+import type { Table, VisibilityState } from "@tanstack/react-table";
+
+import type { AgentType } from "./columns";
+
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import MobileActionGroupStart from "@/components/data-table/MobileActionGroupStart";
+import MobileActionGroupEnd from "@/components/data-table/MobileActionGroupEnd";
+
+// Server-Side Filtering (Add totalNumOfRows)
+type Props = {
+  table: Table<AgentType>;
+  refreshTable: () => void;
+  totalNumOfRows: number;
+  defaultColumns: VisibilityState;
+  dataStatusBadgeDisplay: React.ReactNode;
+  onResetColumnOrdering?: () => void;
+};
+
+export default function AgentTypeDataTableToolbar({
+  table,
+  refreshTable,
+  totalNumOfRows,
+  defaultColumns,
+  dataStatusBadgeDisplay,
+  onResetColumnOrdering,
+}: Props) {
+  return (
+    <div className="flex items-center justify-between p-1.5">
+      <ActionGroupStart table={table} refreshTable={refreshTable} />
+
+      {/* Mobile View (Hide Pagination) */}
+      <div className="hidden md:block">
+        {/* Server-Side Filtering (Pass totalNumOfRows) */}
+        <Pagination table={table} totalNumOfRows={totalNumOfRows} />
+      </div>
+
+      <ActionGroupEnd
+        table={table}
+        refreshTable={refreshTable}
+        defaultColumns={defaultColumns}
+        dataStatusBadgeDisplay={dataStatusBadgeDisplay}
+        onResetColumnOrdering={onResetColumnOrdering}
+      />
+    </div>
+  );
+}
+
+function ActionGroupStart({
+  table,
+  refreshTable,
+}: Omit<
+  Props,
+  "totalNumOfRows" | "defaultColumns" | "dataStatusBadgeDisplay"
+>) {
+  const [selectedRow, setSelectedRow] = useState("");
+  const [agentType, setagentType] = useState("");
+
+  const selectedRowModel = table.getSelectedRowModel();
+
+  useEffect(() => {
+    if (selectedRowModel.rows.length === 1) {
+      setSelectedRow(selectedRowModel.rows[0].original.UUID);
+      setagentType(selectedRowModel.rows[0].original.agentType);
+    }
+  }, [selectedRowModel]);
+
+  // Mobile View (States)
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  return (
+    <div className="flex flex-wrap items-center justify-start gap-x-2 p-1">
+      {/* Mobile View (Start Menu) */}
+      <MobileActionGroupStart
+        table={table}
+        refreshTable={refreshTable}
+        config={{
+          newDestination: "/sales/agent-type/new",
+          editDestination: (row) => `/sales/agent-type/edit?item=${row.agentTypeCode}&id=${row.UUID}`,
+          cloneDestination: (row) => `/sales/agent-type/clone?id=${row.UUID}`,
+          module: "agent-type",
+          model: "agent-type",
+        }}
+      >
+      </MobileActionGroupStart>
+
+      {/* Web View (Start Menu) */}
+      <div className="hidden flex-wrap items-center justify-start gap-x-2 md:flex">
+      <NewButton destination="/sales/agent-type/new" />
+      <EditButton
+        table={table}
+        destination={`/sales/agent-type/edit?item=${agentType}&id=${selectedRow}`}
+      />
+      <CloneButton
+        table={table}
+        destination={`/sales/agent-type/clone?id=${selectedRow}`}
+      />
+      <TrashButton
+        table={table}
+        module={"agent_type"}
+        model={"agent-type"}
+        refreshTable={refreshTable}
+      />
+      <RestoreButton
+        table={table}
+        module={"agent_type"}
+        model={"agent-type"}
+        refreshTable={refreshTable}
+      />
+      <DeleteButton
+        table={table}
+        module={"agent_type"}
+        model={"agent-type"}
+        refreshTable={refreshTable}
+      />
+    </div>
+    </div>
+  );
+}
+
+function ActionGroupEnd({
+  table,
+  refreshTable,
+  defaultColumns,
+  dataStatusBadgeDisplay,
+  onResetColumnOrdering
+}: Omit<Props, "totalNumOfRows">) {
+  return (
+    <div className="relative flex items-center gap-x-1 pr-1.5 text-erp-blue-14">
+      <span className="absolute -left-32">{dataStatusBadgeDisplay}</span>
+      <div className="hidden items-center gap-x-1 md:flex">
+      <Export table={table} module={"agentType"} mainModule={"sales"} />
+      <Refresh
+        refreshTable={refreshTable}
+        resetRowSelection={() => table.resetRowSelection()}
+      />
+      <Validity table={table} />
+      <ColumnVisibilityToggle 
+        table={table} 
+        defaultColumns={defaultColumns} 
+        onResetColumnOrdering={onResetColumnOrdering} 
+      />
+    </div>
+    {/* Mobile View (Search and Sort) */}
+          <MobileActionGroupEnd
+            table={table}
+            config={{
+              searchColumn: "agentTypeCode",
+              searchPlaceholder: "Search Agent Type Code.",
+              sortColumn: "agentTypeCode"
+            }}
+          />
+        </div>
+  );
+}

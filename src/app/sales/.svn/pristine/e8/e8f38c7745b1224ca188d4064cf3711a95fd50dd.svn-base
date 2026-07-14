@@ -1,0 +1,643 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+import React, { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { FaClipboard, FaLayerGroup } from "react-icons/fa6";
+import useSWR from "swr";
+import { z } from "zod";
+
+import { Form } from "@/components/ui/form";
+import LoadingUI from "@/components/LoadingUI";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { TabsNavigator } from "@/components/ui/TabsNavigator";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, getCurrentUserFullName, getCurrentUserID, ORIGIN } from "@/lib/constants";
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+
+import { CustomerPaymentFormOld } from "./main-details/general-details/CustomerPaymentFormOld";
+import { CustomerPaymentForm } from "./main-details/general-details/CustomerPaymentForm";
+import { knockOffDetailsColumns } from "./main-details/knock-off-details/columns";
+import KnockOffDetailsDataTableOld from "./main-details/knock-off-details/DataTableOld";
+import KnockOffDetailsDataTable from "./main-details/knock-off-details/DataTable";
+import { MoreDetailsForm } from "./more-details/MoreDetailsFormOld";
+import TopActionBar from "./TopActionBar";
+import { CustomFieldHandle, CustomFieldDefinition } from "@/components/DisplayCustomField";
+import { DateRestrictionContext } from "@/components/custom/DateRestrictionContext";
+
+type PageParams = {
+  params: { slug: string };
+};
+
+const validRoutes = ["new", "edit", "clone"] as const;
+
+const fetcher = async (url) => {
+  const headers = getAuthHeaders();
+
+  return fetch(url, { headers }).then((res) => {
+    if (!res.ok) {
+      throw new Error("Failed to fetch data");
+    }
+
+    return res.json();
+  });
+};
+
+const knockOffDetailsFetcher = async ({ url, formValues }) => {
+  const headers = getAuthHeaders();
+  const formData = new FormData();
+
+  // Get the currency value from the passed form values
+  const currency = formValues.currency;
+
+  // Append the currency value to the formData
+  formData.append("currency", currency || "");
+
+  return fetch(url, {
+    method: "POST",
+    headers,
+    body: formData,
+  }).then((res) => {
+    if (!res.ok) {
+      throw new Error("Failed to fetch data");
+    }
+
+    return res.json();
+  });
+};
+
+type ValidRoute = (typeof validRoutes)[number];
+
+const customerPaymentFormSchema = z.object({
+  customerCodeCode: z.string().min(1, {
+    message: "Required",
+  }),
+});
+
+function isValidRoute(route: string): route is ValidRoute {
+  return validRoutes.includes(route as ValidRoute);
+}
+
+const tabs = [
+  {
+    id: "mainDetails",
+    name: "Main Details",
+    icon: FaClipboard,
+    shortName: "Main",
+  },
+  {
+    id: "moreDetails",
+    name: "More Details",
+    icon: FaLayerGroup,
+    shortName: "More",
+  },
+];
+
+export default function AccountDetailsPage({ params }: PageParams) {
+  const headers = getAuthHeaders();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const customFieldRef = useRef<CustomFieldHandle>(null);
+  const id = searchParams.get("id");
+
+  const slug = params.slug;
+
+  const { toast } = useToast();
+
+  const [customerPaymentData, setCustomerPaymentData] = useState({});
+  const [tempRowKnockOffDetails, setTempRowKnockOffDetails] = useState([]);
+  const [modifiedKnockOffDetails, setModifiedKnockOffDetails] = useState([]);
+  const [tempRowAttachments, setTempRowAttachments] = useState([]);
+  const [allowPastRecord, setAllowPastRecord] = useState(false);
+
+  const [formResetKey, setFormResetKey] = useState(0);
+  const [approvalStatus, setApprovalStatus] = useState({});
+
+  const [customerCode, setCustomerCode] = useState({});
+
+  const currentUserID = getCurrentUserID();
+  const currentUserFullName = getCurrentUserFullName();
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  if (!isValidRoute(slug)) {
+    notFound();
+  }
+
+  // ─── Layout State ─────────────────────────────────────────────────────────────
+  const [layout, setLayout] = useState<"new" | "old">(() => {
+    if (typeof window === "undefined") return "old";
+    return (localStorage.getItem("Layout") as "new" | "old") || "old";
+  });
+
+  const handleLayoutChange = (newLayout: "new" | "old") => {
+    localStorage.setItem("Layout", newLayout);
+    setLayout(newLayout);
+  };
+
+  const {
+    data: customerPayment,
+    error,
+    isLoading,
+    isValidating,
+  } = useSWR(
+    id
+      ? `${ORIGIN}/customer_payment/api/customer-payment/get-update-customer-payment-data?id=${id}`
+      : null,
+    fetcher, { revalidateOnFocus: false }
+  );
+
+  const form = useForm<z.infer<typeof customerPaymentFormSchema>>({
+    resolver: zodResolver(customerPaymentFormSchema),
+    defaultValues: {
+      docNo: customerPayment?.docNo ?? "",
+      docDate: customerPayment?.docDate ?? "",
+      agent: customerPayment?.agent ?? currentUserID,
+      agentName: customerPayment?.agentName ?? currentUserFullName,
+      description: customerPayment?.description ?? "",
+      customerCode: customerPayment?.customerCode ?? "",
+      customerCodeCode: customerPayment?.customerCodeCode ?? "",
+      customerName: customerPayment?.customerName ?? "",
+      BRN: customerPayment?.BRN ?? "",
+      attentionName: customerPayment?.attentionName ?? "",
+      address: customerPayment?.address ?? "",
+      TIN: customerPayment?.TIN ?? "",
+      SSTNo: customerPayment?.SSTNo ?? "",
+      phoneNo: customerPayment?.phoneNo ?? "",
+      email: customerPayment?.email ?? "",
+      paymentMethodCode: customerPayment?.paymentMethodCode ?? "",
+      currency: customerPayment?.currency ?? "",
+      currencyCode: customerPayment?.currencyCode ?? "",
+      currencyRate: customerPayment?.currencyRate ?? "",
+      bankCharge: customerPayment?.bankCharge ?? "",
+      bank: customerPayment?.bank ?? "",
+      chequeNo: customerPayment?.chequeNo ?? "",
+      PDCDate: customerPayment?.PDCDate ?? "",
+      paidAmount: customerPayment?.paidAmount ?? "",
+      localPaidAmount: customerPayment?.localPaidAmount ?? "",
+      unappliedAmount: customerPayment?.unappliedAmount ?? "",
+      paymentProject: customerPayment?.paymentProject ?? "",
+      valid: customerPayment?.valid ?? "1",
+    },
+  });
+
+  const {
+    data: knockOffDetailsData,
+    error: knockOffDetailsError,
+    mutate: mutateKnockOffDetails,
+  } = useSWR(
+    customerCode && slug === "new"
+      ? {
+        url: `${ORIGIN}/customer_payment/api/customer-payment/get-knock-off-details?customerUUID=${customerCode}&customerPaymentUUID=${id || ""}`,
+        formValues: {
+          currency: form.watch("currency"),
+        },
+      }
+      : customerCode && id && slug === "clone"
+        ? {
+          url: `${ORIGIN}/customer_payment/api/customer-payment/get-knock-off-details?customerUUID=${customerCode}&customerPaymentUUID=${""}`,
+          formValues: {
+            currency: form.watch("currency"),
+          },
+        }
+        : id
+          ? {
+            url: `${ORIGIN}/customer_payment/api/customer-payment/get-knock-off-details?customerUUID=${customerCode}&customerPaymentUUID=${id}`,
+            formValues: {
+              currency: form.watch("currency"),
+            },
+          }
+          : null,
+    knockOffDetailsFetcher, { revalidateOnFocus: false }
+  );
+
+  const isFetching = isLoading || isValidating;
+  // Preference (State)
+  const [preferenceData, setPreferenceData] = useState<any>(null);
+  const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
+  const [customFieldSavedData, setCustomFieldSavedData] = useState<Record<string, unknown>>({});
+
+  const fetchPreferenceData = async () => {
+    try {
+      const headers = getAuthHeaders();
+
+      const response = await fetch(`${ORIGIN}/universal/get-preference?module=sales`, {
+        method: "GET",
+        headers,
+      });
+      if (!response.ok) throw new Error("Failed to fetch preference data");
+      const data = await response.json();
+      setPreferenceData(data);
+
+      // Fetch custom field definitions
+      const prefRes = await fetch(
+        `${ORIGIN}/sales_preference/api/sales-preference/get-index-sales-preference`,
+        { method: "GET", headers }
+      );
+      if (!prefRes.ok) throw new Error("Failed to fetch custom field preference");
+      const prefData = await prefRes.json();
+      const raw = prefData?.data?.customDIYFields ?? prefData?.customDIYFields ?? [];
+      const rawFields: CustomFieldDefinition[] = (() => {
+        try {
+          const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+          return Array.isArray(parsed) ? parsed : [];
+        } catch { return []; }
+      })();
+      setCustomFieldDefs(rawFields);
+
+    } catch (error) {
+      console.error("Error fetching preference data:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchPreferenceData();
+  }, []);
+
+  // Customer Payment Data Logic
+  useEffect(() => {
+    if (customerPayment) {
+      const customerPaymentDataCopy = { ...customerPayment.data };
+
+      // Clear docNo if it's a clone page
+      if (slug === "clone") {
+        customerPaymentDataCopy.docNo = "";
+        customerPaymentDataCopy.docDate = Math.floor(Date.now() / 1000);
+      }
+
+      setCustomerPaymentData(customerPaymentDataCopy);
+      setApprovalStatus(customerPayment.approval);
+      setCustomerCode(customerPayment.data?.customerCode);
+      setTempRowAttachments(
+        customerPayment.data?.attachmentLink ? customerPayment.data.attachmentLink : [],
+      );
+      setAllowPastRecord(customerPayment.data.allowPastDates === "1");
+
+      const rawSaved = customerPayment?.customDIYFieldData;
+      if (rawSaved) {
+        setCustomFieldSavedData(
+          typeof rawSaved === "string" ? JSON.parse(rawSaved) : rawSaved
+        );
+      } else {
+        setCustomFieldSavedData({});
+      }
+    }
+  }, [customerPayment, slug]);
+
+  // Knock-Off Details Data Logic
+  useEffect(() => {
+    if (knockOffDetailsData && knockOffDetailsData.rows) {
+      // Preference (Add Preference Data to Table Details)
+      const detailsWithPreferences = knockOffDetailsData.rows.map((row) => ({
+        ...row,
+        preferenceData: preferenceData,
+      }));
+
+      setTempRowKnockOffDetails(knockOffDetailsData.rows);
+    }
+  }, [knockOffDetailsData, preferenceData]);
+
+  // New Page Logic
+  useEffect(() => {
+    if ((customerCode && slug === "new") || slug === "clone") {
+      // Clear existing knock-off details when customer changes on new page
+      setTempRowKnockOffDetails([]);
+
+      // Trigger revalidation to fetch new data
+      mutateKnockOffDetails();
+    }
+  }, [customerCode, slug, mutateKnockOffDetails]);
+
+  const revalidateKnockOffDetails = () => {
+    mutateKnockOffDetails();
+  };
+
+  // Currency Change Handler
+  const handleCurrencyChange = () => {
+    mutateKnockOffDetails();
+  };
+
+  const handleSubmit = async () => {
+    try {
+      await form.trigger();
+      await form.handleSubmit(onSubmit)();
+    } catch (error) {
+      console.error("Form submission error:", error);
+    }
+  };
+
+  const onSubmit = async () => {
+    setIsSaving(true);
+
+    var form_data = new FormData();
+    var formValues = form.getValues();
+    var saveType =
+      slug == "clone"
+        ? `create-data?c_id=1`
+        : id
+          ? `update-customer-payment-data?id=${id}`
+          : `create-data`;
+
+    // Create customerPayment object excluding attachments
+    const customerPaymentData = { ...formValues };
+    delete customerPaymentData.attachmentLink;
+    delete customerPaymentData.attachment;
+
+    // Always send only modified knock-off details for all operations
+    // This ensures we only send data that has actually been changed by the user
+    const knockOffDetailsToSend = modifiedKnockOffDetails;
+
+    // Combine customerPayment and knockOffDetails into single data object
+    const combinedData = {
+      customerPayment: customerPaymentData,
+      customerPaymentHasDetails: knockOffDetailsToSend,
+    };
+
+    // Add combined data as JSON string
+    form_data.append("data", JSON.stringify(combinedData));
+
+    if (saveType == "create-data") {
+      var counter = 0;
+
+      for (const file of tempRowAttachments) {
+        const base64 = await getFileToBase64(file);
+
+        form_data.append(`customerPayment[attachment][${counter}][Name]`, file.name);
+        form_data.append(`customerPayment[attachment][${counter}][File]`, base64);
+
+        counter++;
+      }
+    } else {
+      var counter = 0;
+
+      for (const attachment of tempRowAttachments) {
+        if (attachment.link) {
+          form_data.append(`customerPayment[attachment][${counter}][Name]`, attachment.name);
+          form_data.append(`customerPayment[attachment][${counter}][File]`, "");
+        } else {
+          const base64 = await getFileToBase64(attachment);
+
+          form_data.append(`customerPayment[attachment][${counter}][Name]`, attachment.name);
+          form_data.append(`customerPayment[attachment][${counter}][File]`, base64);
+        }
+
+        counter++;
+      }
+    }
+
+    try {
+      const response = await fetch(`${ORIGIN}/customer_payment/api/customer-payment/${saveType}`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (response.status === 401) {
+        console.error("Session expired. Redirecting to login.");
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "Your session has expired. Redirecting to login page.",
+        });
+        router.push("/login");
+        throw new Error("Session expired");
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        let errorMessage = errorData.message;
+
+        // Error Handling for "Data too long"
+        if (errorMessage.includes("Data too long")) {
+          errorMessage = errorMessage.split("\n")[0];
+        }
+
+        toast({
+          title: errorData.name,
+          description: errorMessage,
+          variant: "destructive",
+          duration: 2000,
+        });
+
+        throw new Error("Failed to fetch data");
+      }
+
+      const responseData = await response.json();
+
+      if (responseData && responseData.item) {
+        if (customFieldRef.current) {
+          try {
+            await customFieldRef.current.save(
+              responseData.data,
+              responseData.item,
+            );
+          } catch (err) {
+            console.error("Failed to save custom fields:", err);
+          }
+        }
+        const url = `/sales/customer-payment/edit?item=${responseData.item}&id=${responseData.data}`;
+
+        router.push(url);
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+
+        // Clear modified details after successful save
+        setModifiedKnockOffDetails([]);
+
+        // Revalidate knock-off details data
+        mutateKnockOffDetails();
+      } else if (slug === "clone" && id) {
+        router.push(`/sales/customer-payment/clone?id=${id}`);
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+
+        // Revalidate knock-off details data
+        mutateKnockOffDetails();
+      }
+    } catch (error) {
+      console.error("Error creating new customer payment data:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Attachment Logic
+  const loadFiles = async (id: string | null) => {
+    if (id) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/customer_payment/api/customer-payment/load-files?id=${id}`,
+          {
+            headers,
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load files");
+        }
+
+        const loadedFilesData = await response.json();
+
+        setTempRowAttachments(loadedFilesData);
+      } catch (error) {
+        console.error("Error loading files:", error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (id) {
+      loadFiles(id);
+    }
+  }, [id]);
+
+  // ─── Shared Props ─────────────────────────────────────────────────────────────
+  const dataTableProps = {
+    columns: knockOffDetailsColumns,
+    data: id
+      ? knockOffDetailsData
+        ? knockOffDetailsData.rows
+        : []
+      : tempRowKnockOffDetails,
+    tempRowKnockOffDetails,
+    setTempRowKnockOffDetails,
+    revalidateKnockOffDetails,
+    modifiedKnockOffDetails,
+    setModifiedKnockOffDetails,
+    form,
+    customerPaymentData,
+    preferenceData,
+    slug,
+  };
+
+  // Create refs for each section
+  const mainDetailsRef = useRef(null);
+  const moreDetailsRef = useRef(null);
+
+  const [isExpand, setIsExpand] = useState(false);
+
+  return (
+    <DateRestrictionContext.Provider value={{ allowPastRecord, setAllowPastRecord }}>
+      <div className="sticky top-0 z-20">
+        <TopActionBar
+          customerPayment={customerPaymentData}
+          approvalStatus={approvalStatus}
+          form={form}
+          handleSubmit={handleSubmit}
+          action={slug}
+          params={params}
+          isSaving={isSaving}
+          setIsSaving={setIsSaving}
+          customerPaymentData={customerPayment}
+          // Layout switcher props
+          layout={layout}
+          onLayoutChange={handleLayoutChange}
+        />
+      </div>
+
+      {/* New Design */}
+      {layout === "new" && (
+        <div className="box-border flex w-full h-full items-center justify-between gap-x-2 px-1.5 py-2.5">
+          <Form {...form}>
+            {/* Left Container */}
+            <div className="flex h-full min-w-[440px] w-[560px] flex-col gap-y-2">
+              <CustomerPaymentForm
+                key={formResetKey}
+                form={form}
+                setIsExpand={setIsExpand}
+                isExpand={isExpand}
+                slug={slug}
+                preferenceData={preferenceData}
+                id={id}
+                docNo={customerPaymentData?.docNo}
+                customFieldRef={customFieldRef}
+                setCustomerCode={setCustomerCode}
+                onCurrencyChange={handleCurrencyChange}
+                customFieldDefs={customFieldDefs}
+                customFieldSavedData={customFieldSavedData}
+                tempRowAttachments={tempRowAttachments}
+                setTempRowAttachments={setTempRowAttachments}
+              />
+            </div>
+
+            {/* Right Container */}
+            <div className="flex h-full w-full flex-1 flex-col">
+              <KnockOffDetailsDataTable {...dataTableProps} />
+            </div>
+          </Form>
+
+          {isLoading && <LoadingUI />}
+          {(isFetching || isSaving) && <LoadingUI />}
+        </div>
+      )}
+
+      {/* Old Design */}
+      {layout === "old" && (
+        <div className="grid h-full grid-rows-[auto_1fr]">
+          <div className="grid h-full grid-cols-[1fr_auto] gap-x-2">
+            <ScrollArea className="h-full">
+              <div id="mainDetails" className="mt-2" ref={mainDetailsRef}>
+                <CustomerPaymentFormOld
+                  key={formResetKey}
+                  form={form}
+                  customerPayment={customerPaymentData}
+                  setCustomerCode={setCustomerCode}
+                  onCurrencyChange={handleCurrencyChange}
+                  slug={slug}
+                  preferenceData={preferenceData}
+                />
+              </div>
+
+              <div className="mt-2">
+                <KnockOffDetailsDataTableOld
+                  columns={knockOffDetailsColumns}
+                  data={
+                    customerCode && (id || slug === "new")
+                      ? knockOffDetailsData
+                        ? knockOffDetailsData.rows || []
+                        : []
+                      : tempRowKnockOffDetails
+                  }
+                  tempRowKnockOffDetails={tempRowKnockOffDetails}
+                  setTempRowKnockOffDetails={setTempRowKnockOffDetails}
+                  revalidateKnockOffDetailsData={revalidateKnockOffDetails}
+                  currencyRate={customerPaymentData.currencyRate}
+                  docDate={customerPaymentData.docDate}
+                  modifiedKnockOffDetails={modifiedKnockOffDetails}
+                  setModifiedKnockOffDetails={setModifiedKnockOffDetails}
+                  form={form}
+                  preferenceData={preferenceData}
+                />
+              </div>
+
+              <div id="moreDetails" className="mt-2" ref={moreDetailsRef}>
+                <MoreDetailsForm
+                  key={formResetKey}
+                  tempRowAttachments={tempRowAttachments}
+                  setTempRowAttachments={setTempRowAttachments}
+                  form={form}
+                  slug={slug}
+                  preferenceData={preferenceData}
+                />
+              </div>
+            </ScrollArea>
+
+            <TabsNavigator tabs={tabs} initialActiveTabId="mainDetails" stickyTop="top-14" />
+          </div>
+
+          {/* {isLoading && <LoadingUI />} */}
+          {(isFetching || isSaving) && <LoadingUI />}
+          {(isLoading || isSaving) && <LoadingUI />}
+        </div>
+      )}
+    </DateRestrictionContext.Provider>
+  );
+}

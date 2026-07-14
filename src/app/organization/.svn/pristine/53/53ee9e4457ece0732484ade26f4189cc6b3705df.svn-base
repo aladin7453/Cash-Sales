@@ -1,0 +1,200 @@
+"use client";
+
+import { ColumnDef } from "@tanstack/react-table";
+import { useSearchParams } from "next/navigation";
+import { ORIGIN } from "@/lib/constants";
+import ChangelogDataTable from "@/components/features/changelog/DataTable";
+import { ChangelogConfig } from "@/components/features/changelog/types";
+
+// Define the user changelog config
+const UserChangelogConfig: ChangelogConfig = {
+  // Default endpoints (fallback)
+  getHistoryUrl: (id: string) =>
+    `${ORIGIN}/user/api/user/get-user-log?id=${id}`,
+  getDetailsUrl: (id: string, action: string) =>
+    `${ORIGIN}/user/api/user/get-user-log-details?id=${id}&action=${action}`,
+
+  fieldNameMapping: {
+    // Main Details
+    username: "Username",
+    description: "Description",
+    fullName: "Full Name",
+    gender: "Gender",
+    title: "Title",
+    NRIC: "NRIC",
+    nationality: "Nationality",
+    race: "Race",
+    religion: "Religion",
+    maritalStatus: "Marital Status",
+    phoneNo: "Phone No",
+    email: "Email",
+    address: "Address",
+    employeeID: "EmployeeID",
+    employmentType: "Employment Type",
+    exitReason: "Exit Reason",
+    licenseNo: "License No",
+    licenseClass: "License Class",
+    vehicleOwner: "Vechical Owner",
+    plateNo: "Plate No",
+    brand: "Brand",
+    model: "Model",
+    color: "Color",
+    year: "Year",
+    vehicleRemark: "Vechical Remark",
+    attempts: "Attempts",
+    role: "Role",
+    startDateFormat: "Start Date",
+    endDateFormat: "End Date",
+    lastRenewalDateFormat: "Last Renewal Date",
+    expirationDateFormat: "Expiration Date",
+    DOBFormat: "DOB",
+    createdAtFormat: "Created At",
+    updatedAtFormat: "Updated At",
+    userGroupuserGroup: "User Group",
+    accountName: "Account",
+    baseCompanyName: "Base Company",
+    jobTitlejobTitle: "Job Title",
+    baseDepartmentbaseDepartment: "Base Department",
+    baseLocationName: "Base Location",
+    supervisorName: "Supervisor",
+    mentorName: "Mentor",
+    createdByUsername: "Created By",
+    updatedByUsername: "Updated By",
+    accessControl: "Access Control",
+
+    // Company List
+    businessRegNo: "Business Reg No",
+
+    // Job Scope Details
+    user: "User",
+    job: "Job",
+    remark: "Remark",
+    attachment: "Attachment",
+
+    // Custom Information
+    fieldName: "Field Name",
+    fieldValue: "Field Value",
+
+    // Personal Details
+    contact: "Contact",
+    relationship: "Relationship",
+  },
+
+  fieldsToFilter: [
+    "UUID",
+    "account",
+    "historyUUID",
+    "createdAt",
+    "createdBy",
+    "_actionUUID",
+    "_version",
+    "action",
+    "user_id",
+    "updatedAt",
+    "updatedBy",
+    "startDate",
+    "endDate",
+    "lastRenewalDate",
+    "expirationDate",
+    "DOB",
+    "createdAt",
+    "updatedAt",
+    "userGroup",
+    "account",
+    "baseCompany",
+    "jobTitle",
+    "baseDepartment",
+    "baseLocation",
+    "supervisor",
+    "mentor",
+    "valid",
+  ],
+
+  entityName: "user",
+
+  defaultSortField: "createdAt",
+
+  tabs: [
+    {
+      value: "user",
+      label: "User",
+      referenceField: "user",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/user/api/user/get-user-log?id=${id}&tableName=user`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/user/api/user/get-user-log-details?id=${id}&action=${action}&tableName=user`,
+    },
+    {
+      value: "userHasContact",
+      label: "Contact Details",
+      referenceField: "reference",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/user/api/user/get-user-log?id=${id}&tableName=userHasContact`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/user/api/user/get-user-log-details?id=${id}&action=${action}&tableName=userHasContact`,
+    },
+    {
+      value: "userHasCompany",
+      label: "Company Assignment",
+      referenceField: "reference",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/user/api/user/get-user-log?id=${id}&tableName=userHasCompany`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/user/api/user/get-user-log-details?id=${id}&action=${action}&tableName=userHasCompany`,
+    },
+    {
+      value: "userHasJobScope",
+      label: "Job Scope Information",
+      referenceField: "reference",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/user/api/user/get-user-log?id=${id}&tableName=userHasJobScope`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/user/api/user/get-user-log-details?id=${id}&action=${action}&tableName=userHasJobScope`,
+    },
+    {
+      value: "userHasRule",
+      label: "Rule",
+      referenceField: "reference",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/user/api/user/get-user-log?id=${id}&tableName=userHasRule`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/user/api/user/get-user-log-details?id=${id}&action=${action}&tableName=userHasRule`,
+    },
+    {
+      value: "userHasCustomInfo",
+      label: "Custom Information",
+      referenceField: "reference",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/user/api/user/get-user-log?id=${id}&tableName=userHasCustomInfo`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/user/api/user/get-user-log-details?id=${id}&action=${action}&tableName=userHasCustomInfo`,
+    },
+  ],
+};
+
+export default function UserChangelogDataTable<TData, TValue>({
+  columns,
+  initialData,
+  onTableParamsChange,
+}: {
+  columns: ColumnDef<TData, TValue>[];
+  initialData?: any | null;
+  onTableParamsChange?: any;
+}) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return <div>Missing entity ID</div>;
+  }
+
+  return (
+    <ChangelogDataTable
+      columns={columns}
+      initialData={initialData}
+      config={UserChangelogConfig}
+      entityId={id}
+      onTableParamsChange={onTableParamsChange}
+    />
+  );
+}

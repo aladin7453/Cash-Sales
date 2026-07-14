@@ -1,0 +1,157 @@
+"use client";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type BillingContactDetails = {
+  UUID: string;
+  contact: string;
+  title: string;
+  phoneNo: number;
+  email: string;
+  faxNo: string;
+  description: string;
+  attachment: string;
+  valid: "0" | "1";
+  createdAtFormat: string;
+  updatedAtFormat: string;
+  CreatedByUsername: string;
+  UpdatedByUsername: string;
+  attachmentLink: {
+    name: string;
+    link: string;
+  }[];
+  checkDefault: string;
+};
+
+export const billingContactDetailsColumns: ColumnDef<BillingContactDetails>[] = [
+  // Column Drag and Drop and Resize (Add id for each column)
+  {
+    id: "checkDefault",
+    accessorKey: "checkDefault",
+    header: "Default",
+    filterFn: "includesString",
+  },
+  {
+    id: "contact",
+    accessorKey: "contact",
+    header: "Contact",
+    filterFn: "includesString"
+  },
+  {
+    id: "title",
+    accessorKey: "title",
+    header: "Title",
+    filterFn: "includesString"
+  },
+  {
+    id: "phoneNo",
+    accessorKey: "phoneNo",
+    header: "Phone No.",
+    filterFn: "includesString"
+  },
+  {
+    id: "email",
+    accessorKey: "email",
+    header: "Email",
+    filterFn: "includesString"
+  },
+  {
+    id: "faxNo",
+    accessorKey: "faxNo",
+    header: "Fax No.",
+    filterFn: "includesString"
+  },
+  {
+    id: "address",
+    accessorKey: "address",
+    header: "Address",
+    filterFn: "includesString"
+  },
+  {
+    id: "attachment",
+    accessorKey: "attachment",
+    header: "Attachment (.pdf, .png, .jpg, ,jpeg)",
+    cell: ({ row }) => {
+      let attachments = [];
+      try {
+        // Only parse if attachment exists and is not empty
+        if (row.original.attachment && row.original.attachment !== '') {
+          attachments = JSON.parse(row.original.attachment);
+        }
+      } catch (error) {
+        console.error("Error parsing attachment JSON:", error);
+        // Continue with empty attachments array
+      }
+      
+      const attachmentLinks = row.original.attachmentLink || [];
+
+      return attachments && attachments.length > 0 ? (
+        attachments
+          .map((att: { Name: string }, index: number) => {
+            const link = attachmentLinks.find((al) => al.name === att.Name);
+            return link ? (
+              <a
+                key={index}
+                href={link.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "blue" }}
+              >
+                {att.Name}
+              </a>
+            ) : (
+              <span key={index}>{att.Name}</span>
+            );
+          })
+          .reduce((prev: any, curr: any) => [prev, ", ", curr], [])
+      ) : (
+        <span>No attachment</span>
+      );
+    },
+    filterFn: "includesString"
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Remark",
+    filterFn: "includesString"
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created At",
+    filterFn: "includesString"
+  },
+  {
+    id: "CreatedByUsername",
+    accessorKey: "CreatedByUsername",
+    header: "Created By",
+    filterFn: "includesString"
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated At",
+    filterFn: "includesString"
+  },
+  {
+    id: "UpdatedByUsername",
+    accessorKey: "UpdatedByUsername",
+    header: "Updated By",
+    filterFn: "includesString"
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as BillingContactDetails["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    // Custom filter function that first convert the row's numeric boolean
+    // value to string, then check if the string contains the filterValue
+    filterFn: filterWithStringConversion,
+  },
+];

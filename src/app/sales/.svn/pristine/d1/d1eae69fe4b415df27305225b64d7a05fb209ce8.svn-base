@@ -1,0 +1,132 @@
+"use client";
+
+import React from "react";
+
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Card, 
+  CardHeader, 
+  CardContent, 
+  CardTitle 
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+import { useVerify } from "@/lib/hooks/useVerify";
+
+import type { CustomerCategory } from "../../../columns";
+
+type Params = {
+  customerCategory?: CustomerCategory | null;
+};
+
+export function CustomerCategoryForm({
+  customerCategory,
+  customInformationData,
+  tempRowCustomInfo,
+  form,
+  slug,
+}: Params) {
+  const { verifyField } = useVerify(form, "/customer_category/api/customer-category/verify", "customerCategory", form.watch("UUID"));
+
+  return (
+    <Card className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">General Details</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form className="space-y-8">
+            <div className="space-y-2.5">
+              <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="customerCategoryCode"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1 col-span-1">
+                      <FormLabel>Customer Category Code:</FormLabel>
+                      <FormControl>
+                        <Input 
+                          className="h-7.5" 
+                          {...field} 
+                          maxLength={255} 
+                          moduleName="customerCategory"
+                          fieldName="customerCategoryCode"
+                          columnName="CustomerCategoryCode"
+                          onBlur={() => {
+                            if (field.value && field.value.trim()) {
+                              verifyField("customerCategoryCode", field.value);
+                            }
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="customerCategory"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1 col-span-2">
+                      <FormLabel>
+                        Customer Category: <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input 
+                          className="h-7.5" 
+                          {...field} 
+                          maxLength={255} 
+                          moduleName="customerCategory"
+                          fieldName="customerCategory"
+                          columnName="CustomerCategory"
+                          onBlur={() => {
+                            if (field.value && field.value.trim()) {
+                              verifyField("customerCategory", field.value);
+                            }
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-2.5 grid-cols-1 md:grid-cols-5">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem className="col-span-5 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Description:</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          className="h-7" 
+                          {...field} 
+                          maxLength={255} 
+                          moduleName="customerCategory"
+                          fieldName="description"
+                          columnName="Description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

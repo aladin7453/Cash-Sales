@@ -1,0 +1,13 @@
+"use client";
+
+import React from "react";
+
+import CashInCashOutDataTable from "./DataTable";
+
+export default function PortPage() {
+  return (
+    <div className="h-full">
+      <CashInCashOutDataTable />
+    </div>
+  );
+}

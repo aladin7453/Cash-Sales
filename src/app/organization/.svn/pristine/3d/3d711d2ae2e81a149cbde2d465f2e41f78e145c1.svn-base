@@ -1,0 +1,217 @@
+"use client";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import {autoWordSize} from "@/lib/constants";
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type Company = {
+  UUID: string;
+  account: string;
+  attention: string;
+  MISCCode: string;
+  company: string;
+  parentCompany: string;
+  TIN: string;
+  BRN: string;
+  BRNOld: string;
+  SSTNo: string;
+  TTxNo: string;
+  businessNature: string;
+  phoneNo: string;
+  faxNo: string;
+  email: string;
+  website: string;
+  address: string;
+  coordinate: string;
+  bankAccountNo: string;
+  description: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  valid: "0" | "1";
+  _version: string;
+  _actionUUID: string;
+  ClientID: string;
+  ClientSecret1: string;
+  ClientSecret2: string;
+  postcode: string;
+  city: string;
+  state: string;
+  country: string;
+  logo: string;
+  IRBToken: string;
+  IRBTokenExpiredAt: string;
+  productionClientID: string;
+  productionClientSecret1: string;
+  productionClientSecret2: string;
+  testing: string;
+  production: string;
+  id: string;
+  accountName: string;
+  attentionName: string;
+  parentCompanyName: string;
+  MISCCodeCode: string;
+  createdAtFormat: string;
+  updatedAtFormat: string;
+  CreatedByUsername: string;
+  UpdatedByUsername: string;
+};
+
+export const rawColumns: ColumnDef<Company>[] = [
+  // {
+  //   id: "accountName",
+  //   accessorKey: "accountName",
+  //   header: "Sys Acc",
+  //   filterFn: "includesString"
+  // },
+  {
+    id: "attentionName",
+    accessorKey: "attentionName",
+    header: "Attention",
+    filterFn: "includesString",
+  },
+  {
+    id: "MISCCodeCode",
+    accessorKey: "MISCCodeCode",
+    header: "MSIC Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "company",
+    accessorKey: "company",
+    header: "Company",
+    filterFn: "includesString",
+  },
+  {
+    id: "TIN",
+    accessorKey: "TIN",
+    header: "TIN",
+    filterFn: "includesString",
+  },
+  {
+    id: "BRN",
+    accessorKey: "BRN",
+    header: "BRN (New)",
+    filterFn: "includesString",
+  },
+  {
+    id: "BRNOld",
+    accessorKey: "BRNOld",
+    header: "BRN (Old)",
+    filterFn: "includesString",
+  },
+  {
+    id: "SSTNo",
+    accessorKey: "SSTNo",
+    header: "SST No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "TTxNo",
+    accessorKey: "TTxNo",
+    header: "TTx No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "businessNature",
+    accessorKey: "businessNature",
+    header: "Business Nature",
+    filterFn: "includesString",
+  },
+  {
+    id: "phoneNo",
+    accessorKey: "phoneNo",
+    header: "Phone No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "faxNo",
+    accessorKey: "faxNo",
+    header: "Fax No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "email",
+    accessorKey: "email",
+    header: "Email",
+    filterFn: "includesString",
+  },
+  {
+    id: "website",
+    accessorKey: "website",
+    header: "Website",
+    filterFn: "includesString",
+  },
+  {
+    id: "address",
+    accessorKey: "address",
+    header: "Address",
+    filterFn: "includesString",
+  },
+  {
+    id: "bankAccountNo",
+    accessorKey: "bankAccountNo",
+    header: "Bank A/C No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    filterFn: "includesString",
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+    filterFn: "includesString",
+  },
+  {
+    id: "CreatedByUsername",
+    accessorKey: "CreatedByUsername",
+    header: "Created by",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+    filterFn: "includesString",
+  },
+  {
+    id: "UpdatedByUsername",
+    accessorKey: "UpdatedByUsername",
+    header: "Updated by",
+    filterFn: "includesString",
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as Company["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    filterFn: "includesString",
+  },
+];
+
+export const columns: ColumnDef<Company>[] = rawColumns.map(
+  (col) => {
+    if (typeof col.header === "string") {
+      const sizes = autoWordSize(col.header);
+
+      return {
+        ...col,
+        sizes,
+        size: sizes, //applied automatically
+        minSize:50
+      };
+    }
+
+    return col;
+  }
+);
+

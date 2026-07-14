@@ -1,0 +1,70 @@
+"use client";
+
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { TabSelector, TabItem } from "@/components/TabSelector";
+import { type Table } from "@tanstack/react-table";
+import { ChangelogTabType } from "./DataTable";
+
+type Props<TData> = {
+  table: Table<TData>;
+  refreshData: () => void; // This matches the mutate function signature
+  activeTab: ChangelogTabType;
+  onTabChange: (tab: ChangelogTabType) => void;
+  tabCounts: {
+    customerCategory: number;
+    customInformation: number;
+  };
+};
+
+export default function ChangelogDataTableToolbar<TData>({
+  table,
+  refreshData,
+  activeTab,
+  onTabChange,
+  tabCounts,
+}: Props<TData>) {
+  const tabs: TabItem<ChangelogTabType>[] = [
+    {
+      value: "customerCategory",
+      label: "Customer Category",
+      count: tabCounts.customerCategory,
+    },
+    {
+      value: "customInformation",
+      label: "Custom Information",
+      count: tabCounts.customInformation,
+    },
+  ];
+
+  return (
+    <div className="flex flex-col p-1.5 border border-gray-200 rounded-lg shadow-sm">
+      <div className="flex items-center justify-between">
+        {/* Left section - Title */}
+        <div className="flex items-center gap-x-1 pl-2">
+          <div className="text-base font-semibold"></div>
+        </div>
+
+        {/* Middle section - Pagination */}
+        <Pagination table={table} />
+
+        {/* Right section - Additional controls */}
+        <div className="flex items-center gap-x-1 pr-2 text-erp-blue-14">
+          <Export table={table} />
+          <Refresh refreshTable={refreshData} />
+        </div>
+      </div>
+
+      {/* Tab selector */}
+      <div className="mb-2">
+        <TabSelector
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={onTabChange}
+        />
+      </div>
+    </div>
+  );
+}

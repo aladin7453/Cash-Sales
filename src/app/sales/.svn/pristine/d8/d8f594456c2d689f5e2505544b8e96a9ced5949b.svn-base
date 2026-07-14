@@ -1,0 +1,151 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type SalesInvoice = {
+  UUID: string;
+  docNo: string;
+  docDate: string;
+  customerName: string;
+  customerCodeCode: string;
+  totalPayable: string;
+  totalSubtotalTax: string;
+  outstandingAmount: string;
+  currencyCode: string;
+  agentName: string;
+  description: string;
+};
+
+export type PurchaseInvoice = {
+  UUID: string;
+  docNo: string;
+  docDate: string;
+  supplierName: string;
+  supplierCodeCode: string;
+  totalPayable: string;
+  totalSubtotalTax: string;
+  outstandingAmount: string;
+  currencyCode: string;
+  agentName: string;
+  description: string;
+};
+
+export const SalesInvoiceColumns: ColumnDef<SalesInvoice>[] = [
+  {
+    id: "docNo",
+    accessorKey: "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+  },
+  {
+    id: "docDateFormat",
+    accessorKey: "docDateFormat",
+    header: "Doc Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerName",
+    accessorKey: "customerName",
+    header: "Customer",
+    filterFn: "includesString",
+  },
+  {
+    id: "totalPayable",
+    accessorKey: "totalPayable",
+    header: "Total Payable",
+    cell: ({ row }) => (
+      <p className="text-right">{`${Number(row.original.totalPayable || 0).toFixed(2)}`}</p>
+    ),
+    filterFn: "includesString",
+  },
+  {
+    id: "totalSubtotalTax",
+    accessorKey: "totalSubtotalTax",
+    header: "Total Subtotal Tax",
+    cell: ({ row }) => (
+      <p className="text-right">{`${Number(row.original.totalSubtotalTax || 0).toFixed(2)}`}</p>
+    ),
+    filterFn: "includesString",
+  },
+  {
+    id: "outstandingAmount",
+    accessorKey: "outstandingAmount",
+    header: "Outstanding Amount",
+    cell: ({ row }) => (
+      <p className="text-right">{`${Number(row.original.outstandingAmount || 0).toFixed(2)}`}</p>
+    ),
+    filterFn: "includesString",
+  },
+  {
+    id: "currencyCode",
+    accessorKey: "currencyCode",
+    header: "Currency",
+    filterFn: "includesString",
+  },
+  {
+    id: "agentName",
+    accessorKey: "agentName",
+    header: "Agent",
+    filterFn: "includesString",
+  },
+];
+
+export const PurchaseInvoiceColumns: ColumnDef<PurchaseInvoice>[] = [
+  {
+    id: "docNo",
+    accessorKey: "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+  },
+  {
+    id: "docDateFormat",
+    accessorKey: "docDateFormat",
+    header: "Doc Date", 
+    filterFn: "includesString",
+  },
+  {
+    id: "supplierName",
+    accessorKey: "supplierName",
+    header: "Supplier",
+    filterFn: "includesString",
+  },
+  {
+    id: "totalPayable",
+    accessorKey: "totalPayable",
+    header: "Total Payable",
+    cell: ({ row }) => (
+      <p className="text-right">{`${Number(row.original.totalPayable || 0).toFixed(2)}`}</p>
+    ),
+    filterFn: "includesString",
+  },
+  {
+    id: "totalSubtotalTax",
+    accessorKey: "totalSubtotalTax",
+    header: "Total Subtotal Tax",
+    cell: ({ row }) => (
+      <p className="text-right">{`${Number(row.original.totalSubtotalTax || 0).toFixed(2)}`}</p>
+    ),
+    filterFn: "includesString",
+  },
+  {
+    id: "outstandingAmount",
+    accessorKey: "outstandingAmount",
+    header: "Outstanding Amount",
+    cell: ({ row }) => (
+      <p className="text-right">{`${Number(row.original.outstandingAmount || 0).toFixed(2)}`}</p>
+    ),
+    filterFn: "includesString",
+  },
+  {
+    id: "currencyCode",
+    accessorKey: "currencyCode",
+    header: "Currency",
+    filterFn: "includesString",
+  },
+  {
+    id: "agentName",
+    accessorKey: "agentName", 
+    header: "Agent",
+    filterFn: "includesString",
+  },
+];

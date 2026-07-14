@@ -1,0 +1,82 @@
+import React from "react";
+import { TableCell, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils/cn";
+
+interface CheckboxRowProps {
+  label: string;
+  actions?: Record<string, { value: boolean; disabled: boolean }>;
+  onChange: (action: string) => void;
+  onToggleAll: () => void;
+  nested?: boolean;
+}
+
+const CheckboxRow: React.FC<CheckboxRowProps> = ({
+  label,
+  actions = {},
+  onChange,
+  onToggleAll,
+  nested = false,
+}) => {
+  const defaultOrder = [
+    "view",
+    "create",
+    "update",
+    "throw",
+    "restore",
+    "delete",
+    "preview",
+    "transfer-from",
+    "transfer-to",
+    "export",
+    "confirm",
+    "verify",
+    "assignment",
+    "progress",
+    "generate-qr-code",
+    "disable",
+    "download",
+    "print",
+  ];
+
+  const orderedActions = defaultOrder
+    .filter((action) => actions[action] !== undefined)
+    .map((action) => {
+      const meta = actions[action]!;
+      return {
+        action,
+        value: meta.value,
+        disabled: meta.disabled,
+      };
+    });
+
+  const values = orderedActions.map((a) => a?.value);
+  const allChecked = values.length > 0 && values.every((v) => v === true);
+  const isIndeterminate = values.some((v) => v) && !allChecked;
+
+  if (orderedActions.length === 0) return null;
+
+  return (
+    <TableRow className={cn("bg-erp-gray-2", { "pl-6": nested })}>
+      <TableCell
+        className="cursor-pointer bg-white px-2.5"
+        onClick={onToggleAll}
+        indeterminate={isIndeterminate.toString()}
+      >
+        <span className="ml-2">{label}</span>
+      </TableCell>
+
+      {orderedActions.map(({ action, value, disabled }) => (
+        <TableCell key={action} className="bg-gray px-2.5 text-center">
+          <input
+            type="checkbox"
+            checked={value}
+            disabled={disabled}
+            onChange={() => onChange(action)}
+          />
+        </TableCell>
+      ))}
+    </TableRow>
+  );
+};
+
+export default CheckboxRow;

@@ -1,0 +1,13 @@
+"use client";
+
+import React from "react";
+
+import OpeningClosingBalanceDataTable from "./DataTable";
+
+export default function PortPage() {
+  return (
+    <div className="h-full">
+      <OpeningClosingBalanceDataTable />
+    </div>
+  );
+}

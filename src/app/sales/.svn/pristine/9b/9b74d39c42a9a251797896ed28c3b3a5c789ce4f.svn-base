@@ -1,0 +1,40 @@
+"use client";
+import { columns as OriginalSalesInvoiceColumns } from "@/app/sales/sales-invoice/columns";
+import { columns as CashSalesColumns } from "@/app/sales/cash-sales/columns";
+import { columns as SalesCreditNoteColumns } from "@/app/sales/sales-credit-note/columns";
+import { columns as SalesDebitNoteColumns } from "@/app/sales/sales-debit-note/columns";
+
+import type { SalesInvoice } from "@/app/sales/sales-invoice/columns";
+import type { CashSales } from "@/app/sales/cash-sales/columns";
+import type { SalesCreditNote } from "@/app/sales/sales-credit-note/columns";
+import type { SalesDebitNote } from "@/app/sales/sales-debit-note/columns";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+// Union type for all document types
+export type DocumentList = SalesInvoice | CashSales | SalesCreditNote | SalesDebitNote;
+
+// Create a fixed version of SalesInvoiceColumns that handles undefined values
+export const SalesInvoiceColumns: ColumnDef<SalesInvoice>[] = OriginalSalesInvoiceColumns.map((column) => {
+  if (column.id === "outstandingAmount") {
+    return {
+      ...column,
+      cell: ({ row }) => {
+        const value = row.original.outstandingAmount;
+        const numericValue = typeof value === 'number' ? value : parseFloat(value) || 0;
+        return <p className="text-right">{numericValue.toFixed(2)}</p>;
+      },
+    };
+  }
+  return column;
+});
+
+// Export the imported columns directly
+export { 
+  CashSalesColumns,
+  SalesCreditNoteColumns,
+  SalesDebitNoteColumns
+};
+
+// Backward compatibility
+export const DocumentColumns = SalesInvoiceColumns;

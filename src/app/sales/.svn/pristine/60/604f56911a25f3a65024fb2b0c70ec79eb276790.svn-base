@@ -1,0 +1,344 @@
+"use client";
+
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useEffect, useState, memo } from "react";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DEFAULT_DATA_TABLE_PAGE_SIZE } from "@/lib/constants";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+
+import ActivityLogFormPopover from "./ActivityLogFormPopover";
+import ActivityLogDataTableToolbar from "./DataTableToolbar";
+
+import type { ColumnDef, Row, SortingState } from "@tanstack/react-table";
+import type { ActivityLog } from "./columns";
+
+// Mobile View (Imports)
+import MobileFormDataTable from "@/components/form/MobileFormDataTable";
+
+// Column Drag and Drop and Resize (Imports)
+import type { MouseEvent } from "react";
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import { DATA_TABLE_DEFAULT_COLUMN_SIZING } from "@/lib/constants";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import getExcludedColumns from "@/lib/utils/data-table/getExcludedColumns";
+import handleDndDragEnd from "@/lib/utils/data-table/handleDndDragEnd";
+import type {
+  ColumnOrderState,
+  ColumnSizingState,
+  Table as TableType,
+  VisibilityState,
+} from "@tanstack/react-table";
+
+type ActivityLogDataTableProps = {
+  columns: ColumnDef<ActivityLog>[];
+  tempRowActivityLog: ActivityLog[];
+  data: ActivityLog[];
+  setTempRowActivityLog: (data: any) => void;
+  revalidateActivityLogData: () => void;
+};
+
+// Column Drag and Drop and Resize (Local Storage Keys)
+const COLUMN_ORDERING_KEY = "customer.activity-log.bs.table.ordering";
+const COLUMN_SIZING_KEY = "customer.activity-log.bs.table.sizing";
+const COLUMN_VISIBILITY_KEY = "customer.activity-log.bs.table.columns";
+
+export default function ActivityLogDataTable({
+  columns,
+  data,
+  tempRowActivityLog,
+  setTempRowActivityLog,
+  revalidateActivityLogData,
+}: ActivityLogDataTableProps) {
+  function setTempRowActivityLogData(data, overwrite) {
+    if (overwrite) {
+      setTempRowActivityLog(data);
+    } else {
+      setTempRowActivityLog((tempRowActivityLog) => [...tempRowActivityLog, data]);
+    }
+  }
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  
+  // Column Drag and Drop and Resize (Constants)
+  const initialColumnOrder = columns?.filter(column => column?.id).map((column) => column.id!) || [];
+  const [columnOrder, setColumnOrder] = useLocalStorage<ColumnOrderState>(
+    COLUMN_ORDERING_KEY,
+    initialColumnOrder
+  );
+  const [columnSizing, setColumnSizing] = useLocalStorage<ColumnSizingState>(
+    COLUMN_SIZING_KEY,
+    {}
+  );
+  const defaultColumns: Array<keyof ActivityLog> = [
+    "name",
+    "type",
+    "description",
+  ];
+  const defaultColumnVisibility: VisibilityState = getExcludedColumns(
+    columns || [],
+    defaultColumns
+  );
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    COLUMN_VISIBILITY_KEY,
+    defaultColumnVisibility
+  );
+
+  // Column Drag and Drop and Resize (Data Table)
+  const table = useReactTable({
+    columns,
+    data,
+    state: { 
+      sorting, 
+      columnOrder,
+      columnSizing,
+      columnVisibility 
+    },
+    onSortingChange: setSorting,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+    onColumnVisibilityChange: setColumnVisibility,
+    autoResetPageIndex: false,
+    columnResizeMode: "onChange",
+    defaultColumn: DATA_TABLE_DEFAULT_COLUMN_SIZING,
+    enableColumnResizing: true,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      },
+    },
+  });
+
+  const sensors = useDndSensors();
+  const columnSizeVars = useColumnSizeVars(table);
+
+  useEffect(() => {
+    localStorage.setItem(
+      COLUMN_VISIBILITY_KEY,
+      JSON.stringify(columnVisibility)
+    );
+  }, [columnVisibility]);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<string>("");
+
+  // Prevent text selection when performing multiple row selection with "shift" + click
+  usePreventShiftTextSelect();
+
+  const openDialog = (row: Row<ActivityLog>) => {
+    setSelectedRow(row.original);
+    setDialogOpen(true);
+  };
+
+  const onDoubleClick = (row: Row<ActivityLog>) => {
+    setDialogOpen(false);
+    setSelectedRow("");
+    openDialog(row);
+  };
+
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  useEffect(() => {
+    if (dialogOpen === false) {
+      setSelectedRow("");
+    }
+  }, [dialogOpen]);
+
+  return (
+    <Card
+      collapsible
+      defaultCollapsed={false}
+      className="h-auto p-0 shadow-md"
+      style={{ marginTop: "10px" }}
+    >
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Activity Log</CardTitle>
+      </CardHeader>
+      <CardContent className="px-2 py-0">
+        <div className="h-[98cqh] p-2 md:h-[58cqh]">
+          <div className="flex h-[95cqh] flex-col rounded-md bg-erp-blue-3 @container-[size] md:h-[55cqh]">
+            <ActivityLogDataTableToolbar
+              table={table}
+              onAdd={() => setDialogOpen(true)}
+              setTempRowActivityLogData={setTempRowActivityLogData}
+              tempRowActivityLog={tempRowActivityLog}
+              revalidateActivityLogData={revalidateActivityLogData}
+            />
+            <Separator className="bg-erp-blue-11" />
+            <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+              {/* Mobile View (Form Data Table) */}
+              <MobileFormDataTable
+                table={table}
+                initialVisibleFields={4}
+                setTempRowDetailsList={setTempRowActivityLog}
+              />
+
+              {/* Web View (Data Table) */}
+              <div className="hidden md:block">
+                {/* Column Drag and Drop and Resize (DND Context) */}
+                <DndContext
+                  collisionDetection={closestCenter}
+                  modifiers={[restrictToHorizontalAxis]}
+                  onDragEnd={(event) => handleDndDragEnd(event, setColumnOrder)}
+                  sensors={sensors}
+                >
+                  {/* Column Drag and Drop and Resize (Table) */}
+                  <Table 
+                    className="table-fixed border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1"
+                    style={{ ...columnSizeVars, width: table.getTotalSize() }}
+                  >
+                    <TableHeader className="sticky top-0 z-5">
+                      {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id}>
+                          {/* Column Drag and Drop and Resize (Sortable Context) */}
+                          <SortableContext
+                            items={columnOrder}
+                            strategy={horizontalListSortingStrategy}
+                          >
+                            {headerGroup.headers.map((header) => (
+                              // Column Drag and Drop and Resize (Dragable Table Head)
+                              <DragableTableHead
+                                key={header.id}
+                                header={header}
+                                className="bg-erp-blue-11 font-normal"
+                                style={{
+                                  width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                                }}
+                              >
+                                {header.column.id === "valid" ? (
+                                  <TableHeadValidityFilter table={table} />
+                                ) : (
+                                  <TableHeadColumnTextFilter
+                                    column={header.column}
+                                    table={table}
+                                  />
+                                )}
+                                <ColumnResizer header={header} />
+                              </DragableTableHead>
+                            ))}
+                          </SortableContext>
+                        </TableRow>
+                      ))}
+                    </TableHeader>
+                    {/* Column Drag and Drop and Resize (Table Body) */}
+                    {table.getState().columnSizingInfo.isResizingColumn ? (
+                      <MemoizedTableBody
+                        table={table}
+                        onRowSelection={onRowSelection}
+                      />
+                    ) : (
+                      <NonMemoizedTableBody
+                        table={table}
+                        onRowSelection={onRowSelection}
+                      />
+                    )}
+                  </Table>
+                </DndContext>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+
+            {selectedRow && (
+              <ActivityLogFormPopover
+                open={dialogOpen}
+                setOpen={setDialogOpen}
+                row={selectedRow}
+                setTempRowActivityLogData={[]}
+                revalidateActivityLogData={revalidateActivityLogData}
+              />
+            )}
+            {!selectedRow && (
+              <ActivityLogFormPopover
+                open={dialogOpen}
+                setOpen={setDialogOpen}
+                row={undefined}
+                setTempRowActivityLogData={setTempRowActivityLogData}
+                revalidateActivityLogData={revalidateActivityLogData}
+              />
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Column Drag and Drop and Resize (Table Body)
+type TableBodyProps = {
+  table: TableType<ActivityLog>;
+  onRowSelection: (
+    row: Row<ActivityLog>
+  ) => (event: MouseEvent<HTMLTableRowElement>) => void;
+};
+
+function NonMemoizedTableBody({ table, onRowSelection }: TableBodyProps) {
+  return (
+    <TableBody>
+      {table.getRowModel().rows?.length ? (
+        table.getRowModel().rows.map((row, index) => (
+          <TableRow
+            className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+            data-state={row.getIsSelected() && "selected"}
+            onClick={onRowSelection(row)}
+            key={row.id}
+          >
+            {row.getVisibleCells().map((cell) => (
+              <TableCell 
+                key={cell.id}
+                className="truncate"
+                title={(cell.getValue() ?? "").toString()}
+                style={{
+                  width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                  minWidth: cell.column.columnDef.minSize,
+                }}
+              >
+                {flexRender(
+                  cell.column.columnDef.cell,
+                  cell.getContext()
+                )}
+              </TableCell>
+            ))}
+          </TableRow>
+        ))
+      ) : (
+        <NoResultsTableRow columns={table.getVisibleLeafColumns()} />
+      )}
+    </TableBody>
+  );
+}
+
+const MemoizedTableBody = memo(
+  NonMemoizedTableBody,
+  (prev, next) => prev.table.options.data === next.table.options.data
+) as typeof NonMemoizedTableBody;

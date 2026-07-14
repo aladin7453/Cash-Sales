@@ -1,0 +1,419 @@
+// "use client";
+
+// import { zodResolver } from "@hookform/resolvers/zod";
+// import { useForm } from "react-hook-form";
+// import React, { useState, useEffect, useRef } from "react";
+// import { z } from "zod";
+// import { notFound, useSearchParams } from "next/navigation";
+// import CancelButton from "@/components/form/ActionButton/Cancel";
+// import ResetButton from "./Reset";
+// import SaveButton from "./Save";
+// import { Checkbox } from "@/components/ui/checkbox";
+// import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+// import {
+//   Form,
+//   FormControl,
+//   FormField,
+//   FormItem,
+//   FormLabel,
+//   FormMessage,
+// } from "@/components/ui/form";
+// import { Input } from "@/components/ui/input";
+// import { Textarea } from "@/components/ui/textarea";
+// import { data as stockIssuedDetailsData } from "../stockIssuedDetails/data";
+// import { useRouter } from "next/navigation";
+// import type { Dispatch, SetStateAction } from "react";
+// import type { StockUOMDetails } from "../stockUOM-details/columns";
+
+// type Props = {
+//   open: boolean;
+//   setOpen: Dispatch<SetStateAction<boolean>>;
+//   row?: any;
+//   revalidateStockUOMDetail:()=>void;
+//   setTempRowStockUOMDetailData: (data: any, overwrite: boolean)=>void;
+//   setStockData: Dispatch<SetStateAction<StockUOMDetails[]>>;
+  
+// };
+
+// const stockUOMDetailsFormSchema = z.object({
+//   StockUOMUUID: z.union([z.string(), z.literal('')]),
+//   UOM: z.string().min(2, {
+//     message: "Doc. No. must be at least 2 characters.",
+//   }),
+//   Rate: z.string().min(2, {
+//     message: "Please select a date.",
+//   }),
+//   refCost: z.string().min(2, {
+//     message: "Please select a date.",
+//   }),
+//   refPrice: z.string().min(2, {
+//     message: "Please select a date.",
+//   }),
+//   minCost: z.string().min(2, {
+//     message: "Please select a date.",
+//   }),
+//   maxCost: z.string().min(2, {
+//     message: "Please select a date.",
+//   }),
+//   minPrice: z.string().min(2, {
+//     message: "Please select a date.",
+//   }),
+//   maxPrice: z.string().min(2, {
+//     message: "Description must be at least 2 characters.",
+//   }),
+//   barcode: z.string().min(2, {
+//     message: "Description must be at least 2 characters.",
+//   }),
+//   baseOUM: z.union([z.string(), z.literal('')]),
+//   valid: z.union([z.string(), z.literal('')]),
+// });
+
+
+// export default function StockUOMDetailsFormPopover({ open, setOpen, row,setTempRowStockUOMDetailData,revalidateStockUOMDetail }: Props) {
+//   const router = useRouter();
+//   const searchParams = useSearchParams();
+//   const id = searchParams.get("id");
+//   const data:any = row;
+
+
+
+//   const form = useForm<z.infer<typeof stockUOMDetailsFormSchema>>({
+//     resolver: zodResolver(stockUOMDetailsFormSchema),
+//     defaultValues: {
+//       StockUOMUUID: (data?.StockUOMUUID !== undefined) ? data.StockUOMUUID : "",
+//       UOM: (data?.UOM !== undefined) ? data.UOM : "",
+//       Rate: (data?.Rate !== undefined) ? data.Rate : "",
+//       refCost: (data?.refCost !== undefined) ? data.refCost : "",
+//       refPrice: (data?.refPrice !== undefined) ? data.refPrice : "",
+//       minCost: (data?.minCost !== undefined) ? data.minCost : "",
+//       maxCost: (data?.maxCost !== undefined) ? data.maxCost : "",
+//       minPrice: (data?.minPrice !== undefined) ? data.minPrice : "",
+//       maxPrice: (data?.maxPrice !== undefined) ? data.maxPrice : "",
+//       barcode: (data?.barcode !== undefined) ? data.barcode : "",
+//       baseOUM: data?.valid ?? "1",
+//       valid: data?.valid ?? "1",
+//     },
+//   });
+
+//   const updateStockUOMDetail = async (data) => {
+//     try {
+//       const formData = new FormData();
+
+
+//       for (var key in data) {
+//         formData.append(`stockHasUOM[${key}]`, data[key]);
+  
+//       }
+  
+//       const response = await fetch(
+//         `${ORIGIN}/stock/api/stock/create-stock-has-u-o-m-data?stockUUID=${id}`,
+//         {
+//           method: 'POST',
+//           body: formData,
+//         }
+//       );
+
+//       if (!response.ok) {
+//         throw new Error('Failed to update user list data');
+//       }
+  
+//       // Optionally, handle success or display a message to the user
+//     } catch (error) {
+//       console.error('Error updating user list data:', error);
+//       // Handle errors, e.g., display an error message or log the error
+//     }
+//   };
+
+//   const onSubmit = async (values) => {
+//     if (!values) return; // If values are empty or null, return without processing
+  
+//     // Assuming userListData is an array where you store your user data
+//     const newData:any = { ...values };// Copy form values
+//     // Call the function to update custom information data if newData is valid
+//     if(id){
+//       await updateStockUOMDetail(newData);
+//       revalidateStockUOMDetail()
+//     }else{
+//       setTempRowStockUOMDetailData(newData,false) 
+//     } 
+//     setOpen(false); // Close the dialog after submission
+//   };  
+//   const handleReset = () => {
+//     form.reset({
+//       StockUOMUUID:"",
+//       UOM: "",
+//       Rate: "",
+//       refCost:  "",
+//       refPrice: "",
+//       minCost: "",
+//       maxCost: "",
+//       minPrice: "",
+//       maxPrice: "",
+//       barcode: "",
+//       baseOUM: "",
+//       valid: "1",
+//       baseUOM: "1",
+//     });
+//   };
+
+
+//   return (
+//     <Dialog open={open} onOpenChange={setOpen}>
+//       <DialogContent className="max-w-3xl bg-erp-blue-3 p-2">
+//         <Form {...form}>
+//           <form className="space-y-2" onSubmit={form.handleSubmit(onSubmit)}>
+//             <div className="flex items-center justify-between pr-4">
+//               <div className="grid auto-cols-fr grid-flow-col gap-x-1.5">
+//                 <SaveButton />
+//                 <ResetButton onClick={handleReset}/>
+//                 <DialogClose asChild>
+//                   <CancelButton />
+//                 </DialogClose>
+//               </div>
+//               <FormField
+//                 control={form.control}
+//                 name="baseUOM"
+//                 render={({ field }) => (
+//                   <FormItem className="flex items-center gap-x-1.5 space-y-0">
+//                     <FormControl>
+//                       <Checkbox
+//                         checked={field.value === "1"}
+//                         onCheckedChange={(state) => field.onChange(state ? 1 : 0)}
+//                       />
+//                     </FormControl>
+//                     <FormLabel>Base UOM</FormLabel>
+//                   </FormItem>
+//                 )}
+//               />
+//               <FormField
+//                 control={form.control}
+//                 name="valid"
+//                 render={({ field }) => (
+//                   <FormItem className="flex items-center gap-x-2 space-y-0">
+//                     <FormControl>
+//                       <Checkbox
+//                         checked={field.value === "1"}
+//                         onCheckedChange={(state) => field.onChange(state ? 1 : 0)}
+//                       />
+//                     </FormControl>
+//                     <FormLabel>Valid</FormLabel>
+//                   </FormItem>
+//                 )}
+//               />
+//             </div>
+//             <div className="space-y-2.5 bg-white p-3 pt-2">
+//               <h2 className="text-sm font-bold">Stock UOM Details</h2>
+//               <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4">
+//               <FormField
+//                       control={form.control}
+//                       name="StockUOMUUID"
+//                       render={({ field }) => (
+//                         <FormItem className="col-span-4 row-span-1 grid h-full hidden grid-rows-[auto_1fr] space-y-1">
+//                           <FormLabel>StockUOMUUID:</FormLabel>
+//                           <FormControl>
+//                             <Input className="h-7" {...field}  readOnly={true}/>
+//                           </FormControl>
+//                           <FormMessage />
+//                         </FormItem>
+//                       )}
+//                     />
+              
+//               <FormField
+//                   control={form.control}
+//                   name="UOM"
+//                   render={({ field }) => (
+//                     <FormItem className="flex flex-col space-y-1">
+//                       <FormLabel>UOM:</FormLabel>
+//                       <FormControl>
+//                        <Input className="h-7" {...field} />
+//                       </FormControl>
+//                       <FormMessage />
+//                     </FormItem>
+//                   )}
+//                 />
+//                 <FormField
+//                   control={form.control}
+//                   name="Rate"
+//                   render={({ field }) => (
+//                     <FormItem className="flex flex-col space-y-1">
+//                       <FormLabel>Rate:</FormLabel>
+//                       <FormControl>
+//                       <Input
+//                         className="h-7.5"
+//                         type="number"
+//                         {...field}
+//                         onChange={(e) => {
+//                           const value = parseFloat(e.target.value);
+//                           if (!isNaN(value)) {
+//                             field.onChange(value.toFixed(2));
+//                           }
+//                         }}
+//                       />
+//                       </FormControl>
+//                       <FormMessage />
+//                     </FormItem>
+//                   )}
+//                 />
+//                 <FormField
+//                   control={form.control}
+//                   name="minCost"
+//                   render={({ field }) => (
+//                     <FormItem className="flex flex-col space-y-1">
+//                       <FormLabel>Min.Cost:</FormLabel>
+//                       <FormControl>
+//                       <Input
+//                         className="h-7.5"
+//                         type="number"
+//                         {...field}
+//                         onChange={(e) => {
+//                           const value = parseFloat(e.target.value);
+//                           if (!isNaN(value)) {
+//                             field.onChange(value.toFixed(2));
+//                           }
+//                         }}
+//                       />
+//                       </FormControl>
+//                       <FormMessage />
+//                     </FormItem>
+//                   )}
+//                 />
+//                 <FormField
+//                   control={form.control}
+//                   name="maxCost"
+//                   render={({ field }) => (
+//                     <FormItem className="flex flex-col space-y-1">
+//                       <FormLabel>Max.Cost:</FormLabel>
+//                       <FormControl>
+//                       <Input
+//                         className="h-7.5"
+//                         type="number"
+//                         {...field}
+//                         onChange={(e) => {
+//                           const value = parseFloat(e.target.value);
+//                           if (!isNaN(value)) {
+//                             field.onChange(value.toFixed(2));
+//                           }
+//                         }}
+//                       />
+//                       </FormControl>
+//                       <FormMessage />
+//                     </FormItem>
+//                   )}
+//                 />
+//                 </div>
+//                 <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4">
+//                 <FormField
+//                   control={form.control}
+//                   name="refCost"
+//                   render={({ field }) => (
+//                     <FormItem className="flex flex-col space-y-1">
+//                       <FormLabel>Ref.Cost:</FormLabel>
+//                       <FormControl>
+//                       <Input
+//                         className="h-7.5"
+//                         type="number"
+//                         {...field}
+//                         onChange={(e) => {
+//                           const value = parseFloat(e.target.value);
+//                           if (!isNaN(value)) {
+//                             field.onChange(value.toFixed(2));
+//                           }
+//                         }}
+//                       />
+//                       </FormControl>
+//                       <FormMessage />
+//                     </FormItem>
+//                   )}
+//                 />
+//                 <FormField
+//                   control={form.control}
+//                   name="refPrice"
+//                   render={({ field }) => (
+//                     <FormItem className="flex flex-col space-y-1">
+//                       <FormLabel>Ref. Price:</FormLabel>
+//                       <FormControl>
+//                       <Input
+//                         className="h-7.5"
+//                         type="number"
+//                         {...field}
+//                         onChange={(e) => {
+//                           const value = parseFloat(e.target.value);
+//                           if (!isNaN(value)) {
+//                             field.onChange(value.toFixed(2));
+//                           }
+//                         }}
+//                       />
+//                       </FormControl>
+//                       <FormMessage />
+//                     </FormItem>
+//                   )}
+//                 />
+//                 <FormField
+//                   control={form.control}
+//                   name="minPrice"
+//                   render={({ field }) => (
+//                     <FormItem className="flex flex-col space-y-1">
+//                       <FormLabel>Min. Price:</FormLabel>
+//                       <FormControl>
+//                       <Input
+//                         className="h-7.5"
+//                         type="number"
+//                         {...field}
+//                         onChange={(e) => {
+//                           const value = parseFloat(e.target.value);
+//                           if (!isNaN(value)) {
+//                             field.onChange(value.toFixed(2));
+//                           }
+//                         }}
+//                       />
+//                       </FormControl>
+//                       <FormMessage />
+//                     </FormItem>
+//                   )}
+//                 />
+//                 <FormField
+//                   control={form.control}
+//                   name="maxPrice"
+//                   render={({ field }) => (
+//                     <FormItem className="flex flex-col space-y-1">
+//                       <FormLabel>Max. Price:</FormLabel>
+//                       <FormControl>
+//                       <Input
+//                         className="h-7.5"
+//                         type="number"
+//                         {...field}
+//                         onChange={(e) => {
+//                           const value = parseFloat(e.target.value);
+//                           if (!isNaN(value)) {
+//                             field.onChange(value.toFixed(2));
+//                           }
+//                         }}
+//                       />
+//                       </FormControl>
+//                       <FormMessage />
+//                     </FormItem>
+//                   )}
+//                 />
+//                 </div>
+//                 <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4">
+//                 <FormField
+//                   control={form.control}
+//                   name="barcode"
+//                   render={({ field }) => (
+//                     <FormItem className="flex flex-col space-y-1">
+//                       <FormLabel>Barcode:</FormLabel>
+//                       <FormControl>
+//                        <Input className="h-7" {...field} />
+//                       </FormControl>
+//                       <FormMessage />
+//                     </FormItem>
+//                   )}
+//                 />
+//               </div>
+//             </div>
+//           </form>
+//         </Form>
+//       </DialogContent>
+//     </Dialog>
+//   );
+// }

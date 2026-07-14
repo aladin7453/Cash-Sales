@@ -1,0 +1,13 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Customer Category",
+};
+
+export default function CustomerCategoryPageLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return children;
+}

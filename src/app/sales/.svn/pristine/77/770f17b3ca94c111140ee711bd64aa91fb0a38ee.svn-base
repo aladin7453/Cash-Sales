@@ -1,0 +1,238 @@
+"use client";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+import type { ColumnDef } from "@tanstack/react-table";
+import toStringAccessorFn from "@/lib/utils/data-table/toStringAccessorFn";
+import {autoWordSize} from "@/lib/constants";
+// Updated Agent type based on both AgentForm and OtherDetailForm fields
+export type Agent = {
+  UUID: string;
+  account: string;
+  accountName: string;
+  company: string;
+  companyName: string;
+  agentCode: string;
+  agentName: string;
+  agentTypeCode: string;
+  commission: string;
+  gender: string;
+  title: string;
+  phoneNo: string;
+  email: string;
+  address: string;
+  description: string;
+  valid: "0" | "1";
+  createdAt: string;
+  createdAtFormat: string;
+  createdBy: string;
+  createdByUsername: string;
+  updatedAt: string;
+  updatedAtFormat: string;
+  updatedBy: string;
+  updatedByUsername: string;
+  nationality: string;
+  race: string;
+  religion: string;
+  maritalStatus: string;
+  DOB: string;
+  DOBFormat: string;
+  NRIC: string;
+  preferenceData?: any;
+  avatar?:any;
+};
+
+// Preference (Format Number Function)
+const formatNumber = (value: string | number, decimalPlaces: number = 2): string => {
+  if (value === null || value === undefined || value === '') {
+    return (0).toFixed(decimalPlaces);
+  }
+  
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  
+  if (isNaN(numValue)) {
+    return (0).toFixed(decimalPlaces);
+  }
+  
+  return numValue.toFixed(decimalPlaces);
+};
+
+export const rawColumns: ColumnDef<Agent>[] = [
+  {
+    id: "agentCode",
+    accessorKey: "agentCode",
+    header: "Agent Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "agentName",
+    accessorKey: "agentName",
+    header: "Agent Name",
+    filterFn: "includesString",
+  },
+   {
+    id: "agentTypeCode",
+    accessorKey: "agentTypeCode",
+    header: "Agent Type",
+    filterFn: "includesString",
+  },
+  {
+    id: "commission",
+    accessorKey: "commission",
+    header: "Commission %",
+    filterFn: "includesString",
+  },
+  {
+    id: "gender",
+    accessorKey: "gender",
+    header: "Gender",
+    filterFn: "includesString",
+  },
+  {
+    id: "title",
+    accessorKey: "title",
+    header: "Title",
+    filterFn: "includesString",
+  },
+  {
+    id: "phoneNo",
+    accessorKey: "phoneNo",
+    header: "Phone No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "email",
+    accessorKey: "email",
+    header: "Email",
+    filterFn: "includesString",
+  },
+  {
+    id: "address",
+    accessorKey: "address",
+    header: "Address",
+    filterFn: "includesString",
+  },
+  {
+    id: "nationality",
+    accessorKey: "nationality",
+    header: "Nationality",
+    filterFn: "includesString",
+  },
+  {
+    id: "race",
+    accessorKey: "race",
+    header: "Race",
+    filterFn: "includesString",
+  },
+  {
+    id: "religion",
+    accessorKey: "religion",
+    header: "Religion",
+    filterFn: "includesString",
+  },
+  {
+    id: "maritalStatus",
+    accessorKey: "maritalStatus",
+    header: "Marital Status",
+    filterFn: "includesString",
+  },
+  {
+    id: "DOBFormat",
+    accessorKey: "DOBFormat",
+    header: "DOB",
+    accessorFn: (row) => toStringAccessorFn(row, "DOBFormat"),
+    filterFn: "includesString",
+  },
+  {
+    id: "NRIC",
+    accessorKey: "NRIC",
+    header: "NRIC No",
+    filterFn: "includesString",
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+    filterFn: "includesString",
+  },
+  {
+    id: "createdByUsername",
+    accessorKey: "createdByUsername",
+    header: "Created by",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedByUsername",
+    accessorKey: "updatedByUsername",
+    header: "Updated by",
+    filterFn: "includesString",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    filterFn: "includesString",
+  },
+   {
+    id: "avatar",
+    accessorKey: "avatar", // 👈 change this to your actual field name (e.g. "photoUrl")
+    header: "Avatar",
+    cell: ({ row }) => {
+      const imageLinkArray =row.original.profileImageLink.length>0?row.original.profileImageLink[0].link:"";
+      const imageUrl =imageLinkArray
+      return (
+      <div className="flex justify-center items-center">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt="Agent"
+            className="w-16 h-16 object-cover border"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = "/no-image.png";
+            }}
+          />
+        ) : (
+          <span className="text-gray-400">No Image</span>
+        )}
+      </div>
+    );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+  },
+
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as Agent["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    filterFn: filterWithStringConversion,
+  },
+];
+
+export const columns: ColumnDef<Agent>[] = rawColumns.map(
+  (col) => {
+    if (typeof col.header === "string") {
+      const sizes = autoWordSize(col.header);
+
+      return {
+        ...col,
+        sizes,
+        size: sizes, // 👈 applied automatically
+        minSize:50
+      };
+    }
+
+    return col;
+  }
+);

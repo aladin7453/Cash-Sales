@@ -1,0 +1,685 @@
+"use client";
+
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useEffect, useRef, useState } from "react";
+import { FaTimes } from "react-icons/fa";
+import { FaSort, FaSortDown, FaSortUp } from "react-icons/fa6";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { SVGGear } from "@/components/icons/svg-repo/SVGGear";
+import LoadingUI from "@/components/LoadingUI";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  DEFAULT_DATA_TABLE_PAGE_SIZE,
+  getAuthHeaders,
+  getCurrentAccount,
+  getCurrentCompanyUUID,
+  ORIGIN,
+} from "@/lib/constants";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { cn } from "@/lib/utils/cn";
+
+import { useMyContext } from "../../../../organization/contextProvider";
+import RBACTabs from "../../../user/[slug]/RBAC/tabs";
+import UserListDataTableToolbar from "./DataTableToolbar";
+import UserDetailsFormPopover from "./UserDetailsFormPopover";
+
+import type { ColumnDef, Row, SortingState } from "@tanstack/react-table";
+
+import type { UserList } from "./columns";
+
+type AgreementDataTableProps = {
+  columns: ColumnDef<UserList>[];
+  tempRowUserList: UserList[];
+  data: UserList[];
+  setTempRowUserList: (data: any) => void;
+  revalidateUserListData: () => void;
+  userListDropDownData: any;
+  slug: string;
+};
+
+const COLUMN_VISIBILITY_KEY = "company.user-list.bs.table.columns";
+
+export default function UserListDropDownTable({
+  columns,
+  data,
+  tempRowUserList,
+  setTempRowUserList,
+  revalidateUserListData,
+  userListDropDownData,
+  slug,
+  accountId,
+  isLoading,
+  form,
+  setIsUserMatch,
+  mutateCompanyData,
+}: AgreementDataTableProps) {
+  type PermissionMeta = {
+    value: boolean;
+    disabled: boolean;
+  };
+
+  type PermissionsData = {
+    [category: string]: {
+      [module: string]: {
+        [action: string]: PermissionMeta;
+      };
+    };
+  };
+
+  function setTempRowUserListData(data, overwrite) {
+    setTempRowUserList((prevRows) => {
+      if (overwrite) {
+        return data;
+      }
+
+      const rowExists = prevRows.some((row) => row.fullname === data.fullname);
+
+      if (rowExists) {
+        return prevRows.map((row) => (row.fullname === data.fullname ? { ...row, ...data } : row));
+      }
+
+      return [...prevRows, data];
+    });
+  }
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
+    if (typeof window !== "undefined") {
+      return JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}");
+    }
+    return {};
+  });
+
+  const headers = getAuthHeaders();
+  const currentAccount = getCurrentAccount();
+  const [showAccessControl, setShowAccessControl] = useState<boolean>(false);
+  const [showAlertDialog, setShowAlertDialog] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<Row<UserList> | null>(null);
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const [selectedAccounts, setSelectedAccounts] = useState([]);
+  const [grantAllPermissions, setGrantAllPermissions] = useState(false);
+  const [revokeAllPermissions, setRevokeAllPermissions] = useState(false);
+  const shareDataValue = useMyContext();
+  const { toast } = useToast();
+  const [showTableTemplate, setShowTableTemplate] = useState(false);
+  const [templateDropdownTableData, setTemplateDropdownTableData] = useState([]);
+  const [rules, setRules] = useState(null);
+  const [showSaveTemplateForm, setShowSaveTemplateForm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [scopes, setScopes] = useState<Record<string, string>>({});
+  const [departments, setDepartments] = useState<Record<string, string>>({});
+  const [baseRules, setBaseRules] = useState(null);
+  const [baseScopes, setBaseScopes] = useState(null);
+  const [baseDepartmentScopes, setBaseDepartmentScopes] = useState(null);
+  const [departmentDropdownData, setDepartmentDropdownData] = useState([]);
+  const [isUpdateRBAC, setIsUpdateRBAC] = useState(false);
+  const userID = localStorage.getItem("userID");
+
+  const table = useReactTable({
+    columns,
+    data,
+    state: { sorting, columnVisibility },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    autoResetPageIndex: false,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      },
+      columnVisibility: JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}"),
+    },
+  });
+
+  useEffect(() => {
+    localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<string>("");
+
+  // Prevent text selection when performing multiple row selection with "shift" + click
+  usePreventShiftTextSelect();
+
+  const openDialog = (row) => {
+    setSelectedRow(row.original);
+    setDialogOpen(true);
+  };
+  const onDoubleClick = (row: Row<UserList>) => {
+    setDialogOpen(false);
+    setSelectedRow("");
+    console.log(row);
+    openDialog(row);
+  };
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  useEffect(() => {
+    if (dialogOpen === false) {
+      setSelectedRow("");
+    }
+  }, [dialogOpen]);
+
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
+  const [isLoadedSuccessfully, setIsLoadedSuccessfully] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isLoading || !data) {
+      setLoadingProgress(97.5);
+    } else {
+      setIsLoadedSuccessfully(true);
+    }
+  }, [isLoading, data]);
+
+  const handleAccessControlClick = (row: Row<UserList>) => {
+    setSelectedUser(row);
+    setShowAccessControl(true);
+  };
+
+  const closeAccessControl = () => {
+    setShowAccessControl(false);
+  };
+
+  const expandScope = (scope: string): string[] => {
+    switch (scope) {
+      case "personal":
+        return ["personal"];
+      case "personal-supervisor":
+        return ["personal-supervisor"];
+      case "personal-subordinate":
+        return ["personal-subordinate"];
+      case "all":
+        return ["all"];
+      default:
+        return [];
+    }
+  };
+
+  const createExpandDepartmentScope = (departmentData: any) => {
+    const departmentScopeValues: string[] =
+      (Array.isArray(departmentData)
+        ? departmentData.map((row: any) => String(row.departmentID).trim().toLowerCase())
+        : []) ?? [];
+
+    const expandDepartmentScope = (scope: string): string[] => {
+      if (!scope) return [];
+
+      const normalizedScope = String(scope).trim().toLowerCase();
+
+      if (departmentScopeValues.includes(normalizedScope)) {
+        return [normalizedScope];
+      }
+
+      return [];
+    };
+
+    return expandDepartmentScope;
+  };
+
+  const handleSave = async (flatPermissions: Record<string, boolean>) => {
+    if (!selectedUser) {
+      console.error("No user selected");
+      return;
+    }
+
+    setIsLoadedSuccessfully(false);
+
+    const userHasRule: Record<string, any> = {};
+
+    const defaultKeys = [
+      "view",
+      "create",
+      "update",
+      "throw",
+      "restore",
+      "delete",
+      "download",
+      "auth",
+      "bill",
+      "print",
+      "preview",
+      "transfer-from",
+      "transfer-to",
+      "export",
+      "confirm",
+      "verify",
+      "compulsary",
+      "assignment",
+      "progress",
+      "generate-qr-code",
+      "disable",
+      "upload",
+    ];
+
+    Object.entries(flatPermissions).forEach(([ruleKey, isChecked]) => {
+      const newValue = isChecked ? 1 : 0;
+      const oldValue = baseRules?.[ruleKey] ?? 0;
+
+      let action: string | null = null;
+      let moduleKey: string | null = null;
+
+      const sortedKeys = [...defaultKeys].sort((a, b) => b.length - a.length);
+
+      for (const key of sortedKeys) {
+        if (ruleKey.startsWith(`${key}-`)) {
+          action = key;
+          moduleKey = ruleKey.slice(key.length + 1);
+          break;
+        }
+      }
+
+      if (!action || !moduleKey) {
+        console.warn(`Unrecognized ruleKey format: ${ruleKey}`);
+        return;
+      }
+
+      const newScope = scopes[ruleKey] || scopes[moduleKey] || null;
+      const oldScope = baseScopes?.[moduleKey] ?? null;
+
+      const newDepartmentScope = departments[ruleKey] || departments[moduleKey] || null;
+      const oldDepartmentScope = baseDepartmentScopes?.[moduleKey] ?? null;
+
+      const ruleChanged = newValue !== oldValue;
+      const scopeChanged = isChecked && newScope !== oldScope;
+      const departmentScopeChanged = isChecked && newDepartmentScope !== oldDepartmentScope;
+
+      if (!ruleChanged && !scopeChanged && !departmentScopeChanged) return;
+
+      const fullActionKey = ruleKey;
+
+      const selectedScopeRaw =
+        scopes[ruleKey] || scopes[moduleKey] || departments[ruleKey] || departments[moduleKey];
+
+      const isDepartmentScope = Boolean(departments[ruleKey] || departments[moduleKey]);
+
+      const expandDepartmentScope = createExpandDepartmentScope(departmentDropdownData);
+
+      const rawScope = scopes[ruleKey] || scopes[moduleKey] || "";
+      const rawDeptScope = departments[ruleKey] || departments[moduleKey] || "";
+
+      const userScopeParts = rawScope ? expandScope(rawScope.toLowerCase()) : [];
+      const userScope = userScopeParts[0] ?? "";
+      const departmentScopeParts = rawDeptScope
+        ? expandDepartmentScope(rawDeptScope.toLowerCase())
+        : [];
+
+      const departmentScope = departmentScopeParts[0] ?? "";
+
+      if (!isChecked) {
+        userHasRule[fullActionKey] = 0;
+        return;
+      }
+
+      if (!userHasRule[fullActionKey]) {
+        userHasRule[fullActionKey] = {};
+      }
+
+      if (!userHasRule[fullActionKey][moduleKey]) {
+        userHasRule[fullActionKey][moduleKey] = {};
+      }
+
+      const moduleRef = userHasRule[fullActionKey][moduleKey];
+
+      if (isDepartmentScope) {
+        const scopeKey = userScope || "";
+        if (!moduleRef[scopeKey]) moduleRef[scopeKey] = {};
+        moduleRef[scopeKey][departmentScope] = 1;
+      } else {
+        const scopeKey = userScope || "";
+        moduleRef[scopeKey] = 1;
+      }
+    });
+
+    const formData = new FormData();
+    formData.append("data", JSON.stringify({ userHasRule }));
+    formData.append("company", selectedUser.company);
+    setIsUserMatch(userID === JSON.stringify(String(selectedUser?.user)));
+
+    try {
+      const response = await fetch(
+        `${ORIGIN}/user/api/user/update-user-has-rule-data?id=${selectedUser.user}`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        },
+      );
+
+      if (!response.ok) throw new Error("Failed to update user permissions");
+
+      const responseData = await response.json();
+      if (responseData) {
+        toast({ title: "Success", duration: 2000 });
+      } else {
+        shareDataValue?.setRefreshSideBar?.(true);
+        toast({ title: responseData.message, duration: 2000 });
+      }
+
+      await mutateCompanyData();
+      setIsLoadedSuccessfully(true);
+      setShowAccessControl(false);
+    } catch (error) {
+      console.error("Error saving permissions:", error);
+      setIsLoadedSuccessfully(true);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveConfirmation = () => {
+    setShowAlertDialog(true);
+  };
+
+  const handleConfirmSave = () => {
+    setShowAlertDialog(false);
+    handleSave(permissions);
+  };
+
+  const handleNoIsUpdateRBAC = () => {
+    toast({
+      title: "Do Not Have Access",
+      description: "You do not have permission to edit RBAC.",
+      variant: "destructive",
+    });
+  };
+
+  const dropdownTemplateColumns = [{ accessorKey: "ruleTemplate", header: "Rule Template" }];
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableTemplate(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+    return () => document.body.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  const toggleTableTemplate = async () => {
+    if (!showTableTemplate) {
+      const formData = new FormData();
+      formData.append("table[]", "ruleTemplate");
+
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch rule template drop-down data");
+
+        const templateData = await response.json();
+        setTemplateDropdownTableData(templateData.rows);
+        setShowTableTemplate(true);
+      } catch (error) {
+        console.error("Error fetching rule template drop-down data:", error);
+      }
+    } else {
+      setShowTableTemplate(false);
+    }
+  };
+
+  const onClickRowTemplateCode = async (row) => {
+    form.setValue("ruleTemplateUUID", row.UUID);
+    form.setValue("ruleTemplate", row.ruleTemplate);
+
+    const data = await fetch(`${ORIGIN}/user/api/user/load-rule-template-data?id=${row.UUID}`, {
+      method: "POST",
+      headers,
+    });
+
+    if (!data.ok) throw new Error("Failed to fetch rule template data");
+
+    const ruleData = await data.json();
+    setRules(ruleData);
+
+    setShowTableTemplate(false);
+  };
+
+  return (
+    <Card className="h-auto p-0 shadow" collapsible>
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">User List</CardTitle>
+      </CardHeader>
+      <CardContent className="p-2">
+        <div className="flex h-[55cqh] flex-col rounded-t-md bg-erp-blue-3 @container-[size]">
+          <UserListDataTableToolbar
+            table={table}
+            onAdd={() => setDialogOpen(true)}
+            setTempRowUserListData={setTempRowUserListData}
+            tempRowUserList={tempRowUserList}
+            revalidateUserListData={revalidateUserListData}
+            slug={slug}
+          />
+          <Separator className="bg-erp-blue-11" />
+          <ScrollArea className="h-[90cqh] bg-erp-gray-3">
+            <Table className="border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1">
+              <TableHeader className="sticky top-0">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <TableHead className="bg-erp-blue-11 font-normal" key={header.id}>
+                        <div className="flex flex-col gap-y-0.5">
+                          <div
+                            className={cn(
+                              "flex items-center gap-x-0.5 text-white",
+                              header.column.getCanSort() ? "cursor-pointer select-none" : "",
+                            )}
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            <span className="font-bold">
+                              {header.isPlaceholder
+                                ? null
+                                : flexRender(header.column.columnDef.header, header.getContext())}
+                            </span>
+                            {{
+                              asc: <FaSortUp />,
+                              desc: <FaSortDown />,
+                            }[header.column.getIsSorted() as string] ?? <FaSort />}
+                          </div>
+                          {header.column.id === "validity" ? (
+                            <TableHeadValidityFilter table={table} />
+                          ) : (
+                            <TableHeadColumnTextFilter column={header.column} table={table} />
+                          )}
+                        </div>
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel()?.rows?.length ? (
+                  table.getRowModel().rows.map((row) => (
+                    <TableRow
+                      className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+                      data-state={row.getIsSelected() && "selected"}
+                      onClick={onRowSelection(row)}
+                      key={row.id}
+                    >
+                      {row.getVisibleCells().map((cell) => {
+                        if (cell.column.id === "accessControl") {
+                          return (
+                            <TableCell
+                              key={cell.id}
+                              className="flex items-center justify-center"
+                              style={{
+                                width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                                minWidth: cell.column.columnDef.minSize,
+                              }}
+                            >
+                              <Button
+                                className="h-fit border-none bg-transparent p-0 hover:bg-transparent focus:outline-none active:bg-transparent"
+                                onClick={() => handleAccessControlClick(row.original)}
+                              >
+                                <SVGGear />
+                              </Button>
+                            </TableCell>
+                          );
+                        } else {
+                          return (
+                            <TableCell key={cell.id}>
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </TableCell>
+                          );
+                        }
+                      })}
+                    </TableRow>
+                  ))
+                ) : (
+                  <NoResultsTableRow columns={columns} />
+                )}
+              </TableBody>
+            </Table>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+          {selectedRow && (
+            <UserDetailsFormPopover
+              open={dialogOpen}
+              setOpen={setDialogOpen}
+              row={selectedRow}
+              setTempRowUserListData={setTempRowUserListData}
+              revalidateUserListData={revalidateUserListData}
+              slug={slug}
+              accountId={accountId}
+            />
+          )}
+
+          {!selectedRow && (
+            <UserDetailsFormPopover
+              open={dialogOpen}
+              setOpen={setDialogOpen}
+              row={undefined}
+              setTempRowUserListData={setTempRowUserListData}
+              revalidateUserListData={revalidateUserListData}
+              slug={slug}
+              accountId={accountId}
+            />
+          )}
+
+          {showAccessControl && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+              <div className="relative h-[95vh] w-full max-w-[92vw] rounded-lg bg-white p-4 shadow-lg @container-[size]">
+                <button
+                  className="absolute right-2 top-2 text-gray-600 hover:text-gray-800 focus:outline-none"
+                  onClick={closeAccessControl}
+                >
+                  <FaTimes className="h-5 w-5" />
+                </button>
+                <br />
+                <ScrollArea className="h-[75vh]">
+                  <RBACTabs
+                    userUUID={selectedUser.user}
+                    selectedUserCompany={selectedUser.company}
+                    accountUUID={accountId}
+                    isLoadedSuccessfully={isLoadedSuccessfully}
+                    setIsLoadedSuccessfully={setIsLoadedSuccessfully}
+                    permissions={permissions}
+                    setPermissions={setPermissions}
+                    scopes={scopes}
+                    setScopes={setScopes}
+                    departments={departments}
+                    setDepartments={setDepartments}
+                    showAccessControl={showAccessControl}
+                    setShowAccessControl={setShowAccessControl}
+                    baseRules={baseRules}
+                    setBaseRules={setBaseRules}
+                    setBaseScopes={setBaseScopes}
+                    setBaseDepartmentScopes={setBaseDepartmentScopes}
+                    isUpdateRBAC={isUpdateRBAC}
+                    setIsUpdateRBAC={setIsUpdateRBAC}
+                    departmentDropdownData={departmentDropdownData}
+                    setDepartmentDropdownData={setDepartmentDropdownData}
+                  />
+                  <ScrollBar orientation="horizontal" />
+                </ScrollArea>
+                <div className="mt-4 flex flex-col">
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      className={cn(
+                        "mt-4",
+                        isUpdateRBAC
+                          ? "bg-primary text-white"
+                          : "cursor-not-allowed bg-primary/50 text-white hover:bg-primary/50",
+                      )}
+                      onClick={isUpdateRBAC ? handleSaveConfirmation : handleNoIsUpdateRBAC}
+                    >
+                      Save
+                    </Button>
+                    <Button className="mt-4" variant="secondary" onClick={closeAccessControl}>
+                      Cancel
+                    </Button>
+                  </div>
+                  {!isLoadedSuccessfully && <LoadingUI progressValue={loadingProgress} />}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showAlertDialog && (
+            <AlertDialog open={showAlertDialog} onOpenChange={setShowAlertDialog}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogDescription className="text-md text-center text-primary">
+                    Affected user will be logged out to make setting effective.
+                    <br />
+                    Continue?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="pr-40">
+                  <AlertDialogCancel onClick={handleConfirmSave}>Yes</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => setShowAlertDialog(false)}>
+                    Cancel
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

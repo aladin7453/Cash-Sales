@@ -1,0 +1,260 @@
+"use client";
+
+import React, { useState } from "react";
+import { TbInfoSquareFilled } from "react-icons/tb";
+import type { Table } from "@tanstack/react-table";
+
+import { Button } from "@/components/ui/button";
+import { SVGSend } from "@/components/icons/svg-repo/SVGSend";
+import CancelEInvoiceButton from "@/components/form/ActionButton/CancelEInvoice";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import LoadingProgressDialog from "@/components/data-table/LoadingDialog";
+import SubmitSuccessMessageDialog from "@/components/features/e-invoice/SubmitSuccessMessage";
+import SubmitRejectMessageDialog from "@/components/features/e-invoice/SubmitRejectMessage";
+import SubmitErrorMessageDialog from "@/components/features/e-invoice/SubmitErrorMessage";
+import GetSubmissionDetails from "@/components/features/e-invoice/GetSubmissionDetails";
+
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+
+import SubmitConfirmationDialog from "../../[slug]/SubmitConfirmation";
+
+
+type DataTableToolbarProps<TData extends { UUID: string }> = {
+  table: Table<TData>;
+  revalidateData: () => void;
+  id?: string | null;
+  revalidateCashSales:()=>void;
+};
+
+export default function DataTableToolbar<TData extends { UUID: string }>({ 
+  table, 
+  revalidateData,
+  id,
+  revalidateCashSales
+}: DataTableToolbarProps<TData>) {
+  const headers = getAuthHeaders();
+
+  const selectedRows = table.getSelectedRowModel().rows;
+
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(false);
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
+
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+
+  const [submissionData, setSubmissionData] = useState([]);
+  const [submitSuccessMessageDialogOpen, setSubmitSuccessMessageDialogOpen] = useState(false);
+
+  const [rejectMessage, setRejectMessage] = useState("");
+  const [submitRejectMessageDialogOpen, setSubmitRejectMessageDialogOpen] = useState(false);
+
+  const [errorMessage, setErrorMessage] = useState("");
+  const [submitErrorMessageDialogOpen, setSubmitErrorMessageDialogOpen] = useState(false);
+
+  const [submissionDetails, setSubmissionDetails] = useState([]);
+  const [getSubmissionDetailsOpen, setGetSubmissionDetailsOpen] = useState(false);
+
+  const handleSubmitConfirmation = () => {
+    setSubmitDialogOpen(true);
+  };
+
+  const handleSubmitEInvoice = async () => {
+    setSubmitDialogOpen(false);
+    setIsLoadingData(true);
+    setLoadingProgress(0);
+
+    try {
+      const formData = new FormData();
+
+      formData.append("UUIDs[]", id ? id : "");
+
+      const response = await fetch(
+        `${ORIGIN}/cash_sales/api/cash-sales/submit-multiple-e-invoicing`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        // Check for specific error message and append additional instructions
+        if (errorData.message === "Failed to login to MyInvois") {
+          errorData.message +=
+            ". Please go to Settings → Company → e-Invoice Integration to reconfigure MyInvois login";
+        }
+
+        throw new Error(errorData.message || "Failed to submit e-invoice");
+      }
+
+      const responseData = await response.json();
+
+      if (responseData) {
+        if (responseData.ErrorMessage) {
+          setErrorMessage(responseData.ErrorMessage[0]);
+          setSubmitErrorMessageDialogOpen(true);
+        } else if (responseData[0]?.ErrorMessage) {
+          setErrorMessage(responseData[0].ErrorMessage);
+          setSubmitErrorMessageDialogOpen(true);
+        } else if (responseData[0]?.RejectMessage) {
+          const rejectMessages = responseData[0].RejectMessage.join("<br>");
+          setRejectMessage(rejectMessages);
+          setSubmitRejectMessageDialogOpen(true);
+        } else {
+          setSubmissionData(responseData);
+          setSubmitSuccessMessageDialogOpen(true);
+        }
+      }
+
+      revalidateData();
+      revalidateCashSales();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "An error occurred");
+      setSubmitErrorMessageDialogOpen(true);
+    } finally {
+      setIsLoadingData(false);
+      setLoadingProgress(100);
+    }
+  };
+
+  const handleGetSubmissionDetails = async () => {
+    setIsLoadingData(true);
+    setLoadingProgress(0);
+
+    try {
+      const selectedRows = table.getSelectedRowModel().rows;
+      const selectedID = selectedRows.map(item => item.original.UUID);
+
+      if (selectedID.length === 0) {
+        setErrorMessage("No rows selected");
+        setSubmitErrorMessageDialogOpen(true);
+
+        return;
+      }
+
+      const response = await fetch(
+        `${ORIGIN}/cash_sales/api/cash-sales/get-submission-detail?id=${selectedID}`,
+        {
+          method: "GET",
+          headers,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+
+      const responseData = await response.json();
+
+      if (
+        responseData &&
+        responseData.Success &&
+        Array.isArray(responseData.Success) &&
+        responseData.Success.length > 0
+      ) {
+        setSubmissionDetails(responseData.Success);
+        setGetSubmissionDetailsOpen(true);
+      } else {
+        setErrorMessage("No submission details found");
+        setSubmitErrorMessageDialogOpen(true);
+      }
+
+      revalidateData();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Error getting submission details");
+      setSubmitErrorMessageDialogOpen(true);
+    } finally {
+      setIsLoadingData(false);
+      setLoadingProgress(100);
+    }
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between p-1.5">
+        <div className="flex items-center">
+          <Button
+            className="group flex flex-col items-center gap-y-1 disabled:cursor-not-allowed"
+            variant="ghost"
+            size="icon"
+            onClick={handleSubmitConfirmation}
+          >
+            <SVGSend className="size-5.5 text-erp-blue-11 group-disabled:text-erp-gray-5"/>
+            <span className="text-[11px]/none font-medium group-disabled:text-erp-gray-5">
+              Submit
+            </span>
+          </Button>
+
+          <Button
+            className="group flex flex-col items-center gap-y-1 disabled:cursor-not-allowed"
+            variant="ghost"
+            size="icon"
+            onClick={handleGetSubmissionDetails}
+          >
+            <TbInfoSquareFilled className="size-5.5 text-erp-blue-11 group-disabled:text-erp-gray-5"/>
+            <span className="text-[11px]/none font-medium group-disabled:text-erp-gray-5">
+              Get
+            </span>
+          </Button>
+
+          <CancelEInvoiceButton 
+            table={table}
+            module="cash_sales"
+            model="cash-sales"
+            refreshTable={revalidateData}
+            selectedRow={selectedRows}
+            revalidateDocData={revalidateCashSales}
+          />
+        </div>
+
+        <div className="p-1">
+          <Pagination table={table} />
+        </div>
+
+        <div className="grid grid-cols-2 items-center text-erp-blue-14">
+          <Refresh refreshTable={revalidateData} />
+          <ColumnVisibilityToggle table={table} />
+        </div>
+      </div>
+
+      <LoadingProgressDialog
+        open={isLoadingData}
+        setOpen={setIsLoadingData}
+        progress={loadingProgress}
+      />
+      
+      <SubmitConfirmationDialog
+        open={submitDialogOpen}
+        setOpen={setSubmitDialogOpen}
+        onConfirm={handleSubmitEInvoice}
+      />
+
+      <SubmitSuccessMessageDialog
+        open={submitSuccessMessageDialogOpen}
+        setOpen={setSubmitSuccessMessageDialogOpen}
+        submissionData={submissionData}
+      />
+
+      <SubmitRejectMessageDialog
+        open={submitRejectMessageDialogOpen}
+        setOpen={setSubmitRejectMessageDialogOpen}
+        rejectMessage={rejectMessage}
+      />
+
+      <SubmitErrorMessageDialog
+        open={submitErrorMessageDialogOpen}
+        setOpen={setSubmitErrorMessageDialogOpen}
+        errorMessage={errorMessage}
+      />
+
+      <GetSubmissionDetails
+        open={getSubmissionDetailsOpen}
+        setOpen={setGetSubmissionDetailsOpen}
+        submissionDetails={submissionDetails}
+      />
+    </>
+  );
+}

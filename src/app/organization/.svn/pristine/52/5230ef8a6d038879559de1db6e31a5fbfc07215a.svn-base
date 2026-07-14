@@ -1,0 +1,138 @@
+"use client";
+
+import SVGResetPassword from "@/components/icons/svg-repo/SVGResetPassword";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+
+import type { Row, Table } from "@tanstack/react-table";
+
+type Params<TData> = {
+  table?: Table<TData>;
+  userId?: string;
+};
+
+type ResetPasswordData = {
+  Success: string[];
+  Failed: string[];
+};
+
+export default function ResetPasswordButton<TData>({ table, userId }: Params<TData>) {
+  const { toast } = useToast();
+
+  const headers = getAuthHeaders();
+
+  const selectedRows = table && table.getSelectedRowModel().rows;
+
+  const onClickConfirm = async () => {
+    const formData = new FormData();
+
+    if (userId) {
+      formData.append("UUIDs[]", userId);
+    } else if (Array.isArray(selectedRows)) {
+      selectedRows.forEach((row: Row<TData>) => {
+        if ((row.original as any).UUID !== undefined) {
+          formData.append(`UUIDs[]`, (row.original as { UUID: string }).UUID);
+        }
+      });
+    }
+
+    try {
+      const res = await fetch(`${ORIGIN}/user/api/user/reset-password`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        toast({
+          title: "Error",
+          description: errorData.message,
+          variant: "destructive",
+        });
+        throw new Error("Failed to fetch data");
+      } else {
+        const data: ResetPasswordData = await res.json();
+        if (data["Success"].length > 0) {
+          showSuccessResetToast(data["Success"]);
+        }
+        if (data["Failed"].length > 0) {
+          showFailedResetToast(data["Failed"]);
+        }
+      }
+    } catch (error) {
+      console.error("Error resetting password:", error);
+    }
+  };
+
+  const showSuccessResetToast = (fullNames: ResetPasswordData["Success"]) => {
+    toast({
+      title: "Success",
+      description: `Password for ${fullNames.join(", ")} has been reset successfully.`,
+      variant: "success",
+    });
+  };
+
+  const showFailedResetToast = (fullNames: ResetPasswordData["Failed"]) => {
+    toast({
+      title: "Failed",
+      description: `Password for ${fullNames.join(", ")} could not be reset.`,
+      variant: "destructive",
+    });
+  };
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <button
+          type="button"
+          className="group flex flex-col items-center gap-y-1 disabled:cursor-not-allowed"
+          disabled={table?.getSelectedRowModel().rows.length === 0}
+        >
+          <SVGResetPassword
+            className={cn(
+              "size-6 text-erp-blue-11 group-disabled:text-erp-gray-5",
+              table && "size-5.5",
+            )}
+          />
+          <span
+            className={cn(
+              "text-xs/none font-medium group-disabled:text-erp-gray-5",
+              table && "text-[11px]/none",
+            )}
+          >
+            Reset
+          </span>
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent className="max-w-sm">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Reset password</AlertDialogTitle>
+          <AlertDialogDescription>
+            {`Are you sure you want to reset the password ${
+              Array.isArray(selectedRows) ? "for the selected user(s)" : "for this user"
+            }?`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="sm:justify-center">
+          <AlertDialogAction className="h-9" onClick={onClickConfirm}>
+            Confirm
+          </AlertDialogAction>
+          <AlertDialogCancel className="h-9">Cancel</AlertDialogCancel>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}

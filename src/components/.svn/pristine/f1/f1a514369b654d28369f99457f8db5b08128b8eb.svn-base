@@ -1,0 +1,694 @@
+import { Document, Page, StyleSheet, Text, View, Image, Font } from "@react-pdf/renderer";
+import moment from 'moment';
+import { formatNumberWithCommas } from "@/components/ui/number-formatter";
+
+import font from "@/components/templates/font";
+
+const styles = StyleSheet.create({
+  page: {
+    flexDirection: "column",
+    backgroundColor: "#FFFFFF",
+    padding: 30,
+    fontFamily: 'NotoSansSC'
+  },
+  logoContainer: {
+    position: "absolute",
+    top: 5,
+    left: 20,
+    width: 100,
+    height: 100,
+    marginBottom: 60,
+    overflow: "hidden",
+    padding: 0,
+  },
+  logoImage: {
+    width: 100,
+    height: 100,
+    objectFit: "contain",
+  },
+  header: {
+    fontSize: 9,
+    minHeight: 90,
+    marginLeft: 150,
+    marginBottom: 5,
+    textAlign: "left",
+  },
+  headerRow: {
+    flexDirection: "row",
+  },
+  headerText: {
+    fontSize: 8,
+    marginRight: 10,
+    marginTop: 5,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "right",
+    marginBottom: 5,
+  },
+  firstSeparator: {
+    width: "100%",
+    height: 1,
+    backgroundColor: "#000000",
+    marginTop: 30,
+    marginBottom: 2,
+  },
+  table: {
+    width: "100%",
+    marginTop: 10,
+    borderStyle: "solid",
+    borderColor: "#000000",
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderColor: "#000000",
+    borderBottomWidth: 1,
+  },
+  tableHeader: {
+    backgroundColor: "#deebf7",
+    fontWeight: "bold",
+    borderTopWidth: 1,
+  },
+  // tableCellNo: {
+  //   padding: 5,
+  //   fontSize: 7,
+  //   flex: 1,
+  //   textAlign: "center",
+  //   borderRightWidth: 1,
+  //   borderLeftWidth: 1,
+  //   borderColor: "#000000",
+  // },
+  tableCellNo: {
+    padding: 5,
+    fontSize: 7,
+    flex: 4,
+    textAlign: "center",
+    borderRightWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: "#000000",
+  },
+  tableCell: {
+    padding: 5,
+    fontSize: 7,
+    flex: 4,
+    textAlign: "center",
+    borderRightWidth: 1,
+    borderColor: "#000000",
+  },
+  summaryBox: {
+    backgroundColor: "#deebf7",
+    padding: 5,
+    marginTop: 5,
+    borderRadius: 2,
+  },
+  summaryText: {
+    fontSize: 7,
+  },
+  summaryTitle: {
+    fontSize: 8,
+    fontWeight: "bold",
+  },
+  summaryField2: {
+    backgroundColor: "#FFFFFF",
+    padding: 2,
+    marginTop: 2,
+    borderWidth: 1,
+    borderRadius: 2,
+    borderColor: "#CCCCCC",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 80,
+    height: 18,
+  },
+  footerLine: {
+    width: "100%",
+    height: 1,
+    backgroundColor: "#000000",
+    marginTop: 5,
+  },
+  footerContainer: {
+    position: "absolute",
+    bottom: 10,
+    left: 30,
+    right: 30,
+  },
+  footerText: {
+    fontSize: 7,
+  },
+  balanceTable: {
+    width: "100%",
+    marginTop: 5,
+    marginBottom: 5,
+    borderStyle: "solid",
+    borderColor: "#000000",
+    borderBottomWidth: 1,
+    borderLeftWidth: 1,
+  },
+  balanceTableRow: {
+    flexDirection: "row",
+    borderColor: "#000000",
+  },
+  agingTableHeader: {
+    backgroundColor: "#deebf7",
+    fontWeight: "bold",
+  },
+  agingTableCell: {
+    padding: 4,
+    fontSize: 6,
+    flex: 1,
+    textAlign: "center",
+    borderTopWidth: 1,
+    borderRightWidth: 1,
+    borderColor: "#000000",
+  },
+  agingTitleCell: {
+    padding: 4,
+    fontSize: 7,
+    fontWeight: "bold",
+    textAlign: "center",
+    borderTopWidth: 1,
+    borderRightWidth: 1,
+    borderColor: "#000000",
+    backgroundColor: "#deebf7",
+  },
+  custTitle: {
+    fontSize: 8,
+    fontWeight: "bold",
+    marginTop: 1,
+    marginBottom: 1,
+    fontFamily: 'NotoSansSC-Black',
+  },
+  custTitleNoBold: {
+    fontSize: 8,
+    marginTop: 1,
+    marginBottom: 1,
+    fontFamily: 'NotoSansSC-Black',
+  },
+  bottomSection: {
+    marginTop: "auto",
+  },
+  secondSeparator: {
+    width: "100%",
+    height: 1,
+    backgroundColor: "#000000",
+    marginTop: 5,
+    marginBottom: 5,
+  },
+  contentContainer: {
+    // flex: 1,
+    flexGrow: 1,
+    flexDirection: "column",
+  },
+
+  botContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  leftBotColumn: {
+    width: "70%",
+  },
+  rightBotColumn: {
+    width: "30%",
+    marginLeft: 50,
+    display: "flex",
+    flexDirection: "column",
+    height: "100%",
+  },
+  qtyTable: {
+    borderStyle: "solid",
+    borderColor: "#000000",
+    borderTopWidth: 1,
+    borderCollapse: "collapse",
+  },
+  qtyTableCell: {
+    padding: 2,
+    fontSize: 8,
+    textAlign: "left",
+    flexShrink: 1,
+    borderRightWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: "#000000",
+  },
+  qtyTableCellNumber: {
+    padding: 2,
+    fontSize: 8,
+    textAlign: "right",
+    flexShrink: 1,
+    borderRightWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: "#000000",
+  },
+  noBorderLeft: {
+    borderLeftWidth: 0,
+  },
+});
+
+const CustomerStatementTemplate = ({
+  data,
+  salesReportData,
+  generatedReport,
+  salesReportColumns,
+  orientation = 'portrait',
+}: {
+  data?: any;
+  salesReportData?: any;
+  generatedReport?: any;
+  salesReportColumns?: any[];
+  orientation?: 'portrait' | 'landscape';
+}) => {
+  let image64 = data?.currentCompany?.logoLink[0]?.base64;
+
+  const rows = data?.rows || generatedReport || [];
+
+  // Calculate balances for the rows
+  // const calculateBalances = (data: any[]) => {
+  //   let runningBalance = 0;
+    
+  //   return data.map((row) => {
+  //     const credit = parseFloat(row.credit) || 0;
+  //     const debit = parseFloat(row.debit) || 0;
+      
+  //     // If transaction is Credit, subtract from balance
+  //     // If transaction is Debit, add to balance
+  //     if (row.transaction === "Credit") {
+  //       runningBalance -= credit;
+  //     } else if (row.transaction === "Debit") {
+  //       runningBalance += debit;
+  //     }
+      
+  //     return {
+  //       ...row,
+  //       balance: runningBalance.toFixed(2),
+  //     };
+  //   });
+  // };
+
+  // const rowsWithBalances = calculateBalances(rows);
+
+  // Dynamic styles based on orientation
+  const getPageStyles = () => ({
+    ...styles.page,
+    padding: orientation === 'landscape' ? 20 : 30,
+  });
+
+  const getTableCellStyles = () => ({
+    ...styles.tableCell,
+    fontSize: orientation === 'landscape' ? 6 : 7,
+    padding: orientation === 'landscape' ? 3 : 5,
+  });
+
+  const getTableCellNoStyles = () => ({
+    ...styles.tableCellNo,
+    fontSize: orientation === 'landscape' ? 6 : 7,
+    padding: orientation === 'landscape' ? 3 : 5,
+  });
+
+  const getHeaderStyles = () => ({
+    ...styles.header,
+    fontSize: orientation === 'landscape' ? 8 : 9,
+    marginLeft: orientation === 'landscape' ? 120 : 150,
+  });
+
+  const getLogoStyles = () => ({
+    ...styles.logoContainer,
+    width: orientation === 'landscape' ? 80 : 100,
+    height: orientation === 'landscape' ? 80 : 100,
+  });
+
+  const getLogoImageStyles = () => ({
+    ...styles.logoImage,
+    width: orientation === 'landscape' ? 80 : 100,
+    height: orientation === 'landscape' ? 80 : 100,
+  });
+
+  const getSummaryStyles = () => ({
+    ...styles.summaryBox,
+    padding: orientation === 'landscape' ? 3 : 5,
+  });
+
+  const getAgingTableCellStyles = () => ({
+    ...styles.agingTableCell,
+    fontSize: orientation === 'landscape' ? 5 : 6,
+    padding: orientation === 'landscape' ? 2 : 4,
+  });
+
+  // Common header content with dynamic styles
+  const renderHeader = () => (
+    <>
+      <View style={getLogoStyles()}>
+        {image64 ? (
+          <Image
+            src={{ uri: image64, method: "GET", headers: { "Cache-Control": "no-cache" }, body: "" }}
+            style={getLogoImageStyles()}
+          />
+        ) : null}
+      </View>
+      <View style={getHeaderStyles()}>
+        <Text>
+          {data?.currentCompany?.company ?? ""}
+          {data?.currentCompany?.BRN ? ` (${data?.currentCompany?.BRN})` : ""}
+        </Text>
+        <Text style={styles.headerText}>{data?.currentCompany?.address ?? ""}</Text>
+        <View style={styles.headerRow}>
+          {data?.currentCompany?.phoneNo && (
+            <Text style={styles.headerText}>Phone No.: {data?.currentCompany?.phoneNo}</Text>
+          )}
+          {data?.currentCompany?.email && (
+            <Text style={styles.headerText}>Email: {data?.currentCompany?.email}</Text>
+          )}
+        </View>
+      </View>
+      <View>
+        <View style={styles.firstSeparator} />
+      </View>
+      <View>
+        <Text style={[styles.sectionTitle, { textAlign: "center" }]}>
+          CUSTOMER STATEMENT
+        </Text>
+      </View>
+    </>
+  );
+
+  // Common table header with dynamic styles
+  const renderTableHeader = () => (
+    <View style={[styles.tableRow, styles.tableHeader]}>
+      {salesReportColumns
+        ?.filter(column => column.header !== "No")
+        .map((column, index) => (
+        <Text
+          key={index}
+          // style={column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+          style={column.header === "Date" ? getTableCellNoStyles() : getTableCellStyles()}
+        >
+          {column.header}
+        </Text>
+      ))}
+    </View>
+  );
+
+  // Summary box content with dynamic styles
+  const renderSummaryBox = () => (
+    <View style={getSummaryStyles()}>
+      <Text style={styles.summaryTitle}>Summary: </Text>
+      <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 4 : 8 }}>
+        <View>
+          <Text style={styles.summaryText}>Total No. of Document:</Text>
+          <View style={styles.summaryField2}>
+            <Text style={styles.summaryText}>{data?.total ?? "0"}</Text>
+          </View>
+        </View>
+        <View>
+          <Text style={styles.summaryText}>Total Amount:</Text>
+          <View style={styles.summaryField2}>
+            <Text style={styles.summaryText}>{data?.summary?.totalAmountReport ?? ""}</Text>
+          </View>
+        </View>
+        <View>
+          <Text style={styles.summaryText}>Total Paid:</Text>
+          <View style={styles.summaryField2}>
+            <Text style={styles.summaryText}>{data?.summary?.totalPaidAmountReport ?? ""}</Text>
+          </View>
+        </View>
+        <View>
+          <Text style={styles.summaryText}>Total Outstanding:</Text>
+          <View style={styles.summaryField2}>
+            <Text style={styles.summaryText}>{data?.summary?.totalOutstandingReport ?? ""}</Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  // Format decimal values to 2 decimal places
+  // const formatDecimal = (value: any) => {
+  //   if (value === undefined || value === null || value === "") return "0.00";
+  //   const num = parseFloat(value);
+  //   return isNaN(num) ? "0.00" : num.toFixed(2);
+  // };
+  const formatDecimal = (value: any) => {
+    return formatNumberWithCommas(value, 2);
+  };
+
+  // Format decimal with P (Partial Payment)
+  const formatDecimalP = (value: any) => {
+    if (value === undefined || value === null || value === "") return "0.00";
+    const str = String(value).trim();
+    const match = str.match(/^([\d.,]+)/);
+    const num = match ? parseFloat(match[1].replace(/,/g, "")) : NaN;
+    return isNaN(num)
+      ? str
+      : `${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${str.slice(match![1].length)}`;
+  };
+
+  function insertZeroWidthSpace(str: string, orientation: 'portrait' | 'landscape') {
+    const charLimit = orientation === 'landscape' ? 18 : 16; // Allow more characters in landscape
+
+    // For long numbers only
+    if (/^\d+$/.test(str) && str.length > charLimit) {
+      return str.replace(new RegExp(`(.{${charLimit}})`, 'g'), '$1-\n');
+    }
+
+    // For long alphanumeric strings without spaces
+    if (/^[\w\d\-]+$/.test(str) && str.length > charLimit) {
+      return str.replace(new RegExp(`(.{${charLimit}})`, 'g'), '$1-\n');
+    }
+    
+    // For Chinese characters
+    return str.replace(/([\u4e00-\u9fa5])/g, '$1\u200B');
+  }
+
+  // Function display '-'
+  const displayFormatValue = (value) => {
+    if (value === null || value === undefined || value === "") return "-";
+
+    const num = Number(value);
+
+    if (isNaN(num) || num === 0) return "-";
+
+    return formatDecimal(num);
+  };
+
+  return (
+    <Document>
+      <Page size="A4" orientation={orientation} style={getPageStyles()}>
+        {/* Header (fixed on every page) */}
+        <View fixed>{renderHeader()}</View>
+
+        {salesReportData?.reportTypeName === "cusStatement12Months" && (
+          Array.isArray(rows) && rows.length > 0 ? (
+            rows.map((customer, customerIndex) => (
+              <View style={styles.contentContainer} key={customer.UUID || customerIndex} break={customerIndex !== 0}>
+                <View wrap={false}>
+                  <View style={styles.botContainer}>
+                    <View
+                      style={[
+                        styles.leftBotColumn,
+                        {
+                          fontSize: 10,
+                          display: "flex",
+                          flexDirection: "column",
+                          height: "100%",
+                        },
+                      ]}
+                    >
+                      {/* Customer Header */}
+                      <Text style={styles.custTitle}>
+                        {`Customer: ${customer.customerName || "-"}`}
+                      </Text>
+                      <Text style={styles.custTitle}>
+                        {`Address: ${customer.address || "-"}`}
+                      </Text>
+                      <Text style={styles.custTitle}>
+                        {`Tel: ${customer.phoneNo || "-"}`}
+                      </Text>
+                      <Text style={styles.custTitle}>
+                        {`Code: ${customer.customerCode || "-"}`}                 
+                      </Text>
+                      <Text style={styles.custTitle}>
+                        {`Agent: ${customer.agentName || "-"}`}
+                      </Text>
+                      <Text style={styles.custTitle}>
+                        {`Account: ${customer.accountCode || "-"}`}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.rightBotColumn,
+                        { display: "flex", flexDirection: "column", height: "100%" },
+                      ]}
+                    >
+                      <View>
+                        <View style={[styles.tableRow, styles.qtyTable]}>
+                          <View style={[styles.qtyTableCell, { flex: 5, justifyContent: "center", alignItems: "center" }]}>
+                            <Text>Statement Of Account</Text>
+                          </View>
+                        </View>
+                        <View style={[styles.tableRow]}>
+                          <View style={[styles.qtyTableCell, { flex: 3 }]}>
+                            <Text>Total Debit</Text>
+                            <Text>Total Credit</Text>                           
+                          </View>
+                          <View style={[styles.qtyTableCellNumber, styles.noBorderLeft, { flex: 2 }]}>                           
+                            <Text>{Number(customer.totalDebitAmount || 0).toFixed(2)}</Text>
+                            <Text>{Number(customer.totalCreditAmount || 0).toFixed(2)}</Text>
+                          </View>
+                        </View>
+                        <View style={[styles.tableRow, { marginBottom: 22 }]}>
+                          <View style={[styles.qtyTableCell, { flex: 3 }]}>
+                            <Text>Closing Balance</Text>
+                          </View>
+                          <View style={[styles.qtyTableCellNumber, styles.noBorderLeft, { flex: 2 }]}>
+                            <Text>
+                              {Number(customer.closingBalance || 0) < 0
+                                ? `(${Math.abs(Number(customer.closingBalance || 0)).toFixed(2)})`
+                                : Number(customer.closingBalance || 0).toFixed(2)}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  </View>                 
+                </View>
+
+                {/* Table Header for Documents */}
+                <View fixed>{renderTableHeader()}</View>
+
+                {/* Customer's documents */}
+                {Array.isArray(customer.documents) && customer.documents.length > 0 ? (
+                  customer.documents.map((doc, docIndex) => (
+                    <View
+                      key={doc.UUID || `${customer.customerCode}-${docIndex}`}
+                      style={styles.tableRow}
+                      wrap={false}
+                    >
+                      {salesReportColumns
+                        ?.filter(column => column.header !== "No")
+                        .map((column, colIndex) => (
+                        <Text
+                          key={colIndex}
+                          // style={
+                          //   column.header === "No"
+                          //     ? getTableCellNoStyles()
+                          //     : getTableCellStyles()
+                          // }
+                          style={
+                            column.header === "Date"
+                              ? getTableCellNoStyles()
+                              : getTableCellStyles()
+                          }
+                        >
+                          {column.header === "No"
+                            ? docIndex + 1
+                            : [
+                                "Debit",
+                                "Credit",
+                                "Balance",
+                              ].includes(column.header)
+                            ? formatDecimalP(doc[column.accessorKey])
+                            : typeof doc[column.accessorKey] === "string"
+                            ? insertZeroWidthSpace(doc[column.accessorKey], orientation)
+                            : doc[column.accessorKey]}
+                        </Text>
+                      ))}
+                    </View>
+                  ))
+                ) : (
+                  // No document for this customer
+                  <View style={styles.tableRow} wrap={false}>
+                    <Text
+                      style={{
+                        fontSize: orientation === "landscape" ? 7 : 8,
+                        textAlign: "center",
+                        width: "100%",
+                      }}
+                    >
+                      No Documents
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.bottomSection} wrap={false}>
+                  <View>
+                    <View style={styles.secondSeparator} />
+                  </View>
+
+                  <View style={styles.balanceTable}>
+                    {/* Header Row */}
+                    <View style={[styles.balanceTableRow, styles.agingTableHeader]}>
+                      <Text style={getAgingTableCellStyles()}>{"Current Mth"}</Text>
+                      <Text style={getAgingTableCellStyles()}>{"1 Month"}</Text>
+                      <Text style={getAgingTableCellStyles()}>{"2 Months"}</Text>
+                      <Text style={getAgingTableCellStyles()}>{"3 Months"}</Text>
+                      <Text style={getAgingTableCellStyles()}>{"4 Months"}</Text>
+                      <Text style={getAgingTableCellStyles()}>{"5 Months"}</Text>
+                    </View>
+                    {/* Values Row */}
+                    <View style={styles.balanceTableRow}>
+                      <Text style={getAgingTableCellStyles()}>{displayFormatValue(customer.outstandingAging?.currentMonth)}</Text>
+                      <Text style={getAgingTableCellStyles()}>{displayFormatValue(customer.outstandingAging?.oneMonth)}</Text>
+                      <Text style={getAgingTableCellStyles()}>{displayFormatValue(customer.outstandingAging?.twoMonths)}</Text>
+                      <Text style={getAgingTableCellStyles()}>{displayFormatValue(customer.outstandingAging?.threeMonths)}</Text>
+                      <Text style={getAgingTableCellStyles()}>{displayFormatValue(customer.outstandingAging?.fourMonths)}</Text>
+                      <Text style={getAgingTableCellStyles()}>{displayFormatValue(customer.outstandingAging?.fiveMonths)}</Text>
+                    </View>
+                    {/* Header Row */}
+                    <View style={[styles.balanceTableRow, styles.agingTableHeader]}>
+                      <Text style={getAgingTableCellStyles()}>{"6 Months"}</Text>
+                      <Text style={getAgingTableCellStyles()}>{"7 Months"}</Text>
+                      <Text style={getAgingTableCellStyles()}>{"8 Months"}</Text>
+                      <Text style={getAgingTableCellStyles()}>{"9 Months"}</Text>
+                      <Text style={getAgingTableCellStyles()}>{"10 Months"}</Text>
+                      <Text style={getAgingTableCellStyles()}>{"11 Mths & Above"}</Text>
+                    </View>
+                    {/* Values Row */}
+                    <View style={styles.balanceTableRow}>
+                      <Text style={getAgingTableCellStyles()}>{displayFormatValue(customer.outstandingAging?.sixMonths)}</Text>
+                      <Text style={getAgingTableCellStyles()}>{displayFormatValue(customer.outstandingAging?.sevenMonths)}</Text>
+                      <Text style={getAgingTableCellStyles()}>{displayFormatValue(customer.outstandingAging?.eightMonths)}</Text>
+                      <Text style={getAgingTableCellStyles()}>{displayFormatValue(customer.outstandingAging?.nineMonths)}</Text>
+                      <Text style={getAgingTableCellStyles()}>{displayFormatValue(customer.outstandingAging?.tenMonths)}</Text>
+                      <Text style={getAgingTableCellStyles()}>{displayFormatValue(customer.outstandingAging?.elevenMonthsAndAbove)}</Text>
+                    </View>
+                  </View>
+                </View>            
+              </View>
+            ))
+          ) : (
+            // No customers at all
+            <View style={styles.tableRow} wrap={false}>
+              <Text
+                style={{
+                  fontSize: orientation === "landscape" ? 7 : 8,
+                  textAlign: "center",
+                  width: "100%",
+                }}
+              >
+                No Result
+              </Text>
+            </View>
+          )
+        )}
+
+        {/* Footer (fixed on every page) */}
+        {/* <View fixed style={styles.footerContainer}>
+          <View style={styles.footerLine} />
+          <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 5 }}>
+            <Text style={styles.footerText}>
+              Date Generated: {moment().format("YYYY-MM-DD")}
+            </Text>
+            <Text
+              style={styles.footerText}
+              render={({ pageNumber, totalPages }) =>
+                `Page ${pageNumber} of ${totalPages}`
+              }
+            />
+          </View>
+        </View> */}
+      </Page>
+    </Document>
+  );
+};
+
+export default CustomerStatementTemplate;

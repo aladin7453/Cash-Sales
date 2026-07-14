@@ -1,0 +1,28 @@
+import type { UserList } from "./columns";
+
+export const userListData: UserList[] = [
+  {
+    username: "john001",
+    fullName: "Jonatthan",
+    phoneNo: "0123456789",
+    email: "jonatthan@example.com",
+    description: "Sample description",
+    createdAt: "2022-01-01",
+    createdBy: "john001",
+    updatedAt: "2022-01-01",
+    updatedBy: "john001",
+    validity: 1,
+  },
+  {
+    username: "john002",
+    fullName: "Jonatthan",
+    phoneNo: "0123456789",
+    email: "jonatthan@example.com",
+    description: "Sample description",
+    createdAt: "2022-01-01",
+    createdBy: "john001",
+    updatedAt: "2022-01-01",
+    updatedBy: "john001",
+    validity: 0,
+  },
+];

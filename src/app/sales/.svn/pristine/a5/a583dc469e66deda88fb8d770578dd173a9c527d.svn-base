@@ -1,0 +1,36 @@
+"use client";
+import React, { useState, useEffect } from 'react';
+import { FaMinus, FaPlus } from 'react-icons/fa6';
+import ConfirmationDialog from './ConfirmationDialog';
+import { notFound, useSearchParams } from "next/navigation";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+// import Validity from "../../../Validity";
+import { Button } from "@/components/ui/button";
+
+import type { Table } from "@tanstack/react-table";
+
+type Props<TData> = {
+  table: Table<TData>;
+
+};
+
+export default function DropdownTableToolbar<TData>({ table }: Props<TData>) {
+
+  return (
+    <>
+      <div className="flex items-center justify-between p-1.5">
+        {/* ActionGroupStart */}
+      
+        <Pagination table={table} /> {/* Pagination */}
+        {/* ActionGroupEnd */}
+        <div className="grid  items-center text-erp-blue-14">
+          <Refresh />     
+        </div>
+      </div>
+    
+    </>
+  );
+}

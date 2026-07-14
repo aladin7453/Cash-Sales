@@ -1,0 +1,236 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import CloneButton from "@/components/form/ActionButton/Clone";
+import DeleteButton from "@/components/form/ActionButton/Delete";
+import NewButton from "@/components/form/ActionButton/New";
+import PreviewButton from "@/components/form/ActionButton/Preview";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+import LayoutToggleButton from "@/components/form/ActionButton/LayoutToggleButton";
+// Mobile View (Imports)
+import MobileFormActionGroup from "@/components/form/MobileFormActionGroup";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useDateRestriction } from "@/components/custom/DateRestrictionContext";
+
+import { ApprovalStatusIcon } from "./ApprovalStatusIcon";
+
+import type { CustomerPayment } from "../columns";
+
+type TopActionBarProps = {
+  customerPayment?: CustomerPayment | null;
+  approvalStatus?: CustomerPayment | null;
+  handleSubmit: () => void;
+  handleSaveAndOpenDialog?: () => void;
+  resetForm: () => void; // Add resetForm prop
+  action: string;
+  params: { slug: string }; // Add params prop
+  form: any;
+  customerPaymentData?: any;
+  layout: "new" | "old";
+  onLayoutChange: (layout: "new" | "old") => void;
+  isLoading?: boolean;
+};
+
+export default function TopActionBar({
+  customerPayment,
+  approvalStatus,
+  form,
+  handleSubmit,
+  handleSaveAndOpenDialog,
+  action,
+  params,
+  customerPaymentData,
+  layout,
+  onLayoutChange,
+  isLoading
+}: TopActionBarProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    form.reset(customerPayment || {});
+  }, [customerPayment, form]);
+
+  const handleReset = () => {
+    const excludedKeys = [
+      "account",
+      "accountName",
+      "_actionUUID",
+      "_version",
+      "UUID",
+      "company",
+      "companyName",
+    ];
+    if (params.slug == "new") {
+      //new reset all to empty
+      const defaultValues = Object.keys(form.getValues()).reduce((acc, key) => {
+        const originalValue = form.getValues(key); // Get the original value
+
+        if (!excludedKeys.includes(key)) {
+          acc[key] = ""; // Reset to an empty string
+        } else {
+          acc[key] = originalValue; // Keep the original value
+        }
+        return acc;
+      }, {});
+      defaultValues.valid = "1";
+      form.reset(defaultValues);
+    } else {
+      //reset back to previous data
+      form.reset();
+    }
+  };
+
+  const { allowPastRecord, setAllowPastRecord } = useDateRestriction();
+
+  // Change layout button condition (HardCode)
+  const systemAccount = JSON.parse(localStorage.getItem("system-account") || "{}");
+  const canChangeLayout = ["infollective", "infollectivetesting", "dev", "mymug", "vminimarket", "tridentmed"].includes(systemAccount);
+
+  return (
+    <div className="flex h-full w-full items-center justify-between bg-erp-gray-3 py-2">
+      <div className="flex flex-1 space-x-3">
+        {/* Mobile View (Action Buttons) */}
+        <MobileFormActionGroup
+          config={{
+            onSave: handleSubmit,
+            onReset: handleReset,
+            onCancel: () => router.push(`/sales/customer-payment/`),
+            newDestination: "/sales/customer-payment/new",
+            cloneDestination: `/sales/customer-payment/clone?id=${id}`,
+            deleteConfig:
+              id && action !== "clone"
+                ? {
+                  module: "customer_payment",
+                  model: "customer-payment",
+                  id: `${id}`,
+                  indexPath: `/sales/customer-payment/`,
+                }
+                : undefined,
+            showNew: !!(id && action !== "clone"),
+            showClone: !!(id && action !== "clone"),
+            showDelete: !!(id && action !== "clone"),
+          }}
+        >
+          {/* Additional Actions (Other than Save, New, Clone, Reset, Delete, and Cancel) */}
+          {customerPayment && (
+            <DropdownMenuItem asChild>
+              <PreviewButton
+                previewType={"CUSTOMER PAYMENT"}
+                module={"customer_payment"}
+                model={"customer-payment"}
+                doc_id={customerPayment.UUID}
+                data={customerPaymentData}
+              />
+              {/* <PreviewButton2
+                previewType={"CUSTOMER PAYMENT"}
+                module={"customer_payment"}
+                model={"customer-payment"}
+                doc_id={customerPayment?.UUID}
+                data={customerPaymentData}
+              /> */}
+            </DropdownMenuItem>
+          )}
+        </MobileFormActionGroup>
+
+        {/* Web View (Action Buttons) */}
+        <div className="hidden space-x-3 md:flex">
+          <SaveButton onSubmit={handleSubmit} disabled={isLoading} />
+
+          {id && action !== "clone" && <NewButton destination="/sales/customer-payment/new" />}
+
+          {id && action !== "clone" && (
+            <CloneButton destination={`/sales/customer-payment/clone?id=${id}`} />
+          )}
+
+          <ResetButton onClick={handleReset} />
+
+          {id && action !== "clone" && (
+            <DeleteButton
+              module={"customer_payment"}
+              model={"customer-payment"}
+              id={`${id}`}
+              indexPath={`/sales/customer-payment/`}
+            />
+          )}
+
+          {/* PreviewButton integration */}
+          {customerPayment && (
+            <PreviewButton
+              previewType={"CUSTOMER PAYMENT"}
+              module={"customer_payment"}
+              model={"customer-payment"}
+              doc_id={customerPayment.UUID}
+              data={customerPaymentData}
+            />
+          )}
+
+          {/* <PreviewButton2
+            previewType={"CUSTOMER PAYMENT"}
+            module={"customer_payment"}
+            model={"customer-payment"}
+            doc_id={customerPayment?.UUID}
+            data={customerPaymentData}
+          /> */}
+
+          <CancelButton onClick={() => router.push(`/sales/customer-payment/`)} />
+
+          {/* Change Layout button */}
+          {canChangeLayout && <LayoutToggleButton layout={layout} onChange={onLayoutChange} />}
+        </div>
+      </div>
+      
+      <Form id="topActionBarForm" {...form}>
+        <div className="flex justify-center items-center gap-x-5 space-y-0 px-3">
+          {/* Valid checkbox */}
+          <FormField
+            control={form.control}
+            name="valid"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-x-2.5 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value === "1"}
+                    onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                  />
+                </FormControl>
+                <FormLabel>Valid</FormLabel>
+              </FormItem>
+            )}
+          />
+
+          {/* Past Record checkbox */}
+          <FormField
+            control={form.control}
+            name="allowPastDates"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-x-2.5 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value === "1"}
+                    onCheckedChange={(state) => {
+                      field.onChange(state ? "1" : "0");
+                      setAllowPastRecord(state === true);
+                    }}
+                  />
+                </FormControl>
+                <FormLabel className="cursor-pointer">Past Record</FormLabel>
+              </FormItem>
+            )}
+          />
+        </div>
+      </Form>
+    </div>
+  );
+}

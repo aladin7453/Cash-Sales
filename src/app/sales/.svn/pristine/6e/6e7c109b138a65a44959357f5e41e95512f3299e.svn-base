@@ -1,0 +1,8 @@
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+
+  title: "Customer Balance Report",
+};
+export default function CustomerBalanceReportPageLayout({ children }: { children: React.ReactNode }) {
+  return children;
+}

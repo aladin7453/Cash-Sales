@@ -1,0 +1,289 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { FaMinus, FaPlus, FaCube } from "react-icons/fa6";
+import type { Table } from "@tanstack/react-table";
+
+import { notFound, useSearchParams } from "next/navigation";
+
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+
+import { useToast } from "@/components/ui/use-toast";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import Validity from "@/components/data-table/Validity";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+
+import ConfirmationDialog from './ConfirmationDialog';
+
+// Mobile View (Imports)
+import MobileFormTableActionGroupStart from "@/components/form/MobileFormTableActionGroupStart";
+import MobileFormTableActionGroupEnd from "@/components/form/MobileFormTableActionGroupEnd";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+
+type Props<TData> = {
+  table: Table<TData>;
+  onAdd?: () => void;
+  setTempRowQuotationDetailsListData: (data, overwrite) => void;
+  tempRowQuotationDetailsList: [];
+  revalidateQuotationDetails: any;
+  handleOnPackage: () => void;
+  slug: string;
+};
+
+export default function QuotationDetailsDataTableToolbar<TData>({
+  table,
+  onAdd,
+  setTempRowQuotationDetailsListData,
+  tempRowQuotationDetailsList,
+  revalidateQuotationDetails,
+  handleOnPackage,
+  slug,
+}: Props<TData>) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<any[]>([]);
+
+  const handleDeleteConfirmation = async () => {
+    // Perform deletion logic here
+    var form_data = new FormData();
+    const currentCurrencyRate = document.querySelector(".currencyRate");
+
+    const selectedRows = table.getSelectedRowModel().rows;
+
+    selectedRows.forEach((row, index) => {
+      form_data.append(`UUIDs[${index}]`, row.original.UUID);
+    });
+
+    // Calculate totals from the remaining rows (after deletion)
+    const remainingRows = table.getFilteredRowModel().rows.filter(
+      row => !selectedRows.some(selectedRow => selectedRow.id === row.id)
+    );
+
+
+    // Calculate total values
+    let totalAmount = remainingRows.reduce((sum, row) => {
+      return sum + (row.original.amount ? parseFloat(row.original.amount) : 0);
+    }, 0);
+
+    let totalDiscount = remainingRows.reduce((sum, row) => {
+      return sum + (row.original.discountAmount ? parseFloat(row.original.discountAmount) : 0);
+    }, 0);
+
+    let totalDiscount2 = remainingRows.reduce((sum, row) => {
+      return sum + (row.original.discountAmount2 ? parseFloat(row.original.discountAmount2) : 0);
+    }, 0);
+
+
+    let totalDiscount3 = remainingRows.reduce((sum, row) => {
+      return sum + (row.original.discountAmount3 ? parseFloat(row.original.discountAmount3) : 0);
+    }, 0);
+
+    let totalTax = remainingRows.reduce((sum, row) => {
+      return sum + (row.original.taxAmount ? parseFloat(row.original.taxAmount) : 0);
+    }, 0);
+
+    const finalTotalDiscount = totalDiscount + totalDiscount2 + totalDiscount3
+
+
+    // Calculate subtotal tax (this is what should be used for outstanding amount)
+    const subtotalTax = totalAmount - finalTotalDiscount + totalTax;
+    const roundTotalPayable = Math.round(subtotalTax * 20) / 20;
+    const roundingAmount = roundTotalPayable - subtotalTax;
+
+    const localNetTotal = roundTotalPayable * (currentCurrencyRate.value ? currentCurrencyRate.value : 1)
+
+    // Add the calculated totals to form data
+    form_data.append('quotation[totalAmount]', totalAmount.toFixed(2));
+    form_data.append('quotation[totalDiscount]', finalTotalDiscount.toFixed(2));
+    form_data.append('quotation[totalTax]', totalTax.toFixed(2));
+    form_data.append('quotation[totalSubtotal]', (totalAmount - finalTotalDiscount).toFixed(2));
+    form_data.append('quotation[totalPayable]', roundTotalPayable.toFixed(2));
+    form_data.append('quotation[outstandingAmount]', roundTotalPayable.toFixed(2));
+
+    form_data.append('quotation[localNetTotal]', localNetTotal.toFixed(2));
+    form_data.append('quotation[netTotal]', roundTotalPayable.toFixed(2));
+    form_data.append('quotation[roundingAmount]', roundingAmount.toFixed(2));
+
+    // if (id && slug !== "clone") {
+    //   try {
+    //     const response = await fetch(`${ORIGIN}/quotation/api/quotation/remove-quotation-has-details-data`, {
+    //       method: 'POST',
+    //       headers,
+    //       body: form_data,
+    //     });
+
+    //     if (!response.ok) {
+    //       const errorData = await response.json();
+
+    //       if (response.status === 403) {
+    //         toast({
+    //           title: errorData.message,
+    //           duration: 2000
+    //         });
+    //       }
+
+    //       throw new Error('Failed to fetch data');
+    //     }
+
+    //     const responseData = await response.json();
+    //   } catch (error) {
+    //     console.error('Error deleting quotation has details data:', error);
+    //   }
+
+    //   revalidateQuotationDetails();
+
+    //   // After deletion, close the confirmation dialog
+    //   setShowConfirmationDialog(false);
+    // } else {
+    const deletedIndex = selectedRows.map(item => {
+      return item.index
+    });
+    const remainRows = tempRowQuotationDetailsList.filter((item, index) => !deletedIndex.includes(index));
+    const resequencedRows = remainRows.map((row, index) => ({
+      ...row,
+      seq: index + 1
+    }));
+
+    setTempRowQuotationDetailsListData(resequencedRows, true)
+    setShowConfirmationDialog(false);
+    //}
+  };
+
+  //Update total selected rows
+  useEffect(() => {
+    const selected = table.getSelectedRowModel().rows;
+    setSelectedRow(selected);
+  }, [table.getState().rowSelection, table.getRowModel().rows.length]);
+
+  return (
+    <>
+      <div className="flex items-center justify-between rounded-t-md">
+        {/* Mobile View (Start Action Buttons) */}
+        <MobileFormTableActionGroupStart
+          table={table}
+          config={{
+            core: {
+              add: {
+                handler: () => onAdd?.(),
+                tooltip: "Add service or stock"
+              },
+              remove: {
+                handler: () => setShowConfirmationDialog(true)
+              },
+            },
+          }}
+        >
+          {/* Additional Action other than Add and Remove */}
+          {(closeDropdown) => (
+            <DropdownMenuItem>
+              <div className="flex flex-col items-center w-full">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    closeDropdown();
+                    handleOnPackage();
+                  }}
+                >
+                  <FaCube className="size-5" />
+                </Button>
+                <span className="text-[11px]/none font-medium text-black">Package</span>
+              </div>
+            </DropdownMenuItem>
+          )}
+        </MobileFormTableActionGroupStart>
+
+        {/* Web View (Start Action Buttons) */}
+        <div className="hidden md:flex items-center gap-x-1 pl-2 text-erp-blue-14">
+          <div className="flex flex-col items-center">
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    className="size-8"
+                    variant="ghost"
+                    size="icon"
+                    onClick={onAdd}
+                  >
+                    <FaPlus className="size-5.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Add service or stock
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <span className="text-[11px]/none font-medium text-black">Add</span>
+          </div>
+
+          <div className="flex flex-col items-center">
+            <Button
+              className="size-8"
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowConfirmationDialog(true)}
+            >
+              <FaMinus className="size-5.5" />
+            </Button>
+            <span className="text-[11px]/none font-medium text-black">Remove</span>
+          </div>
+
+          <div className="flex flex-col items-center">
+            <Button
+              className="size-8"
+              variant="ghost"
+              size="icon"
+              onClick={handleOnPackage}
+            >
+              <FaCube className="size-5.5" />
+            </Button>
+            <span className="text-[11px]/none font-medium text-black">Package</span>
+          </div>
+        </div>
+
+        {/* Mobile View (Hide Pagination) */}
+        <div className="hidden md:block">
+          <Pagination table={table} />
+        </div>
+
+        {/* Mobile View (End Action Buttons) */}
+        <MobileFormTableActionGroupEnd
+          table={table}
+          config={{
+            search: {
+              column: "itemCode",
+              placeholder: "Search Item Code"
+            },
+            sort: {
+              column: "itemCode"
+            }
+          }}
+        >
+          <Export table={table} />
+          <Validity table={table} />
+
+          {/* Mobile View (Hide Refresh and Column Visibility Toggle) */}
+          <div className="hidden md:flex items-center gap-x-3">
+            <Refresh refreshTable={revalidateQuotationDetails} />
+            <ColumnVisibilityToggle table={table} />
+          </div>
+        </MobileFormTableActionGroupEnd>
+      </div>
+
+      <ConfirmationDialog
+        open={showConfirmationDialog}
+        setOpen={setShowConfirmationDialog}
+        onConfirm={handleDeleteConfirmation}
+        selectedRows={selectedRow}
+      />
+    </>
+  );
+}

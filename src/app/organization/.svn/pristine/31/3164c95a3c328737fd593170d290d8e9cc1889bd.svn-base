@@ -1,0 +1,259 @@
+import type { Section } from "../sections";
+
+export const stockSection: Section = {
+  access: "Stock",
+  children: [
+    {
+      access: "Stock Requisition",
+      hasScope: true,
+      allowedActions: [
+        "View",
+        "New",
+        "Edit",
+        "Clone",
+        "Trash",
+        "Restore",
+        "Delete",
+        "Export",
+        "Transfer To",
+      ],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Stock Received",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Stock Issued",
+      hasScope: true,
+      allowedActions: [
+        "View",
+        "New",
+        "Edit",
+        "Clone",
+        "Trash",
+        "Restore",
+        "Delete",
+        "Export",
+        "Confirm",
+        "Verify",
+        "Transfer From",
+      ],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Stock Transfer",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Stock Take",
+      hasScope: true,
+      allowedActions: [
+        "View",
+        "New",
+        "Edit",
+        "Clone",
+        "Trash",
+        "Restore",
+        "Delete",
+        "Export",
+        "Transfer To",
+      ],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Stock Adjustment",
+      hasScope: true,
+      allowedActions: [
+        "View",
+        "New",
+        "Edit",
+        "Clone",
+        "Trash",
+        "Restore",
+        "Delete",
+        "Export",
+        "Transfer From",
+      ],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Stock Item",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Supplier",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "BOM",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Allocation",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Batch",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Stock Category",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Stock Batch",
+      hasScope: true,
+      allowedActions: [
+        "View",
+        "New",
+        "Edit",
+        "Clone",
+        "Trash",
+        "Restore",
+        "Delete",
+        "Export",
+        "QR Code",
+      ],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Stock Group",
+      hasScope: true,
+      allowedActions: ["View", "New", "Edit", "Clone", "Trash", "Restore", "Delete", "Export"],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Finance",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Stock Transfer",
+      hasScope: true,
+      allowedActions: ["View", "Edit"],
+    },
+  ],
+};

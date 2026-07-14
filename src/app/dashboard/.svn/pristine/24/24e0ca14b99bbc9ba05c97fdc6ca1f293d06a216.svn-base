@@ -1,0 +1,350 @@
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardTitle,
+} from "@/components/ui/card"
+import StatusCard from "./statusCard"
+import BarChart from "./barChart"
+import TableCard from "./table"
+import { BsCashStack } from "react-icons/bs";
+import { LiaShoppingBagSolid } from "react-icons/lia";
+import { FaCoins, FaRegCreditCard, FaRegUser, FaRegListAlt } from "react-icons/fa";
+import { CiCircleInfo, CiViewList } from "react-icons/ci";
+import { useState } from "react";
+
+export default function Stock() {
+
+  const [stockExpirationData, setStockExpirationData] = useState([
+    {
+      name: "Farmland Organic Yogurt 450g",
+      price: "RM 9",
+      dayToExpiry: "2 days ago",
+      quantity: 89,
+      batchNumber: "FL240822334",
+    },
+    {
+      name: "Dairy Fresh Whole Milk 1L",
+      price: "RM 10",
+      dayToExpiry: "3 days ago",
+      quantity: 50,
+      batchNumber: "FL240822336",
+    },
+    {
+      name: "Premium White Bread Loaf",
+      price: "RM 6",
+      dayToExpiry: "10 days ago",
+      quantity: 36,
+      batchNumber: "FL240822340",
+    },
+  ])
+
+  const [stockAgingAnalysisData, setStockAgingAnalysisData] = useState([
+    {
+      name: "Farmland Organic Yogurt 450g",
+      dayInStock: "1 days",
+      batchNumber: "FL240822334",
+    },
+    {
+      name: "Dairy Fresh Whole Milk 1L",
+      dayInStock: "15 days",
+      batchNumber: "FL240822336"
+    },
+    {
+      name: "Premium White Bread Loaf",
+      dayInStock: "20 days",
+      batchNumber: "FL240822340"
+    },
+  ])
+
+
+
+  const [stockOverviewChart, setStockOverviewChart] = useState(
+    {
+      title: "Stock Overview",
+      labels: ["Electronics", "Clothing", "Home appliances", "Sports", "Books"],
+      data: [5000, 3000, 2500, 2000, 1000],
+      datasetLabel: "Sales (RM)",
+      backgroundColors:
+        [
+          "rgba(59, 130, 246,1)",
+          "rgba(16,185,129,1)",
+          "rgba(245, 158, 11, 1)",
+          "rgba(239, 68, 68, 1)",
+          "rgba(139, 92, 246, 1)",
+        ]
+    }
+
+  )
+
+  const [lastStock, setLastStock] = useState(
+    {
+      stockNo: "Stock001",
+      bestSeller: "",
+      totalSoldQuantity: "1050",
+      totalSoldAmount: "75900.00",
+      stockName: "Stock1",
+
+    }
+
+  )
+
+
+  const [monthlyPurchaseTrend, setMonthlyPurchaseTrend] = useState(
+    {
+      title: "Monthly Sales Trends",
+      labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+      datasets: [
+        {
+          label: "Sales",
+          data: [12, 19, 3, 5, 2],
+          borderColor: "rgba(255, 99, 132, 1)",
+          backgroundColor: "rgba(255, 99, 132, 0.2)",
+        },
+        {
+          label: "Purchases",
+          data: [8, 15, 6, 9, 4],
+          borderColor: "rgba(54, 162, 235, 1)",
+          backgroundColor: "rgba(54, 162, 235, 0.2)",
+        },
+      ]
+    }
+
+  )
+
+  const [stockAvailable, setStockAvailable] = useState(
+    {
+      title: "Stock Available : 50000",
+      labels: ["Electronics", "Clothing", "Home appliances", "Sports", "Books"],
+      data: [5000, 3000, 2500, 2000, 1000],
+      // datasetLabel: "Sales (RM)",
+      backgroundColors:
+        [
+          "rgba(59, 130, 246,1)",
+          "rgba(16,185,129,1)",
+          "rgba(245, 158, 11, 1)",
+          "rgba(239, 68, 68, 1)",
+          "rgba(139, 92, 246, 1)",
+        ]
+    }
+
+  )
+
+  const [purchaseOverallPerformance, setPurchaseOverallPerformance] = useState([
+    { icon: FaRegListAlt, title: "Total Number of Stock:", value: "5021", change: "+4", changeText: " since last month", changeType: "up" },
+    { icon: BsCashStack, title: "Total Stock Value:", value: "RM 324500.00", change: "25.10%", changeText: "increased", changeType: "up" },
+    { icon: LiaShoppingBagSolid, title: "Total Stock Quantity:", value: "10572", change: "-509", changeText: "since last month", changeType: "down" }
+
+  ])
+
+  const [stockInformation, setStockInformation] = useState(
+    { salesQuantity: "5910", salesAmount: " 45318.50", purchaseQuantity: "461", purchaseAmount: " 5910.00" }
+
+  )
+
+  const [visitData, setVisitData] = useState([
+    { label: "Expected Visit", value: 150, color: "border-blue-500 text-blue-500", borderLineColor: "#0D6EFD" },
+    { label: "Actual Visit", value: 148, color: "border-green-500 text-green-500", borderLineColor: "#198754" },
+    { label: "Miss Visit", value: 2, color: "border-red-500 text-red-500", borderLineColor: "#DC3545" },
+  ])
+
+  const stockExpirationColumn = ["Stock Name", "Day to Expiry", "Quantity", "Batch Number"]
+  const stockAgingAnalysisColumn = ["Stock Name", "Days in Stock", "Batch Number"]
+
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-4">
+        {/* Top wide card */}
+        <div className="col-span-2 row-span-1">
+          <Card className="flex flex-col text-sm" style={{ marginTop: "10px", overflow: "hidden" }}>
+            <CardTitle className="pl-4 pt-2 text-md">Overall Performance</CardTitle>
+            <CardContent className="flex-1 overflow-y-auto px-4" style={{ maxHeight: "calc(45vh - 60px)" }}>
+              <div className="flex gap-8 justify-around">
+
+                {purchaseOverallPerformance.map((sales, index) => (
+                  <StatusCard
+                    key={index}
+                    icon={<sales.icon />}
+                    title={sales.title}
+                    value={sales.value}
+                    change={sales.change}
+                    changeText={sales.changeText}
+                    changeType={sales.changeType}
+                  />
+
+                ))}
+
+
+
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Third column card (will be same height as both left cards) */}
+        <div className="row-span-2">
+          <Card className="flex flex-col text-sm" style={{ marginTop: "10px", overflow: "hidden" }}>
+            <CardTitle className="text-center pt-3 font-normal pb-2">Stock Expenses</CardTitle>
+            <CardContent>
+              <table className="table-auto w-full border border-grey border-collapse text-center text-lg pt-3">
+                <tbody>
+                  <tr>
+                    <td colSpan="2" style={{ background: "#D5D2D2" }}>Sales</td>
+                  </tr>
+                  <tr>
+                    <td style={{ borderRight: "1px solid black" }}>Quantity</td>
+                    <td>Amount</td>
+                  </tr>
+                  <tr>
+                    <td style={{ borderRight: "1px solid black" }}>{stockInformation.salesQuantity}</td>
+                    <td>{stockInformation.salesAmount}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan="2" style={{ background: "#D5D2D2" }}></td>
+
+                  </tr>
+                  <tr>
+                    <td colSpan="2" style={{ background: "#D5D2D2" }}>Purchases</td>
+                  </tr>
+                  <tr>
+                    <td style={{ borderRight: "1px solid black" }}>  Quantity</td>
+                    <td>Amount</td>
+                  </tr>
+                  <tr>
+                    <td style={{ borderRight: "1px solid black" }}>{stockInformation.purchaseQuantity}</td>
+                    <td>{stockInformation.purchaseAmount}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+
+
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Second stacked card under the first */}
+        <div className="col-span-2 row-span-1">
+          <Card className="flex flex-col text-sm" style={{ marginTop: "10px", overflow: "hidden" }}>
+            <CardTitle className="pl-4 pt-2 text-md">Most quantity available category</CardTitle>
+            <CardContent className="flex-1 overflow-y-auto px-4" style={{ maxHeight: "calc(45vh - 60px)" }}>
+              <div className="flex gap-8 justify-around">
+                <BarChart
+                  title={stockOverviewChart.title}
+                  labels={stockOverviewChart.labels}
+                  data={stockOverviewChart.data}
+                  // datasetLabel="Sales (RM)"
+                  backgroundColors={stockOverviewChart.backgroundColors}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+
+        </div>
+
+
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        {/* First div - spans 2 columns */}
+        <div className="col-span-1 row-span-2">
+          <Card className="flex flex-col text-sm" style={{ marginTop: "10px", overflow: "hidden" }}>
+            <CardTitle className="pl-4 pt-2 text-md"></CardTitle>
+            <CardContent className="flex-1 overflow-y-auto px-4" style={{ maxHeight: "calc(45vh - 60px)" }}>
+              <TableCard
+                title="Stock Expiration"
+                type="stockExpiration"
+                column={stockExpirationColumn}
+                // subtitle="(Purchase suggestion)"
+                data={stockExpirationData}
+              />
+
+
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="col-span-1 row-span-2">
+          <Card className="flex flex-col text-sm" style={{ marginTop: "10px", overflow: "hidden" }}>
+            <CardTitle className="pl-4 pt-2 text-md"></CardTitle>
+            <CardContent className="flex-1 overflow-y-auto px-4" style={{ maxHeight: "calc(45vh - 60px)" }}>
+              <TableCard
+                title="Stock Aging Analysis"
+                type="stockAgingAnalysis"
+                column={stockAgingAnalysisColumn}
+                // subtitle="(Purchase suggestion)"
+                data={stockAgingAnalysisData}
+              />
+
+
+            </CardContent>
+          </Card>
+        </div>
+
+
+
+        {/* Second div - 1 column */}
+        <div className="row-span-1">
+          <Card
+            className="flex flex-col text-sm"
+            style={{ marginTop: "10px", overflow: "hidden" }}
+          >
+            <CardContent className="pt-3">
+              <div className="flex items-center">
+                <p className="text-lg">
+                  Best Seller: {lastStock.bestSeller}
+                </p>
+                <select className="border rounded px-2 py-1 text-sm ml-auto">
+                  <option>1st</option>
+                  <option>2nd</option>
+                  <option>3rd</option>
+                </select>
+              </div>
+              <p>Stock No: {lastStock.stockNo}</p>
+              <p>Stock Name:{lastStock.stockName}</p>
+              <p>Total Sold Quantity: {lastStock.totalSoldQuantity}</p>
+              <p>Total Sold Amount: {lastStock.totalSoldAmount}</p>
+
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Third div - 1 column */}
+        <div className="row-span-1">
+          <Card className="flex flex-col text-sm mt-2 overflow-hidden">
+            <CardContent className="p-0">
+              {visitData.map((stat, index) => (
+                <div
+                  key={index}
+                  className={`flex items-center justify-between p-4`}
+                  style={{ borderBottom: "solid 1px #D5D2D2" }}
+                >
+                  <span className="flex items-center gap-2" style={{ borderLeft: `solid 3px ${stat.borderLineColor}`, paddingLeft: "8px" }}>{stat.label}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`font-bold text-lg ${stat.color}`}>{stat.value}</span>
+                    <button className="p-1 rounded-full bg-gray-100 hover:bg-gray-200">
+                      <CiCircleInfo size={16} className="text-gray-500" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+
+
+
+
+
+
+
+
+
+
+    </>
+  );
+}

@@ -1,0 +1,63 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+// Drag and Drop (Imports)
+import { DragHandle } from "@/components/data-table/row-drag-drop";
+
+export type AssigneeDetails = {
+  UUID: string;
+  location: string;
+  userGroup: string;
+  assignee: string;
+  supervisor: string;
+  title: string;
+  gender: string;
+  email: string;
+  phoneNo: number;
+  vehicleNo: string;
+  brand: string;
+  model: string;
+  color: string;
+  year: number;
+  vehicleRamark: string;
+};
+
+export const assigneeDetailsColumns: ColumnDef<AssigneeDetails>[] = [
+  {
+    id: "assigneeFullName",
+    accessorKey: "assigneeFullName",
+    header: "Assignee",
+    filterFn: "includesString"
+  },
+  {
+    id: "assigneeGender",
+    accessorKey: "assigneeGender",
+    header: "Gender",
+    filterFn: "includesString"
+  },
+  {
+    id: "assigneeTitle",
+    accessorKey: "assigneeTitle",
+    header: "Title",
+    filterFn: "includesString"
+  },
+  {
+    id: "assigneePhoneNo",
+    accessorKey: "assigneePhoneNo",
+    header: "Phone Number",
+    filterFn: "includesString"
+  },
+  {
+    id: "assigneeEmail",
+    accessorKey: "assigneeEmail",
+    header: "Email",
+    filterFn: "includesString"
+  },
+  {
+    id: "supervisorFullName",
+    accessorKey: "supervisorFullName",
+    header: "Supervisor",
+    filterFn: "includesString"
+  },
+];

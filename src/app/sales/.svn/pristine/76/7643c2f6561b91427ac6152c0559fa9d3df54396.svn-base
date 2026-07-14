@@ -1,0 +1,144 @@
+"use client";
+
+import { FaBoxesStacked } from "react-icons/fa6";
+
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+import { SVGService } from "@/components/icons/svg-repo/SVGService";
+import { Button } from "@/components/ui/button";
+
+// Mobile View (Imports)
+import MobilePopoverActionGroupStart from "@/components/form/MobilePopoverActionGroupStart";
+import MobilePopoverActionGroupEnd from "@/components/form/MobilePopoverActionGroupEnd";
+
+type Props = {
+  table: any;
+  setOpen: any;
+  handleSave: (prop) => void;
+  revalidateQuotationDetails: any;
+  fetchItemData: (itemType: string) => void;
+  itemType: string;
+  setSelectedRow: (row) => void;
+  saveDisabled: boolean;
+  setSaveDisabled: (state: boolean) => void;
+};
+
+export default function ItemPopoverToolbar({
+  table,
+  setOpen,
+  handleSave,
+  revalidateQuotationDetails,
+  fetchItemData,
+  itemType,
+  setSelectedRow,
+  saveDisabled,
+  setSaveDisabled,
+}: Props) {
+  const handleReset = () => {
+    table.getSelectedRowModel().rows.forEach((row) => {
+      row.toggleSelected();
+    });
+    revalidateQuotationDetails();
+    if (itemType === "service") setSaveDisabled(true);
+    setSelectedRow(null);
+  };
+
+  // Mobile View (Determine Item Code Column ID)
+  const itemCodeColumnId = itemType === "service" ? "serviceCode" : "stockCode";
+
+  return (
+    <>
+      <div className="flex items-center justify-between p-1.5">
+        {/* Mobile View (Start Action Buttons) */}
+        <MobilePopoverActionGroupStart
+          config={{
+            save: {
+              handler: () => handleSave({ table: table, itemType: itemType }),
+              disabled: false,
+            },
+            reset: { handler: handleReset },
+            cancel: { handler: () => setOpen(false) },
+          }}
+        />
+        
+        {/* Web View (Start Action Buttons) */}
+        <div className="hidden md:grid auto-cols-fr grid-flow-col gap-x-1.5">
+          <SaveButton
+            onClick={() => {
+              handleSave({ table: table, itemType: itemType });
+            }}
+            disabled={false}
+          />
+          <ResetButton onClick={handleReset} />
+          <CancelButton onClick={() => setOpen(false)} />
+        </div>
+
+        {/* Mobile View (Hide Pagination) */}
+        <div className="hidden md:block">
+          <Pagination table={table} />
+        </div>
+        
+        {/* Mobile View (End Action Buttons) */}
+        <MobilePopoverActionGroupEnd
+          table={table}
+          config={{
+            search: {
+              column: itemCodeColumnId,
+              placeholder: `Search ${itemType === "service" ? "Service" : "Stock"} Code`,
+            },
+            sort: {
+              column: itemCodeColumnId,
+            },
+          }}
+        >
+          {/* Stock button first */}
+          <div className="flex flex-col items-center my-2">
+            <Button
+              className="hover:text-erp-blue-14 active:bg-erp-blue-14 active:text-white size-8"
+              variant={itemType === "stock" ? "default" : "ghost"}
+              size="icon"
+              onClick={() => {
+                setSelectedRow(null);
+                setSaveDisabled(false);
+                table.toggleAllRowsSelected(false);
+                fetchItemData("stock");
+              }}
+            >
+              <FaBoxesStacked className="size-5.5" />
+            </Button>
+            <span className="text-[11px]/none font-medium text-black">Stock</span>
+          </div>
+
+          {/* Service button second */}
+          <div className="flex flex-col items-center my-2">
+            <Button
+              className="hover:text-erp-blue-14 active:bg-erp-blue-14 active:text-white size-8"
+              variant={itemType === "service" ? "default" : "ghost"}
+              size="icon"
+              onClick={() => {
+                setSelectedRow(null);
+                setSaveDisabled(false);
+                table.toggleAllRowsSelected(false);
+                fetchItemData("service");
+              }}
+            >
+              <SVGService className="size-5.5" />
+            </Button>
+            <span className="text-[11px]/none font-medium text-black">Service</span>
+          </div>
+       
+          {/* Mobile View (Hide Refresh and ColumnVisibilityToggle) */}
+          <div className="hidden md:flex items-center gap-x-1">
+            <Refresh />
+            <ColumnVisibilityToggle table={table} />
+          </div>
+        </MobilePopoverActionGroupEnd>
+      </div>
+    </>
+  );
+}

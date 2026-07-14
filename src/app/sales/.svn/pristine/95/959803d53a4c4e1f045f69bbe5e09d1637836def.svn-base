@@ -1,0 +1,96 @@
+"use client";
+
+import { useSearchParams } from "next/navigation";
+import { ORIGIN } from "@/lib/constants";
+import ChangelogDataTable from "@/components/features/changelog/DataTable";
+import { ChangelogConfig } from "@/components/features/changelog/types";
+import { ColumnDef } from "@tanstack/react-table";
+
+// Define the type changelog config
+const AgentChangelogConfig: ChangelogConfig = {
+  getHistoryUrl: (id: string) => `${ORIGIN}/agent/api/agent/get-agent-log?id=${id}`,
+  getDetailsUrl: (id: string, action: string) => 
+    `${ORIGIN}/agent/api/agent/get-agent-log-details?id=${id}&action=${action}`,
+  
+  fieldNameMapping: {
+    agentCode: "Agent Code",
+    agentName: "Agent Name",
+    agentTypeCode: "Agent TypeCode",
+    commission: "Commission",
+    gender: "Gender",
+    title: "Title",
+    phoneNo: "Phone No.",
+    email: "Email",
+    address: "Address",
+    nationality: "Nationality",
+    race: "Race",
+    religion: "Religion",
+    maritalStatus: "Marital Status",
+    DOBFormat: "Date of Birth",
+    NRICNO: "NRIC No",
+    description: "Description",
+    createdAtFormat: "Created at",
+    CreatedByUsername: "Created by",
+    updatedAtFormat: "Updated at",
+    UpdatedByUsername: "Updated by",
+    valid: "Validity",
+  },
+  
+  fieldsToFilter: [
+    "UUID",
+    "account",
+    "historyUUID",
+    "createdAt",
+    "createdBy",
+    "createdByUsername",
+    "_actionUUID",
+    "_version",
+    "action",
+    "date_created",
+    "user_id",
+    "updatedAt",
+    "updatedBy",
+    "valid",
+    "company",
+    "agentType",
+    "user",
+    "username",
+    "DOB",
+
+  ],
+  
+  entityName: "agent",
+  
+  defaultSortField: "createdAt",
+  
+  tabs: [
+    { value: "agent", label: "agent" }
+  ],
+};
+
+export default function AgentChangelogDataTable<TData, TValue>({
+  columns,
+  initialData,
+  onTableParamsChange,
+}: {
+  columns: ColumnDef<TData, TValue>[];
+  initialData?: any | null;
+  onTableParamsChange?: any;
+}) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return <div>Missing entity ID</div>;
+  }
+
+  return (
+    <ChangelogDataTable
+      columns={columns}
+      initialData={initialData}
+      config={AgentChangelogConfig}
+      entityId={id}
+      onTableParamsChange={onTableParamsChange}
+    />
+  );
+}

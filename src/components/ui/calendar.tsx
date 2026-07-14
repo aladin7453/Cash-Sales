@@ -1,0 +1,278 @@
+"use client";
+
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import * as React from "react";
+import { DayPicker } from "react-day-picker";
+import { useDateRestriction } from "@/components/custom/DateRestrictionContext";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils/cn";
+
+export type CalendarProps = React.ComponentProps<typeof DayPicker>;
+
+type ViewMode = "day" | "month" | "year";
+
+const normalizeDate = (value: any): Date | undefined => {
+  if (!value) return undefined;
+
+  if (value instanceof Date) return value;
+
+  if (!isNaN(value)) {
+    return new Date(Number(value) * 1000);
+  }
+
+  const parsed = new Date(value);
+  if (!isNaN(parsed.getTime())) return parsed;
+
+  return undefined;
+};
+
+function Calendar({
+  className,
+  classNames,
+  showOutsideDays = true,
+  onSelect,
+  ...props
+}: CalendarProps) {
+  const [viewMode, setViewMode] = React.useState<ViewMode>("day");
+  const selectedDate = normalizeDate(props.selected);
+  const [currentDate, setCurrentDate] = React.useState<Date>(selectedDate || new Date());
+  const { allowPastRecord } = useDateRestriction();
+
+  React.useEffect(() => {
+    const normalized = normalizeDate(props.selected);
+    if (normalized) {
+      setCurrentDate(normalized);
+    }
+  }, [props.selected]);
+
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  const handleMonthSelect = (monthIndex: number) => {
+    const newDate = new Date(currentDate.getFullYear(), monthIndex, 1);
+    setCurrentDate(newDate);
+    setViewMode("day");
+    if (!allowPastRecord && newDate < new Date()) return;
+    if (props.onSelect) {
+      props.onSelect(newDate);
+    }
+  };
+
+  const handleYearSelect = (year: number) => {
+    const newDate = new Date(year, currentDate.getMonth(), 1);
+    setCurrentDate(newDate);
+    setViewMode("month");
+    if (!allowPastRecord && year < new Date().getFullYear()) return;
+  };
+
+  const generateYearRange = () => {
+    const currentYear = currentDate.getFullYear();
+    const startYear = Math.floor(currentYear / 10) * 10;
+    return Array.from({ length: 16 }, (_, i) => startYear - 2 + i);
+  };
+
+  const navigateYear = (direction: "prev" | "next") => {
+    const currentYear = currentDate.getFullYear();
+    const newYear = direction === "prev" ? currentYear - 10 : currentYear + 10;
+    setCurrentDate(new Date(newYear, currentDate.getMonth(), 1));
+  };
+
+  const navigateMonth = (direction: "prev" | "next") => {
+    const newDate = new Date(currentDate);
+    if (direction === "prev") {
+      newDate.setFullYear(newDate.getFullYear() - 1);
+    } else {
+      newDate.setFullYear(newDate.getFullYear() + 1);
+    }
+    setCurrentDate(newDate);
+  };
+
+  const handleDaySelect = (date: Date | undefined) => {
+    if (onSelect) {
+      onSelect(date);
+    }
+  };
+
+  const handleReset = () => {
+    setCurrentDate(new Date());
+    if (onSelect) {
+      onSelect(undefined);
+    }
+  };
+
+  if (viewMode === "year") {
+    const years = generateYearRange();
+    return (
+      <div className={cn("p-3", className)}>
+        <div className="relative mb-4 flex items-center justify-center pt-1">
+          <button
+            onClick={() => navigateYear("prev")}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "absolute left-1 h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+            )}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <div className="text-sm font-medium">
+            {years[0]} - {years[years.length - 1]}
+          </div>
+          <button
+            onClick={() => navigateYear("next")}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "absolute right-1 h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+            )}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="grid grid-cols-4">
+          {years.map((year) => (
+            <button
+              key={year}
+              onClick={() => handleYearSelect(year)}
+              className={cn(
+                buttonVariants({ variant: "ghost" }),
+                "h-9 px-2 py-6 font-normal",
+                year === currentDate.getFullYear() && "bg-primary text-primary-foreground",
+              )}
+            >
+              {year}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (viewMode === "month") {
+    return (
+      <div className={cn("p-3", className)}>
+        <div className="relative mb-4 flex items-center justify-center pt-1">
+          <button
+            onClick={() => navigateMonth("prev")}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "absolute left-1 h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+            )}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setViewMode("year")}
+            className="cursor-pointer text-sm font-medium hover:underline"
+          >
+            {currentDate.getFullYear()}
+          </button>
+          <button
+            onClick={() => navigateMonth("next")}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "absolute right-1 h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+            )}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="grid grid-cols-4">
+          {months.map((month, index) => (
+            <button
+              key={month}
+              onClick={() => handleMonthSelect(index)}
+              className={cn(
+                buttonVariants({ variant: "ghost" }),
+                "h-9 px-3 py-6 font-normal",
+                index === currentDate.getMonth() && "bg-primary text-primary-foreground",
+              )}
+            >
+              {month.slice(0, 3)}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("p-3", className)}>
+      <DayPicker
+        selected={selectedDate}
+        disabled={allowPastRecord ? undefined : { before: new Date() }}
+        showOutsideDays={showOutsideDays}
+        month={currentDate}
+        onMonthChange={setCurrentDate}
+        onSelect={handleDaySelect}
+        classNames={{
+          months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+          month: "space-y-4",
+          caption: "flex justify-center pt-1 relative items-center",
+          caption_label: "text-sm font-medium hover:underline cursor-pointer",
+          nav: "space-x-1 flex items-center",
+          nav_button: cn(
+            buttonVariants({ variant: "outline" }),
+            "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+          ),
+          nav_button_previous: "absolute left-1",
+          nav_button_next: "absolute right-1",
+          table: "w-full border-collapse space-y-1",
+          head_row: "flex",
+          head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
+          row: "flex w-full mt-2",
+          cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+          day: cn(
+            buttonVariants({ variant: "ghost" }),
+            "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
+          ),
+          day_range_end: "day-range-end",
+          day_selected:
+            "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+          day_today: "bg-accent text-accent-foreground",
+          day_outside:
+            "day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
+          day_disabled: "text-muted-foreground opacity-50",
+          day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
+          day_hidden: "invisible",
+          ...classNames,
+        }}
+        components={{
+          IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
+          IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
+          CaptionLabel: ({ displayMonth }) => (
+            <button
+              onClick={() => setViewMode("month")}
+              className="cursor-pointer text-sm font-medium hover:underline"
+            >
+              {displayMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+            </button>
+          ),
+        }}
+        {...props}
+      />
+
+      {selectedDate && (
+        <button
+          onClick={handleReset}
+          className="mt-2 w-full text-sm text-erp-blue-14 hover:text-erp-blue-14"
+        >
+          Reset
+        </button>
+      )}
+    </div>
+  );
+}
+Calendar.displayName = "Calendar";
+
+export { Calendar };

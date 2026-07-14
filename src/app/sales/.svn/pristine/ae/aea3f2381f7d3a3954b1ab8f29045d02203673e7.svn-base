@@ -1,0 +1,8 @@
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+
+  title: "Sales S/N Profit/Loss Report",
+};
+export default function SalesSNProfitLossReportPageLayout({ children }: { children: React.ReactNode }) {
+  return children;
+}

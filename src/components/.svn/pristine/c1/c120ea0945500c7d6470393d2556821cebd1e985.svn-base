@@ -1,0 +1,39 @@
+"use client";
+
+import React from 'react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import type { TransferToDialogProps } from './types';
+
+export default function TransferToDialog({ 
+  open, 
+  setOpen, 
+  destinations,
+  onDestinationSelect,
+  title = "Transfer to"
+}: TransferToDialogProps) {
+  const handleDestinationClick = (docType: string) => {
+    onDestinationSelect(docType);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="w-96">
+        <p><strong>{title}</strong></p>
+
+        <div className="grid grid-row justify-center gap-2">
+          {destinations.map((destination) => (
+            <Button
+              key={destination.key}
+              onClick={() => handleDestinationClick(destination.key)}
+              variant="outline"
+              className="hover:bg-erp-blue-10"
+            >
+              {destination.label}
+            </Button>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

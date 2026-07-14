@@ -1,0 +1,44 @@
+"use client";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+import type { ColumnDef } from "@tanstack/react-table";
+import React from "react";
+
+export type PackageList = {
+  packageTypeCodeCode: string;
+  packageCode: string;
+  packageName: string;
+  description: string;
+  createdAt: string;
+  createdBy: string;
+  updatedBy: string;
+  updatedAt: string;
+};
+
+export const PackageColumns: ColumnDef<PackageList>[] = [
+  {
+    id: "packageCode",
+    accessorKey: "packageCode",
+    header: "Package Code",
+    filterFn: "includesString"
+  },
+  {
+    id: "packageTypeCodeCode",
+    accessorKey: "packageTypeCodeCode",
+    header: "Package Type Code",
+    filterFn: "includesString"
+  },
+  {
+    id: "packageName",
+    accessorKey: "packageName",
+    header: "Package Name",
+    filterFn: "includesString"
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    filterFn: "includesString"
+  },
+];

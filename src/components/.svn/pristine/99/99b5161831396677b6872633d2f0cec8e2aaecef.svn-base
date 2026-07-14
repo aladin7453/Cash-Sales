@@ -1,0 +1,259 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { HiOutlineFilter } from "react-icons/hi";
+import { IoMdSearch } from "react-icons/io";
+import { IoCloseSharp } from "react-icons/io5";
+
+//Import Button
+import DeleteButton from "@/components/data-table/ActionButton/Delete";
+import GetEInvoiceButton from "@/components/data-table/ActionButton/GetEinvoice";
+import PreviewButton from "@/components/data-table/ActionButton/Preview";
+import SubmitEInvoiceButton from "@/components/data-table/ActionButton/SubmitEInvoice";
+import TrashButton from "@/components/data-table/ActionButton/Trash";
+import Export from "@/components/data-table/Export";
+import Refresh from "@/components/data-table/Refresh";
+import RestoreButton from "@/components/data-table/ActionButton/Restore";
+import Validity from "@/components/data-table/Validity";
+import { TransferFromButton } from "@/components/features/transfer/transferFrom";
+
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import NewButton from "./ActionButton/New";
+
+import type { Table } from "@tanstack/react-table";
+
+interface MobileActionGroupEndProps<T> {
+  table: Table<T>;
+  config: {
+    searchColumn: string;
+    searchPlaceholder: string;
+    sortColumn: string;
+    module?: string;
+    model?: string;
+    previewType?: string;
+    refreshTable?: () => void;
+
+    //Path
+    newDestination?: string;
+
+    //Transfer From Module
+    transferFromConfig?: any;
+    getTransferFromId?: (selectedRow: any) => string;
+    transferFromOnComplete?: () => void;
+
+    //Export Module
+    exportModule?: string;
+    exportMainModule?: string;
+
+    //Button Condition (Show Or Hidden)
+    showSubmitEInvoice?: boolean;
+    showGetEInvoice?: boolean;
+    showTransferFrom?: boolean;
+  };
+  isSelectionMode?: boolean;
+  children?: React.ReactNode;
+  onExitSelectionMode?: () => void;
+}
+
+export default function MobileActionGroupEnd<T extends Record<string, any>>({
+  table,
+  config,
+  isSelectionMode = false,
+  onExitSelectionMode,
+  children,
+}: MobileActionGroupEndProps<T>) {
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<T | null>(null);
+
+  const selectedRows = table.getSelectedRowModel().rows;
+
+  useEffect(() => {
+    setSelectedRow(selectedRows.length === 1 ? selectedRows[0].original : null);
+  }, [selectedRows.length, selectedRows[0]?.id]);
+
+  if (isSelectionMode) {
+    return (
+      <div className="flex w-full items-center justify-center gap-3">
+        <TrashButton
+          table={table}
+          module={config.module!}
+          model={config.model!}
+          refreshTable={config.refreshTable}
+          isMobile={true}
+          isSelectionMode={true}
+        />
+        <DeleteButton
+          table={table}
+          module={config.module!}
+          model={config.model!}
+          refreshTable={config.refreshTable}
+          isMobile={true}
+          isSelectionMode={true}
+        />
+        <RestoreButton
+          table={table}
+          module={config.module!}
+          model={config.model!}
+          refreshTable={config.refreshTable}
+          isMobile={true}
+          isSelectionMode={true}
+        />
+        <PreviewButton
+          table={table}
+          previewType={config.previewType!}
+          module={config.module!}
+          model={config.model!}
+          refreshTable={config.refreshTable}
+          isMobile={true}
+          isSelectionMode={true}
+        />
+        {config.showSubmitEInvoice && (
+          <SubmitEInvoiceButton
+            table={table}
+            module={config.module!}
+            model={config.model!}
+            isMobile={true}
+            isSelectionMode={true}
+          />
+        )}
+        {config.showGetEInvoice && (
+          <GetEInvoiceButton
+            table={table}
+            module={config.module!}
+            model={config.model!}
+            isMobile={true}
+            isSelectionMode={true}
+          />
+        )}
+        <button
+          onClick={onExitSelectionMode}
+          className="flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-transparent bg-white text-erp-blue-14 shadow-md transition-all duration-300 ease-in-out"
+        >
+          <IoCloseSharp className="size-4.5 text-erp-blue-11" />
+        </button>
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex w-full items-center gap-x-1.5 md:hidden">
+      {/* Search Button */}
+      <button
+        onClick={() => setIsSearchOpen(true)}
+        className={[
+          "flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-md",
+          "transition-all duration-300 ease-in-out",
+          isSearchOpen ? "pointer-events-none w-0 scale-75 opacity-0" : "scale-100 opacity-100",
+        ].join(" ")}
+      >
+        <IoMdSearch className="size-4.5 text-erp-blue-11" />
+      </button>
+
+      {/* Search Column */}
+      <div
+        className={[
+          "duration-400 ease-[cubic-bezier(0.34,1.56,0.64,1)] transition-all",
+          isSearchOpen ? "max-w-full flex-1 opacity-100" : "max-w-0 flex-none opacity-0",
+        ].join(" ")}
+      >
+        <div
+          className={
+            isSearchOpen
+              ? "min-w-[200px] [&_input]:!h-9 [&_input]:rounded-full [&_input]:border-none [&_input]:!bg-white [&_input]:px-3 [&_input]:py-1 [&_input]:text-[11px] [&_input]:shadow-md [&_input]:outline-none [&_input]:transition-all [&_input]:duration-300 [&input]:ease-in-out"
+              : "hidden"
+          }
+        >
+          <TableHeadColumnTextFilter
+            column={table.getColumn(config.searchColumn)}
+            table={table}
+            placeholder={config.searchPlaceholder}
+          />
+        </div>
+      </div>
+
+      {/* Close Search Button */}
+      <button
+        onClick={() => setIsSearchOpen(false)}
+        className={[
+          "flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-md",
+          "ease-[cubic-bezier(0.34,1.56,0.64,1)] transition-all duration-300",
+          isSearchOpen ? "size-8 scale-100 opacity-100" : "hidden",
+        ].join(" ")}
+      >
+        <IoCloseSharp className="size-5 text-erp-blue-11" />
+      </button>
+
+      <div
+        className={[
+          "flex items-center justify-center gap-x-3 transition-all duration-300 ease-in-out",
+          isSearchOpen ? "hidden" : "scale-100 opacity-100",
+        ].join(" ")}
+      >
+        {/* New Button */}
+        {config.newDestination && <NewButton destination={config.newDestination} isMobile={true} />}
+
+        {/* Transfer From Button */}
+        {config.showTransferFrom && (
+          <TransferFromButton
+            table={table}
+            id={config.getTransferFromId ? config.getTransferFromId(selectedRow) : ""}
+            config={config.transferFromConfig}
+            onTransferComplete={config.transferFromOnComplete}
+            refreshTable={config.transferFromOnComplete}
+            isMobile={true}
+            forceEnabled={true}
+          />
+        )}
+
+        {/* Validity Button */}
+        <Validity table={table} isMobile={true} />
+
+        {/* Refresh Button */}
+        <Refresh
+          refreshTable={config.refreshTable}
+          isMobile={true}
+          resetRowSelection={() => table.resetRowSelection()}
+        />
+
+        {/* Export Button */}
+        <Export
+          table={table}
+          module={config.exportModule ?? ""}
+          mainModule={config.exportMainModule ?? ""}
+          isMobile={true}
+        />
+
+        <DropdownMenu>
+          {/* Sort */}
+          <DropdownMenuTrigger className="flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-transparent bg-white text-erp-blue-14 shadow-md outline-none transition-all duration-300 ease-in-out data-[state=open]:border-blue-300">
+            <HiOutlineFilter className="size-4.5 text-erp-blue-11" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="min-w-[150px] [&_[role='menuitem']]:text-[clamp(11px,1.2vw,14px)]">
+            <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => table.getColumn(config.sortColumn)?.toggleSorting(false)}
+            >
+              Ascending
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => table.getColumn(config.sortColumn)?.toggleSorting(true)}
+            >
+              Descending
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}

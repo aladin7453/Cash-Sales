@@ -1,0 +1,1112 @@
+"use client";
+
+import React, { useEffect, useRef, useState } from "react";
+import { FaCircleXmark, FaCropSimple, FaLocationDot, FaMagnifyingGlass } from "react-icons/fa6";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import Map from "@/components/ui/googleMap";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { useVerify } from "@/lib/hooks/useVerify";
+
+import type { Customer } from "../../../columns";
+
+type Params = {
+  customer?: Customer | null;
+  customInformationData: any;
+  tempRow: any;
+  form: any;
+  hasAssociations: boolean;
+};
+
+export function CustomerForm({ form }: Params) {
+  const { verifyField } = useVerify(
+    form,
+    "/customer/api/customer/verify",
+    "customer",
+    form.watch("UUID"),
+  );
+
+  const headers = getAuthHeaders();
+
+  const [dropdownState, setDropdownState] = useState({
+    currentDropdown: null as string | null,
+    data: [] as any[],
+    originalData: [] as any[],
+    showTable: false,
+  });
+
+  const dropdownInputRef = useRef(null);
+  const dropdownTableRef = useRef(null);
+
+  const dropdownConfigs: Record<string, DropdownConfig> = {
+    MISC: {
+      tableName: "MISCCode",
+      columns: [
+        { accessorKey: "code", header: "MISCCode" },
+        {
+          accessorKey: "description",
+          header: "Description",
+          cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+        },
+      ],
+      valueField: "UUID",
+      displayField: "code",
+      formValueField: "MISC",
+      formDisplayField: "MISCCode",
+    },
+    salesAgent: {
+      tableName: "agent",
+      columns: [
+        { accessorKey: "agentName", header: "Agent Name" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "agentName",
+      formValueField: "agent",
+      formDisplayField: "salesAgent",
+    },
+    servicingAgent: {
+      tableName: "agent",
+      columns: [
+        { accessorKey: "agentName", header: "Agent Name" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "agentName",
+      formValueField: "servicingAgent",
+      formDisplayField: "servicingAgentName",
+    },
+    customerGroup: {
+      tableName: "customerGroup",
+      columns: [
+        { accessorKey: "customerGroupCode", header: "Customer Group Code" },
+        { accessorKey: "customerGroupName", header: "Customer Group Name" },
+        {
+          accessorKey: "description",
+          header: "Description",
+          cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+        },
+      ],
+      valueField: "UUID",
+      displayField: "customerGroupName",
+      formValueField: "customerGroup",
+      formDisplayField: "customerGroupName",
+    },
+    customerCategory: {
+      tableName: "customerCategory",
+      columns: [
+        { accessorKey: "customerCategoryCode", header: "Customer Category Code" },
+        { accessorKey: "customerCategory", header: "Customer Category Name" },
+        {
+          accessorKey: "description",
+          header: "Description",
+          cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+        },
+      ],
+      valueField: "UUID",
+      displayField: "customerCategory",
+      formValueField: "customerCategory",
+      formDisplayField: "customerCategoryName",
+    },
+    collectionAgent: {
+      tableName: "agent",
+      columns: [
+        { accessorKey: "agentName", header: "Agent Name" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "agentName",
+      formValueField: "collectionAgent",
+      formDisplayField: "collectionAgentName",
+    },
+  };
+
+  const fetchDropdownData1 = async (dropdownKey: string) => {
+    try {
+      const config = dropdownConfigs[dropdownKey];
+
+      if (!config) return;
+
+      var form_data = new FormData();
+
+      form_data.append(`table[0]`, config.tableName);
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${dropdownKey} data`);
+      }
+
+      const data = await response.json();
+
+      setDropdownState({
+        currentDropdown: dropdownKey,
+        data: data.rows,
+        originalData: data.rows,
+        showTable: true,
+      });
+    } catch (error) {
+      console.error(`Error fetching ${dropdownKey} data:`, error);
+
+      throw new Error(`Failed to fetch ${dropdownKey} data`);
+    }
+  };
+
+  const onClickRow = (row: any) => {
+    const config = dropdownConfigs[dropdownState.currentDropdown!];
+
+    if (config) {
+      form.setValue(config.formValueField, row[config.valueField]);
+      form.setValue(config.formDisplayField, row[config.displayField]);
+
+      if (config.additionalMappings) {
+        config.additionalMappings.forEach((mapping) => {
+          if (row[mapping.sourceField]) {
+            form.setValue(mapping.targetFormField, row[mapping.sourceField]);
+          }
+        });
+      }
+    }
+
+    setDropdownState((prev) => ({ ...prev, showTable: false }));
+  };
+
+  // Close dropdown when clicking outside
+  const handleClickOutside = (event) => {
+    if (
+      dropdownTableRef.current &&
+      !dropdownTableRef.current.contains(event.target) &&
+      dropdownInputRef.current !== event.target
+    ) {
+      setDropdownState((prev) => ({ ...prev, showTable: false }));
+    }
+
+    if (
+      customerGroupDropdownRef.current &&
+      !customerGroupDropdownRef.current.contains(event.target) &&
+      customerGroupInputRef.current !== event.target
+    ) {
+      setShowTableCustomerGroup(false);
+    }
+
+    if (
+      customerCategoryDropdownRef.current &&
+      !customerCategoryDropdownRef.current.contains(event.target) &&
+      customerCategoryInputRef.current !== event.target
+    ) {
+      setShowTableCustomerCategory(false);
+    }
+
+    if (
+      agentDropdownRef.current &&
+      !agentDropdownRef.current.contains(event.target) &&
+      agentInputRef.current !== event.target
+    ) {
+      setShowTableAgent(false);
+    }
+
+    if (
+      mSICDropdownRef.current &&
+      !mSICDropdownRef.current.contains(event.target) &&
+      mSICInputRef.current !== event.target
+    ) {
+      setShowTableMSICCode(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  // MSIC Code Dropdown
+  const mSICInputRef = useRef<HTMLInputElement>(null);
+  const mSICDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [showTableMSICCode, setShowTableMSICCode] = useState(false);
+  const [MSICCodeDropdownTableData, setMSICCodeDropdownTableData] = useState([]);
+
+  const dropdownMSICCodeColumns = [
+    { accessorKey: "code", header: "MSIC" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const onClickRowMSICCode = (row) => {
+    form.setValue("MISC", row.UUID);
+    form.setValue("MISCCode", row.code);
+    form.setValue("businessNature", row.description);
+
+    setShowTableMSICCode(false);
+  };
+
+  const toggleTableMSICCode = async () => {
+    const formData = new FormData();
+    const MSICCode = "MISCCode";
+
+    formData.append("table[]", MSICCode);
+
+    if (!showTableMSICCode) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch agent drop-down data");
+        }
+
+        const MSICCodeData = await response.json();
+
+        setMSICCodeDropdownTableData(MSICCodeData.rows);
+        setShowTableMSICCode(true);
+      } catch (error) {
+        console.error("Error fetching MSICCode drop-down data:", error);
+      }
+    } else {
+      setShowTableMSICCode(false);
+    }
+  };
+
+  // Customer Group Dropdown
+  const customerGroupInputRef = useRef<HTMLInputElement>(null);
+  const customerGroupDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [showTableCustomerGroup, setShowTableCustomerGroup] = useState(false);
+  const [customerGroupDropdownTableData, setCustomerGroupDropdownTableData] = useState([]);
+
+  const dropdownCustomerGroupColumns = [
+    { accessorKey: "customerGroupCode", header: "Customer Group Code" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const toggleTableCustomerGroup = async () => {
+    const formData = new FormData();
+    const customerGroup = "customerGroup";
+
+    formData.append("table[]", customerGroup);
+
+    if (!showTableCustomerGroup) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch company drop-down data");
+        }
+
+        const customerGroupData = await response.json();
+
+        setCustomerGroupDropdownTableData(customerGroupData.rows);
+        setShowTableCustomerGroup(true);
+      } catch (error) {
+        console.error("Error fetching company drop-down data:", error);
+      }
+    } else {
+      setShowTableCustomerGroup(false);
+    }
+  };
+
+  const onClickRowCustomerGroup = (row) => {
+    form.setValue("customerGroup", row.UUID);
+    form.setValue("customerGroupName", row.customerGroupName);
+
+    setShowTableCustomerGroup(false);
+  };
+
+  // Customer Category Dropdown
+  const customerCategoryInputRef = useRef<HTMLInputElement>(null);
+  const customerCategoryDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [showTableCustomerCategory, setShowTableCustomerCategory] = useState(false);
+  const [customerCategoryDropdownTableData, setCustomerCategoryDropdownTableData] = useState([]);
+
+  const dropdownCustomerCategoryColumns = [
+    { accessorKey: "customerCategoryCode", header: "Customer Category Code" },
+    { accessorKey: "customerCategory", header: "Customer Category Name" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const toggleTableCustomerCategory = async () => {
+    const formData = new FormData();
+    const customerCategory = "customerCategory";
+
+    formData.append("table[]", customerCategory);
+
+    if (!showTableCustomerCategory) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch company drop-down data");
+        }
+
+        const customerCategoryData = await response.json();
+
+        setCustomerCategoryDropdownTableData(customerCategoryData.rows);
+        setShowTableCustomerCategory(true);
+      } catch (error) {
+        console.error("Error fetching company drop-down data:", error);
+      }
+    } else {
+      setShowTableCustomerCategory(false);
+    }
+  };
+
+  const onClickRowCustomerCategory = (row) => {
+    form.setValue("customerCategory", row.UUID);
+    form.setValue("customerCategoryName", row.customerCategory);
+
+    setShowTableCustomerCategory(false);
+  };
+
+  // Agent Dropdown
+  const agentInputRef = useRef<HTMLInputElement>(null);
+  const agentDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [showTableAgent, setShowTableAgent] = useState(false);
+  const [agentDropdownTableData, setAgentDropdownTableData] = useState([]);
+
+  const dropdownAgentGroupColumns = [
+    { accessorKey: "agentName", header: "Agent" },
+    { accessorKey: "description", header: "Description" },
+  ];
+
+  const toggleTableAgent = async () => {
+    const formData = new FormData();
+    const agent = "agent";
+
+    formData.append("table[]", agent);
+
+    if (!showTableAgent) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch agent drop-down data");
+        }
+
+        const AgentData = await response.json();
+
+        setAgentDropdownTableData(AgentData.rows);
+        setShowTableAgent(true);
+      } catch (error) {
+        console.error("Error fetching agent drop-down data:", error);
+      }
+    } else {
+      setShowTableAgent(false);
+    }
+  };
+
+  const onClickRowAgent = (row) => {
+    form.setValue("agent", row.UUID);
+    form.setValue("salesAgent", row.agentName);
+
+    setShowTableAgent(false);
+  };
+
+  // Map Dialog State
+  const [mapDialogOpen, setMapDialogOpen] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
+
+  const handleMapLocationSelect = (locationData: {
+    placeName: string;
+    coordinates: { lat: number; lng: number };
+  }) => {
+    const coordinateString = `${locationData.coordinates.lat}, ${locationData.coordinates.lng}`;
+    form.setValue("coordinate", coordinateString);
+
+    // Optionally update the address field with the place name if it's empty
+    // if (locationData.placeName && !form.getValues("address")) {
+    //   form.setValue("address", locationData.placeName);
+    // }
+    form.setValue("address", locationData.placeName);
+  };
+
+  const openMapDialog = () => {
+    setMapDialogOpen(true);
+  };
+
+  const handleDropdownSearchChange = (dropdownKey: string, searchTerm: string) => {
+    const config = dropdownConfigs[dropdownKey];
+
+    if (!config) return;
+
+    form.setValue(config.formDisplayField, searchTerm);
+
+    if (searchTerm == "") {
+      form.setValue(config.formValueField, ""); //Empty uuid field if search term == empty
+    }
+
+    if (!dropdownState.originalData || dropdownState.currentDropdown !== dropdownKey) {
+      fetchDropdownData1(dropdownKey);
+      return;
+    }
+
+    const filtered = dropdownState.originalData.filter((row: any) =>
+      row[config.displayField]?.toString().toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+    setDropdownState((prev) => ({
+      ...prev,
+      data: filtered,
+      showTable: true,
+      currentDropdown: dropdownKey,
+    }));
+  };
+
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">General Details</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form>
+            {/* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+              <FormField
+                control={form.control}
+                name="customerCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Customer Code:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7.5 pr-7"
+                        {...field}
+                        moduleName="customer"
+                        fieldName="customerCode"
+                        columnName="Customer Code"
+                        onBlur={() => {
+                          if (field.value && field.value.trim()) {
+                            verifyField("customerCode", field.value);
+                          }
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="customerName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>
+                      Customer: <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7.5 pr-7"
+                        {...field}
+                        moduleName="customer"
+                        fieldName="customerName"
+                        columnName="Customer Name"
+                        onBlur={() => {
+                          if (field.value && field.value.trim()) {
+                            verifyField("customerName", field.value);
+                          }
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="BRN"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>BRN (New):</FormLabel>
+                    <FormControl>
+                      <div className="relative h-7.5">
+                        <Input
+                          className="h-7.5 pr-7"
+                          {...field}
+                          onBlur={() => {
+                            if (field.value && field.value.trim()) {
+                              verifyField("BRN", field.value);
+                            }
+                          }}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="BRNOld"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>BRN (Old):</FormLabel>
+                    <FormControl>
+                      <div className="relative h-7.5">
+                        <Input
+                          className="h-7.5 pr-7"
+                          {...field}
+                          onBlur={() => {
+                            if (field.value && field.value.trim()) {
+                              verifyField("BRNOld", field.value);
+                            }
+                          }}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="TIN"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>TIN:</FormLabel>
+                    <FormControl>
+                      <div className="relative h-7.5">
+                        <Input
+                          className="h-7.5 pr-7"
+                          {...field}
+                          onBlur={() => {
+                            if (field.value && field.value.trim()) {
+                              verifyField("TIN", field.value);
+                            }
+                          }}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="SSTNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>SST No:</FormLabel>
+                    <FormControl>
+                      <div className="relative h-7.5">
+                        <Input
+                          className="h-7.5 pr-7"
+                          {...field}
+                          onBlur={() => {
+                            if (field.value && field.value.trim()) {
+                              verifyField("SSTNo", field.value);
+                            }
+                          }}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="mt-4 grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+
+              <FormField
+                control={form.control}
+                name="TTXNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>TTX No.:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="customerGroup"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="customerGroupName"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Customer Group:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative h-7.5">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          // readOnly
+                          onChange={(e) =>
+                            handleDropdownSearchChange("customerGroup", e.target.value)
+                          }
+                          onClick={() => fetchDropdownData1("customerGroup")}
+                          ref={
+                            dropdownState.currentDropdown === "customerGroup"
+                              ? dropdownInputRef
+                              : null
+                          }
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable &&
+                          dropdownState.currentDropdown === "customerGroup" && (
+                            <div
+                              ref={dropdownTableRef}
+                              className="absolute  top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownConfigs.customerGroup.columns}
+                                  data={dropdownState.data}
+                                  onClickRow={onClickRow}
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="customerCategory"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="customerCategoryName"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Customer Category:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative h-7.5">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          // readOnly
+                          onChange={(e) =>
+                            handleDropdownSearchChange("customerCategory", e.target.value)
+                          }
+                          onClick={() => fetchDropdownData1("customerCategory")}
+                          ref={
+                            dropdownState.currentDropdown === "customerCategory"
+                              ? dropdownInputRef
+                              : null
+                          }
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable &&
+                          dropdownState.currentDropdown === "customerCategory" && (
+                            <div
+                              ref={dropdownTableRef}
+                              className="absolute  top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownConfigs.customerCategory.columns}
+                                  data={dropdownState.data}
+                                  onClickRow={onClickRow}
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="agent"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>Sales Agent UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="salesAgent"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1 md:col-span-1">
+                    <FormLabel>Sales Agent:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative h-7.5">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onChange={(e) => handleDropdownSearchChange("salesAgent", e.target.value)}
+                          onClick={() => fetchDropdownData1("salesAgent")}
+                          ref={
+                            dropdownState.currentDropdown === "salesAgent" ? dropdownInputRef : null
+                          }
+                          autoComplete="off"
+                          // readOnly={true}
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable &&
+                          dropdownState.currentDropdown === "salesAgent" && (
+                            <div
+                              ref={dropdownTableRef}
+                              className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownConfigs.salesAgent.columns}
+                                  data={dropdownState.data}
+                                  onClickRow={onClickRow}
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="businessNature"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Business Nature:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="MISC"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="MISCCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>MSIC Code:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative h-7.5">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onChange={(e) => handleDropdownSearchChange("MISC", e.target.value)}
+                          onClick={() => fetchDropdownData1("MISC")}
+                          ref={dropdownState.currentDropdown === "MISC" ? dropdownInputRef : null}
+                          autoComplete="off"
+                          // readOnly={true}
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable && dropdownState.currentDropdown === "MISC" && (
+                          <div
+                            ref={dropdownTableRef}
+                            className="absolute right-0 top-full z-50 h-[200px] min-w-[512px] rounded border border-gray-200 bg-white shadow-md"
+                          >
+                            <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownConfigs.MISC.columns}
+                                data={dropdownState.data}
+                                onClickRow={onClickRowMSICCode}
+                              />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="mt-4 grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+              <div className="col-span-1 md:col-span-4">
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem className="grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Address:</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          className="h-24"
+                          {...field}
+                          moduleName="customer"
+                          fieldName="address"
+                          columnName="Address"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="col-span-1 grid grid-cols-1 gap-x-8 gap-y-4 md:col-span-2 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem className="grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Email:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          moduleName="customer"
+                          fieldName="email"
+                          columnName="Email"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="phoneNo"
+                  render={({ field }) => (
+                    <FormItem className="grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Phone No:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="coordinate"
+                  render={({ field }) => (
+                    <FormItem className="grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Coordinates:</FormLabel>
+                      <FormControl>
+                        <div className="relative h-7.5">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                            onChange={(e) => {
+                              field.onChange(e);
+                              setMapKey((prev) => prev + 1);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={openMapDialog}
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 hover:text-erp-blue-14"
+                          >
+                            <FaLocationDot className="text-gray-400 hover:text-erp-blue-14" />
+                          </button>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="GLCode"
+                  render={({ field }) => (
+                    <FormItem className="grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>GL Code:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="mt-4 grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-12">
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1 md:col-span-12">
+                    <FormLabel>Description:</FormLabel>
+                    <FormControl>
+                      <Textarea className="h-7" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="mt-4 grid grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+              <FormField
+                control={form.control}
+                name="account"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="company"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+
+      {/* Google Map Dialog */}
+      <Dialog open={mapDialogOpen} onOpenChange={setMapDialogOpen}>
+        <DialogContent className="bg-erp-blue-3 p-2">
+          <div className="rounded bg-white p-2">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold">Select Location</h2>
+              <button
+                type="button"
+                onClick={() => setMapDialogOpen(false)}
+                className="text-blue-300 hover:text-blue-400"
+              >
+                <FaCircleXmark size={30} />
+              </button>
+            </div>
+            <div className="flex justify-center">
+              <Map
+                key={mapKey}
+                onLocationSelect={handleMapLocationSelect}
+                initialCoordinates={form.watch("coordinate")}
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}

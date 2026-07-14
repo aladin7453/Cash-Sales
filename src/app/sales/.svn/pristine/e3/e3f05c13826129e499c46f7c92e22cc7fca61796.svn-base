@@ -1,0 +1,100 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+export type CashInCashOut = {
+  UUID: string;
+  counterNo: string;
+  action: string;
+  amount: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  valid: string;
+  createdByUsername: string;
+  updatedByUsername: string;
+  createdAtFormat: string;
+  updatedAtFormat: string;
+  preferenceData?: any;
+};
+
+// Preference (Format Number Function)
+const formatNumber = (value: string | number, decimalPlaces: number = 2): string => {
+  if (value === null || value === undefined || value === '') {
+    return (0).toFixed(decimalPlaces);
+  }
+  
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  
+  if (isNaN(numValue)) {
+    return (0).toFixed(decimalPlaces);
+  }
+  
+  return numValue.toFixed(decimalPlaces);
+};
+
+export const columns: ColumnDef<CashInCashOut>[] = [
+  {
+    id: "counterNo",
+    accessorKey: "counterNo",
+    header: "Counter No",
+    filterFn: "includesString",
+  },
+  {
+    id: "action",
+    accessorKey: "action",
+    header: "Action",
+    filterFn: "includesString",
+  },
+  {
+    id: "amount",
+    accessorKey: "amount",
+    header: "Amount",
+    cell: ({ row }) => {
+      const amount = row.getValue("amount");
+
+      return formatNumber(amount);
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+    filterFn: "includesString",
+  },
+  {
+    id: "createdByUsername",
+    accessorKey: "createdByUsername",
+    header: "Created by",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedByUsername",
+    accessorKey: "updatedByUsername",
+    header: "Updated by",
+    filterFn: "includesString",
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as CashInCashOut["valid"];
+      
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    filterFn: filterWithStringConversion,
+  },
+];

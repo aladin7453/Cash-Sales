@@ -1,0 +1,219 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { FaMinus, FaPlus } from "react-icons/fa6";
+import type { Table } from "@tanstack/react-table";
+
+import { notFound, useSearchParams } from "next/navigation";
+
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+
+import { useToast } from "@/components/ui/use-toast";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import Validity from "@/components/data-table/Validity";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import ConfirmationDialog from './ConfirmationDialog';
+
+// Mobile View (Imports)
+import MobileFormTableActionGroupStart from "@/components/form/MobileFormTableActionGroupStart";
+import MobileFormTableActionGroupEnd from "@/components/form/MobileFormTableActionGroupEnd";
+
+type Props<TData> = {
+  table: Table<TData>;
+  onAdd?: () => void;
+  setTempRowCustomerContraDetailsListData: (data, overwrite) => void;
+  tempRowCustomerContraDetailsList: [];
+  revalidateCustomerContraDetails: any;
+  slug: string;
+};
+
+export default function CustomerContraDetailsDataTableToolbar<TData>({
+  table,
+  onAdd,
+  setTempRowCustomerContraDetailsListData,
+  tempRowCustomerContraDetailsList,
+  revalidateCustomerContraDetails,
+  slug,
+}: Props<TData>) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const headers = getAuthHeaders();
+
+  const { toast } = useToast();
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<any[]>([]);
+
+  const handleDeleteConfirmation = async () => {
+    var form_data = new FormData();
+
+    const selectedRows = table.getSelectedRowModel().rows;
+
+    selectedRows.forEach((row, index) => {
+      form_data.append(`UUIDs[${index}]`, row.original.UUID);
+    });
+
+    selectedRows.forEach((row, index) => {
+      form_data.append(`outstandingAmount[${index}]`, row.original.outstanding);
+    });
+
+    // if (id && slug !== "clone") {
+    //   try {
+    //     const response = await fetch(`${ORIGIN}/sales_purchase_contra/api/sales-purchase-contra/remove-sales-purchase-contra-has-details`, {
+    //       method: 'POST',
+    //       headers,
+    //       body: form_data,
+    //     });
+
+    //     if (!response.ok) {
+    //       const errorData = await response.json();
+
+    //       if (response.status === 403) {
+    //         toast({
+    //           title: errorData.message,
+    //           duration: 2000
+    //         });
+    //       }
+
+    //       throw new Error('Failed to fetch data');
+    //     }
+    //     const responseData = await response.json();
+
+    //     toast({
+    //       title: "Success",
+    //       description: "Customer contra details removed successfully.",
+    //       duration: 2000
+    //     });
+
+    //   } catch (error) {
+    //     console.error('Error deleting customer contra details:', error);
+    //     toast({
+    //       title: "Failed",
+    //       description: "An error occurred while removing the details.",
+    //       variant: "destructive",
+    //       duration: 3000
+    //     });
+    //   }
+
+    //   revalidateCustomerContraDetails();
+
+    //   setShowConfirmationDialog(false);
+    // } else {
+    const deletedIndex = selectedRows.map(item => {
+      return item.index
+    });
+
+    const remainRows = tempRowCustomerContraDetailsList.filter((item, index) => !deletedIndex.includes(index));
+
+    setTempRowCustomerContraDetailsListData(remainRows, true);
+    toast({
+      title: "Success",
+      description: "Selected items removed successfully.",
+      duration: 2000
+    });
+    setShowConfirmationDialog(false);
+    // }
+  };
+
+  //Update total selected rows
+  useEffect(() => {
+    const selected = table.getSelectedRowModel().rows;
+    setSelectedRow(selected);
+  }, [table.getState().rowSelection, table.getRowModel().rows.length]);
+
+  return (
+    <>
+      <div className="flex items-center justify-between rounded-t-md">
+        {/* Mobile View (Start Action Buttons) */}
+        <MobileFormTableActionGroupStart
+          table={table}
+          config={{
+            core: {
+              add: {
+                handler: () => onAdd?.(),
+                tooltip: "Add customer contra details"
+              },
+              remove: {
+                handler: () => setShowConfirmationDialog(true)
+              },
+            },
+          }}
+        />
+
+        {/* Web View (Start Action Buttons) */}
+        <div className="hidden md:flex items-center gap-x-1 pl-2 text-erp-blue-14">
+          <div className="flex flex-col items-center">
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    className="size-8"
+                    variant="ghost"
+                    size="icon"
+                    onClick={onAdd}
+                  >
+                    <FaPlus className="size-5.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Add customer contra details
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <span className="text-[11px]/none font-medium text-black">Add</span>
+          </div>
+
+          <div className="flex flex-col items-center">
+            <Button
+              className="size-8"
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowConfirmationDialog(true)}
+            >
+              <FaMinus className="size-5.5" />
+            </Button>
+            <span className="text-[11px]/none font-medium text-black">Remove</span>
+          </div>
+        </div>
+
+        {/* Mobile View (Hide Pagination) */}
+        <div className="hidden md:block">
+          <Pagination table={table} />
+        </div>
+
+        {/* Mobile View (End Action Buttons) */}
+        <MobileFormTableActionGroupEnd
+          table={table}
+          config={{
+            search: {
+              column: "docNo",
+              placeholder: "Search Doc. No"
+            },
+            sort: {
+              column: "docNo"
+            }
+          }}
+        >
+          <Export table={table} />
+          <Validity table={table} />
+
+          {/* Mobile View (Hide Refresh and Column Visibility Toggle) */}
+          <div className="hidden md:flex items-center gap-x-3">
+            <Refresh refreshTable={() => revalidateCustomerContraDetails()} />
+            <ColumnVisibilityToggle table={table} />
+          </div>
+        </MobileFormTableActionGroupEnd>
+      </div>
+
+      <ConfirmationDialog
+        open={showConfirmationDialog}
+        setOpen={setShowConfirmationDialog}
+        onConfirm={handleDeleteConfirmation}
+        selectedRows={selectedRow}
+      />
+    </>
+  );
+}

@@ -1,0 +1,830 @@
+"use client";
+
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useRouter } from "next/navigation";
+import React, { memo, useCallback, useEffect, useState } from "react";
+
+//Icon
+import { IoEllipsisHorizontalSharp } from "react-icons/io5";
+import { MdOutlineSupportAgent } from "react-icons/md";
+import { FaRegFile } from "react-icons/fa";
+import { FiBox, FiClock, FiUser } from "react-icons/fi";
+
+// Server-Side Filtering (Imports)
+import useSWR from "swr";
+
+//Button
+import CloneButton from "@/components/data-table/ActionButton/Clone";
+import DeleteButton from "@/components/data-table/ActionButton/Delete";
+import EditButton from "@/components/data-table/ActionButton/Edit";
+import GetEInvoiceButton from "@/components/data-table/ActionButton/GetEinvoice";
+import PreviewButton from "@/components/data-table/ActionButton/Preview";
+import SubmitEInvoiceButton from "@/components/data-table/ActionButton/SubmitEInvoice";
+import TrashButton from "@/components/data-table/ActionButton/Trash";
+import DataLoadingStatusBadge from "@/components/data-table/badge/DataLoadingStatusBadge";
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import RestoreButton from "@/components/data-table/ActionButton/Restore";
+import { TransferToButton } from "@/components/features/transfer/transferTo";
+
+// Mobile View
+import MobileDataTable from "@/components/data-table/MobileDataTableV2";
+import MobilePaginationControl from "@/components/data-table/MobilePaginationControl";
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import TableHeadStatusFilter from "@/components/data-table/TableHeadStatusFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import LoadingUI from "@/components/LoadingUI";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  DATA_TABLE_DEFAULT_COLUMN_SIZING,
+  DEFAULT_DATA_TABLE_PAGE_SIZE,
+  getAuthHeaders,
+  getCurrentAccount,
+  getCurrentCompanyUUID,
+  ORIGIN,
+  removeAuthData,
+} from "@/lib/constants";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { cn } from "@/lib/utils/cn";
+import getExcludedColumns from "@/lib/utils/data-table/getExcludedColumns";
+import handleDndDragEnd from "@/lib/utils/data-table/handleDndDragEnd";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { columns } from "./columns";
+import DataTableToolbar from "./DataTableToolbar";
+import { salesInvoiceTransferToConfig } from "./transfer/transferTo/config";
+
+import type {
+  ColumnDef,
+  ColumnFiltersState,
+  ColumnOrderState,
+  ColumnSizingState,
+  PaginationState,
+  Row,
+  SortingState,
+  Table as TableType,
+  VisibilityState,
+} from "@tanstack/react-table";
+import type { MouseEvent } from "react";
+
+import type { SalesInvoice } from "./columns";
+
+// Server-Side Filtering (Define Data Structure)
+type SalesInvoiceData = {
+  total: string;
+  rows: SalesInvoice[];
+};
+
+type DataTableProps = {
+  columns?: ColumnDef<SalesInvoice>[];
+  data?: SalesInvoice[];
+  refreshTable?: any;
+  message?: string;
+  salesInvoiceDetails?: any;
+  isError?: boolean;
+  isLoading?: boolean;
+  viewEInvoiceDetails?: any;
+};
+
+const COLUMN_FILTERS_KEY = "sales-invoice.bs.table.filters";
+const COLUMN_ORDERING_KEY = "sales-invoice.bs.table.ordering";
+const COLUMN_SIZING_KEY = "sales-invoice.bs.table.sizing";
+const COLUMN_VISIBILITY_KEY = "sales-invoice.bs.table.columns";
+const PAGINATION_KEY = "sales-invoice.bs.table.pagination";
+const SORTING_KEY = "sales-invoice.bs.table.sorting";
+
+export default function SalesInvoiceDataTable({ }: DataTableProps) {
+  // Server-Side Filtering (Declare)
+  const router = useRouter();
+  const { toast } = useToast();
+
+  // Server-Side Filtering (State)
+  const [tableData, setTableData] = useState<SalesInvoice[]>([]);
+  const [forbiddenMessage, setForbiddenMessage] = useState<string | null>(null);
+  const [totalNumOfRows, setTotalNumOfRows] = useState<number>(0);
+
+  // Preference (State)
+  const [preferenceData, setPreferenceData] = useState<any>(null);
+
+  const [columnFilters, setColumnFilters] = useLocalStorage<ColumnFiltersState>(
+    COLUMN_FILTERS_KEY,
+    [],
+  );
+  const initialColumnOrder = columns.map((column) => column.id!);
+  const [columnOrder, setColumnOrder] = useLocalStorage<ColumnOrderState>(
+    COLUMN_ORDERING_KEY,
+    initialColumnOrder,
+  );
+  const [columnSizing, setColumnSizing] = useLocalStorage<ColumnSizingState>(COLUMN_SIZING_KEY, {});
+  const defaultColumns: Array<keyof SalesInvoice> = [
+    "docNo",
+    "docDateFormat",
+    "customerName",
+    "netTotal",
+    "currencyCode",
+  ];
+  const defaultColumnVisibility: VisibilityState = getExcludedColumns(columns, defaultColumns);
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    COLUMN_VISIBILITY_KEY,
+    defaultColumnVisibility,
+  );
+  const [pagination, setPagination] = useLocalStorage<PaginationState>(PAGINATION_KEY, {
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+  });
+
+  const [sorting, setSorting] = useLocalStorage<SortingState>(SORTING_KEY, []);
+
+  // Server-Side Filtering (Get Current Account and Company)
+  const currentAccount = getCurrentAccount();
+  const currentCompanyUUID = getCurrentCompanyUUID();
+
+  let apiUrl = `${ORIGIN}/sales_invoice/api/sales-invoice/get-index-sales-invoice`;
+
+  if (currentAccount && currentCompanyUUID) {
+    apiUrl += `?byCom=${currentCompanyUUID}&byAcc=${currentAccount}`;
+  }
+
+  const fetcher = async (url) => {
+    const headers = getAuthHeaders();
+
+    return fetch(url, { headers }).then((res) => {
+      if (!res.ok) {
+        throw new Error("Failed to fetch data");
+      }
+
+      return res.json();
+    });
+  };
+
+  // const {
+  //   data: getPermissions,
+  //   error: getPermissionsError,
+  //   mutate: mutateGetPermissions,
+  // } = useSWR(
+  //   `${ORIGIN}/sales_invoice/api/sales-invoice/get-permissions`,
+  //   fetcher,
+  //   { revalidateOnFocus: false }
+  // );
+
+  // const viewEInvoiceDetails = Array.isArray(getPermissions?.data)
+  //   ? getPermissions.data.includes("view-sales-invoice-e-invoice-details")
+  //   : false;
+
+  // Preference (Fetch Function)
+  // const fetchPreferenceData = async () => {
+  //   try {
+  //     const headers = getAuthHeaders();
+
+  //     const response = await fetch(`${ORIGIN}/universal/get-preference?module=sales`, {
+  //       method: "GET",
+  //       headers,
+  //     });
+
+  //     if (!response.ok) {
+  //       throw new Error('Failed to fetch preference data');
+  //     }
+
+  //     const data = await response.json();
+  //     setPreferenceData(data);
+  //   } catch (error) {
+  //     console.error('Error fetching preference data:', error);
+  //   }
+  // };
+
+  useEffect(() => {
+    // fetchPreferenceData();
+  }, []);
+
+  // Server-Side Filtering (Data Fetching)
+  const {
+    data: salesInvoiceIndexData,
+    error,
+    isLoading,
+    isValidating,
+    mutate: mutateTableData,
+  } = useSWR<SalesInvoiceData, Error>(
+    [apiUrl, columnFilters, pagination, sorting],
+    async ([url]) => {
+      const columnFiltersWithoutValid = columnFilters.filter((filter) => filter.id !== "valid");
+
+      const params = new FormData();
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append("param[offset]", `${pagination.pageIndex * pagination.pageSize}`);
+      params.append(
+        "param[filter]",
+        columnFiltersWithoutValid.length > 0
+          ? JSON.stringify(
+            columnFiltersWithoutValid.reduce<Record<string, unknown>>((acc, curr) => {
+              acc[curr.id] = curr.value;
+              return acc;
+            }, {}),
+          )
+          : "{}",
+      );
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc",
+      );
+      params.append(
+        "param[valid]",
+        columnFilters.length > 0
+          ? `${columnFilters.find((row) => row.id === "valid")?.value ?? ""}`
+          : "",
+      );
+      params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "createdAt");
+
+      const headers = getAuthHeaders();
+
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers,
+          body: params,
+        });
+
+        if (response.status === 401) {
+          throw new Error("Session expired");
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to fetch data");
+        }
+
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        throw error;
+      }
+    },
+    {
+      revalidateOnFocus: false,
+    },
+  );
+
+  // Server-Side Filtering: Update table data when API response changes
+  useEffect(() => {
+    if (salesInvoiceIndexData) {
+      // Preference (Add Data)
+      const dataWithPreferences = salesInvoiceIndexData.rows.map((row) => ({
+        ...row,
+        preferenceData: preferenceData,
+        note: stripHtml(row.note),
+      }));
+
+      setTableData(dataWithPreferences);
+      setTotalNumOfRows(+salesInvoiceIndexData.total);
+    }
+  }, [salesInvoiceIndexData]);
+
+  // Server-Side Filtering: Handle errors and session expiration
+  useEffect(() => {
+    if (error) {
+      if (error.message === "Session expired") {
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "Your session has expired. Redirecting to login page.",
+        });
+
+        removeAuthData();
+
+        setTimeout(() => {
+          mutateTableData(undefined, false);
+
+          router.push("/login");
+        }, 500);
+      } else {
+        setForbiddenMessage(error.message);
+      }
+    }
+  }, [error, router, toast]);
+
+  // Reset Ordering Function
+  const handleResetColumnOrdering = () => {
+    try {
+      localStorage.removeItem(COLUMN_ORDERING_KEY);
+    } catch {
+      // ignore storage errors
+    }
+    // Immediately apply default order to current state
+    setColumnOrder([...initialColumnOrder]);
+  };
+
+  // Server-Side Filtering (Table)
+  const table = useReactTable({
+    columns,
+    data: tableData,
+    state: {
+      columnFilters,
+      columnOrder,
+      columnSizing,
+      columnVisibility,
+      pagination,
+      sorting,
+    },
+    onColumnFiltersChange: setColumnFilters,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+    onColumnVisibilityChange: setColumnVisibility,
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    columnResizeMode: "onChange",
+    // defaultColumn: DATA_TABLE_DEFAULT_COLUMN_SIZING,
+    enableColumnResizing: true,
+    manualFiltering: true,
+    manualPagination: true,
+    manualSorting: true,
+    pageCount: totalNumOfRows ? Math.ceil(totalNumOfRows / pagination.pageSize) : -1,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  usePreventShiftTextSelect();
+
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
+  const [isLoadedSuccessfully, setIsLoadedSuccessfully] = useState<boolean>(false);
+
+  //Status Label
+  const getApprovalStatusStyle = (status: string) => {
+    switch (status) {
+      case "Approved":
+        return "bg-[#D0F3E2] text-[#307E59]";
+      case "Pending":
+        return "bg-[#FFF0D3] text-[#D7A946]";
+      case "Reject":
+        return "bg-[#FFB0AA] text-[#A61F1F]";
+      default:
+        return "bg-[#FFB0AA] text-[#A61F1F]";
+    }
+  };
+
+  //Word Limit Function
+  const truncateText = (text: string | null | undefined, maxLength: number) => {
+    if (!text) return "-";
+    return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+  };
+
+  // Server-Side Filtering (Loading State)
+  useEffect(() => {
+    if (isLoading || !salesInvoiceIndexData) {
+      setLoadingProgress(90);
+    } else {
+      setIsLoadedSuccessfully(true);
+    }
+  }, [isLoading, salesInvoiceIndexData]);
+
+  // Server-Side Filtering (Handle Validation State Changes)
+  useEffect(() => {
+    if (isValidating) {
+      setIsLoadedSuccessfully(false);
+      setLoadingProgress(95);
+    } else {
+      setIsLoadedSuccessfully(true);
+    }
+  }, [isValidating]);
+
+  const onDoubleClick = (row: Row<SalesInvoice>) => {
+    const url = `/sales/sales-invoice/edit?item=${row.original.docNo}&id=${row.original.UUID}`;
+
+    router.push(url);
+  };
+
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  const sensors = useDndSensors();
+
+  // Use custom hook to memoize and generate CSS variable mappings for header and column sizes
+  const columnSizeVars = useColumnSizeVars(table);
+
+  //Selection mode
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+
+  const exitSelectionMode = useCallback(() => {
+    table.resetRowSelection();
+    setIsSelectionMode(false);
+  }, [table]);
+
+  return (
+    <div className="flex h-full flex-col bg-erp-blue-5">
+      {/* Server-Side Filtering (Pass mutateTableData and totalNumOfRows) */}
+      <DataTableToolbar
+        table={table}
+        refreshTable={mutateTableData}
+        totalNumOfRows={totalNumOfRows}
+        defaultColumns={defaultColumnVisibility}
+        dataStatusBadgeDisplay={
+          (isLoadedSuccessfully && <DataLoadingStatusBadge variant="success" />) ||
+          (!!error && <DataLoadingStatusBadge variant="error" />)
+        }
+        onResetColumnOrdering={handleResetColumnOrdering}
+        isSelectionMode={isSelectionMode}
+        onExitSelectionMode={exitSelectionMode}
+      // viewEInvoiceDetails={viewEInvoiceDetails}
+      />
+      <Separator className="hidden bg-erp-blue-11 md:block" />
+      <ScrollArea className="h-[100cqh] pb-2.5 md:p-1.5 md:pb-0">
+        {/* Server-Side Filtering (Use forbiddenMessage Instead of Message Prop) */}
+        {forbiddenMessage ? (
+          <NoResultsTableRow columns={columns} message={forbiddenMessage} />
+        ) : (
+          <>
+            {/* Mobile View Data Table */}
+            <MobileDataTable
+              table={table}
+              isLoading={!isLoadedSuccessfully}
+              isSelectionMode={isSelectionMode}
+              onSelectionModeChange={setIsSelectionMode}
+              renderCard={(row, isSelectionMode) => (
+                <div className="w-full rounded-lg border bg-white p-3 shadow-sm">
+                  {/* Project name and icon */}
+                  <div className="flex items-center justify-between">
+                    <div className="w-[20%]">
+                      <p className="truncate text-[10px] text-[#857B7B]">
+                        {row.original.projectCode ?? "Unknown"}
+                      </p>
+                    </div>
+
+                    <DropdownMenu
+                      onOpenChange={(open) => {
+                        if (open) {
+                          if (!row.getIsSelected()) {
+                            table.resetRowSelection();
+                            row.toggleSelected(true);
+                          }
+                        }
+                      }}
+                    >
+                      {isSelectionMode ? (
+                        <div className="h-full w-[2rem] justify-center border-none p-1 outline-none md:hidden">
+                          <input
+                            type="checkbox"
+                            checked={row.getIsSelected()}
+                            className="h-3.5 w-3.5 accent-blue-500"
+                          />
+                        </div>
+                      ) : (
+                        <DropdownMenuTrigger
+                          className="h-full w-[2rem] justify-center border-none p-1 outline-none md:hidden"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <IoEllipsisHorizontalSharp className="size-4.5 text-[#969696]" />
+                        </DropdownMenuTrigger>
+                      )}
+
+                      {/* Edit Button */}
+                      <DropdownMenuContent className="w-[8.5rem] !bg-white [&_[role='menuitem']]:text-[clamp(11px,1.2vw,14px)]">
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          <EditButton
+                            table={table}
+                            destination={`/sales/sales-invoice/edit?item=${row.original.docNo}&id=${row.original.UUID}`}
+                            isMobile={true}
+                          />
+                        </DropdownMenuItem>
+
+                        <DropdownMenuSeparator />
+
+                        {/* Clone Button */}
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          <CloneButton
+                            table={table}
+                            destination={`/sales/sales-invoice/clone?id=${row.original.UUID}`}
+                            isMobile={true}
+                          />
+                        </DropdownMenuItem>
+
+                        <DropdownMenuSeparator />
+
+                        {/* Delete Button */}
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          <DeleteButton
+                            table={table}
+                            module={"sales_invoice"}
+                            model={"sales-invoice"}
+                            refreshTable={mutateTableData}
+                            isMobile={true}
+                          />
+                        </DropdownMenuItem>
+
+                        <DropdownMenuSeparator />
+
+                        {/* Preview Button */}
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          <PreviewButton
+                            table={table}
+                            previewType={"SALES INVOICE"}
+                            module={"sales_invoice"}
+                            model={"sales-invoice"}
+                            doc_id={row.original.UUID}
+                            refreshTable={mutateTableData}
+                            isMobile={true}
+                          />
+                        </DropdownMenuItem>
+
+                        <DropdownMenuSeparator />
+
+                        {/* Restore Button */}
+                        {row.original.valid == "0" && (
+                          <>
+                            {/* 0 = invalid, 1 = valid */}
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                              <RestoreButton
+                                table={table}
+                                module={"sales_invoice"}
+                                model={"sales-invoice"}
+                                refreshTable={mutateTableData}
+                                isMobile={true}
+                              />
+                            </DropdownMenuItem>
+                          </>
+                        )}
+
+                        {row.original.valid == "1" && (
+                          <>
+                            {/* Trash Button */}
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                              <TrashButton
+                                table={table}
+                                module={"sales_invoice"}
+                                model={"sales-invoice"}
+                                refreshTable={mutateTableData}
+                                isMobile={true}
+                              />
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
+
+                            {/* Transfer To Button */}
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                              <TransferToButton
+                                table={table}
+                                id={row.original.UUID}
+                                config={salesInvoiceTransferToConfig}
+                                isMobile={true}
+                              />
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
+
+                            {/* Submit EInvoice Button */}
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                              <SubmitEInvoiceButton
+                                table={table}
+                                module={"sales_invoice"}
+                                model={"sales-invoice"}
+                                isMobile={true}
+                              />
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
+
+                            {/* Get EInvoice Button */}
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                              <GetEInvoiceButton
+                                table={table}
+                                module={"sales_invoice"}
+                                model={"sales-invoice"}
+                                isMobile={true}
+                              />
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  {/* Doc number and approval status */}
+                  <div className="flex items-center justify-between">
+                    <div className="w-[45%]">
+                      <p className="truncate text-[15px] text-[#1E1E1E]">{row.original.docNo}</p>
+                    </div>
+                    {row.original.approvalStatus?.length > 0 && (
+                      <span
+                        className={cn(
+                          "flex min-w-[70px] items-center justify-center rounded-2xl py-1 text-[9px]",
+                          getApprovalStatusStyle(row.original.approvalStatus),
+                        )}
+                      >
+                        {row.original.approvalStatus}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Doc date, quantity, customer name */}
+                  <div className="mt-2 grid grid-cols-[auto_auto_1fr] items-center gap-x-3 pr-3">
+                    <div className="flex min-w-0 items-center gap-x-1">
+                      <FiClock className="shrink-0 text-[#969696]" />
+                      <p className="truncate text-[10px] text-[#857B7B]">
+                        {row.original.docDateFormat}
+                      </p>
+                    </div>
+
+                    <div className="flex min-w-0 items-center gap-x-1">
+                      <FiBox className="shrink-0 text-[#969696]" />
+                      <p className="truncate text-[10px] text-[#857B7B]">
+                        {row.original.totalQuantity ?? 0}
+                      </p>
+                    </div>
+
+                    <div className="flex min-w-0 items-center gap-x-1 overflow-hidden">
+                      <FiUser className="shrink-0 text-[#969696]" />
+                      <p className="truncate text-[10px] text-[#857B7B]">
+                        {truncateText(row.original.customerName, 20)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <hr className="mt-2"></hr>
+
+                  <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-x-3">
+                    {/* Left column */}
+                    <div className="flex min-w-0 flex-col gap-y-2 overflow-hidden">
+                      <div className="flex min-w-0 items-center gap-x-1">
+                        <MdOutlineSupportAgent className="shrink-0 text-[#969696]" />
+                        <p className="truncate text-[10px] text-[#857B7B]">
+                          {truncateText(row.original.salesAgentName, 20)}
+                        </p>
+                      </div>
+
+                      <div className="flex min-w-0 items-center gap-x-1">
+                        <MdOutlineSupportAgent className="shrink-0 text-[#969696]" />
+                        <p className="truncate text-[10px] text-[#857B7B] ">
+                          {truncateText(row.original.servicingAgentName, 20)}
+                        </p>
+                      </div>
+
+                      <div className="flex min-w-0 items-center gap-x-1">
+                        <FaRegFile className="shrink-0 text-[#969696]" />
+                        <p className="truncate text-[10px] text-[#857B7B]">
+                          {truncateText(row.original.description, 30)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Right column */}
+                    <div className="flex flex-col">
+                      <p className="text-[10px] text-[#857B7B]">Total Amount</p>
+                      <p className="break-normal text-[14px] font-medium text-[#1E1E1E]">
+                        {row.original.currencyCode} {row.original.totalSubtotal}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            />
+
+            {/* Web View (Data Table) */}
+            <div className="hidden md:block">
+              <DndContext
+                collisionDetection={closestCenter}
+                modifiers={[restrictToHorizontalAxis]}
+                onDragEnd={(event) => handleDndDragEnd(event, setColumnOrder)}
+                sensors={sensors}
+              >
+                <Table
+                  className="table-fixed border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1"
+                  style={{ ...columnSizeVars, width: table.getTotalSize() }}
+                >
+                  <TableHeader className="sticky top-0">
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id}>
+                        <SortableContext
+                          items={columnOrder}
+                          strategy={horizontalListSortingStrategy}
+                        >
+                          {headerGroup.headers.map((header) => (
+                            <DragableTableHead
+                              key={header.id}
+                              header={header}
+                              className="bg-erp-blue-11 font-normal"
+                              style={{
+                                width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                              }}
+                            >
+                              {header.column.id === "status" ? (
+                                <TableHeadStatusFilter table={table} />
+                              ) : header.column.id === "valid" ? (
+                                <TableHeadValidityFilter table={table} />
+                              ) : (
+                                <TableHeadColumnTextFilter column={header.column} table={table} />
+                              )}
+                              <ColumnResizer header={header} />
+                            </DragableTableHead>
+                          ))}
+                        </SortableContext>
+                      </TableRow>
+                    ))}
+                  </TableHeader>
+                  {/* When resizing any column in the table, render the memoized version of the table body */}
+                  {table.getState().columnSizingInfo.isResizingColumn ? (
+                    <MemoizedTableBody table={table} onRowSelection={onRowSelection} />
+                  ) : (
+                    <NonMemoizedTableBody table={table} onRowSelection={onRowSelection} />
+                  )}
+                </Table>
+              </DndContext>
+            </div>
+          </>
+        )}
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
+      {!isLoadedSuccessfully && <LoadingUI progressValue={loadingProgress} isMobile={true} />}
+
+      {/* Mobile Pagination */}
+      <div
+        className={
+          isSelectionMode
+            ? "hidden"
+            : "border-t-1 sticky bottom-0 z-30 w-full bg-white py-2.5 md:hidden"
+        }
+      >
+        <MobilePaginationControl table={table} />
+      </div>
+    </div>
+  );
+}
+
+type TableBodyProps = {
+  table: TableType<SalesInvoice>;
+  onRowSelection: (row: Row<SalesInvoice>) => (event: MouseEvent<HTMLTableRowElement>) => void;
+};
+
+function NonMemoizedTableBody({ table, onRowSelection }: TableBodyProps) {
+  return (
+    <TableBody>
+      {table.getRowModel().rows?.length ? (
+        table.getRowModel().rows.map((row) => {
+          return (
+            <TableRow
+              className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+              data-state={row.getIsSelected() && "selected"}
+              onClick={onRowSelection(row)}
+              key={row.id}
+            >
+              {row.getVisibleCells().map((cell) => (
+                <TableCell
+                  key={cell.id}
+                  className="truncate"
+                  title={(cell.getValue() ?? "").toString()}
+                  style={{
+                    width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                    minWidth: cell.column.columnDef.minSize,
+                  }}
+                >
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
+          );
+        })
+      ) : (
+        <NoResultsTableRow columns={table.getVisibleLeafColumns()} />
+      )}
+    </TableBody>
+  );
+}
+
+const MemoizedTableBody = memo(
+  NonMemoizedTableBody,
+  (prev, next) => prev.table.options.data === next.table.options.data,
+) as typeof NonMemoizedTableBody;
+
+// HTML Utility Function
+function stripHtml(html: string | null | undefined): string {
+  if (!html) return "";
+  // Replace <br> and <br/> with newlines
+  let text = html.replace(/<br\s*\/?>/gi, "\n");
+  // Replace <p> with nothing, </p> with newline
+  text = text.replace(/<p[^>]*>/gi, "").replace(/<\/p>/gi, "\n");
+  // Remove all other HTML tags
+  text = text.replace(/<[^>]+>/g, "");
+  // Replace HTML entities
+  text = text.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
+
+  return text;
+}

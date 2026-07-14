@@ -1,0 +1,139 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardTitle,
+  CardHeader
+} from "@/components/ui/card";
+
+type UserRole = 'admin' | 'manager' | 'user';
+
+const currentUserRole: UserRole = 'manager'; 
+const currentLocation = 'Location 02'; 
+
+const locationData = [
+  {
+    name: 'Location 01',
+    subLocations: [
+      { name: 'Location 01-01', subLocations: [] },
+      { name: 'Location 01-02', subLocations: [] },
+    ],
+  },
+  {
+    name: 'Location 02',
+    subLocations: [
+      {
+        name: 'Location 02-01',
+        subLocations: [],
+      },
+      {
+        name: 'Location 02-02',
+        subLocations: [
+          { name: 'Location 02-02-01', subLocations: [] },
+        ],
+      },
+    ],
+  },
+];
+
+const canAccessDepartment = (selectedLocations: { [key: string]: boolean }, departmentLocation: string) => {
+  return selectedLocations[departmentLocation] || false; 
+};
+
+function NestedCheckbox({ location, checked, onChange, isDisabled }) {
+  const [isChecked, setIsChecked] = useState(checked);
+
+  const handleChange = (e) => {
+    setIsChecked(e.target.checked);
+    onChange(e.target.checked);
+  };
+
+  return (
+    <div className="pl-4">
+      <label className="inline-flex items-center space-x-2">
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          checked={isChecked}
+          onChange={handleChange}
+          disabled={isDisabled} 
+        />
+        <span>{location.name}</span>
+      </label>
+      {location.subLocations.length > 0 && (
+        <div className="pl-4">
+          {location.subLocations.map((subLocation, idx) => (
+            <NestedCheckbox
+              key={idx}
+              location={subLocation}
+              checked={isChecked}
+              onChange={onChange}
+              isDisabled={isDisabled}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AuthorizedLocationForm() {
+  const [selectedLocations, setSelectedLocations] = useState<{ [key: string]: boolean }>({});
+  const [defaultAccessLocations, setDefaultAccessLocations] = useState<string[]>([]);
+
+  useEffect(() => {
+    const defaultAccess = locationData.reduce((acc, location) => {
+      if (location.name === currentLocation || location.name === 'Location 01') {
+        acc[location.name] = true;
+      }
+      return acc;
+    }, {} as { [key: string]: boolean });
+
+    setSelectedLocations(defaultAccess);
+    setDefaultAccessLocations(Object.keys(defaultAccess));
+  }, []);
+
+  const handleCheckboxChange = (checked: boolean, location: string) => {
+    setSelectedLocations((prev) => ({
+      ...prev,
+      [location]: checked,
+    }));
+  };
+
+  const canModifySubLocations = 
+    currentUserRole === 'admin' || 
+    currentUserRole === 'manager';
+
+  const canAccess = canAccessDepartment(selectedLocations, 'Department_Location');
+
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Location</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form>
+          <div className="overflow-auto max-h-96">
+            <div className="space-y-2">
+              {locationData.map((location, index) => (
+                <NestedCheckbox
+                  key={index}
+                  location={location}
+                  checked={selectedLocations[location.name] || false}
+                  onChange={(checked) =>
+                    handleCheckboxChange(checked, location.name)
+                  }
+                  isDisabled={
+                    !canModifySubLocations &&
+                    defaultAccessLocations.includes(location.name)
+                  } 
+                />
+              ))}
+            </div>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}

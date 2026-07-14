@@ -1,0 +1,177 @@
+"use client";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type ServiceList = {
+  UUID: string;
+  quotation: string;
+  item: string;
+  type: number;
+  description: string;
+  "2ndDescription": string;
+  moreDescription: string;
+  itemGroup: string;
+  itemCategory: string;
+  tariff: string;
+  classification: string;
+  permitNo: string;
+  project: string;
+  quantity: number;
+  UOM: string;
+  price: number;
+  discountRate: number;
+  discountAmount: number;
+  tax: string;
+  deliveryDate: string;
+  billingFrequency: number;
+  billingInterval: string;
+  startAt: string;
+  endAt: string;
+  remark1: string;
+  remark2: string;
+  serviceName: string;
+  serviceCode: string;
+  createdAt: string;
+  createdBy: string;
+  updatedBy: string;
+  updatedAt: string;
+  valid: string;
+};
+
+export const ServiceColumns: ColumnDef<ServiceList>[] = [
+  {
+    accessorKey: "serviceGroupCodeCode",
+    header: "Service Group Code",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "serviceCategoryCodeCode",
+    header: "Service Category Code",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "serviceCodeCode",
+    header: "Service Code",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "serviceName",
+    header: "Service Name",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} columnName="description" />,
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "2ndDescription",
+    header: "2nd Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} columnName="2ndDescription" />,
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "moreDescription",
+    header: "More Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} columnName="moreDescription" />,
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "classificationCodeCode",
+    header: "Classification",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "masterServiceCode",
+    header: "Master Service Code",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "UOM",
+    header: "UOM",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "quantity",
+    header: "Quantity",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "minQuantity",
+    header: "Min. Quantity",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "maxQuantity",
+    header: "Max. Quantity",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "refCost",
+    header: "Ref. Cost",
+    cell: ({ row }) => <p className="text-right">{row.original.refCost}</p>,
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "refPrice",
+    header: "Ref. Price",
+    cell: ({ row }) => <p className="text-right">{row.original.refPrice}</p>,
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "minCost",
+    header: "Min. Cost",
+    cell: ({ row }) => <p className="text-right">{row.original.minCost}</p>,
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "maxCost",
+    header: "Max. Cost",
+    cell: ({ row }) => <p className="text-right">{row.original.maxCost}</p>,
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "minPrice",
+    header: "Min. Price",
+    cell: ({ row }) => <p className="text-right">{row.original.minPrice}</p>,
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "maxPrice",
+    header: "Max. Price",
+    cell: ({ row }) => <p className="text-right">{row.original.maxPrice}</p>,
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "billingFrequency",
+    header: "billingFrequency",
+    cell: ({ row }) => <p className="text-right">{row.original.billingFrequency}</p>,
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "billingInterval",
+    header: "billingInterval",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "subtotal",
+    header: "Subtotal",
+    cell: ({ row }) => <p className="text-right">{row.original.subtotal}</p>,
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as ServiceList["valid"];
+      return validity ? "Valid" : "Invalid";
+    },
+    // Custom filter function that first convert the row's numeric boolean
+    // value to string, then check if the string contains the filterValue
+    filterFn: filterWithStringConversion,
+  },
+];

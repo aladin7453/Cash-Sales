@@ -1,0 +1,13 @@
+"use client";
+
+import React from "react";
+
+import CashSalesDataTable from "./DataTable";
+
+export default function CashSalesPage() {
+  return (
+    <div className="h-full">
+      <CashSalesDataTable/>
+    </div>
+  );
+}

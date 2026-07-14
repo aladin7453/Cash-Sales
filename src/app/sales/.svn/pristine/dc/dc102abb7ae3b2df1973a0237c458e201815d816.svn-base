@@ -1,0 +1,13 @@
+"use client";
+
+import React, { useState, useEffect} from "react";
+
+import SalesDebitNoteDataTable from "./DataTable";
+
+export default function SalesDebitNotePage() {
+  return (
+    <div className="h-full">
+        <SalesDebitNoteDataTable/>
+    </div>
+  )
+}

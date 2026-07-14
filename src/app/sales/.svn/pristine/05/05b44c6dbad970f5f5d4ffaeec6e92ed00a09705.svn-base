@@ -1,0 +1,448 @@
+"use client";
+
+import React, { useState } from "react";
+import { useForm } from "react-hook-form";
+import { MdClose } from "react-icons/md";
+import { FaMagnifyingGlassPlus, FaDownload } from "react-icons/fa6";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { useSearchParams, useRouter } from "next/navigation";
+
+import GoogleMap from "./interactiveMap";
+
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+import type { DeliveryOrder } from "../../columns";
+
+type Params = {
+  deliveryOrder?: DeliveryOrder | null;
+  setDeliveryOrder:(data: any) => void;
+  tempRowDeliveryLink:any;
+  actualDeliveryAttachment: any;
+  form: any
+  row?: any;
+};
+
+const PODFormSchema = z.object({
+  UUID: z.union([z.string(), z.literal('')]),
+  actualDeliveryAddress: z.union([z.string(), z.literal('')]),
+  actualDeliveryCoordinates: z.union([z.string(), z.literal('')]),
+  actualDeliveryAtFormat: z.union([z.string(), z.literal('')]),
+  actualDeliveryNIRC: z.union([z.string(), z.literal('')]),
+  actualDeliveryRecipient: z.union([z.string(), z.literal('')]),
+  actualDeliveryRemark: z.union([z.string(), z.literal('')]),
+  actualDeliverySignatureLink: z.union([z.string(), z.literal('')]),
+  actualDeliveryAttachmentLink: z.union([z.string(), z.literal('')]),
+  actualDeliverySubmitedAtFormat: z.union([z.string(), z.literal('')]),
+  actualDeliverySubmitedByFullName: z.union([z.string(), z.literal('')]),
+});
+
+export default function DeliveryPointFormOld({ 
+  deliveryOrder, 
+  jobAssignmentData, 
+  tempRowDeliveryLink, 
+  actualDeliveryAttachment
+}: Params) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const router = useRouter();
+  const data:any = jobAssignmentData;
+  const [showDialog, setShowDialog] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedImages, setSelectedImages] = useState([]);
+  const [imageSrc, setImageSrc] = useState('');
+
+  const updateAddressFields = (location) => {
+    const { placeName, coordinates } = location;
+
+    form.setValue('actualDeliveryAddress', placeName);
+    form.setValue('actualDeliveryCoordinates', `${coordinates.lat}, ${coordinates.lng}`);
+  };
+
+  const handleImageClick = (image) => {
+    // Handle different types of image links
+    if (typeof image === 'string' && image.includes('/view')) {
+      // Google Drive link
+      const newLink = image.replace(/\/view.*$/, "/preview");
+      setImageSrc(newLink);
+      setSelectedImage(newLink);
+    } else if (typeof image === 'string' && !image.startsWith('blob:')) {
+      // Direct server URL or other link types
+      setImageSrc(image);
+      setSelectedImage(image);
+    } else {
+      // Blob URL for local files
+      setSelectedImage(image);
+      setImageSrc(image);
+    }
+    setShowDialog(true);
+  };
+
+  const handleFileUpload = (files) => {
+    const selectedFiles = Array.from(files);
+
+    setSelectedImages(prevImages => [
+      ...prevImages,
+      ...selectedFiles.map(file => URL.createObjectURL(file))
+    ]);
+  };
+  
+  const form = useForm<z.infer<typeof PODFormSchema>>({
+    resolver: zodResolver(PODFormSchema),
+    defaultValues: {
+      UUID: data?.UUID || "",
+      actualDeliveryAddress: data?.actualDeliveryAddress || "",
+      actualDeliveryCoordinates: data?.actualDeliveryCoordinates || "",
+      actualDeliveryAtFormat: data?.actualDeliveryAtFormat || "",
+      actualDeliveryNIRC: data?.actualDeliveryNIRC || "",
+      actualDeliveryRecipient: data?.actualDeliveryRecipient || "",
+      actualDeliveryRemark: data?.actualDeliveryRemark || "",
+      actualDeliverySignatureLink: data?.actualDeliverySignatureLink || "",
+      actualDeliveryAttachmentLink: data?.actualDeliveryAttachmentLink || "",
+      actualDeliverySubmitedAtFormat: data?.actualDeliverySubmitedAtFormat || "",
+      actualDeliverySubmitedByFullName: data?.actualDeliverySubmitedByFullName || "",
+
+    },
+  });
+
+  return (
+    <Form {...form}>
+      <div className="flex flex-col md:flex-row">
+        {/* Left Side - Delivery Details */}
+        <div className="mr-0 md:mr-2 flex-[3]">
+          {/* Outer Card with Blue Background */}
+          <Card className="bg-erp-blue-11 p-2 pt-5 pb-2 mb-2 rounded-lg">
+            <h2 className="font-bold text-white">Delivery Details</h2>
+            {/* Inner Card with White Background */}
+            <Card className="bg-white p-1 m-0 rounded-lg">
+              <CardTitle className="px-2 text-sm font-bold">
+                <h2 className="pl-8"></h2>
+              </CardTitle>
+              <CardContent className="p-1">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1 pl-1 pr-1">
+                    <GoogleMap 
+                      onLocationSelect={updateAddressFields} 
+                      initialCoordinates={data?.actualDeliveryCoordinates}
+                    />
+                  </div>
+                  <div className="w-full">
+                    <div className="grid grid-flow-row gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="actualDeliveryAddress"
+                          render={({ field }) => (
+                            <FormItem className="col-span-2 grid h-full space-y-1">
+                              <FormLabel>Address:</FormLabel>
+                              <FormControl>
+                                <Textarea className="h-7.5 bg-gray-100 text-gray-500" {...field} readOnly />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="actualDeliveryCoordinates"
+                          render={({ field }) => (
+                            <FormItem className="col-span-1 grid h-full space-y-1">
+                              <FormLabel>Coordinates:</FormLabel>
+                              <FormControl>
+                                <Input className="h-7.5 bg-gray-100 text-gray-500" {...field} readOnly />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="actualDeliveryAtFormat"
+                          render={({ field }) => (
+                            <FormItem className="col-span-1 grid h-full space-y-1">
+                              <FormLabel>Timestamp:</FormLabel>
+                              <FormControl>
+                                <Input className="h-7.5 bg-gray-100 text-gray-500" {...field} readOnly />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="actualDeliveryRemark"
+                          render={({ field }) => (
+                            <FormItem className="col-span-2 grid h-full space-y-1">
+                              <FormLabel>Remark:</FormLabel>
+                              <FormControl>
+                                <Textarea className="h-7.5 bg-gray-100 text-gray-500" {...field} readOnly />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="actualDeliverySubmitedAtFormat"
+                          render={({ field }) => (
+                            <FormItem className="col-span-1 grid h-full space-y-1">
+                              <FormLabel>Submitted At:</FormLabel>
+                              <FormControl>
+                                <Input className="h-7.5 bg-gray-100 text-gray-500" {...field} readOnly />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="actualDeliverySubmitedByFullName"
+                          render={({ field }) => (
+                            <FormItem className="col-span-1 grid h-full space-y-1">
+                              <FormLabel>Submitted By:</FormLabel>
+                              <FormControl>
+                                <Input className="h-7.5 bg-gray-100 text-gray-500" {...field} readOnly />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter></CardFooter>
+            </Card>
+          </Card>
+        </div>
+
+        {/* Right Side - Verified Details and Photo */}
+        <div className="ml-0 md:ml-2 flex-[2] flex flex-col">
+          <Card className="bg-erp-blue-11 p-2 pt-5 pb-2 mb-2 rounded-lg flex-1">
+            <h2 className="font-bold text-white">Verifier Details</h2>
+            {/* Inner Card with White Background */}
+            <Card className="bg-white p-1 m-0 rounded-lg flex-1">
+              <CardTitle className="px-2 text-sm font-bold">
+                <h2 className="pl-8"></h2>
+              </CardTitle>
+              <CardContent className="p-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="actualDeliveryRecipient"
+                    render={({ field }) => (
+                      <FormItem className="col-span-1 grid h-full space-y-1">
+                        <FormLabel>Verifier:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 bg-gray-100 text-gray-500" {...field} readOnly />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="actualDeliveryNIRC"
+                    render={({ field }) => (
+                      <FormItem className="col-span-1 grid h-full space-y-1">
+                        <FormLabel>Verifier NRIC:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 bg-gray-100 text-gray-500" {...field} readOnly />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <FormField
+                    control={form.control}
+                    name="actualDeliverySignatureLink"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2 grid h-full space-y-1 relative">
+                        <FormLabel>Signature:</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center">
+                            <Input
+                              className="h-7.5 flex-grow bg-gray-100 text-blue-500"
+                              {...field}
+                              readOnly
+                              value={data?.actualDeliverySignatureLink ? data?.actualDeliverySignatureLink[0]?.name : 'No signature available'}
+                            />
+                            {data?.actualDeliverySignatureLink && (
+                              <>
+                                <a
+                                  href={data?.actualDeliverySignatureLink[0]?.link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="absolute inset-0 z-[1] block w-full h-full"
+                                >
+                                </a>
+                                <a
+                                  href={data?.actualDeliverySignatureLink[0]?.link}
+                                  download={data?.actualDeliverySignatureLink[0]?.name}
+                                  className="ml-2 bg-blue-500 text-white px-3 py-2 rounded h-7.5 flex items-center justify-center hover:bg-blue-600 min-w-[30px]"
+                                >
+                                  <FaMagnifyingGlassPlus/>
+                                </a>
+                                <a
+                                  href={data?.actualDeliverySignatureLink[0]?.link}
+                                  download={data?.actualDeliverySignatureLink[0]?.name}
+                                  className="ml-2 bg-blue-500 text-white px-3 py-2 rounded h-7.5 flex items-center justify-center hover:bg-blue-600 min-w-[30px]"
+                                >
+                                  <FaDownload/>
+                                </a>
+                              </>
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </CardContent>
+              <CardFooter></CardFooter>
+            </Card>
+          </Card>
+
+          <Card className="bg-erp-blue-11 p-2 pt-5 pb-2 mb-2 rounded-lg flex-1">
+            <h2 className="font-bold text-white">Photo</h2>
+            <Card className="bg-white p-1 m-0 rounded-lg flex-1 min-h-[150px]">
+              <CardTitle className="px-2 text-sm font-bold">
+                <h2 className="pl-8"></h2>
+              </CardTitle>
+              <CardContent className="p-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="actualDeliveryAttachmentLink"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2 grid h-full space-y-1">
+                        <FormControl>
+                          <input
+                            id="actualDeliveryAttachment"
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={(e) => handleFileUpload(e.target.files)}
+                            className="hidden"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                    {selectedImages.length > 0 && (
+                      <div className="w-full grid grid-flow-row gap-2 grid-cols-[repeat(auto-fill,minmax(100px,1fr))]">
+                        {selectedImages.map((image, index) => (
+                          <div key={index} className="relative w-24 h-24 cursor-pointer" onClick={() => handleImageClick(image)}>
+                            <img
+                              src={image}
+                              alt={`Uploaded ${index}`}
+                              className="object-cover w-full h-full"
+                            />
+                          </div>
+                        ))}
+                    </div>
+                    )}
+                    {actualDeliveryAttachment && actualDeliveryAttachment.map((file, index) => {
+                      const isGoogleDriveLink = file.link.includes('/view');
+                      const previewLink = isGoogleDriveLink ? file.link.replace(/\/view.*$/, "/preview") : file.link;
+                      
+                      return (
+                        <div key={index} className="relative w-24 h-24 cursor-pointer" onClick={() => handleImageClick(file.link)}>
+                          {isGoogleDriveLink ? (
+                            <iframe
+                              src={previewLink}
+                              className="w-full h-full object-cover pointer-events-none"
+                              title={`Attached ${index}`}
+                            />
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={file.link}
+                              alt={`Attached ${index}`}
+                              className="object-cover w-full h-full"
+                              onError={(e) => {
+                                console.error("Failed to load delivery attachment:", file.link);
+                              }}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+                {showDialog && selectedImage && (
+                  <Dialog open={showDialog} onOpenChange={setShowDialog}>
+                    <DialogContent className="max-w-3xl">
+                      <div className="flex justify-center items-center relative p-5">
+                        <button 
+                          className="absolute top-2 right-2 bg-gray-800 text-white p-2 rounded-full"
+                          onClick={() => setShowDialog(false)}
+                        >
+                          <MdClose size={20} />
+                        </button>
+                        {imageSrc.includes('/preview') ? (
+                          <iframe
+                            src={imageSrc}
+                            className="w-full h-full object-cover pointer-events-none"
+                            title="Preview Image"
+                          />
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img 
+                            src={selectedImage} 
+                            alt="Clicked Image"
+                            onError={(e) => {
+                              console.error("Failed to load preview image:", selectedImage);
+                            }}
+                          />
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </CardContent>
+              <CardFooter></CardFooter>
+            </Card>
+          </Card>
+        </div>
+      </div>
+    </Form>
+  );
+}

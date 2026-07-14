@@ -1,0 +1,973 @@
+"use client";
+
+import { PDFDownloadLink, PDFViewer } from "@react-pdf/renderer";
+import { ColumnDef } from "@tanstack/react-table";
+import { endOfMonth } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import moment from "moment";
+import React, { useEffect, useRef, useState } from "react";
+import { UseFormReturn } from "react-hook-form";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import ReportPreviewButton from "@/components/form/ActionButton/ReportPreview";
+import CustomerOverdueLetterTemplate from "@/components/templates/sales/customerOverdueLetterTemplate";
+import SalesReport from "@/components/templates/sales/salesReportTemplate";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { DATE_FORMAT, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+
+interface CustomerDueDocumentListing {
+  id: string;
+  name: string;
+}
+
+type DropdownConfig = {
+  tableName: string;
+  columns: { accessorKey: string; header: string; cell? }[];
+  valueField: string;
+  displayField: string;
+  formValueField: string;
+  formDisplayField: string;
+  additionalMappings?: { sourceField: string; targetFormField: string }[];
+};
+
+interface CustomerDueDocumentListingProps {
+  form: UseFormReturn<any>;
+  onSubmit: (data: any) => void;
+  onPreview?: (data: any, isGenerated?: boolean) => void;
+  previewPDF?: any;
+  salesReportData?: any;
+  generatedReport?: any;
+  filterFields?: string[];
+  sorting?: any;
+}
+
+interface CustomerDueDocumentListingFormProps extends CustomerDueDocumentListingProps {
+  salesReportColumns?: ColumnDef<CustomerDueDocumentListing>[];
+}
+
+export default function CustomerDueDocumentListingForm({
+  form,
+  onSubmit,
+  onPreview,
+  previewPDF,
+  salesReportData,
+  salesReportColumns = [],
+  generatedReport,
+  filterFields,
+  sorting,
+}: CustomerDueDocumentListingFormProps) {
+  const headers = getAuthHeaders();
+  const systemAccount = JSON.parse(localStorage.getItem("system-account"));
+  const formData = form.getValues();
+  const docType = formData.docType || "salesInvoice";
+  const formStatus = form.watch("status");
+
+  const [dropdownState, setDropdownState] = useState({
+    currentDropdown: null as string | null,
+    data: [] as any[],
+    originalData: [] as any[],
+    showTable: false,
+  });
+
+  const [selectedReportList, setSelectedReportList] = useState<any>([]);
+
+  const dropdownInputRef = useRef(null);
+  const dropdownTableRef = useRef(null);
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+
+  const dropdownConfigs: Record<string, DropdownConfig> = {
+    customer: {
+      tableName: "customer",
+      columns: [
+        { accessorKey: "customerCode", header: "Customer Code" },
+        { accessorKey: "customerGroupCode", header: "Customer Group" },
+        { accessorKey: "customerName", header: "Customer Name" },
+      ],
+      valueField: "UUID",
+      displayField: "customerName",
+      formValueField: "customerCode",
+      formDisplayField: "customerName",
+      additionalMappings: [{ sourceField: "customerCode", targetFormField: "customerCodeCode" }],
+    },
+  };
+
+  const handleClickOutside = (event: MouseEvent) => {
+    if (
+      dropdownTableRef.current &&
+      !dropdownTableRef.current.contains(event.target) &&
+      dropdownInputRef.current !== event.target
+    ) {
+      setDropdownState((prev) => ({ ...prev, showTable: false }));
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  const fetchDropdownData = async (dropdownKey: string) => {
+    try {
+      const config = dropdownConfigs[dropdownKey];
+
+      if (!config) return;
+
+      const form_data = new FormData();
+
+      form_data.append(`table[0]`, config.tableName);
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${dropdownKey} data`);
+      }
+
+      const data = await response.json();
+
+      setDropdownState({
+        currentDropdown: dropdownKey,
+        data: data.rows,
+        originalData: data.rows,
+        showTable: true,
+      });
+    } catch (error) {
+      console.error(`Error fetching ${dropdownKey} data:`, error);
+
+      throw new Error(`Failed to fetch ${dropdownKey} data`);
+    }
+  };
+
+  const onClickRow = (row: any) => {
+    const config = dropdownConfigs[dropdownState.currentDropdown!];
+
+    if (config) {
+      form.setValue(config.formValueField, row[config.valueField]);
+      form.setValue(config.formDisplayField, row[config.displayField]);
+
+      if (config.additionalMappings) {
+        config.additionalMappings.forEach((mapping) => {
+          if (row[mapping.sourceField]) {
+            form.setValue(mapping.targetFormField, row[mapping.sourceField]);
+          }
+        });
+      }
+    }
+
+    setDropdownState((prev) => ({ ...prev, showTable: false }));
+  };
+
+  const handleReset = () => {
+    form.reset({
+      docType: "salesInvoice",
+      columnFilterDocType: "",
+      columnFilterStatus: "",
+      docNo: "",
+      customerCode: "",
+      customerCodeCode: "",
+      customerName: "",
+      status: "undue",
+      docDate: "",
+      netTotal: "",
+      creditTermCode: "",
+      docDueDate: "",
+      paidAmount: "",
+      outstandingAmount: "",
+      age: "",
+      endDate: Math.floor(endOfMonth(new Date()).getTime() / 1000).toString(),
+      valid: "1",
+    });
+  };
+
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
+  const [reportType, setReportType] = useState("Customer Due Document Listing");
+
+  // Orientation Option (Constant)
+  const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
+
+  const [isVariantAvailable, setIsVariantAvailable] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<string | null>(null);
+
+  const handlePreview = () => {
+    if (generatedReport.length == 0) {
+      setIsAlertOpen(true);
+      return false;
+    }
+    if (onPreview) {
+      form.setValue("reportTypeName", selectedReport, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+
+      onPreview(
+        {
+          ...formData,
+          reportTypeName: selectedReport,
+        },
+        false,
+      );
+
+      // onPreview(formData, false);
+    }
+
+    setReportType("Customer Due Document Listing");
+    setShowPreviewDialog(false);
+    setTimeout(() => {
+      setShowPreviewDialog(true);
+    }, 0);
+  };
+
+  // Add state to control popover open/close for each date field
+  const [docDateOpen, setDocDateOpen] = useState(false);
+  const [docDueDateOpen, setDocDueDateOpen] = useState(false);
+
+  const handleDropdownSearchChange = (dropdownKey: string, searchTerm: string) => {
+    const config = dropdownConfigs[dropdownKey];
+    if (!config) return;
+
+    form.setValue(config.formDisplayField, searchTerm);
+
+    if (searchTerm.trim() === "") {
+      // Clear related fields: hidden UUID, and additional mappings (like supplierCode)
+      form.setValue(config.formValueField, ""); // clear UUID
+
+      if (config.additionalMappings) {
+        config.additionalMappings.forEach((mapping) => {
+          form.setValue(mapping.targetFormField, ""); // clear mapped fields
+        });
+      }
+
+      return; // Exit early — no filtering needed
+    }
+
+    if (!dropdownState.originalData || dropdownState.currentDropdown !== dropdownKey) {
+      fetchDropdownData(dropdownKey);
+      return;
+    }
+
+    const filtered = dropdownState.originalData.filter((row: any) =>
+      row[config.displayField]?.toString().toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+
+    setDropdownState((prev) => ({
+      ...prev,
+      data: filtered,
+      showTable: true,
+      currentDropdown: dropdownKey,
+    }));
+  };
+
+  useEffect(() => {
+    const invoiceList = [
+      { id: "customerDueSalesInvoiceListing", name: "Customer Due Sales Invoice Listing" },
+      {
+        id: "customerDueSalesInvoiceListingLv1TaxDate",
+        name: "Cust Local - Due Invoice Listing - Level 1 (Tax)",
+      },
+      {
+        id: "customerDueSalesInvoiceListingLv2DocNo",
+        name: "Cust Due Invoice Listing - Level 2 (Document No)",
+      },
+      ...(formStatus === "overdue"
+        ? [{ id: "customerOverdueLetter", name: "Customer Overdue Letter" }]
+        : []),
+    ];
+
+    const debitNoteList = [
+      { id: "customerDueSalesDebitNoteListing", name: "Customer Due Sales Debit Note Listing" },
+      {
+        id: "customerDueSalesDebitNoteListingLv1TaxDate",
+        name: "Cust Local - Due Debit Note Listing - Level 1 (Tax)",
+      },
+      {
+        id: "customerDueSalesDebitNoteListingLv2DocNo",
+        name: "Cust Due Debit Note Listing - Level 2 (Document No)",
+      },
+      ...(formStatus === "overdue"
+        ? [{ id: "customerOverdueLetter", name: "Customer Overdue Letter" }]
+        : []),
+    ];
+
+    if (docType === "salesInvoice") {
+      setSelectedReportList(invoiceList);
+    } else if (docType === "salesDebitNote") {
+      setSelectedReportList(debitNoteList);
+    } else {
+      setSelectedReportList([]);
+    }
+  }, [docType, formStatus]);
+
+  return (
+    <div className="mx-auto">
+      <Card collapsible defaultCollapsed={false} className="shadow-sm">
+        <CardHeader></CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              <div className="mb-4">
+                <h3 className="text-md mb-2 font-semibold">Main Filters:</h3>
+                <div className="grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-4">
+                  <FormField
+                    control={form.control}
+                    name="docType"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Sales Document Type:</FormLabel>
+                        <FormControl>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger className="h-7.5 w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="salesInvoice">Sales Invoice</SelectItem>
+                              <SelectItem value="salesDebitNote">Sales Debit Note</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="docNo"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Doc No:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="customerCode"
+                    render={({ field }) => (
+                      <FormItem className="hidden">
+                        <FormLabel>Customer UUID:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="customerName"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Customer:</FormLabel>
+                        <FormControl className="relative">
+                          <div className="relative">
+                            <Input
+                              className="h-7.5 pr-8"
+                              {...field}
+                              // readOnly
+                              onChange={(e) =>
+                                handleDropdownSearchChange("customer", e.target.value)
+                              }
+                              onClick={() => fetchDropdownData("customer")}
+                              ref={
+                                dropdownState.currentDropdown === "customer"
+                                  ? dropdownInputRef
+                                  : null
+                              }
+                              autoComplete="off"
+                            />
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                              <FaMagnifyingGlass className="text-gray-400" />
+                            </div>
+                            {dropdownState.showTable &&
+                              dropdownState.currentDropdown === "customer" && (
+                                <div
+                                  ref={dropdownTableRef}
+                                  className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                                >
+                                  <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                                    <DropdownTable
+                                      columns={dropdownConfigs.customer.columns}
+                                      data={dropdownState.data}
+                                      onClickRow={onClickRow}
+                                    />
+                                    <ScrollBar orientation="vertical" />
+                                  </ScrollArea>
+                                </div>
+                              )}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Status:</FormLabel>
+                        <FormControl>
+                          <Select
+                            value={field.value ?? "1"}
+                            onValueChange={field.onChange}
+                            defaultValue="1"
+                          >
+                            <SelectTrigger className="h-7.5 w-full">
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="overdue">Overdue</SelectItem>
+                              <SelectItem value="undue">Undue</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Separator Line */}
+              <hr className="my-6 border-gray-300" />
+
+              <div className="mb-4">
+                <h3 className="text-md mb-2 font-semibold">Column Filters:</h3>
+                <div className="grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                  <FormField
+                    control={form.control}
+                    name="docNo"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Doc No:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="columnFilterDocType"
+                    render={({ field }) => {
+                      const docTypeMapping: Record<string, string> = {
+                        salesInvoice: "Sales Invoice",
+                        salesDebitNote: "Sales Debit Note",
+                      };
+
+                      return (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Doc Type:</FormLabel>
+                          <FormControl>
+                            <Input
+                              className="h-7.5 pr-7"
+                              {...field}
+                              value={docTypeMapping[field.value] || field.value}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="docDate"
+                    render={({ field }) => (
+                      <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                        <FormLabel>Doc Date:</FormLabel>
+                        <Popover open={docDateOpen} onOpenChange={setDocDateOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                className={cn(
+                                  "flex h-7.5 w-full",
+                                  !field.value && "text-muted-foreground",
+                                )}
+                                variant="outline"
+                                size="sm"
+                              >
+                                {field.value
+                                  ? moment.unix(field.value).format(DATE_FORMAT)
+                                  : moment().format(DATE_FORMAT)}
+                                <CalendarIcon className="ml-auto h-4 w-4 text-gray-400" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={
+                                field.value ? moment.unix(field.value).toDate() : new Date()
+                              }
+                              onSelect={(date) => {
+                                const unixTimestamp = date
+                                  ? Math.floor(date.getTime() / 1000)
+                                  : Math.floor(Date.now() / 1000);
+                                field.onChange(unixTimestamp.toString());
+                                setDocDateOpen(false);
+                              }}
+                              initialFocus
+                              defaultMonth={
+                                field.value ? moment.unix(field.value).toDate() : new Date()
+                              }
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="customerCodeCode"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Customer Code:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="customerName"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Customer:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="netTotal"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Local Amount:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                  <FormField
+                    control={form.control}
+                    name="creditTermCode"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Terms:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="docDueDate"
+                    render={({ field }) => (
+                      <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                        <FormLabel>Due Date:</FormLabel>
+                        <Popover open={docDueDateOpen} onOpenChange={setDocDueDateOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                className={cn(
+                                  "flex h-7.5 w-full",
+                                  !field.value && "text-muted-foreground",
+                                )}
+                                variant="outline"
+                                size="sm"
+                              >
+                                {field.value
+                                  ? moment.unix(field.value).format(DATE_FORMAT)
+                                  : moment().format(DATE_FORMAT)}
+                                <CalendarIcon className="ml-auto h-4 w-4 text-gray-400" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={
+                                field.value ? moment.unix(field.value).toDate() : new Date()
+                              }
+                              onSelect={(date) => {
+                                const unixTimestamp = date
+                                  ? Math.floor(date.getTime() / 1000)
+                                  : Math.floor(Date.now() / 1000);
+                                field.onChange(unixTimestamp.toString());
+                                setDocDueDateOpen(false);
+                              }}
+                              initialFocus
+                              defaultMonth={
+                                field.value ? moment.unix(field.value).toDate() : new Date()
+                              }
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="columnFilterStatus"
+                    render={({ field }) => {
+                      const statusMapping: Record<string, string> = {
+                        both: "Both",
+                        overdue: "Overdue",
+                        undue: "Undue",
+                      };
+
+                      return (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Status:</FormLabel>
+                          <FormControl>
+                            <Input
+                              className="h-7.5 pr-7"
+                              {...field}
+                              value={statusMapping[field.value] || field.value}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="paidAmount"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Local Payment:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="outstandingAmount"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Local Outstanding Amount:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="age"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Age:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="mr-16 mt-6 flex flex-row justify-center space-x-4">
+                <Button
+                  type="button"
+                  className="erp-blue-12 w-28 text-white hover:bg-blue-800"
+                  onClick={form.handleSubmit(onSubmit)}
+                >
+                  Generate
+                </Button>
+                <Button
+                  type="button"
+                  className="erp-blue-12 w-28 text-white hover:bg-blue-800"
+                  // onClick={handlePreview}
+                  onClick={() => {
+                    if (generatedReport.length == 0) {
+                      setIsAlertOpen(true);
+                      return false;
+                    }
+
+                    setIsVariantAvailable(true);
+                  }}
+                >
+                  Preview
+                </Button>
+                <Button
+                  type="button"
+                  className="erp-blue-12 w-28 text-white hover:bg-blue-800"
+                  onClick={handleReset}
+                >
+                  Reset
+                </Button>
+                {systemAccount === "dev" || systemAccount === "infollectivetesting" ? (
+                  <>
+                    <ReportPreviewButton
+                      form={form}
+                      formData={formData}
+                      previewType={"CUSTOMER DUE DOCUMENT"}
+                      docType={docType}
+                      reportType={"customerDueDocument"}
+                      modelType={"sales"}
+                      filterFields={filterFields}
+                      sorting={sorting}
+                      generatedReport={generatedReport}
+                      setIsAlertOpen={setIsAlertOpen}
+                      showPreviewDialog={showDialog}
+                      setShowPreviewDialog={setShowDialog}
+                    />
+                  </>
+                ) : null}
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <Dialog open={isVariantAvailable} onOpenChange={setIsVariantAvailable}>
+        <DialogContent className="max-w-l rounded-md bg-white p-6">
+          <Form {...form}>
+            <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+              <h2 className="text-center text-lg font-semibold">Select Report</h2>
+
+              <div className="h-[160px] overflow-auto border border-gray-300 bg-white">
+                {selectedReportList?.map((report) => (
+                  <div
+                    key={report.id}
+                    onClick={() => setSelectedReport(report.id)}
+                    className={`cursor-pointer px-3 py-1 text-sm
+            hover:bg-blue-100
+            ${selectedReport === report.id ? "bg-blue-600 text-white" : ""}`}
+                  >
+                    {report.name}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-[10px] flex justify-center gap-4 p-10">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setIsVariantAvailable(false)}
+                  className="h-10 w-40 bg-erp-blue-14 text-white hover:bg-erp-blue-13 hover:text-white"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handlePreview}
+                  className="h-10 w-40 border border-erp-blue-14 bg-white text-erp-blue-14"
+                >
+                  OK
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dialog */}
+      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle className="flex items-center justify-between">
+            <span>{reportType} - Report Preview</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Orientation:</span>
+              <Button
+                type="button"
+                variant={orientation === "portrait" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setOrientation("portrait")}
+                className="h-8 px-3"
+              >
+                Portrait
+              </Button>
+              <Button
+                type="button"
+                variant={orientation === "landscape" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setOrientation("landscape")}
+                className="h-8 px-3"
+              >
+                Landscape
+              </Button>
+            </div>
+          </DialogTitle>
+
+          <div className="relative h-[550px] w-full">
+            {previewPDF ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                {/* Orientation Option (Add Orientation Prop) */}
+                {selectedReport === "customerOverdueLetter" ? (
+                  <CustomerOverdueLetterTemplate
+                    type={reportType}
+                    data={previewPDF}
+                    salesReportData={salesReportData}
+                    salesReportColumns={salesReportColumns}
+                    generatedReport={generatedReport}
+                    orientation={orientation}
+                  />
+                ) : (
+                  <SalesReport
+                    type={reportType}
+                    data={previewPDF}
+                    salesReportData={salesReportData}
+                    salesReportColumns={salesReportColumns}
+                    generatedReport={generatedReport}
+                    orientation={orientation}
+                  />
+                )}
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <p className="animate-pulse text-lg">
+                  Loading preview
+                  <span className="ml-1 inline-block">
+                    <span>. </span>
+                    <span className="animation-delay-200">. </span>
+                    <span className="animation-delay-400">.</span>
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                selectedReport === "customerOverdueLetter" ? (
+                  <CustomerOverdueLetterTemplate
+                    type={reportType}
+                    data={previewPDF}
+                    salesReportData={salesReportData}
+                    salesReportColumns={salesReportColumns}
+                    generatedReport={generatedReport}
+                    orientation={orientation}
+                  />
+                ) : (
+                  <SalesReport
+                    type={reportType}
+                    data={previewPDF}
+                    salesReportData={salesReportData}
+                    salesReportColumns={salesReportColumns}
+                    generatedReport={generatedReport}
+                    orientation={orientation}
+                  />
+                )
+              }
+              fileName={`${previewPDF?.currentCompany?.company || ""} - Customer Due Document Listing.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              // onClick={() => setShowPreviewDialog(false)}
+              onClick={() => {
+                setShowPreviewDialog(false);
+                setIsVariantAvailable(false);
+              }}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent className="max-w-sm">
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-md text-center text-erp-blue-14">kindly generate first.</p>
+          </div>
+          <AlertDialogFooter className="mt-2 flex items-center !justify-center justify-center gap-3 [&>*]:m-0">
+            <AlertDialogAction className="h-9 w-24" autoFocus onClick={() => setShowDialog(false)}>
+              Close
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

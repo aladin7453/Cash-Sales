@@ -1,0 +1,110 @@
+import React from "react";
+import { FiSave } from "react-icons/fi";
+import { cn } from "@/lib/utils/cn";
+
+interface MobileStepperLayoutProps {
+  steps: string[];
+  currentStep: number;
+  onStepChange: (step: number) => void;
+  onSave: () => void;
+  preventdoublescroll?: number[];
+  children: React.ReactNode;
+}
+
+export function MobileStepperLayout({
+  steps,
+  currentStep,
+  onStepChange,
+  onSave,
+  preventdoublescroll,
+  children,
+}: MobileStepperLayoutProps) {
+  const childrenArray = React.Children.toArray(children);
+
+  return (
+    <>
+      {/* Stepper */}
+      <div className="flex items-center gap-x-3 px-3 py-3.5 bg-white border-b border-gray-100 overflow-x-auto flex-shrink-0">
+        {steps.map((step, index) => (
+          <React.Fragment key={index}>
+            <button
+              type="button"
+              onClick={() => onStepChange(index)}
+              className="flex items-center gap-x-2 flex-shrink-0"
+            >
+              <div
+                className={cn(
+                  "w-[28px] h-[28px] rounded-full flex items-center justify-center text-[12px] font-medium flex-shrink-0",
+                  index < currentStep
+                    ? "bg-blue-100 text-blue-800"
+                    : index === currentStep
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 text-gray-400"
+                )}
+              >
+                {index + 1}
+              </div>
+              <span
+                className={cn(
+                  "text-[11px]",
+                  index === currentStep
+                    ? "text-blue-600 font-medium"
+                    : "text-gray-400"
+                )}
+              >
+                {step}
+              </span>
+            </button>
+
+            {index < steps.length - 1 && (
+              <span className="text-gray-300 text-[10px] flex-shrink-0">&gt;</span>
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div className={preventdoublescroll?.includes(currentStep) ? "flex-1 overflow-hidden" : "flex-1 overflow-y-auto"}>
+        {childrenArray.map((child, index) => (
+          <div key={index} className={index === currentStep ? "block" : "hidden"}>
+            {child}
+          </div>
+        ))}
+      </div>
+
+      {/* Bottom Nav */}
+      <div className="flex items-center justify-between px-2 py-4 border-t border-gray-100 bg-white flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => onStepChange(Math.max(0, currentStep - 1))}
+          disabled={currentStep === 0}
+          className="px-5.5 py-1.5 text-[13px] border border-gray-200 rounded-lg disabled:opacity-30 text-gray-600"
+        >
+          Back
+        </button>
+
+        <span className="text-[12px] text-gray-400">
+          {currentStep + 1} / {steps.length}
+        </span>
+
+        <button
+          type="button"
+          onClick={() => onStepChange(Math.min(steps.length - 1, currentStep + 1))}
+          disabled={currentStep === steps.length - 1}
+          className="px-5.5 py-1.5 text-[13px] bg-blue-600 text-white rounded-lg disabled:opacity-30"
+        >
+          Next
+        </button>
+      </div>
+
+      {/* Save Button */}
+      <button
+        type="button"
+        onClick={onSave}
+        className="fixed bottom-20 right-4 z-50 w-11 h-11 rounded-full bg-blue-600 text-white shadow-lg flex items-center justify-center"
+      >
+        <FiSave className="size-4.5" />
+      </button>
+    </>
+  );
+}

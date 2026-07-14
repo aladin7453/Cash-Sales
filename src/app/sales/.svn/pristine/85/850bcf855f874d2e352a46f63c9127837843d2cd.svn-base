@@ -1,0 +1,115 @@
+"use client";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+import {autoWordSize} from "@/lib/constants";
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type CustomerTag = {
+  UUID: string;
+  account: string;
+  company: string;
+  customerTagCode: string;
+  customerTag: string;
+  description: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  valid: string;
+  _version: string;
+  _actionUUID: string;
+  createdByUsername: string;
+  updatedByUsername: string;
+  createdAtFormat: string;
+  updatedAtFormat: string;
+  preferenceData?: any;
+};
+
+// Preference (Format Number Function)
+const formatNumber = (value: string | number, decimalPlaces: number = 2): string => {
+  if (value === null || value === undefined || value === '') {
+    return (0).toFixed(decimalPlaces);
+  }
+  
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  
+  if (isNaN(numValue)) {
+    return (0).toFixed(decimalPlaces);
+  }
+  
+  return numValue.toFixed(decimalPlaces);
+};
+
+export const rawColumns: ColumnDef<CustomerTag>[] = [
+  {
+    id: "customerTagCode",
+    accessorKey: "customerTagCode",
+    header: "Customer Tag Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerTag",
+    accessorKey: "customerTag",
+    header: "Customer Tag",
+    filterFn: "includesString",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    filterFn: "includesString",
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+    filterFn: "includesString",
+  },
+  {
+    id: "createdByUsername",
+    accessorKey: "createdByUsername",
+    header: "Created by",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedByUsername",
+    accessorKey: "updatedByUsername",
+    header: "Updated by",
+    filterFn: "includesString",
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as CustomerTag["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    filterFn: filterWithStringConversion,
+  },
+];
+
+export const columns: ColumnDef<CustomerTag>[] = rawColumns.map(
+  (col) => {
+    if (typeof col.header === "string") {
+      const sizes = autoWordSize(col.header);
+
+      return {
+        ...col,
+        sizes,
+        size: sizes, // 👈 applied automatically
+        minSize:50
+      };
+    }
+
+    return col;
+  }
+);

@@ -1,0 +1,57 @@
+"use client";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import toStringAccessorFn from "@/lib/utils/data-table/toStringAccessorFn";
+import {autoWordSize} from "@/lib/constants";
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type RuleTemplate = {
+  UUID: string;
+  ruleTemplate: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  valid: "0" | "1";
+  _version: string;
+  _actionUUID: string;
+  account: string;
+  company: string;
+};
+
+export const rawColumns: ColumnDef<RuleTemplate>[] = [
+  {
+    id: "ruleTemplate",
+    accessorKey: "ruleTemplate",
+    header: "Rule Template",
+    filterFn: "includesString",
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as RuleTemplate["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    filterFn: "includesString",
+  },
+];
+
+export const columns: ColumnDef<RuleTemplate>[] = rawColumns.map(
+  (col) => {
+    if (typeof col.header === "string") {
+      const sizes = autoWordSize(col.header);
+
+      return {
+        ...col,
+        sizes,
+        size: sizes, //applied automatically
+        minSize:50
+      };
+    }
+
+    return col;
+  }
+);
+

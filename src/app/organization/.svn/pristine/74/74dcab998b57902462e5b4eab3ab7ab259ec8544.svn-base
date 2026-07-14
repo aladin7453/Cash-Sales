@@ -1,0 +1,222 @@
+"use client";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+import toStringAccessorFn from "@/lib/utils/data-table/toStringAccessorFn";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type CompanyAssignment = {
+  UUID: string;
+  user: string;
+  employeeID: string;
+  company: string;
+  department: string;
+  jobTitle: string;
+  location: string;
+  employmentType: string;
+  supervisor: string;
+  supervisorName: string;
+  mentor: string;
+  mentorName: string;
+  startDate: string;
+  endDate: string;
+  startDateFormat: string;
+  endDateFormat: string;
+  exitReason: string;
+  remark: string;
+  attachment: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  valid: "0" | "1";
+  _version: string;
+  _actionUUID: string;
+  companyName: string;
+  departmentName: string;
+  jobTitleName: string;
+  locationName: string;
+  createdAtFormat: string;
+  updatedAtFormat: string;
+  createdByUsername: string;
+  updatedByUsername: string;
+  attachmentLink: Array<{
+    name: string;
+    link: string;
+  }>;
+  accessControl: string;
+};
+
+export const CompanyAssignmentColumns: ColumnDef<CompanyAssignment>[] = [
+  {
+    accessorKey: "companyName",
+    header: "Company",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "departmentName",
+    header: "Department",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "jobTitleName",
+    header: "Job Title",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "locationName",
+    header: "Location",
+    filterFn: "includesString",
+  },
+  {
+    id: "employeeID",
+    accessorKey: "employeeID",
+    header: "Employee ID",
+    filterFn: "includesString",
+  },
+  {
+    id: "employmentType",
+    accessorKey: "employmentType",
+    header: "Employment Type",
+    filterFn: "includesString",
+  },
+  {
+    id: "supervisorName",
+    accessorKey: "supervisorName",
+    header: "Supervisor",
+    filterFn: "includesString",
+  },
+  {
+    id: "mentorName",
+    accessorKey: "mentorName",
+    header: "Mentor",
+    filterFn: "includesString",
+  },
+  {
+    id: "startDateFormat",
+    accessorKey: "startDateFormat",
+    header: "Start Date",
+    accessorFn: (row) => toStringAccessorFn(row, "startDateFormat"),
+    filterFn: "includesString",
+  },
+  {
+    id: "endDateFormat",
+    accessorKey: "endDateFormat",
+    header: "End Date",
+    accessorFn: (row) => toStringAccessorFn(row, "endDateFormat"),
+    filterFn: "includesString",
+  },
+  {
+    id: "exitReason",
+    accessorKey: "exitReason",
+    header: "Quit Reason",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "remark",
+    header: "Description",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "attachment",
+    header: "Attachment (.pdf, .png, .jpg, ,jpeg)",
+    cell: ({ row }) => {
+      const tempFiles = row.original.attachmentFiles;
+      if (tempFiles && tempFiles.length > 0) {
+        return tempFiles
+          .map((file, index) => {
+            // Create a blob URL for preview
+            const fileUrl = URL.createObjectURL(file);
+            return (
+              <a
+                key={`temp-${index}`}
+                href={fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "blue", marginRight: "5px" }}
+                onClick={(e) => {
+                  // Cleanup URL object after navigation starts
+                  setTimeout(() => URL.revokeObjectURL(fileUrl), 1000);
+                }}
+              >
+                {file.name}
+              </a>
+            );
+          })
+          .reduce((prev, curr) => [prev, ", ", curr]);
+      }
+
+      let attachments = [];
+
+      try {
+        if (row.original.attachment && row.original.attachment.trim() !== "") {
+          attachments = JSON.parse(row.original.attachment);
+        }
+      } catch (error) {
+        console.error("Error parsing attachment JSON:", error);
+        attachments = [];
+      }
+
+      const attachmentLinks = row.original.attachmentLink;
+
+      return attachments && attachments.length > 0 ? (
+        attachments
+          .map((att: { Name: string }, index: number) => {
+            const link = attachmentLinks.find((al) => al.name === att.Name);
+            return link ? (
+              <a
+                key={index}
+                href={link.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "blue" }}
+              >
+                {att.Name}
+              </a>
+            ) : (
+              <span key={index}>{att.Name}</span>
+            );
+          })
+          .reduce((prev: any, curr: any) => [prev, ", ", curr])
+      ) : (
+        <span>No attachment</span>
+      );
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "createdAtFormat",
+    header: "Created At",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "createdByUsername",
+    header: "Created By",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "updatedAtFormat",
+    header: "Updated At",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "updatedByUsername",
+    header: "Updated By",
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as CompanyAssignment["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    filterFn: filterWithStringConversion,
+  },
+  {
+    id: "accessControl",
+    accessorKey: "accessControl",
+    header: "Access Control",
+    filterFn: "includesString",
+  },
+];

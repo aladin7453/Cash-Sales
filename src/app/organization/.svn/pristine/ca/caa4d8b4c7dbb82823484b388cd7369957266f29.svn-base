@@ -1,0 +1,65 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { FaMinus, FaPlus } from "react-icons/fa6";
+
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import Validity from "@/components/data-table/Validity";
+import { Button } from "@/components/ui/button";
+
+import type { Table } from "@tanstack/react-table";
+
+type Props<TData> = {
+  table: Table<TData>;
+  onAdd?: () => void;
+};
+
+export default function AgreementDataTableToolbar<TData>({ table, onAdd }: Props<TData>) {
+  return (
+    <div className="flex items-center justify-between p-1.5">
+      <ActionGroupStart table={table} onAdd={onAdd} />
+      <Pagination table={table} />
+      <ActionGroupEnd table={table} />
+    </div>
+  );
+}
+
+function ActionGroupStart<TData>({ table, onAdd }: Props<TData>) {
+  const [selectedRow, setSelectedRow] = useState("");
+
+  const selectedRowModel = table.getSelectedRowModel();
+
+  useEffect(() => {
+    if (selectedRowModel.rows.length === 1) {
+      setSelectedRow(selectedRowModel.rows[0].getValue("id"));
+    }
+  }, [selectedRowModel]);
+
+  return (
+    <div className="flex items-center gap-x-1 pl-2">
+      <span className="text-sm/none font-semibold">Agreement</span>
+      <div className="flex items-center text-erp-blue-14">
+        <Button className="size-8" variant="ghost" size="icon" onClick={onAdd}>
+          <FaPlus className="size-5.5" />
+        </Button>
+        <Button className="size-8" variant="ghost" size="icon">
+          <FaMinus className="size-5.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ActionGroupEnd<TData>({ table }: Props<TData>) {
+  return (
+    <div className="grid grid-cols-4 items-center text-erp-blue-14">
+      <Export table={table} />
+      <Refresh />
+      <Validity table={table} />
+      <ColumnVisibilityToggle table={table} />
+    </div>
+  );
+}

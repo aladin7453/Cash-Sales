@@ -1,0 +1,1418 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import {
+  FaClipboard,
+  FaHandshakeSimple,
+  FaLayerGroup,
+  FaMobile,
+  FaTableList,
+  FaUniversalAccess,
+} from "react-icons/fa6";
+import useSWRImmutable from "swr/immutable";
+import { z } from "zod";
+
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import CloneButton from "@/components/form/ActionButton/Clone";
+import DeleteButton from "@/components/form/ActionButton/Delete";
+import NewButton from "@/components/form/ActionButton/New";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+import DriverDetails from "@/components/icons/svg-repo/DriverDetails";
+import JobScope from "@/components/icons/svg-repo/JobScope";
+import PersonalDetails from "@/components/icons/svg-repo/PersonalDetails";
+import TopActionBar from "@/components/layouts/TopActionBar";
+import LoadingUI from "@/components/LoadingUI";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { TabsNavigator } from "@/components/ui/TabsNavigator";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+
+import { useMyContext } from "../../contextProvider";
+import ResetPasswordButton from "../ResetPassword";
+import { assetAssignmentDetailsColumns } from "./asset-assigned/asset-assignment-details/columns";
+import AssetAssignmentDetailsDataTable from "./asset-assigned/asset-assignment-details/DataTable";
+import { changelogColumns } from "./changelog/columns";
+import UserChangelogDataTable from "./changelog/DataTable";
+import { DriverLicenseDetailsForm } from "./driver-details/driver-details/DriverLicenseDetailsForm";
+import VehicleDetailsForm from "./driver-details/driver-details/VehicleDetailsForm";
+import { CompanyAssignmentColumns } from "./employement-details/employement-details/columns";
+import CompanyAssignmentDataTable from "./employement-details/employement-details/DataTable";
+import { EmployementDetailsForm } from "./employement-details/employement-details/EmployementDetailsForm";
+import { JobScopeInformationColumns } from "./job-scope-details/job-scope-information/columns";
+import JobScopeInformationDataTable from "./job-scope-details/job-scope-information/DataTable";
+import { UserForm } from "./main-details/general-details/UserForm";
+import { customInformationColumns } from "./more-details/custom-information/columns";
+import CustomInformationDataTable from "./more-details/custom-information/DataTable";
+import { OtherDetailForm } from "./more-details/custom-information/OtherFormDetail";
+import { ContactDetailsColumns } from "./personal-details/contact-details/columns";
+import ContactDetailsDataTable from "./personal-details/contact-details/DataTable";
+import { PersonalDetailsForm } from "./personal-details/contact-details/PersonalDetailsForm";
+import RBACTabs, { expandScope } from "./RBAC/tabs";
+
+import type { User } from "../columns";
+
+type PageParams = {
+  params: { slug: string };
+};
+
+interface DefaultCompany {
+  companyName: string;
+  remark: string;
+  valid: string;
+}
+
+const validRoutes = ["new", "edit", "clone"] as const;
+
+const fetcher = async (url: string) => {
+  const headers = getAuthHeaders();
+
+  return fetch(url, { headers }).then(async (res) => {
+    if (res.status == 401) {
+      throw new Error("Session expired");
+    }
+
+    if (!res.ok) {
+      throw new Error("Failed to fetch data");
+    }
+
+    try {
+      return await res.json();
+    } catch (error) {
+      throw new Error("Failed to parse response JSON");
+    }
+  });
+};
+
+type ValidRoute = (typeof validRoutes)[number];
+
+export type ProfileImageAttachment = {
+  name: string;
+  link: string;
+};
+
+const userFormSchema = z.object({
+  // account: z.string().min(1).nonempty({
+  //   message: "Please select a status.",
+  // }),
+  // accountName: z.string().min(1).nonempty({
+  //   message: "Please select a status.",
+  // }),
+  // username: z.string().min(1).nonempty({
+  //   message: "Please select a status.",
+  // }),
+  // validity: z.union([z.literal(0), z.literal(1)]).default(1),
+});
+
+function isValidRoute(route: string): route is ValidRoute {
+  return validRoutes.includes(route as ValidRoute);
+}
+
+const tabs = [
+  {
+    id: "mainDetails",
+    name: "Main Details",
+    shortName: "Main",
+    icon: FaClipboard,
+  },
+  {
+    id: "moreDetails",
+    name: "More Details",
+    shortName: "More",
+    icon: FaLayerGroup,
+  },
+  {
+    id: "personalDetails",
+    name: "Personal Details",
+    shortName: "Personal",
+    icon: PersonalDetails,
+  },
+  {
+    id: "employmentDetails",
+    name: "Employment Details",
+    shortName: "Employment",
+    icon: FaHandshakeSimple,
+  },
+  {
+    id: "jobScopeDetails",
+    name: "Job Scope",
+    shortName: "Job",
+    icon: JobScope,
+  },
+  {
+    id: "driverDetails",
+    name: "Driver Details",
+    shortName: "Driver",
+    icon: DriverDetails,
+  },
+  {
+    id: "assetAssigned",
+    name: "Asset Assigned",
+    shortName: "Asset",
+    icon: FaMobile,
+  },
+  {
+    id: "rbac",
+    name: "RBAC",
+    shortName: "RBAC",
+    icon: FaUniversalAccess,
+  },
+];
+
+export default function UserDetailsPage({ params }: PageParams) {
+  const router = useRouter();
+  const slug = params.slug;
+  const [user1, setUser1] = useState({});
+  const headers = getAuthHeaders();
+  const [tempProfileImage, setTempProfileImage] = useState<ProfileImageAttachment>();
+  const [companyAssignmentFiles, setCompanyAssignmentFiles] = useState([]);
+  const [tempRowCustomInfo, setTempRowCustomInfo] = useState([]);
+  const [tempRowJobScopeInfo, setTempRowJobScopeInfo] = useState([]);
+  const [tempRowContactDetails, setTempRowContactDetails] = useState([]);
+  const [tempRowCompanyAssignment, setTempRowCompanyAssignment] = useState([]);
+  const [tempCompanyList, setTempCompanyList] = useState<DefaultCompany[]>([]);
+  const [companyAssignmentData, setCompanyAssignmentData] = useState<User | null | undefined>(null);
+  const [contactDetailsData, setContactDetailsData] = useState<User | null | undefined>(null);
+  const [customInformationData, setCustomInformationData] = useState<User | null | undefined>(null);
+  const [jobScopeInformationData, setJobScopeInformationData] = useState<User | null | undefined>(
+    null,
+  );
+  const [ruleData, setRuleData] = useState<User | null | undefined>(null);
+  const [assetAssignedData, setAssetAssignedData] = useState<User | null | undefined>(null);
+  const [tempRowAssetAssignmentDetails, setTempRowAssetAssignmentDetails] = useState([]);
+  const { toast } = useToast();
+
+  const searchParams = useSearchParams();
+
+  const id = searchParams.get("id");
+  const [formResetKey, setFormResetKey] = useState(0);
+
+  const [userData, setUserData] = useState<User | null | undefined>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const resetForm = () => {
+    setFormResetKey((prevKey) => prevKey + 1);
+  };
+  const [forbiddenMessage, setForbiddenMessage] = useState<string | null>(null);
+  const [isLoadedSuccessfully, setIsLoadedSuccessfully] = useState<boolean>(false);
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const [scopes, setScopes] = useState<Record<string, string>>({});
+  const [departments, setDepartments] = useState<Record<string, string>>({});
+  const shareDataValue = useMyContext();
+  const [showAccessControl, setShowAccessControl] = useState<boolean>(false);
+  const [showAlertDialog, setShowAlertDialog] = useState(false);
+  const [baseRules, setBaseRules] = useState(null);
+  const [baseScopes, setBaseScopes] = useState(null);
+  const [baseDepartmentScopes, setBaseDepartmentScopes] = useState(null);
+  const [departmentDropdownData, setDepartmentDropdownData] = useState([]);
+  const [isRBACChanged, setIsRBACChanged] = useState(false);
+  const [isUpdateRBAC, setIsUpdateRBAC] = useState(false);
+  const [isCompanyAssignmentData, setIsCompanyAssignmentData] = useState(false);
+
+  useEffect(() => {
+    let hasChanges = false;
+
+    Object.entries(permissions).forEach(([ruleKey, isChecked]) => {
+      const newValue = isChecked ? 1 : 0;
+      const oldValue = baseRules?.[ruleKey] ?? 0;
+
+      if (newValue !== oldValue) {
+        hasChanges = true;
+        return;
+      }
+
+      if (isChecked) {
+        const defaultKeys = [
+          "view",
+          "create",
+          "update",
+          "throw",
+          "restore",
+          "delete",
+          "download",
+          "auth",
+          "bill",
+          "print",
+          "preview",
+          "transfer-from",
+          "transfer-to",
+          "export",
+          "confirm",
+          "verify",
+          "compulsary",
+          "assignment",
+          "progress",
+          "generate-qr-code",
+          "disable",
+          "upload",
+        ];
+
+        let action: string | null = null;
+        let moduleKey: string | null = null;
+
+        const sortedKeys = [...defaultKeys].sort((a, b) => b.length - a.length);
+
+        for (const key of sortedKeys) {
+          if (ruleKey.startsWith(`${key}-`)) {
+            action = key;
+            moduleKey = ruleKey.slice(key.length + 1);
+            break;
+          }
+        }
+
+        if (!action || !moduleKey) {
+          console.warn(`Unrecognized ruleKey format: ${ruleKey}`);
+          return;
+        }
+
+        const newScope = scopes[ruleKey] || scopes[moduleKey] || null;
+        const oldScope = baseScopes?.[moduleKey] ?? null;
+
+        if (newScope !== oldScope) {
+          hasChanges = true;
+        }
+
+        const newDepartmentScope = departments[ruleKey] || departments[moduleKey] || null;
+        const oldDepartmentScope = baseDepartmentScopes?.[moduleKey] ?? null;
+
+        if (newDepartmentScope !== oldDepartmentScope) {
+          hasChanges = true;
+        }
+      }
+    });
+
+    setIsRBACChanged(hasChanges);
+  }, [permissions, scopes, departments, baseRules, baseScopes, baseDepartmentScopes]);
+
+  if (!isValidRoute(slug)) {
+    notFound();
+  }
+
+  const {
+    data: user,
+    error,
+    isLoading,
+    isValidating,
+    mutate: mutateUserData,
+  } = useSWRImmutable(
+    id ? `${ORIGIN}/user/api/user/get-update-user-data-2?id=${id}` : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+
+  useEffect(() => {
+    if (error) {
+      if (error.message === "Session expired") {
+        if (isRBACChanged) {
+          toast({
+            variant: "destructive",
+            title: "Session Expired",
+            description: "Your session has expired. Redirecting to login page.",
+          });
+        }
+        setTimeout(() => {
+          mutateUserData(undefined, false);
+          router.push("/login");
+        }, 500);
+      } else {
+        setForbiddenMessage(error.message);
+      }
+    }
+  }, [error, router, toast]);
+
+  const refreshTable = (table?: string) => {
+    if (!table || table === "user") {
+      mutateUserData();
+    }
+    if (!table || table === "customInfo") {
+      mutateUserData();
+    }
+    if (!table || table === "contactDetails") {
+      mutateUserData();
+    }
+    if (!table || table === "companyAssignment") {
+      mutateUserData();
+    }
+    if (!table || table === "jobScopeInfo") {
+      mutateUserData();
+    }
+    if (!table || table === "assetAssigned") {
+      mutateUserData();
+    }
+  };
+
+  useEffect(() => {
+    if (user && slug === "edit") {
+      setUserData(user.data);
+      setCompanyAssignmentData(user.userHasCompany);
+      setTempRowCompanyAssignment(user.userHasCompany.rows);
+      setContactDetailsData(user.userHasContact);
+      setCustomInformationData(user.userHasCustomInfo);
+      setJobScopeInformationData(user.userHasJobScope);
+      setRuleData(user.userHasRule);
+      setAssetAssignedData(user.assetAssigned);
+      setTempProfileImage(
+        Array.isArray(user.data.profileImageLink) && user.data.profileImageLink[0],
+      );
+      if (user.historyData) {
+        const historyData = {
+          user: user.historyData.userHistory || {
+            total: user.historyData.userHistory.total,
+            rows: [],
+          },
+          userHasContact: user.historyData.userHasContactHistory || {
+            total: user.historyData.userHasContact.total,
+            rows: [],
+          },
+          userHasCompany: user.historyData.userHasCompanyHistory || {
+            total: user.historyData.userHasCompanyHistory.total,
+            rows: [],
+          },
+          userHasJobScope: user.historyData.userHasJobScopeHistory || {
+            total: user.historyData.userHasJobScopeHistory.total,
+            rows: [],
+          },
+          userHasRule: user.historyData.userHasRuleHistory || {
+            total: user.historyData.userHasRuleHistory.total,
+            rows: [],
+          },
+          userHasCustomInfo: user.historyData.userHasCustomInfoHistory || {
+            total: user.historyData.userHasCustomInfoHistory.total,
+            rows: [],
+          },
+        };
+        setChangelogData(historyData);
+      }
+    } else if (user && slug === "clone") {
+      setUserData(user.data);
+      setTempRowCompanyAssignment(user.userHasCompany.rows);
+      setTempRowContactDetails(user.userHasContact.rows);
+      setTempRowCustomInfo(user.userHasCustomInfo.rows);
+      setTempRowJobScopeInfo(user.userHasJobScope.rows);
+      setRuleData(user.userHasRule);
+      setTempRowAssetAssignmentDetails(user.assetAssigned.rows);
+      setTempProfileImage(
+        Array.isArray(user.data.profileImageLink) && user.data.profileImageLink[0],
+      );
+      if (user.historyData) {
+        const historyData = {
+          user: user.historyData.userHistory || {
+            total: user.historyData.userHistory.total,
+            rows: [],
+          },
+          userHasContact: user.historyData.userHasContactHistory || {
+            total: user.historyData.userHasContact.total,
+            rows: [],
+          },
+          userHasCompany: user.historyData.userHasCompanyHistory || {
+            total: user.historyData.userHasCompanyHistory.total,
+            rows: [],
+          },
+          userHasJobScope: user.historyData.userHasJobScopeHistory || {
+            total: user.historyData.userHasJobScopeHistory.total,
+            rows: [],
+          },
+          userHasRule: user.historyData.userHasRuleHistory || {
+            total: user.historyData.userHasRuleHistory.total,
+            rows: [],
+          },
+          userHasCustomInfo: user.historyData.userHasCustomInfoHistory || {
+            total: user.historyData.userHasCustomInfoHistory.total,
+            rows: [],
+          },
+        };
+        setChangelogData(historyData);
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (assetAssignedData) {
+      var updatedData = assetAssignedData.rows;
+      updatedData.forEach((item, index) => {
+        if (item.attachment) {
+          try {
+            const rowAttachmentDecode = JSON.parse(item.attachment); // Parse JSON string
+            const attachmentNames = rowAttachmentDecode
+              .map((item2) => item2.Name) // Extract 'Name' property
+              .join(","); // Join names with commas
+            item.attachment = attachmentNames; // Update 'attachment' with the string
+          } catch (error) {
+            console.error(`Error parsing attachment for item at index ${index}:`, error);
+          }
+        }
+      });
+      setTempRowAssetAssignmentDetails(updatedData);
+    }
+  }, [assetAssignedData]);
+
+  const createExpandDepartmentScope = (departmentData: any) => {
+    const departmentScopeValues: string[] =
+      (Array.isArray(departmentData)
+        ? departmentData.map((row: any) => String(row.departmentID).trim().toLowerCase())
+        : []) ?? [];
+
+    const expandDepartmentScope = (scope: string): string[] => {
+      if (!scope) return [];
+
+      const normalizedScope = String(scope).trim().toLowerCase();
+
+      if (departmentScopeValues.includes(normalizedScope)) {
+        return [normalizedScope];
+      }
+
+      return [];
+    };
+
+    return expandDepartmentScope;
+  };
+
+  const handleSaveRBAC = async (flatPermissions: Record<string, boolean>) => {
+    if (!id) {
+      console.error("No user selected");
+      return;
+    }
+
+    setIsLoadedSuccessfully(false);
+
+    const userHasRule: Record<string, any> = {};
+
+    const defaultKeys = [
+      "view",
+      "create",
+      "update",
+      "throw",
+      "restore",
+      "delete",
+      "download",
+      "auth",
+      "bill",
+      "print",
+      "preview",
+      "transfer-from",
+      "transfer-to",
+      "export",
+      "confirm",
+      "verify",
+      "compulsary",
+      "assignment",
+      "progress",
+      "generate-qr-code",
+      "disable",
+      "upload",
+    ];
+
+    Object.entries(flatPermissions).forEach(([ruleKey, isChecked]) => {
+      const newValue = isChecked ? 1 : 0;
+      const oldValue = baseRules?.[ruleKey] ?? 0;
+
+      let action: string | null = null;
+      let moduleKey: string | null = null;
+
+      const sortedKeys = [...defaultKeys].sort((a, b) => b.length - a.length);
+
+      for (const key of sortedKeys) {
+        if (ruleKey.startsWith(`${key}-`)) {
+          action = key;
+          moduleKey = ruleKey.slice(key.length + 1);
+          break;
+        }
+      }
+
+      if (!action || !moduleKey) {
+        console.warn(`Unrecognized ruleKey format: ${ruleKey}`);
+        return;
+      }
+
+      const newScope = scopes[ruleKey] || scopes[moduleKey] || null;
+      const oldScope = baseScopes?.[moduleKey] ?? null;
+
+      const newDepartmentScope = departments[ruleKey] || departments[moduleKey] || null;
+      const oldDepartmentScope = baseDepartmentScopes?.[moduleKey] ?? null;
+
+      const ruleChanged = newValue !== oldValue;
+      const scopeChanged = isChecked && newScope !== oldScope;
+      const departmentScopeChanged = isChecked && newDepartmentScope !== oldDepartmentScope;
+
+      if (!ruleChanged && !scopeChanged && !departmentScopeChanged) return;
+
+      const fullActionKey = ruleKey;
+
+      const selectedScopeRaw =
+        scopes[ruleKey] || scopes[moduleKey] || departments[ruleKey] || departments[moduleKey];
+
+      const isDepartmentScope = Boolean(departments[ruleKey] || departments[moduleKey]);
+
+      const expandDepartmentScope = createExpandDepartmentScope(departmentDropdownData);
+
+      const rawScope = scopes[ruleKey] || scopes[moduleKey] || "";
+      const rawDeptScope = departments[ruleKey] || departments[moduleKey] || "";
+
+      const userScopeParts = rawScope ? expandScope(rawScope.toLowerCase()) : [];
+      const userScope = userScopeParts[0] ?? "";
+      const departmentScopeParts = rawDeptScope
+        ? expandDepartmentScope(rawDeptScope.toLowerCase())
+        : [];
+
+      const departmentScope = departmentScopeParts[0] ?? "";
+
+      if (!isChecked) {
+        userHasRule[fullActionKey] = 0;
+        return;
+      }
+
+      if (!userHasRule[fullActionKey]) {
+        userHasRule[fullActionKey] = {};
+      }
+
+      if (!userHasRule[fullActionKey][moduleKey]) {
+        userHasRule[fullActionKey][moduleKey] = {};
+      }
+
+      const moduleRef = userHasRule[fullActionKey][moduleKey];
+
+      if (isDepartmentScope) {
+        const scopeKey = userScope || "";
+        if (!moduleRef[scopeKey]) moduleRef[scopeKey] = {};
+        moduleRef[scopeKey][departmentScope] = 1;
+      } else {
+        const scopeKey = userScope || "";
+        moduleRef[scopeKey] = 1;
+      }
+    });
+
+    const formData = new FormData();
+    formData.append("data", JSON.stringify({ userHasRule }));
+    formData.append("company", user?.data?.baseCompany);
+
+    try {
+      const response = await fetch(`${ORIGIN}/user/api/user/update-user-has-rule-data?id=${id}`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorMessage = await response.json();
+
+        toast({
+          variant: "destructive",
+          title: "Failed",
+          description: `${errorMessage.message}` || "Error updating access control",
+          duration: 5000,
+        });
+
+        throw new Error("Failed to update user permissions");
+      }
+
+      const responseData = await response.json();
+      if (responseData) {
+        if (slug === "new" || "clone") {
+          toast({ title: "Success", duration: 2000 });
+        } else {
+          shareDataValue?.setRefreshSideBar?.(true);
+          toast({ title: responseData.message, duration: 2000 });
+        }
+      }
+
+      await mutateUserData();
+      setIsLoadedSuccessfully(true);
+      setShowAccessControl(false);
+    } catch (error) {
+      console.error("Error saving permissions:", error);
+      setIsLoadedSuccessfully(true);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    const values = form.getValues();
+
+    if (!values.username) {
+      form.setError("username", {
+        type: "required",
+        message: "Required",
+      });
+
+      return;
+    }
+
+    if (!isCompanyAssignmentData) {
+      toast({
+        title: "Assign Company",
+        description: "Must assign at least one company to create new user.",
+        variant: "destructive",
+      });
+
+      document.getElementById("employmentDetails")?.scrollIntoView({ behavior: "smooth" });
+
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await form.trigger();
+      await form.handleSubmit(onSubmit)();
+
+      if (isRBACChanged && slug !== "new" && slug !== "clone") {
+        await handleSaveRBAC(permissions);
+      }
+    } catch (error) {
+      console.error("Form submission error:", error);
+      setIsSaving(false);
+    }
+  };
+
+  const form = useForm<z.infer<typeof userFormSchema>>({
+    resolver: zodResolver(userFormSchema),
+    defaultValues: {
+      account: user?.account ?? "",
+      accountName: user?.accountName ?? "",
+      userGroup: user?.userGroup ?? "",
+      username: user?.username ?? "",
+      description: user?.description ?? "",
+      fullName: user?.fullName ?? "",
+      gender: user?.gender ?? "",
+      title: user?.title ?? "",
+      DOB: user?.DOB ?? "",
+      NRIC: user?.NRIC ?? "",
+      nationality: user?.nationality ?? "",
+      race: user?.race ?? "",
+      religion: user?.religion ?? "",
+      maritalStatus: user?.maritalStatus ?? "",
+      phoneNo: user?.phoneNo ?? "",
+      email: user?.email ?? "",
+      address: user?.address ?? "",
+      licenseNo: user?.licenseNo ?? "",
+      licenseClass: user?.licenseClass ? user.licenseClass.split(",") : [],
+      lastRenewalDate: user?.lastRenewalDate ?? "",
+      expirationDate: user?.expirationDate ?? "",
+      vehicleOwner: user?.vehicleOwner ?? "",
+      plateNo: user?.plateNo ?? "",
+      brand: user?.brand ?? "",
+      model: user?.model ?? "",
+      color: user?.color ?? "",
+      year: user?.year ?? "",
+      vehicleRemark: user?.vehicleRemark ?? "",
+      attempts: user?.attempts ?? "",
+      role: slug === "new" ? "User" : user?.role ?? "",
+      webAccess: user?.webAccess ?? "",
+      rememberMe: user?.rememberMe ?? "",
+      signature: user?.signature ?? "",
+      userGroupuserGroup: user?.userGroupuserGroup ?? "",
+      valid: user?.valid ?? "1",
+      UUID: user?.UUID ?? "",
+    },
+  });
+
+  useEffect(() => {
+    if (user) {
+      if (user.data) {
+        const userValue = user.data;
+        form.reset({
+          account: userValue?.account ?? "",
+          accountName: userValue?.accountName ?? "",
+          userGroup: userValue?.userGroup ?? "",
+          username: slug === "clone" ? null : userValue?.username ?? "",
+          description: userValue?.description ?? "",
+          fullName: slug === "clone" ? null : userValue?.fullName ?? "",
+          gender: userValue?.gender ?? "",
+          title: userValue?.title ?? "",
+          DOB: userValue?.DOB ?? "",
+          NRIC: userValue?.NRIC ?? "",
+          nationality: userValue?.nationality ?? "",
+          race: userValue?.race ?? "",
+          religion: userValue?.religion ?? "",
+          maritalStatus: userValue?.maritalStatus ?? "",
+          phoneNo: userValue?.phoneNo ?? "",
+          email: userValue?.email ?? "",
+          address: userValue?.address ?? "",
+          licenseNo: userValue?.licenseNo ?? "",
+          licenseClass: userValue?.licenseClass ? userValue.licenseClass.split(",") : [],
+          lastRenewalDate: userValue?.lastRenewalDate ?? "",
+          expirationDate: userValue?.expirationDate ?? "",
+          vehicleOwner: userValue?.vehicleOwner ?? "",
+          plateNo: userValue?.plateNo ?? "",
+          brand: userValue?.brand ?? "",
+          model: userValue?.model ?? "",
+          color: userValue?.color ?? "",
+          year: userValue?.year ?? "",
+          vehicleRemark: userValue?.vehicleRemark ?? "",
+          attempts: userValue?.attempts ?? "",
+          role: slug === "new" ? "User" : userValue?.role ?? "",
+          webAccess: userValue?.webAccess ?? "",
+          rememberMe: userValue?.rememberMe ?? "",
+          signature: userValue?.signature ?? "",
+          userGroupuserGroup: userValue?.userGroupuserGroup ?? "",
+          valid: userValue?.valid ?? "1",
+          UUID: userValue?.UUID ?? "",
+        });
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (slug === "new") {
+      const newCompanyList: DefaultCompany[] = [
+        {
+          companyName: "Testing Company",
+          remark: "Default company from auto generate",
+          valid: "1",
+        },
+      ];
+      setTempCompanyList(newCompanyList);
+    }
+  }, [slug]);
+
+  const onSubmit = async () => {
+    var form_data = new FormData();
+    var formValues = form.getValues();
+    var saveType =
+      slug == "clone" ? `create-data?c_id=1` : id ? `update-user-data?id=${id}` : `create-data`;
+
+    for (var key in formValues) {
+      form_data.append(`user[${key}]`, formValues[key] ? formValues[key] : "");
+    }
+
+    tempRowAssetAssignmentDetails.forEach((row, index) => {
+      for (const key in row) {
+        if (key !== "attachment") {
+          form_data.append(`assetAssignHasAsset[${index}][${key}]`, row[key]);
+        }
+      }
+    });
+
+    if (saveType === "create-data?c_id=1" || "create-data") {
+      if ("File" in window && tempProfileImage instanceof File) {
+        const base64 = await getFileToBase64(tempProfileImage);
+
+        form_data.append(`user[profileImage][0][Name]`, tempProfileImage.name);
+        form_data.append(`user[profileImage][0][File]`, base64);
+      }
+
+      tempRowCustomInfo.forEach((row, index) => {
+        for (const key in row) {
+          if (key !== "attachment") {
+            form_data.append(`userHasCustomInfo[${index}][${key}]`, row[key]);
+          }
+        }
+      });
+
+      tempRowContactDetails.forEach((row, index) => {
+        for (const key in row) {
+          if (key !== "attachment") {
+            form_data.append(`userHasContact[${index}][${key}]`, row[key]);
+          }
+        }
+      });
+
+      tempRowJobScopeInfo.forEach((row, index) => {
+        for (const key in row) {
+          if (key !== "attachment") {
+            form_data.append(`userHasJobScope[${index}][${key}]`, row[key]);
+          }
+        }
+      });
+
+      for (let i = 0; i < tempRowJobScopeInfo.length; i++) {
+        const row = tempRowJobScopeInfo[i];
+        let counter = 0;
+
+        if (Array.isArray(row.attachmentFiles)) {
+          for (const file of row.attachmentFiles) {
+            const base64 = await getFileToBase64(file);
+            form_data.append(`userHasJobScope[${i}][attachment][${counter}][Name]`, file.name);
+            form_data.append(`userHasJobScope[${i}][attachment][${counter}][File]`, base64);
+            counter++;
+          }
+        }
+      }
+
+      for (let i = 0; i < tempRowCustomInfo.length; i++) {
+        const row = tempRowCustomInfo[i];
+        let counter = 0;
+
+        if (Array.isArray(row.attachmentFiles)) {
+          for (const file of row.attachmentFiles) {
+            const base64 = await getFileToBase64(file);
+            form_data.append(`userHasCustomInfo[${i}][attachment][${counter}][Name]`, file.name);
+            form_data.append(`userHasCustomInfo[${i}][attachment][${counter}][File]`, base64);
+            counter++;
+          }
+        }
+      }
+
+      for (let i = 0; i < tempRowContactDetails.length; i++) {
+        const row = tempRowContactDetails[i];
+        let counter = 0;
+
+        if (Array.isArray(row.attachmentFiles)) {
+          for (const file of row.attachmentFiles) {
+            const base64 = await getFileToBase64(file);
+            form_data.append(`userHasContact[${i}][attachment][${counter}][Name]`, file.name);
+            form_data.append(`userHasContact[${i}][attachment][${counter}][File]`, base64);
+            counter++;
+          }
+        }
+      }
+
+      if (slug === "new" || slug === "clone") {
+        setIsLoadedSuccessfully(false);
+
+        const userHasRule: Record<string, any> = {};
+
+        const defaultKeys = [
+          "view",
+          "create",
+          "update",
+          "throw",
+          "restore",
+          "delete",
+          "download",
+          "auth",
+          "bill",
+          "print",
+          "preview",
+          "transfer-from",
+          "transfer-to",
+          "export",
+          "confirm",
+          "verify",
+          "compulsary",
+          "assignment",
+          "progress",
+          "generate-qr-code",
+          "disable",
+          "upload",
+        ];
+
+        Object.entries(permissions).forEach(([ruleKey, isChecked]) => {
+          const newValue = isChecked ? 1 : 0;
+          const oldValue = baseRules?.[ruleKey] ?? 0;
+
+          let action: string | null = null;
+          let moduleKey: string | null = null;
+
+          const sortedKeys = [...defaultKeys].sort((a, b) => b.length - a.length);
+
+          for (const key of sortedKeys) {
+            if (ruleKey.startsWith(`${key}-`)) {
+              action = key;
+              moduleKey = ruleKey.slice(key.length + 1);
+              break;
+            }
+          }
+
+          if (!action || !moduleKey) {
+            console.warn(`Unrecognized ruleKey format: ${ruleKey}`);
+            return;
+          }
+
+          const newScope = scopes[ruleKey] || scopes[moduleKey] || null;
+          const oldScope = baseScopes?.[moduleKey] ?? null;
+
+          const newDepartmentScope = departments[ruleKey] || departments[moduleKey] || null;
+          const oldDepartmentScope = baseDepartmentScopes?.[moduleKey] ?? null;
+
+          const ruleChanged = newValue !== oldValue;
+          const scopeChanged = isChecked && newScope !== oldScope;
+          const departmentScopeChanged = isChecked && newDepartmentScope !== oldDepartmentScope;
+
+          if (slug !== "clone") {
+            if (!ruleChanged && !scopeChanged && !departmentScopeChanged) return;
+          }
+
+          const fullActionKey = ruleKey;
+
+          const selectedScopeRaw =
+            scopes[ruleKey] || scopes[moduleKey] || departments[ruleKey] || departments[moduleKey];
+
+          const isDepartmentScope = Boolean(departments[ruleKey] || departments[moduleKey]);
+
+          const expandDepartmentScope = createExpandDepartmentScope(departmentDropdownData);
+
+          const rawScope = scopes[ruleKey] || scopes[moduleKey] || "";
+          const rawDeptScope = departments[ruleKey] || departments[moduleKey] || "";
+
+          const userScopeParts = rawScope ? expandScope(rawScope.toLowerCase()) : [];
+          const userScope = userScopeParts[0] ?? "";
+          const departmentScopeParts = rawDeptScope
+            ? expandDepartmentScope(rawDeptScope.toLowerCase())
+            : [];
+
+          const departmentScope = departmentScopeParts[0] ?? "";
+
+          if (!isChecked) {
+            userHasRule[fullActionKey] = 0;
+            return;
+          }
+
+          if (!userHasRule[fullActionKey]) {
+            userHasRule[fullActionKey] = {};
+          }
+
+          if (!userHasRule[fullActionKey][moduleKey]) {
+            userHasRule[fullActionKey][moduleKey] = {};
+          }
+
+          const moduleRef = userHasRule[fullActionKey][moduleKey];
+
+          if (isDepartmentScope) {
+            const scopeKey = userScope || "";
+            if (!moduleRef[scopeKey]) moduleRef[scopeKey] = {};
+            moduleRef[scopeKey][departmentScope] = 1;
+          } else {
+            const scopeKey = userScope || "";
+            moduleRef[scopeKey] = 1;
+          }
+        });
+
+        form_data.append("data", JSON.stringify({ userHasRule }));
+
+        if (tempRowCompanyAssignment && tempRowCompanyAssignment.length > 0) {
+          tempRowCompanyAssignment.forEach((row, index) => {
+            for (const key in row) {
+              if (key !== "attachment") {
+                form_data.append(`userHasCompany[${index}][${key}]`, row[key] ?? "");
+              }
+            }
+          });
+
+          let counter = 0;
+          for (const fileData of companyAssignmentFiles) {
+            if (fileData.link) {
+              form_data.append(
+                `userHasCompany[${counter}][attachment][${counter}][Name]`,
+                fileData.name,
+              );
+              form_data.append(`userHasCompany[${counter}][attachment][${counter}][File]`, "");
+            } else {
+              const base64 = await getFileToBase64(fileData);
+              form_data.append(
+                `userHasCompany[${counter}][attachment][${counter}][Name]`,
+                fileData.name,
+              );
+              form_data.append(`userHasCompany[${counter}][attachment][${counter}][File]`, base64);
+            }
+            counter++;
+          }
+        }
+      }
+    } else {
+      if ("File" in window && tempProfileImage instanceof File) {
+        const base64 = await getFileToBase64(tempProfileImage);
+
+        form_data.append(`user[profileImage][0][Name]`, tempProfileImage.name);
+        form_data.append(`user[profileImage][0][File]`, base64);
+      } else {
+        if (tempProfileImage?.link) {
+          form_data.append(`user[profileImage][0][Name]`, tempProfileImage.name);
+          form_data.append(`user[profileImage][0][File]`, "");
+        }
+      }
+    }
+
+    try {
+      const response = await fetch(`${ORIGIN}/user/api/user/${saveType}`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      const responseData = await response.json();
+      if (responseData && responseData.item) {
+        if (!isRBACChanged || slug === "new" || slug === "clone") {
+          const url = `/organization/user/edit?item=${responseData.item}&id=${responseData.data}`;
+          router.push(url);
+
+          if (responseData.data) {
+            refreshTable();
+          }
+
+          toast({
+            title: responseData.message,
+            duration: 2000,
+          });
+        }
+      } else if (responseData.message) {
+        if (!isRBACChanged || slug === "new" || slug === "clone") {
+          toast({
+            title: responseData.message,
+            duration: 2000,
+          });
+
+          if (id) {
+            refreshTable();
+          }
+        }
+      } else if (slug === "clone" && id) {
+        if (!isRBACChanged || slug === "clone") {
+          router.push(`/organization/user/clone?id=${id}`);
+          toast({
+            title: responseData.message,
+            duration: 2000,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error creating new user data:", error);
+      toast({
+        title: `${error.message}`,
+        duration: 2000,
+      });
+    } finally {
+      if (!isRBACChanged || slug === "new" || slug === "clone") {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  // Changelog
+  const [changelogData, setChangelogData] = useState(null);
+
+  const tabsWithChangelog = [
+    ...tabs,
+    ...(slug !== "new"
+      ? [
+          {
+            id: "changelog",
+            name: "Changelog",
+            shortName: "Changelog",
+            icon: FaTableList,
+          },
+        ]
+      : []),
+  ];
+
+  const handleReset = () => {
+    const excludedKeys = [
+      "account",
+      "accountName",
+      "_actionUUID",
+      "_version",
+      "UUID",
+      "company",
+      "companyName",
+    ];
+    if (slug == "new") {
+      //new reset all to empty
+      const defaultValues = Object.keys(form.getValues()).reduce((acc, key) => {
+        const originalValue = form.getValues(key); // Get the original value
+
+        if (!excludedKeys.includes(key)) {
+          acc[key] = ""; // Reset to an empty string
+        } else {
+          acc[key] = originalValue; // Keep the original value
+        }
+        return acc;
+      }, {});
+      defaultValues.valid = "1";
+      form.reset(defaultValues);
+    } else {
+      //reset back to previous data
+      form.reset();
+    }
+  };
+
+  const handleSave = async () => {
+    if (isUpdateRBAC) {
+      setShowAlertDialog(true);
+    } else {
+      handleNoIsUpdateRBAC();
+    }
+  };
+
+  const handleConfirmSave = () => {
+    setShowAlertDialog(false);
+    handleSubmit();
+  };
+
+  const handleNoIsUpdateRBAC = () => {
+    toast({
+      title: "Do Not Have Access",
+      description: "You do not have permission to edit RBAC.",
+      variant: "destructive",
+    });
+  };
+
+  const tableCompanyData = useMemo(() => {
+    if (id) return tempRowCompanyAssignment;
+    if (tempRowCompanyAssignment.length === 0) return tempCompanyList;
+    return [...tempCompanyList, ...tempRowCompanyAssignment];
+  }, [id, tempCompanyList, tempRowCompanyAssignment]);
+
+  return (
+    <div className="relative flex h-full flex-col">
+      <TopActionBar
+        left={
+          <>
+            <SaveButton
+              onSubmit={
+                isRBACChanged && slug !== "new" && slug !== "clone" ? handleSave : handleConfirmSave
+              }
+            />
+            {id && slug !== "clone" && <NewButton destination="/organization/user/new" />}
+            {id && slug !== "clone" && (
+              <CloneButton destination={`/organization/user/clone?id=${id}`} />
+            )}
+            <ResetButton onClick={handleReset} />
+            {id && slug !== "clone" && (
+              <DeleteButton
+                module={"user"}
+                model={"user"}
+                id={`${id}`}
+                indexPath={`/organization/user/`}
+              />
+            )}
+            <ResetPasswordButton userId={user ? user.data.UUID : ""} />
+            <CancelButton onClick={() => router.push(`/organization/user/`)} />
+          </>
+        }
+        right={
+          <>
+            <Form id="topActionBarForm" {...form}>
+              {/* Added onSubmit to Form */}
+              <FormField
+                control={form.control}
+                name="rememberMe"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <div className="flex items-center gap-x-2 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          {...field}
+                          checked={field.value === "1"}
+                          onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                        />
+                      </FormControl>
+                      <FormLabel>Remember me</FormLabel>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="valid"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-x-2 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        {...field}
+                        checked={field.value === "1"}
+                        onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                      />
+                    </FormControl>
+                    <FormLabel>Valid</FormLabel>
+                  </FormItem>
+                )}
+              />
+            </Form>
+          </>
+        }
+      />
+      <Form {...form}>
+        <div className="grid h-full grid-cols-[1fr_auto] gap-x-2 overflow-hidden">
+          <ScrollArea className="h-full">
+            <div id="mainDetails" className="mt-2">
+              <UserForm
+                user={userData}
+                key={formResetKey}
+                customInformationData={customInformationData}
+                tempRowCustomInfo={tempRowCustomInfo}
+                form={form}
+                tempProfileImage={tempProfileImage}
+                setTempProfileImage={setTempProfileImage}
+              />
+            </div>
+
+            {/* <AgreementDataTable columns={agreementColumns} data={agreementData} /> */}
+
+            <div id="moreDetails" className="mt-2">
+              <OtherDetailForm
+                key={formResetKey}
+                customInformationData={customInformationData}
+                tempRowCustomInfo={tempRowCustomInfo}
+                form={form}
+                slug={slug}
+              />
+            </div>
+
+            <div className="mt-2">
+              <CustomInformationDataTable
+                slug={slug}
+                columns={customInformationColumns}
+                data={
+                  id && slug !== "clone"
+                    ? customInformationData
+                      ? customInformationData.rows
+                      : []
+                    : tempRowCustomInfo
+                }
+                tempRowCustomInfo={tempRowCustomInfo}
+                setTempRowCustomInfo={setTempRowCustomInfo}
+                revalidateCustomInfoData={() => refreshTable("customInfo")}
+              />
+            </div>
+
+            <div id="personalDetails" className="mt-2">
+              <PersonalDetailsForm form={form} />
+            </div>
+
+            <div className="mt-2">
+              <ContactDetailsDataTable
+                slug={slug}
+                columns={ContactDetailsColumns}
+                data={
+                  id && slug !== "clone"
+                    ? contactDetailsData
+                      ? contactDetailsData.rows
+                      : []
+                    : tempRowContactDetails
+                }
+                tempRowContactDetails={tempRowContactDetails}
+                setTempRowContactDetails={setTempRowContactDetails}
+                revalidateContactDetailsData={() => refreshTable("contactDetails")}
+              />
+            </div>
+
+            {/* <div id="employmentDetails" className="mt-2">
+              <EmployementDetailsForm form={form} />
+            </div> */}
+
+            <div id="employmentDetails" className="mt-2">
+              <CompanyAssignmentDataTable
+                slug={slug}
+                columns={CompanyAssignmentColumns}
+                data={tableCompanyData}
+                tempRowCompanyAssignment={tempRowCompanyAssignment}
+                setTempRowCompanyAssignment={setTempRowCompanyAssignment}
+                revalidateCompanyAssignmentData={() => refreshTable("companyAssignment")}
+                accountId={userData?.account}
+                isLoading={isLoading}
+                form={form}
+                setIsCompanyAssignmentData={setIsCompanyAssignmentData}
+                companyAssignmentFiles={companyAssignmentFiles}
+                setCompanyAssignmentFiles={setCompanyAssignmentFiles}
+                setIsRBACChanged={setIsRBACChanged}
+              />
+            </div>
+
+            <div id="jobScopeDetails" className="mt-2">
+              <JobScopeInformationDataTable
+                slug={slug}
+                columns={JobScopeInformationColumns}
+                data={
+                  id && slug !== "clone"
+                    ? jobScopeInformationData
+                      ? jobScopeInformationData.rows
+                      : []
+                    : tempRowJobScopeInfo
+                }
+                tempRowJobScopeInfo={tempRowJobScopeInfo}
+                setTempRowJobScopeInfo={setTempRowJobScopeInfo}
+                revalidateJobScopeInfoData={() => refreshTable("jobScopeInfo")}
+              />
+            </div>
+
+            <div id="driverDetails" className="mt-2">
+              <DriverLicenseDetailsForm form={form} />
+            </div>
+
+            <div className="mt-2">
+              <VehicleDetailsForm form={form} />
+            </div>
+
+            <div id="assetAssigned" className="mt-2">
+              <AssetAssignmentDetailsDataTable
+                slug={slug}
+                columns={assetAssignmentDetailsColumns}
+                data={tempRowAssetAssignmentDetails}
+                tempRowAssetAssignmentDetails={tempRowAssetAssignmentDetails}
+                setTempRowAssetAssignmentDetails={setTempRowAssetAssignmentDetails}
+                revalidateAssetAssignmentDetails={mutateUserData}
+              />
+            </div>
+
+            <div id="rbac" className="mt-2">
+              <RBACTabs
+                userUUID={id}
+                selectedUserCompany={userData?.baseCompany}
+                accountUUID={userData?.account}
+                isLoadedSuccessfully={isLoadedSuccessfully}
+                setIsLoadedSuccessfully={setIsLoadedSuccessfully}
+                permissions={permissions}
+                setPermissions={setPermissions}
+                scopes={scopes}
+                setScopes={setScopes}
+                departments={departments}
+                setDepartments={setDepartments}
+                showAccessControl={showAccessControl}
+                setShowAccessControl={setShowAccessControl}
+                baseRules={baseRules}
+                setBaseRules={setBaseRules}
+                setBaseScopes={setBaseScopes}
+                setBaseDepartmentScopes={setBaseDepartmentScopes}
+                isUpdateRBAC={isUpdateRBAC}
+                setIsUpdateRBAC={setIsUpdateRBAC}
+                departmentDropdownData={departmentDropdownData}
+                setDepartmentDropdownData={setDepartmentDropdownData}
+              />
+            </div>
+
+            {slug !== "new" && (
+              <div id="changelog" className="mt-2">
+                <UserChangelogDataTable
+                  columns={changelogColumns}
+                  initialData={changelogData}
+                  // onTableParamsChange={handleTableParamsChange}
+                />
+              </div>
+            )}
+          </ScrollArea>
+
+          <TabsNavigator tabs={tabsWithChangelog} initialActiveTabId="mainDetails" />
+        </div>
+        {(isLoading || isValidating || isSaving) && <LoadingUI />}
+      </Form>
+
+      {showAlertDialog && (
+        <AlertDialog open={showAlertDialog} onOpenChange={setShowAlertDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogDescription className="text-md text-center text-primary">
+                Affected user will be logged out to make setting effective.
+                <br />
+                Continue?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="pr-40">
+              <AlertDialogCancel onClick={handleConfirmSave}>Yes</AlertDialogCancel>
+              <AlertDialogAction onClick={() => setShowAlertDialog(false)}>
+                Cancel
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+          {isSaving && <LoadingUI />}
+        </AlertDialog>
+      )}
+    </div>
+  );
+}

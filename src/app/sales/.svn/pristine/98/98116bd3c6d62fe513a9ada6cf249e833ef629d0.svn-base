@@ -1,0 +1,128 @@
+"use client";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type CustomInformation = {
+  fieldName: string;
+  fieldValue: string;
+  attachment: string | null;
+  valid: 0 | 1;
+  // Add optional properties for new records
+  attachmentLink?: { name: string; link: string }[];
+};
+
+export const customInformationColumns: ColumnDef<CustomInformation>[] = [
+  {
+    id: "fieldName",
+    accessorKey: "fieldName",
+    header: "Field Name",
+    filterFn: "includesString",
+  },
+  {
+    id: "fieldValue",
+    accessorKey: "fieldValue",
+    header: "Field Value",
+    filterFn: "includesString",
+  },
+  {
+    id: "attachment",
+    accessorKey: "attachment",
+    header: "Attachment (.pdf, .png, .jpg, .jpeg)",
+    cell: ({ row }) => {
+      const attachmentData = row.original.attachment;
+      const attachments = attachmentData ? JSON.parse(attachmentData) : null;
+      const attachmentLinks = row.original.attachmentLink;
+      const attachmentFiles = row.original.attachmentFiles;
+
+      // Handle temporary files (for new entries)
+      if (attachmentFiles && attachmentFiles.length > 0) {
+        return attachmentFiles
+          .map((file, index) => {
+            const link = attachmentLinks?.find((al) => al.name === file.name);
+            return link ? (
+              <a
+                key={index}
+                href={link.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "blue" }}
+              >
+                {file.name}
+              </a>
+            ) : (
+              <span key={index} style={{ color: "blue" }}>
+                {file.name}
+              </span>
+            );
+          })
+          .reduce((prev, curr) => [prev, ", ", curr]);
+      }
+
+      // Handle existing attachments
+      if (attachments && attachments.length > 0) {
+        return attachments
+          .map((att, index) => {
+            const link = attachmentLinks?.find((al) => al.name === att.Name);
+            return link ? (
+              <a
+                key={index}
+                href={link.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "blue" }}
+              >
+                {att.Name}
+              </a>
+            ) : (
+              <span key={index} style={{ color: "gray" }}>
+                {att.Name}
+              </span>
+            );
+          })
+          .reduce((prev, curr) => [prev, ", ", curr]);
+      }
+
+      return null;
+    },
+    filterFn: filterWithStringConversion,
+  },
+   {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+    filterFn: "includesString",
+  },
+  {
+    id: "createdByUsername",
+    accessorKey: "createdByUsername",
+    header: "Created by",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedByUsername",
+    accessorKey: "updatedByUsername",
+    header: "Updated by",
+    filterFn: "includesString",
+  },
+
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as CustomInformation["valid"];
+      return validity ? "Valid" : "Invalid";
+    },
+    // Custom filter function that first convert the row's numeric boolean
+    // value to string, then check if the string contains the filterValue
+    filterFn: filterWithStringConversion,
+  },
+];

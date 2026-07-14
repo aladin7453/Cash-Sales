@@ -1,0 +1,107 @@
+"use client";
+
+import React from "react";
+import { UseFormReturn } from "react-hook-form";
+
+import { Input } from "@/components/ui/input";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
+
+interface CustomerPostDatedChequeListingFormProps {
+  form: UseFormReturn<any>;
+  onSubmit: (data: any) => void;
+}
+
+export default function CustomerPostDatedChequeListingForm({ form, onSubmit }: CustomerPostDatedChequeListingFormProps) {
+  return (
+    <div className="rounded-sm w-full p-2 mx-auto bg-erp-blue-8 mt-2">
+      <div className="rounded-sm p-4 bg-erp-blue-4">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <h2 className="text-md font-bold mb-4">Summary</h2>
+
+            <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4">
+              <FormField
+                control={form.control}
+                name="total"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Total PD Cheque:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        readOnly
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="totalAmountPDCheque"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Total Amount PD Cheque:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        readOnly
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="totalUnapplied"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Total Unapplied:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        readOnly
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="totalKnockOff"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Total Knock Off:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        readOnly
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </div>
+    </div>
+  );
+}

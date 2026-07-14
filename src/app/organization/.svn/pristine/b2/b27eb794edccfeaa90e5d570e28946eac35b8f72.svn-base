@@ -1,0 +1,286 @@
+"use client";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { autoWordSize } from "@/lib/constants";
+import toStringAccessorFn from "@/lib/utils/data-table/toStringAccessorFn";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export const accountStatus = ["Active", "Suspended", "Terminated"] as const;
+
+export type User = {
+  UUID: string;
+  account: string;
+  userGroup: string;
+  username: string;
+  description: string;
+  fullName: string;
+  gender: string;
+  title: string;
+  DOB: string;
+  NRIC: string;
+  nationality: string;
+  race: string;
+  religion: string;
+  maritalStatus: string;
+  phoneNo: string;
+  email: string;
+  address: string;
+  licenseNo: string;
+  licenseClass: string;
+  lastRenewalDate: string;
+  expirationDate: string;
+  vehicleOwner: string;
+  plateNo: string;
+  brand: string;
+  model: string;
+  color: string;
+  year: string;
+  vehicleRemark: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  valid: "0" | "1";
+  _version: string;
+  _actionUUID: string;
+  profileImage: string;
+  attempts: string;
+  role: string;
+  webAccess: "0" | "1";
+  id: string;
+  lastRenewalDateFormat: string;
+  expirationDateFormat: string;
+  DOBFormat: string;
+  createdAtFormat: string;
+  updatedAtFormat: string;
+  userGroupuserGroup: string;
+  accountName: string;
+  createdByUsername: string;
+  updatedByUsername: string;
+  accessControl: string;
+};
+
+export const rawColumns: ColumnDef<User>[] = [
+  // {
+  //   id: "accountName",
+  //   accessorKey: "accountName",
+  //   header: "Sys Acc",
+  //   filterFn: "includesString"
+  // },
+  {
+    id: "userGroupuserGroup",
+    accessorKey: "userGroupuserGroup",
+    header: "User Group",
+    filterFn: "includesString",
+  },
+  {
+    id: "username",
+    accessorKey: "username",
+    header: "Username",
+    filterFn: "includesString",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    filterFn: "includesString",
+  },
+  {
+    id: "fullName",
+    accessorKey: "fullName",
+    header: "Full Name",
+    filterFn: "includesString",
+  },
+  {
+    id: "gender",
+    accessorKey: "gender",
+    header: "Gender",
+    filterFn: "includesString",
+  },
+  {
+    id: "title",
+    accessorKey: "title",
+    header: "Title",
+    filterFn: "includesString",
+  },
+  {
+    id: "DOBFormat",
+    accessorKey: "DOBFormat",
+    header: "DOB",
+    accessorFn: (row) => toStringAccessorFn(row, "DOBFormat"),
+    filterFn: "includesString",
+  },
+  {
+    id: "NRIC",
+    accessorKey: "NRIC",
+    header: "NRIC",
+    accessorFn: (row) => toStringAccessorFn(row, "NRIC"),
+    filterFn: "includesString",
+  },
+  {
+    id: "nationality",
+    accessorKey: "nationality",
+    header: "Nationality",
+    filterFn: "includesString",
+  },
+  {
+    id: "race",
+    accessorKey: "race",
+    header: "Race",
+    filterFn: "includesString",
+  },
+  {
+    id: "religion",
+    accessorKey: "religion",
+    header: "Religion",
+    filterFn: "includesString",
+  },
+  {
+    id: "maritalStatus",
+    accessorKey: "maritalStatus",
+    header: "Marital Status",
+    filterFn: "includesString",
+  },
+  {
+    id: "phoneNo",
+    accessorKey: "phoneNo",
+    header: "Phone No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "email",
+    accessorKey: "email",
+    header: "Email",
+    filterFn: "includesString",
+  },
+  {
+    id: "address",
+    accessorKey: "address",
+    header: "Address",
+    filterFn: "includesString",
+  },
+  {
+    id: "webAccess",
+    accessorKey: "webAccess",
+    header: "Web Access",
+    cell: ({ row }) => {
+      const validity = row.getValue("webAccess") as User["webAccess"];
+      return validity === "1" ? "Access" : "Denied";
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "licenseNo",
+    accessorKey: "licenseNo",
+    header: "License No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "lastRenewalDateFormat",
+    accessorKey: "lastRenewalDateFormat",
+    header: "Last Renewal Date",
+    accessorFn: (row) => toStringAccessorFn(row, "lastRenewalDateFormat"),
+    filterFn: "includesString",
+  },
+  {
+    id: "expirationDateFormat",
+    accessorKey: "expirationDateFormat",
+    header: "Expiration Date",
+    accessorFn: (row) => toStringAccessorFn(row, "expirationDateFormat"),
+    filterFn: "includesString",
+  },
+  // {
+  //   id: "vehicleOwner",
+  //   accessorKey: "vehicleOwner",
+  //   header: "Vehicle Owner",
+  // },
+  // {
+  //   id: "plateNo",
+  //   accessorKey: "plateNo",
+  //   header: "Plate No.",
+  // },
+  // {
+  //   id: "brand",
+  //   accessorKey: "brand",
+  //   header: "Brand",
+  // },
+  // {
+  //   id: "model",
+  //   accessorKey: "model",
+  //   header: "Model",
+  // },
+  // {
+  //   id: "color",
+  //   accessorKey: "color",
+  //   header: "Color",
+  // },
+  // {
+  //   id: "year",
+  //   accessorKey: "year",
+  //   header: "Year",
+  // },
+  // {
+  //   id: "vehicleRemark",
+  //   accessorKey: "vehicleRemark",
+  //   header: "Vehicle Remark",
+  // },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+    accessorFn: (row) => toStringAccessorFn(row, "createdAtFormat"),
+    filterFn: "includesString",
+  },
+  {
+    id: "createdByUsername",
+    accessorKey: "createdByUsername",
+    header: "Created by",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+    accessorFn: (row) => toStringAccessorFn(row, "updatedAtFormat"),
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedByUsername",
+    accessorKey: "updatedByUsername",
+    header: "Updated by",
+    filterFn: "includesString",
+  },
+  {
+    id: "role",
+    accessorKey: "role",
+    header: "Role",
+    filterFn: "includesString",
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as User["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    filterFn: "includesString",
+  },
+];
+
+export const columns: ColumnDef<User>[] = rawColumns.map((col) => {
+  if (typeof col.header === "string") {
+    const sizes = autoWordSize(col.header);
+
+    return {
+      ...col,
+      sizes,
+      size: sizes, //applied automatically
+      minSize: 50,
+    };
+  }
+
+  return col;
+});

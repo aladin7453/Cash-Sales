@@ -1,0 +1,691 @@
+"use client";
+
+import { useForm } from "react-hook-form";
+import { useEffect } from "react";
+
+import { useSearchParams } from "next/navigation";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+import type { DeliveryOrder } from "../../../columns";
+
+type Params = {
+  deliveryOrder?: DeliveryOrder | null;
+  setDeliveryOrder: (data: any) => void;
+  form: any;
+  row?: any;
+  jobAssignmentData?: any;
+};
+
+const jobAssignmentFormSchema = z.object({
+  UUID: z.union([z.string(), z.literal("")]),
+  jobID: z.union([z.string(), z.literal("")]),
+  deliveryOrderType: z.union([z.string(), z.literal("")]),
+  startPickupAtFormat: z.union([z.string(), z.literal("")]),
+  endPickupAtFormat: z.union([z.string(), z.literal("")]),
+  pickupLocation: z.union([z.string(), z.literal("")]),
+  pickupContact: z.union([z.string(), z.literal("")]),
+  pickupContactNo: z.union([z.string(), z.literal("")]),
+  pickupAddress: z.union([z.string(), z.literal("")]),
+  deliveryLocation: z.union([z.string(), z.literal("")]),
+  deliveryContact: z.union([z.string(), z.literal("")]),
+  deliveryContactNo: z.union([z.string(), z.literal("")]),
+  deliveryAddress: z.union([z.string(), z.literal("")]),
+  remark: z.union([z.string(), z.literal("")]),
+  estimateMinute: z.union([z.string(), z.literal("")]),
+  actualWorkingMinute: z.union([z.string(), z.literal("")]),
+  assignedAtFormat: z.union([z.string(), z.literal("")]),
+  assignedByFullName: z.union([z.string(), z.literal("")]),
+  startedAtFormat: z.union([z.string(), z.literal("")]),
+  startedByFullName: z.union([z.string(), z.literal("")]),
+  pickedUpAtFormat: z.union([z.string(), z.literal("")]),
+  pickedUpByFullName: z.union([z.string(), z.literal("")]),
+  deliveredAtFormat: z.union([z.string(), z.literal("")]),
+  deliveredByFullName: z.union([z.string(), z.literal("")]),
+  cancelledAtFormat: z.union([z.string(), z.literal("")]),
+  cancelledByFullName: z.union([z.string(), z.literal("")]),
+});
+
+export function JobAssignmentDetailsFormOld({ deliveryOrder, row, jobAssignmentData }: Params) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const data: any = jobAssignmentData;
+
+  const formatTime = (minutes: number) => {
+    if (minutes >= 60) {
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      return `${hours} Hour${hours > 1 ? "s" : ""} ${remainingMinutes} Minute${
+        remainingMinutes > 1 ? "s" : ""
+      }`;
+    } else {
+      return `${minutes} Minute${minutes > 1 ? "s" : ""}`;
+    }
+  };
+
+  const formattedEstimateMinute = formatTime(Number(data?.estimateMinute) || 0);
+  const formattedActualWorkingMinute = formatTime(Number(data?.actualWorkingMinute) || 0);
+
+  const form = useForm<z.infer<typeof jobAssignmentFormSchema>>({
+    resolver: zodResolver(jobAssignmentFormSchema),
+    defaultValues: {
+      UUID: "",
+      jobID: "",
+      deliveryOrderType: "",
+      startPickupAtFormat: "",
+      endPickupAtFormat: "",
+      pickupLocation: "",
+      pickupContact: "",
+      pickupContactNo: "",
+      pickupAddress: "",
+      deliveryLocation: "",
+      deliveryContact: "",
+      deliveryContactNo: "",
+      deliveryAddress: "",
+      remark: "",
+      estimateMinute: "",
+      actualWorkingMinute: "",
+      assignedAtFormat: "",
+      assignedByFullName: "",
+      startedAtFormat: "",
+      startedByFullName: "",
+      pickedUpAtFormat: "",
+      pickedUpByFullName: "",
+      deliveredAtFormat: "",
+      deliveredByFullName: "",
+      cancelledAtFormat: "",
+      cancelledByFullName: "",
+    },
+  });
+
+  // Update form when jobAssignmentData changes
+  useEffect(() => {
+    if (data) {
+      const formattedEstimateMinute = formatTime(Number(data.estimateMinute) || 0);
+      const formattedActualWorkingMinute = formatTime(Number(data.actualWorkingMinute) || 0);
+
+      form.reset({
+        UUID: data.UUID || "",
+        jobID: data.jobID || "",
+        deliveryOrderType: data.deliveryOrderType || "",
+        startPickupAtFormat: data.startPickupAtFormat || "",
+        endPickupAtFormat: data.endPickupAtFormat || "",
+        pickupLocation: data.pickupLocation || "",
+        pickupContact: data.pickupContact || "",
+        pickupContactNo: data.pickupContactNo || "",
+        pickupAddress: data.pickupAddress || "",
+        deliveryLocation: data.deliveryLocation || "",
+        deliveryContact: data.deliveryContact || "",
+        deliveryContactNo: data.deliveryContactNo || "",
+        deliveryAddress: data.deliveryAddress || "",
+        remark: data.remark || "",
+        estimateMinute: formattedEstimateMinute,
+        actualWorkingMinute: formattedActualWorkingMinute,
+        assignedAtFormat: data.assignedAtFormat || "",
+        assignedByFullName: data.assignedByFullName || "",
+        startedAtFormat: data.startedAtFormat || "",
+        startedByFullName: data.startedByFullName || "",
+        pickedUpAtFormat: data.pickedUpAtFormat || "",
+        pickedUpByFullName: data.pickedUpByFullName || "",
+        deliveredAtFormat: data.deliveredAtFormat || "",
+        deliveredByFullName: data.deliveredByFullName || "",
+        cancelledAtFormat: data.cancelledAtFormat || "",
+        cancelledByFullName: data.cancelledByFullName || "",
+      });
+    }
+  }, [data, form]);
+
+  const handleReset = () => {
+    form.reset({
+      UUID: "",
+      jobID: "",
+      deliveryOrderType: "",
+      startPickupAtFormat: "",
+      endPickupAtFormat: "",
+      pickupLocation: "",
+      pickupContact: "",
+      pickupContactNo: "",
+      pickupAddress: "",
+      deliveryLocation: "",
+      deliveryContact: "",
+      deliveryContactNo: "",
+      deliveryAddress: "",
+    });
+  };
+
+  return (
+    <div className="flex-col gap-2 md:flex md:flex-row">
+      <Card collapsible defaultCollapsed={false} className="shadow-md flex-[2]">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold">Job Assignment Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form>
+              { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+              <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="UUID"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid hidden h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="jobID"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Job ID:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="deliveryOrderType"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Job Type:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                          value={field.value}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-3 mt-4">
+                <FormField
+                  control={form.control}
+                  name="startPickupAtFormat"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Start Pickup Window:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="endPickupAtFormat"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>End Delivery Window:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-3 mt-4">
+                <FormField
+                  control={form.control}
+                  name="pickupLocation"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Pickup Location:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                          moduleName="deliveryOrder"
+                          fieldName="pickupLocation"
+                          columnName="Pickup Location"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="pickupContact"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Pickup Contact Name:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                          moduleName="deliveryOrder"
+                          fieldName="pickupContact"
+                          columnName="Pickup Contact Name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="pickupContactNo"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Pickup Contact No:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-1 mt-4">
+                <FormField
+                  control={form.control}
+                  name="pickupAddress"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Pickup Address:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                          moduleName="deliveryOrder"
+                          fieldName="pickupAddress"
+                          columnName="Pickup Address"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-3 mt-4">
+                <FormField
+                  control={form.control}
+                  name="deliveryLocation"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Delivery Location:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                          moduleName="deliveryOrder"
+                          fieldName="deliveryLocation"
+                          columnName="Delivery Location"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="deliveryContact"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Delivery Contact Name:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="deliveryContactNo"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Delivery Contact No:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-1 mt-4">
+                <FormField
+                  control={form.control}
+                  name="deliveryAddress"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Delivery Address:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-1 mt-4">
+                <FormField
+                  control={form.control}
+                  name="remark"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Job Remark:</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          className="h-7"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                          moduleName="deliveryOrder"
+                          fieldName="remark"
+                          columnName="Job Remark"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <Card collapsible defaultCollapsed={false} className="shadow-md flex-[1] mt-2 md:mt-0">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold">Job History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form>
+              { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+              <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="estimateMinute"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Estimated Working Hour:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="actualWorkingMinute"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Actual Working Hour:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+              <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-2 mt-4">
+                <FormField
+                  control={form.control}
+                  name="assignedAtFormat"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Assigned At:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="assignedByFullName"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Assigned By:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+              <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-2 mt-4">
+                <FormField
+                  control={form.control}
+                  name="startedAtFormat"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Started At:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="startedByFullName"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Started By:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+              <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-2 mt-4">
+                <FormField
+                  control={form.control}
+                  name="pickedUpAtFormat"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Pickup At:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="pickedUpByFullName"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Pickup By:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+              <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-2 mt-4">
+                <FormField
+                  control={form.control}
+                  name="deliveredAtFormat"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Delivered At:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="deliveredByFullName"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Delivered By:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

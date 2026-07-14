@@ -1,0 +1,208 @@
+"use client";
+
+import { usePathname, useSearchParams } from "next/navigation";
+import React from "react";
+
+import {
+  Breadcrumb,
+  BreadcrumbEllipsis,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+import { useDashboard } from "../app/dashboard/DashboardContext";
+
+// Logic Flow
+interface BreadcrumbSegment {
+  label: string;
+  pathway: string;
+  hasPage: boolean;
+  capitalize: boolean;
+  isLast: boolean;
+}
+
+function useBreadcrumbs(): BreadcrumbSegment[] {
+  const pathname = usePathname()
+    .replace("organization", "my-organization")
+    .replace("job-management", "job")
+    .replace("asset-management", "asset")
+    .replace("index.html", "")
+    .replace("index", "");
+
+  const searchParams = useSearchParams();
+
+  const rawSegments = pathname.split("/").filter(Boolean);
+
+  const invalid_pathway = new Set([
+    "sales-report",
+    "location",
+    "general-tools",
+    "job-report",
+    "purchase-report",
+    "assest-report",
+    "stock-report",
+    "cargo-tools",
+    "shipping-report",
+  ]);
+
+  return rawSegments.map((path, index) => {
+    let capitalize = true;
+    let label = decodeURIComponent(path).replaceAll("-", " ");
+    const fullPath = "/" + rawSegments.slice(0, index + 1).join("/");
+    const isLast = index === rawSegments.length - 1;
+
+    // Special rename
+    if (
+      (index === 1 && label.toLowerCase() === "stock") ||
+      (isLast && label.toLowerCase() === "stock" && rawSegments.length >= 3)
+    ) {
+      label = "Stock Item";
+    }
+
+    if (isLast && searchParams.has("item")) {
+      label = searchParams.get("item") ?? label;
+      capitalize = false;
+    }
+
+    switch (label) {
+      case "consolidated invoice":
+        label = "Consolidated e-Invoice";
+        capitalize = false;
+        break;
+      case "e invoice item classification":
+        label = "E-Invoice Item Classification";
+        capitalize = false;
+        break;
+      case "cargo shipping":
+        label = "Shipping";
+        capitalize = false;
+        break;
+      case "sales purchase contra":
+        label = "Customer Contra";
+        capitalize = false;
+        break;
+      case "sales profit loss report":
+        label = "Sales Profit/Loss Report";
+        capitalize = false;
+        break;
+    }
+
+    return {
+      label,
+      pathway: fullPath,
+      hasPage: !invalid_pathway.has(path),
+      capitalize,
+      isLast,
+    };
+  });
+}
+
+export default function AppBreadcrumb() {
+  const segments = useBreadcrumbs();
+  const firstSegment = segments[0];
+
+  const pathname = usePathname();
+  const isDashboard = pathname === "/dashboard";
+  const { widgetName, active, setActive } = useDashboard();
+
+  if (!segments.length) return null;
+  const shouldHideFirst = segments.length >= 3;
+
+  return (
+    <Breadcrumb className="hidden h-full px-1.5 md:block">
+      <BreadcrumbList>
+        {shouldHideFirst && (
+          <>
+            <BreadcrumbItem>
+              <BreadcrumbPage>
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon-md"
+                      variant="ghost"
+                      className="rounded-xl p-1 transition-all duration-300 ease-in-out hover:bg-[#EEEEEE]"
+                    >
+                      <BreadcrumbEllipsis />
+                    </Button>
+                  </DropdownMenuTrigger>
+
+                  <DropdownMenuContent className="hidden md:block">
+                    <DropdownMenuGroup>
+                      {firstSegment && (
+                        <DropdownMenuItem
+                          className={firstSegment.capitalize ? "capitalize" : undefined}
+                        >
+                          <span className="text-[clamp(11px,1.2vw,13px)]">
+                            {firstSegment.label}
+                          </span>
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+          </>
+        )}
+
+        {segments
+          .filter((_, index) => !(shouldHideFirst && index === 0))
+          .map((seg, index) => {
+            const isLastSegment = index === segments.length - 1;
+
+            return (
+              <React.Fragment key={index}>
+                {index !== 0 && <BreadcrumbSeparator />}
+
+                <BreadcrumbItem>
+                  {isDashboard && isLastSegment ? (
+                    <div className="flex items-center">
+                      <span className="text-[clamp(11px,1.2vw,13px)] capitalize">{seg.label}</span>
+
+                      <BreadcrumbSeparator className="mx-1" />
+
+                      <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="h-auto p-0 text-[clamp(11px,1.2vw,13px)] capitalize hover:bg-transparent"
+                          >
+                            {active}
+                          </Button>
+                        </DropdownMenuTrigger>
+
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuGroup>
+                            {widgetName?.map((name) => (
+                              <DropdownMenuItem key={name} onClick={() => setActive(name)}>
+                                {name}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ) : (
+                    <BreadcrumbPage className={seg.capitalize ? "capitalize" : undefined}>
+                      <span className="text-[clamp(11px,1.2vw,13px)]">{seg.label}</span>
+                    </BreadcrumbPage>
+                  )}
+                </BreadcrumbItem>
+              </React.Fragment>
+            );
+          })}
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+}

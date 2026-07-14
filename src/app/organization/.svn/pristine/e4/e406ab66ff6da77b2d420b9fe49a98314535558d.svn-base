@@ -1,0 +1,396 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { getAuthHeaders,ORIGIN } from "@/lib/constants";
+import { notFound, useSearchParams } from "next/navigation";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import ResetButton from "./Reset";
+import SaveButton from "./Save";
+import { FaFileCirclePlus } from "react-icons/fa6";
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+import { FaCircleXmark } from "react-icons/fa6";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import type { Dispatch, SetStateAction } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useLayoutEffect, useState, useRef } from "react";
+import type { CustomInformation } from "../custom-information/columns";
+
+type Props = {
+  open: boolean;
+  setOpen: Dispatch<SetStateAction<boolean>>;
+  setTempRowData: () => void;
+  revalidateCustomInfoData: () => void;
+  setUserData: Dispatch<SetStateAction<CustomInformation[]>>;
+};
+
+const customInformationFormSchema = z.object({
+  UUID: z.union([z.string(), z.literal("")]),
+  fieldName: z.string().min(2, {
+    message: "Field Name must be at least 2 characters.",
+  }),
+  fieldValue: z.string().min(2, {
+    message: "Field Value must be at least 2 characters.",
+  }),
+  attachment: z.custom((value) => {
+    if (!value || !value[0]) {
+      return "Attachment is required.";
+    }
+    return true;
+  }),
+  valid: z.union([z.string(), z.literal("")]),
+});
+
+export default function CustomInformationFormPopover({
+  slug,
+  open,
+  setOpen,
+  row,
+  setTempRowCustomInfoData,
+  revalidateCustomInfoData,
+}: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const data = row;
+  const { toast } = useToast();
+  const [customInfoFiles, setCustomInfoFiles] = useState([]);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const fileInputRef = useRef(null);
+  const headers = getAuthHeaders();
+
+  const handleChooseFileClick = () => {
+    fileInputRef.current.click(); // Trigger click event on file input
+  };
+
+  const handleReset = () => {
+    form.reset({
+      UUID: "",
+      fieldName: "",
+      fieldValue: "",
+      attachment: null,
+      valid: "1",
+    });
+  };
+
+  useEffect(() => {
+    if (open) {
+      !data && handleReset();
+      !data && setCustomInfoFiles([]);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (data && data.attachmentLink) {
+      setCustomInfoFiles(data.attachmentLink);
+    }
+    if (data && data.attachmentFiles) {
+      setCustomInfoFiles(data.attachmentFiles);
+    }
+
+    return () => {};
+  }, [data]);
+
+  function handleDeleteFile(index) {
+    var newCustomInfoFiles = [...customInfoFiles];
+    newCustomInfoFiles.splice(index, 1);
+    setCustomInfoFiles(newCustomInfoFiles);
+  }
+
+  const validateFileType = (file: File): boolean => {
+    const allowedTypes = [".pdf", ".png", ".jpg", ".jpeg"];
+    const fileExtension = "." + file.name.split(".").pop()?.toLowerCase();
+    return allowedTypes.includes(fileExtension);
+  };
+
+  const handleFileChange = (event) => {
+    const fileList = Array.from(event.target.files);
+
+    // Validate file types
+    for (const file of fileList) {
+      if (!validateFileType(file)) {
+        setFileError("Only (.pdf, .png, .jpg, .jpeg) files are allowed.");
+        return;
+      }
+    }
+
+    setFileError(null);
+    const mergeArray: any = [...customInfoFiles, ...fileList];
+    setCustomInfoFiles(mergeArray);
+  };
+
+  const form = useForm<z.infer<typeof customInformationFormSchema>>({
+    resolver: zodResolver(customInformationFormSchema),
+    defaultValues: {
+      UUID: data?.UUID !== undefined ? data.UUID : "",
+      fieldName: data?.fieldName !== undefined ? data.fieldName : "",
+      fieldValue: data?.fieldValue !== undefined ? data.fieldValue : "",
+      attachment: data?.attachment ? [new File([], data.attachment)] : null,
+      valid: data?.valid ?? "1",
+    },
+  });
+
+  useEffect(() => {
+    if (!data) return;
+
+    form.reset({
+      ...data,
+      UUID: slug === "clone" ? "" : data.UUID,
+    });
+  }, [data, slug, form]);
+
+  const updateCustomInfoData = async (data) => {
+    var counter = 0;
+    try {
+      const formData = new FormData();
+      for (var key in data) {
+        if (key !== "attachment") {
+          //exclude attachment first for testing,will add back later
+          formData.append(`userHasCustomInfo[${key}]`, data[key]);
+        }
+      }
+
+      for (const fileData of customInfoFiles) {
+        if (fileData.link) {
+          formData.append(
+            `userHasCustomInfo[attachment][${counter}][Name]`,
+            fileData.name
+          );
+          formData.append(
+            `userHasCustomInfo[attachment][${counter}][File]`,
+            ""
+          );
+        } else {
+          var base64 = await getFileToBase64(fileData);
+          formData.append(
+            `userHasCustomInfo[attachment][${counter}][Name]`,
+            fileData.name
+          );
+          formData.append(
+            `userHasCustomInfo[attachment][${counter}][File]`,
+            base64
+          );
+        }
+        counter++;
+      }
+
+      const response = await fetch(
+        `${ORIGIN}/user/api/user/update-custom-info-data?id=${id}`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        }
+      );
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 403) {
+          toast({
+            title: errorData.message,
+            duration: 2000,
+          });
+        }
+        throw new Error("Failed to fetch data");
+      }
+      const responseData = await response.json();
+      if (responseData) {
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      }
+
+      // Optionally, handle success or display a message to the user
+    } catch (error) {
+      console.error("Error updating custom information data:", error);
+    }
+  };
+
+  const onSubmit = async (values) => {
+    if (!values) return; // If values are empty or null, return without processing
+
+    // Assuming userListData is an array where you store your user data
+    const newData = { ...values }; // Copy form values
+    // Call the function to update custom information data if newData is valid
+    if (id && slug !== "clone") {
+      await updateCustomInfoData(newData);
+      revalidateCustomInfoData();
+    } else if (slug === "clone") {
+      newData.attachmentFiles = customInfoFiles;
+
+      setTempRowCustomInfoData(newData, false);
+    } else {
+      newData.attachmentFiles = customInfoFiles;
+
+      setTempRowCustomInfoData(newData);
+    }
+    setOpen(false); // Close the dialog after submission
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen} className="m-2">
+      <DialogContent className="max-w-6xl bg-erp-blue-3 p-2">
+        <Form {...form}>
+          <form className="space-y-2" onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="flex items-center justify-between pr-4">
+              <div className="grid auto-cols-fr grid-flow-col gap-x-1.5">
+                <SaveButton />
+                <ResetButton onClick={handleReset} />
+                <DialogClose asChild>
+                  <CancelButton />
+                </DialogClose>
+              </div>
+              <FormField
+                control={form.control}
+                name="valid"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-x-1.5 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value === "1"}
+                        onCheckedChange={(state) =>
+                          field.onChange(state ? "1" : "0")
+                        }
+                      />
+                    </FormControl>
+                    <FormLabel>Valid</FormLabel>
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="space-y-2.5 bg-white p-3 pt-2">
+              <h2 className="text-sm font-bold">Custom Information</h2>
+              <div className="grid grid-cols-3 gap-x-6 gap-y-2.5">
+                <FormField
+                  control={form.control}
+                  name="UUID"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid h-full hidden grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="fieldName"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Field Name:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7"
+                          {...field}
+                          moduleName="userHasCustomInfo"
+                          fieldName="fieldName"
+                          columnName="Field Name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="fieldValue"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Field Value:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7"
+                          {...field}
+                          moduleName="userHasCustomInfo"
+                          fieldName="fieldValue"
+                          columnName="Field Value"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div>
+                <FormField
+                  control={form.control}
+                  name="attachment"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          Attachment:{" "}
+                          <button type="button" onClick={handleChooseFileClick}>
+                            <FaFileCirclePlus
+                              style={{ marginLeft: "5px" }}
+                              className="text-erp-blue-14"
+                            />
+                          </button>
+                        </div>
+                      </FormLabel>
+
+                      <FormControl>
+                        <Input
+                          id="attachments"
+                          type="file"
+                          multiple
+                          onChange={handleFileChange}
+                          ref={fileInputRef}
+                          className="hidden"
+                        />
+                      </FormControl>
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* You can render the files here */}
+                {customInfoFiles &&
+                  customInfoFiles.map((file, index) => (
+                    <div className="flex items-center gap-x-0.5" key={index}>
+                      <a
+                        href={file.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "blue" }}
+                      >
+                        {file.name}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteFile(index)}
+                        style={{ color: "red" }}
+                      >
+                        <FaCircleXmark
+                          style={{
+                            verticalAlign: "bottom",
+                            marginLeft: "2px",
+                            marginTop: "2px",
+                          }}
+                          title={"Remove"}
+                        />
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

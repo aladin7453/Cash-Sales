@@ -1,0 +1,138 @@
+"use client";
+
+import { useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { FaMinus, FaPlus } from "react-icons/fa6";
+
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+// import Validity from "../../../Validity";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders,ORIGIN} from "@/lib/constants";
+
+import ConfirmationDialog from "./ConfirmationDialog";
+
+import type { Table } from "@tanstack/react-table";
+
+type Props<TData> = {
+  table: Table<TData>;
+  onAdd?: () => void;
+};
+
+export default function CustomInformationDataTableToolbar<TData>({
+  table,
+  onAdd,
+  tempRowCustomInfo,
+  setTempRowCustomInfoData,
+  revalidateCustomInfoData,
+}: Props<TData>) {
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
+  const [selectedRow, setSelectedRow] = useState("");
+
+  const handleDeleteConfirmation = async () => {
+    var form_data = new FormData();
+    const selectedRows = table.getSelectedRowModel().rows;
+    selectedRows.forEach((row, index) => {
+      form_data.append(`UUIDs[]`, row["original"]["UUID"]);
+    });
+    if (id) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/customer_tag/api/customer-tag/remove-customer-tag-has-custom-info`,
+          {
+            method: "POST",
+            headers,
+            body: form_data,
+          }
+        );
+        if (!response.ok) {
+          const errorData = await response.json();
+          if (response.status === 403) {
+            toast({
+              title: errorData.message,
+              duration: 2000,
+            });
+          }
+          throw new Error("Failed to fetch data");
+        }
+        const responseData = await response.json();
+      } catch (error) {
+        console.error("Error creating new customer tag data:", error);
+      }
+      revalidateCustomInfoData();
+      setShowConfirmationDialog(false);
+    } else {
+      const deletedIndex = selectedRows.map((item) => {
+        return item.index;
+      });
+      const remainRows = tempRowCustomInfo.filter(
+        (item, index) => !deletedIndex.includes(index)
+      );
+      setTempRowCustomInfoData(remainRows, true);
+      setShowConfirmationDialog(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between p-2.2">
+        <div className="flex items-center gap-x-1 pl-2">
+          {/* Add & Remove buttons aligned to the left */}
+          <div className="flex items-center gap-x-1 text-erp-blue-14">
+            <div className="flex flex-col items-center">
+              <Button
+                className="size-8"
+                variant="ghost"
+                size="icon"
+                onClick={onAdd}
+              >
+                <FaPlus className="size-5.5" />
+              </Button>
+              <span className="text-[11px]/none font-medium text-black">
+                Add
+              </span>
+            </div>
+            <div className="flex flex-col items-center">
+              <Button
+                className="size-8"
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowConfirmationDialog(true)}
+              >
+                <FaMinus className="size-5.5" />
+              </Button>
+              <span className="text-[11px]/none font-medium text-black">
+                Remove
+              </span>
+            </div>
+          </div>
+        </div>
+        {/* Pagination Section */}
+        <Pagination table={table} />
+
+        {/* ActionGroupEnd */}
+        <div className="flex items-center gap-x-3 pr-2 text-erp-blue-14">
+          {/* Other actions */}
+          <Export table={table} />
+          <Refresh refreshTable={revalidateCustomInfoData} />
+          {/* <Validity table={table} /> */}
+          <ColumnVisibilityToggle table={table} />
+        </div>
+      </div>
+
+      <ConfirmationDialog
+        open={showConfirmationDialog}
+        setOpen={setShowConfirmationDialog}
+        onConfirm={handleDeleteConfirmation}
+      />
+    </>
+  );
+}

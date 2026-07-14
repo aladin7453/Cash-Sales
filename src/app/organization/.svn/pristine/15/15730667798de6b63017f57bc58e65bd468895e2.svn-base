@@ -1,0 +1,564 @@
+import type { Section } from "../sections";
+
+export const organizationSection: Section = {
+  access: "Organization",
+  children: [
+    {
+      access: "Company",
+      hasScope: true,
+      allowedActions: [
+        "View",
+        "New",
+        "Edit",
+        "Clone",
+        "Trash",
+        "Restore",
+        "Delete",
+        "Export",
+      ],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "User List",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Department",
+      hasScope: true,
+      allowedActions: [
+        "View",
+        "New",
+        "Edit",
+        "Clone",
+        "Trash",
+        "Restore",
+        "Delete",
+        "Export",
+      ],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "User List",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Authorized Location",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Job Title",
+      hasScope: true,
+      allowedActions: [
+        "View",
+        "New",
+        "Edit",
+        "Clone",
+        "Trash",
+        "Restore",
+        "Delete",
+        "Export",
+      ],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "User List",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Authorized Location",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "User Group",
+      hasScope: true,
+      allowedActions: [
+        "View",
+        "New",
+        "Edit",
+        "Clone",
+        "Trash",
+        "Restore",
+        "Delete",
+        "Export",
+      ],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "User List",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "User",
+      hasScope: true,
+      allowedActions: [
+        "View",
+        "New",
+        "Edit",
+        "Clone",
+        "Trash",
+        "Restore",
+        "Delete",
+        "Export",
+      ],
+      children: [
+        {
+          access: "Main Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "More Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Personal Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Employment Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Job hasScope",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Driver Details",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "Asset Assigned",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+        {
+          access: "RBAC",
+          hasScope: true,
+          allowedActions: ["View", "Edit", "Reset"],
+        },
+      ],
+    },
+    {
+      access: "Location",
+      hasScope: true,
+      allowedActions: ["View", "Edit"],
+      children: [
+        {
+          access: "Location Type",
+          hasScope: true,
+          allowedActions: [
+            "View",
+            "New",
+            "Edit",
+            "Clone",
+            "Trash",
+            "Restore",
+            "Delete",
+            "Export",
+          ],
+          children: [
+            {
+              access: "Main Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "More Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+          ],
+        },
+        {
+          access: "Location",
+          hasScope: true,
+          allowedActions: [
+            "View",
+            "New",
+            "Edit",
+            "Clone",
+            "Trash",
+            "Restore",
+            "Delete",
+            "Export",
+          ],
+          children: [
+            {
+              access: "Main Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "More Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "User List",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "Contact",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "Stock Balance",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      access: "General Tools",
+      hasScope: true,
+      allowedActions: ["View"],
+      children: [
+        {
+          access: "Project",
+          hasScope: true,
+          allowedActions: [
+            "View",
+            "New",
+            "Edit",
+            "Clone",
+            "Trash",
+            "Restore",
+            "Delete",
+            "Export",
+          ],
+          children: [
+            {
+              access: "Main Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "More Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+          ],
+        },
+        {
+          access: "E-Invoice Item Classification",
+          hasScope: true,
+          allowedActions: [
+            "View",
+            "New",
+            "Edit",
+            "Clone",
+            "Trash",
+            "Restore",
+            "Delete",
+            "Export",
+          ],
+          children: [
+            {
+              access: "Main Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "More Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+          ],
+        },
+        {
+          access: "Payment Method",
+          hasScope: true,
+          allowedActions: [
+            "View",
+            "New",
+            "Edit",
+            "Clone",
+            "Trash",
+            "Restore",
+            "Delete",
+            "Export",
+          ],
+          children: [
+            {
+              access: "Main Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "More Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+          ],
+        },
+        {
+          access: "Currency",
+          hasScope: true,
+          allowedActions: [
+            "View",
+            "New",
+            "Edit",
+            "Clone",
+            "Trash",
+            "Restore",
+            "Delete",
+            "Export",
+          ],
+          children: [
+            {
+              access: "Main Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "More Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+          ],
+        },
+        {
+          access: "Shipper",
+          hasScope: true,
+          allowedActions: [
+            "View",
+            "New",
+            "Edit",
+            "Clone",
+            "Trash",
+            "Restore",
+            "Delete",
+            "Export",
+          ],
+          children: [
+            {
+              access: "Main Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "More Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+          ],
+        },
+        {
+          access: "Credit Terms",
+          hasScope: true,
+          allowedActions: [
+            "View",
+            "New",
+            "Edit",
+            "Clone",
+            "Trash",
+            "Restore",
+            "Delete",
+            "Export",
+          ],
+          children: [
+            {
+              access: "Main Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "More Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+          ],
+        },
+        {
+          access: "Tag",
+          hasScope: true,
+          allowedActions: [
+            "View",
+            "New",
+            "Edit",
+            "Clone",
+            "Trash",
+            "Restore",
+            "Delete",
+            "Export",
+          ],
+          children: [
+            {
+              access: "Main Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "More Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+          ],
+        },
+        {
+          access: "Tariff",
+          hasScope: true,
+          allowedActions: [
+            "View",
+            "New",
+            "Edit",
+            "Clone",
+            "Trash",
+            "Restore",
+            "Delete",
+            "Export",
+          ],
+          children: [
+            {
+              access: "Main Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "More Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+          ],
+        },
+        {
+          access: "Tax Type",
+          hasScope: true,
+          allowedActions: [
+            "View",
+            "New",
+            "Edit",
+            "Clone",
+            "Trash",
+            "Restore",
+            "Delete",
+            "Export",
+          ],
+          children: [
+            {
+              access: "Main Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "More Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+          ],
+        },
+        {
+          access: "Tax",
+          hasScope: true,
+          allowedActions: [
+            "View",
+            "New",
+            "Edit",
+            "Clone",
+            "Trash",
+            "Restore",
+            "Delete",
+            "Export",
+          ],
+          children: [
+            {
+              access: "Main Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "More Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+          ],
+        },
+        {
+          access: "Withholding Tax",
+          hasScope: true,
+          allowedActions: [
+            "View",
+            "New",
+            "Edit",
+            "Clone",
+            "Trash",
+            "Restore",
+            "Delete",
+            "Export",
+          ],
+          children: [
+            {
+              access: "Main Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+            {
+              access: "More Details",
+              hasScope: true,
+              allowedActions: ["View", "Edit", "Reset"],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};

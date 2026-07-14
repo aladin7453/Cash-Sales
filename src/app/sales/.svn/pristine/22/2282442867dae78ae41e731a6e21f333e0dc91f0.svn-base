@@ -1,0 +1,453 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+import { z } from "zod";
+
+import DropdownTable from "@/components/data-table/DropdownTable";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+
+import { AuthorizedUser } from "./columns";
+import ResetButton from "./Reset";
+import SaveButton from "./Save";
+
+import type { Dispatch, SetStateAction } from "react";
+
+type Props = {
+  open: boolean;
+  setOpen: Dispatch<SetStateAction<boolean>>;
+  rowId?: string;
+  setTempRowAuthorizedUserData: (data: any, overwrite: boolean) => void;
+  revalidateAuthorizedUserData: () => void;
+  setLocationTypeData: Dispatch<SetStateAction<AuthorizedUser[]>>;
+};
+
+const AuthorizedUserFormSchema = z.object({
+  UUID: z.union([z.string(), z.literal("")]),
+  authorizedUser: z.union([z.string(), z.literal("")]),
+  fullName: z.string().min(2, {
+    message: "Full Name must be at least 2 characters.",
+  }),
+  title: z.string().min(2, {
+    message: "Title must be at least 2 characters.",
+  }),
+  department: z.string().min(2, {
+    message: "Department must be at least 2 characters.",
+  }),
+  jobTitle: z.string().min(2, {
+    message: "Job Title must be at least 2 characters.",
+  }),
+  phoneNo: z.string().min(2, {
+    message: "Phone No. must be at least 2 characters.",
+  }),
+  email: z.string().min(2, {
+    message: "Email must be at least 2 characters.",
+  }),
+  remark: z.string(),
+  valid: z.union([z.literal("0"), z.literal("1")]).default("1"),
+});
+
+export default function AuthorizedDetailsFormPopover({
+  open,
+  setOpen,
+  row,
+  setTempRowAuthorizedUserData,
+  revalidateAuthorizedUserData,
+  accountId,
+}: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const data: any = row;
+  const { toast } = useToast();
+  const headers = getAuthHeaders();
+
+  const [showTableFullName, setShowTableFullName] = useState(false);
+
+  const [fullNameDropdownTableData, setFullNameDropdownTableData] = useState([]);
+
+  const dropdownFullNameColumns = [
+    { accessorKey: "fullName", header: "Full Name" },
+    { accessorKey: "title", header: "Title" },
+    { accessorKey: "phoneNo", header: "Phone No" },
+    { accessorKey: "email", header: "Email" },
+  ];
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableFullName(false);
+    }
+  };
+
+  // Attach click event listener to the document body
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    // Cleanup: remove event listener when component unmounts
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  const toggleTableFullName = async () => {
+    var account = accountId;
+    account ? (account = account) : (account = "");
+
+    if (!showTableFullName) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-user-by-account?id=${accountId}`, {
+          headers,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch user list drop-down data");
+        }
+        const accountData = await response.json();
+        setFullNameDropdownTableData(accountData.rows);
+        setShowTableFullName(true);
+      } catch (error) {
+        console.error("Error fetching user list drop-down data:", error);
+      }
+    } else {
+      setShowTableFullName(false);
+    }
+  };
+
+  const onClickRowFullName = (row) => {
+    form.setValue("UUID", "");
+    form.setValue("authorizedUser", row.UUID);
+    form.setValue("fullName", row.fullName);
+    form.setValue("title", row.title);
+    form.setValue("department", row.department);
+    form.setValue("jobTitle", row.jobTitle);
+    form.setValue("phoneNo", row.phoneNo);
+    form.setValue("email", row.email);
+    setShowTableFullName(false);
+  };
+
+  const form = useForm<z.infer<typeof AuthorizedUserFormSchema>>({
+    resolver: zodResolver(AuthorizedUserFormSchema),
+    defaultValues: {
+      UUID: data?.UUID ?? "",
+      authorizedUser: data?.authorizedUser !== undefined ? data.authorizedUser : "",
+      fullName: data?.fullName !== undefined ? data?.fullName : "",
+      title: data?.title !== undefined ? data?.title : "",
+      department: data?.department !== undefined ? data.department : "",
+      jobTitle: data?.jobTitle !== undefined ? data.jobTitle : "",
+      phoneNo: data?.phoneNo !== undefined ? data?.phoneNo : "",
+      email: data?.email !== undefined ? data.email : "",
+      remark: data?.remark !== undefined ? data.remark : "",
+      valid: data?.valid ?? "1",
+    },
+  });
+
+  const updateAuthorizedUserData = async (data) => {
+    try {
+      const formData = new FormData();
+
+      for (var key in data) {
+        formData.append(`customerGroupHasAuthorizedUser[${key}]`, data[key]);
+      }
+
+      const response = await fetch(
+        `${ORIGIN}/customer_group/api/customer-group/update-customer-group-has-authorized-user-data?id=${id}`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 403) {
+          toast({
+            title: errorData.message,
+            duration: 2000,
+          });
+        }
+        throw new Error("Failed to fetch data");
+      }
+
+      const responseData = await response.json();
+      if (responseData) {
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      }
+
+      // Optionally, handle success or display a message to the user
+    } catch (error) {
+      console.error("Error updating authorized user data:", error);
+      // Handle errors, e.g., display an error message or log the error
+    }
+  };
+
+  const onSubmit = async (values) => {
+    if (!values) return; // If values are empty or null, return without processing
+
+    // Assuming authorizedUserData is an array where you store your user data
+    const newData = { ...values };
+    // Call the function to update custom information data if newData is valid
+    if (id) {
+      await updateAuthorizedUserData(newData);
+      revalidateAuthorizedUserData();
+    } else {
+      setTempRowAuthorizedUserData(newData, false);
+    }
+    setOpen(false);
+  };
+
+  const handleReset = () => {
+    form.reset({
+      UUID: "",
+      authorizedUser: "",
+      fullName: "",
+      title: "",
+      department: "",
+      jobTitle: "",
+      phoneNo: "",
+      email: "",
+      remark: "",
+      valid: "1",
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-3xl bg-erp-blue-3 p-2">
+        <Form {...form}>
+          <form className="space-y-2" onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="flex items-center justify-between pr-4">
+              <div className="grid auto-cols-fr grid-flow-col gap-x-1.5">
+                <SaveButton />
+                <ResetButton onClick={handleReset} />
+                <DialogClose asChild>
+                  <CancelButton />
+                </DialogClose>
+              </div>
+              <FormField
+                control={form.control}
+                name="valid"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-x-1.5 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value === "1"}
+                        onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                      />
+                    </FormControl>
+                    <FormLabel>Valid</FormLabel>
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="space-y-2.5 bg-white p-3 pt-2">
+              <h2 className="text-sm font-bold">Authorized User</h2>
+              <div className="grid grid-flow-col-dense  grid-cols-1 items-start gap-x-8 gap-y-2.5 md:grid-cols-4 ">
+                <FormField
+                  control={form.control}
+                  name="UUID"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid hidden h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="authorizedUser"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid hidden h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Authorized User:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="fullName"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Full Name:</FormLabel>
+                      <FormControl className="relative">
+                        <div className="relative h-7.5">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                            onClick={toggleTableFullName}
+                            ref={inputRef}
+                            autoComplete="off"
+                          />
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="text-gray-400" />
+                          </div>
+                          {showTableFullName && (
+                            <div
+                              ref={dropdownRef}
+                              className="absolute top-full z-50 h-[400px] overflow-y-auto rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownFullNameColumns}
+                                  data={fullNameDropdownTableData}
+                                  onClickRow={onClickRowFullName}
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Title:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="department"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Department:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="jobTitle"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Job Title:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-flow-col-dense  grid-cols-1 items-start gap-x-8 gap-y-2.5 md:grid-cols-4 ">
+                <FormField
+                  control={form.control}
+                  name="phoneNo"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Phone Number:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Email:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          readOnly
+                          style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-flow-col-dense  grid-cols-1 items-start gap-x-8 gap-y-2.5 md:grid-cols-4 ">
+                <FormField
+                  control={form.control}
+                  name="remark"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Remark:</FormLabel>
+                      <FormControl>
+                        <Textarea className="h-7" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

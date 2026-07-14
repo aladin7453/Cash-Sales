@@ -1,0 +1,824 @@
+"use client";
+
+import React, { useEffect, useRef, useState } from "react";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+  FormLabel
+} from "@/components/ui/form";
+
+import {
+  TooltipProvider,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
+
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+
+type Params = {
+  form: any;
+  supplierCode: string;
+  defaultCurrentCompany: any;
+  salesInvoiceData?: any;
+  isMobile?: boolean;
+};
+
+export function SupplierDetailsForm({
+  form,
+  supplierCode,
+  defaultCurrentCompany,
+  salesInvoiceData,
+  isMobile
+}: Params) {
+  const headers = getAuthHeaders();
+
+  const [currentCompanyUUID, setCurrentCompanyUUID] = useState<string | null>(
+    null,
+  );
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  // MSIC Code Dropdown
+  const [showTableMSICCode, setShowTableMSICCode] = useState(false);
+  const [MSICCodeDropdownTableData, setMSICCodeDropdownTableData] = useState(
+    [],
+  );
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredMSICCodeData = MSICCodeDropdownTableData.filter(
+    (row) =>
+      row.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      row.description.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+
+  const dropdownMSICCodeColumns = [
+    { accessorKey: "code", header: "MSIC" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableMSICCode(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  // Auto-fetch current company UUID and fill in fields on mount
+  useEffect(() => {
+    const currentCompany = JSON.parse(
+      localStorage.getItem("currentCompany") || "null",
+    );
+
+    if (currentCompany?.UUID) {
+      setCurrentCompanyUUID(currentCompany.UUID);
+
+      const fetchAndFill = async () => {
+        try {
+          const authHeaders = getAuthHeaders();
+          const res = await fetch(
+            `${ORIGIN}/universal/get-current-company?id=${currentCompany.UUID}`,
+            { headers: authHeaders },
+          );
+
+          if (!res.ok) throw new Error("Failed to fetch current company");
+
+          const data = await res.json();
+          const companyData = data.data;
+
+          form.setValue("supplierName", companyData.company);
+          form.setValue("supplierTIN", companyData.TIN);
+          form.setValue("supplierBRN", companyData.BRN);
+          form.setValue("supplierSSTNo", companyData.SSTNo);
+          form.setValue("supplierTTXNo", companyData.TTxNo);
+          form.setValue("supplierMSICCode", companyData.MSIC);
+          form.setValue("MISCCodeCode", companyData.MSICCode);
+          setSearchTerm(companyData.MSICCode);
+          form.setValue("supplierBusinessNature", companyData.businessNature);
+          form.setValue("supplierEmail", companyData.email);
+          form.setValue("supplierPhoneNo", companyData.phoneNo);
+          form.setValue("supplierAddress", companyData.address);
+        } catch (error) {
+          console.error("Error fetching current company data:", error);
+        }
+      };
+
+      fetchAndFill();
+    }
+  }, []);
+
+  // Fallback
+  useEffect(() => {
+    if (defaultCurrentCompany) {
+      const companyData = defaultCurrentCompany.data;
+
+      form.setValue("supplierName", companyData.company);
+      form.setValue("supplierTIN", companyData.TIN);
+      form.setValue("supplierBRN", companyData.BRN);
+      form.setValue("supplierSSTNo", companyData.SSTNo);
+      form.setValue("supplierTTXNo", companyData.TTxNo);
+      form.setValue("supplierMSICCode", companyData.MSIC);
+      form.setValue("MISCCodeCode", companyData.MSICCode);
+      setSearchTerm(companyData.MSICCode);
+      form.setValue("supplierBusinessNature", companyData.businessNature);
+      form.setValue("supplierEmail", companyData.email);
+      form.setValue("supplierPhoneNo", companyData.phoneNo);
+      form.setValue("supplierAddress", companyData.address);
+    }
+  }, [defaultCurrentCompany]);
+
+  useEffect(() => {
+    const misc =
+      salesInvoiceData?.data?.MISCCodeCode ?? salesInvoiceData?.MISCCodeCode;
+    if (misc) {
+      setSearchTerm(misc);
+    }
+  }, [salesInvoiceData]);
+
+  const toggleTableMSICCode = async () => {
+    const formData = new FormData();
+    formData.append("table[]", "MISCCode");
+
+    if (!showTableMSICCode) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/universal/get-all-drop-down-table-data`,
+          { method: "POST", headers, body: formData },
+        );
+
+        if (!response.ok) throw new Error("Failed to fetch MSIC drop-down data");
+
+        const MSICCodeData = await response.json();
+        setMSICCodeDropdownTableData(MSICCodeData.rows);
+        setShowTableMSICCode(true);
+      } catch (error) {
+        console.error("Error fetching MSICCode drop-down data:", error);
+      }
+    } else {
+      setShowTableMSICCode(false);
+    }
+  };
+
+  const onClickRowMSICCode = (row) => {
+    form.setValue("supplierMSICCode", row.UUID);
+    form.setValue("MISCCodeCode", row.code);
+    form.setValue("supplierBusinessNature", row.description);
+    setSearchTerm(row.code);
+    setShowTableMSICCode(false);
+  };
+
+  if (isMobile) {
+    return (
+      <>
+        <div className="flex flex-col gap-y-4 px-1 py-2.5">
+          <h1 className="mt-3 font-bold uppercase text-black">Me</h1>
+
+          {/* First Row */}
+          <div className="grid grid-cols-2 items-center gap-x-3">
+            {/* Supplier UUID */}
+            <FormField
+              control={form.control}
+              name="supplier"
+              render={({ field }) => (
+                <FormItem className="hidden">
+                  <FormControl>
+                    <Input className="h-7.5" {...field} readOnly />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Supplier Name */}
+            <FormField
+              control={form.control}
+              name="supplierName"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">Supplier Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-10 rounded-md border border-gray-200 bg-erp-gray-1/50 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out focus-visible:ring-0"
+                      {...field}
+                      moduleName="salesInvoice"
+                      fieldName="supplierName"
+                      columnName="Supplier Name"
+                      placeholder="Supplier Name"
+                      readOnly
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Supplier TIN */}
+            <FormField
+              control={form.control}
+              name="supplierTIN"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">Supplier TIN</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-10 rounded-md border border-gray-200 bg-erp-gray-1/50 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out focus-visible:ring-0"
+                      {...field}
+                      moduleName="salesInvoice"
+                      fieldName="supplierTIN"
+                      columnName="Supplier TIN"
+                      placeholder="Supplier TIN"
+                      readOnly
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Second Row */}
+          <div className="grid grid-cols-2 items-center gap-x-3">
+            {/* Supplier BRN/NRIC */}
+            <FormField
+              control={form.control}
+              name="supplierBRN"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">Supplier BRN/NRIC</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-10 rounded-md border border-gray-200 bg-erp-gray-1/50 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out focus-visible:ring-0"
+                      {...field}
+                      placeholder="Supplier BRN/NRIC"
+                      readOnly
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Supplier SST No */}
+            <FormField
+              control={form.control}
+              name="supplierSSTNo"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">Supplier SST No</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-10 rounded-md border border-gray-200 bg-erp-gray-1/50 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out focus-visible:ring-0"
+                      {...field}
+                      placeholder="Supplier SST No"
+                      readOnly
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Third Row */}
+          <div className="grid grid-cols-2 items-center gap-x-3">
+            {/* TTX No */}
+            <FormField
+              control={form.control}
+              name="supplierTTXNo"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">TTx No</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-10 rounded-md border border-gray-200 bg-erp-gray-1/50 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out focus-visible:ring-0"
+                      {...field}
+                      placeholder="TTx No"
+                      readOnly
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* MSIC UUID (hidden) */}
+            <FormField
+              control={form.control}
+              name="supplierMSICCode"
+              render={({ field }) => (
+                <FormItem className="hidden">
+                  <FormControl>
+                    <Input className="h-7.5" {...field} readOnly={true} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* MSIC Code */}
+            <FormField
+              control={form.control}
+              name="MISCCodeCode"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">MSIC</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Input
+                        className="h-10 rounded-md border border-gray-200 bg-erp-gray-1/50 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out focus-visible:ring-0"
+                        {...field}
+                        onClick={toggleTableMSICCode}
+                        ref={inputRef}
+                        value={searchTerm}
+                        onChange={(e) => {
+                          setSearchTerm(e.target.value);
+                          setShowTableMSICCode(true);
+                        }}
+                        autoComplete="off"
+                        placeholder="MSIC"
+                        readOnly
+                      />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Forth Row */}
+          <div className="grid grid-cols-2 items-center gap-x-3">
+            {/* Business Nature */}
+            <FormField
+              control={form.control}
+              name="supplierBusinessNature"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">Business Nature</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-10 rounded-md border border-gray-200 bg-erp-gray-1/50 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out focus-visible:ring-0"
+                      {...field}
+                      placeholder="Business Nature"
+                      readOnly
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Supplier Email */}
+            <FormField
+              control={form.control}
+              name="supplierEmail"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">Supplier Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-10 rounded-md border border-gray-200 bg-erp-gray-1/50 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out focus-visible:ring-0"
+                      {...field}
+                      moduleName="salesInvoice"
+                      fieldName="supplierEmail"
+                      columnName="Supplier Email"
+                      placeholder="Supplier Email"
+                      readOnly
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Fifth Row */}
+          <div className="grid grid-cols-1 items-center">
+            {/* Supplier Phone */}
+            <FormField
+              control={form.control}
+              name="supplierPhoneNo"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">Supplier Phone</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="h-10 rounded-md border border-gray-200 bg-erp-gray-1/50 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out focus-visible:ring-0"
+                      {...field}
+                      placeholder="Supplier Phone"
+                      readOnly
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Supplier Address */}
+          <div className="flex-1">
+            <FormField
+              control={form.control}
+              name="supplierAddress"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="text-[11px] font-semibold tracking-wider text-black">Supplier Address</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      className="h-[100px] px-2 bg-white border border-gray-200 bg-erp-gray-1/50 resize-none text-gray-500 text-[11px] outline-none transition-all duration-300 ease-in-out shadow-sm focus-visible:ring-0"
+                      placeholder="Supplier Address"
+                      {...field}
+                      readOnly
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <Card className="w-full !shadow-none border-none">
+      <div className="w-full flex justify-between items-center px-0.5 pt-1.5">
+        <CardTitle className="text-sm font-bold">
+          Me
+        </CardTitle>
+      </div>
+      <CardContent className="p-0">
+        <Form {...form}>
+          <form>
+            <div className="flex flex-col gap-y-2.5 pt-1.5">
+              {/* First Row */}
+              <div className="grid grid-cols-3 items-center gap-x-2">
+                {/* Supplier UUID */}
+                <FormField
+                  control={form.control}
+                  name="supplier"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <Input className="h-7.5" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Supplier Name */}
+                <FormField
+                  control={form.control}
+                  name="supplierName"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md bg-erp-gray-1 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                moduleName="salesInvoice"
+                                fieldName="supplierName"
+                                columnName="Supplier Name"
+                                placeholder="Supplier Name"
+                                readOnly
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Supplier Name
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Supplier TIN */}
+                <FormField
+                  control={form.control}
+                  name="supplierTIN"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md bg-erp-gray-1 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                moduleName="salesInvoice"
+                                fieldName="supplierTIN"
+                                columnName="Supplier TIN"
+                                placeholder="Supplier TIN"
+                                readOnly
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Supplier TIN
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Supplier BRN/NRIC */}
+                <FormField
+                  control={form.control}
+                  name="supplierBRN"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md bg-erp-gray-1 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                placeholder="Supplier BRN/NRIC"
+                                readOnly
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Supplier BRN/NRIC
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Second Row */}
+              <div className="grid grid-cols-3 items-center gap-x-2">
+                {/* Supplier SST No */}
+                <FormField
+                  control={form.control}
+                  name="supplierSSTNo"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md bg-erp-gray-1 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                placeholder="Supplier SST No"
+                                readOnly
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Supplier SST No
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* TTX No */}
+                <FormField
+                  control={form.control}
+                  name="supplierTTXNo"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md bg-erp-gray-1 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                placeholder="TTx No"
+                                readOnly
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              TTx No
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* MSIC UUID (hidden) */}
+                <FormField
+                  control={form.control}
+                  name="supplierMSICCode"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <Input className="h-7.5" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* MSIC Code */}
+                <FormField
+                  control={form.control}
+                  name="MISCCodeCode"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormControl className="relative">
+                        <div className="relative">
+                          <TooltipProvider delayDuration={1000}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Input
+                                  className="h-7.5 rounded-md bg-erp-gray-1 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out"
+                                  {...field}
+                                  onClick={toggleTableMSICCode}
+                                  ref={inputRef}
+                                  value={searchTerm}
+                                  onChange={(e) => {
+                                    setSearchTerm(e.target.value);
+                                    setShowTableMSICCode(true);
+                                  }}
+                                  autoComplete="off"
+                                  placeholder="MSIC"
+                                  readOnly
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" align="center">
+                                MISC
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Third Row */}
+              <div className="grid grid-cols-3 items-center gap-x-2">
+                {/* Business Nature */}
+                <FormField
+                  control={form.control}
+                  name="supplierBusinessNature"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md bg-erp-gray-1 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                placeholder="Business Nature"
+                                readOnly
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Business Nature
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Supplier Email */}
+                <FormField
+                  control={form.control}
+                  name="supplierEmail"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md bg-erp-gray-1 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                moduleName="salesInvoice"
+                                fieldName="supplierEmail"
+                                columnName="Supplier Email"
+                                placeholder="Supplier Email"
+                                readOnly
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Supplier Email
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Supplier Phone */}
+                <FormField
+                  control={form.control}
+                  name="supplierPhoneNo"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7.5 rounded-md bg-erp-gray-1 px-2 text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                placeholder="Supplier Phone"
+                                readOnly
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Supplier Phone
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Supplier Address */}
+              <div className="flex-1">
+                <FormField
+                  control={form.control}
+                  name="supplierAddress"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Textarea
+                                className="h-[85px] rounded-md bg-erp-gray-1 px-2 resize-none text-[11px] text-gray-500 outline-none transition-all duration-300 ease-in-out"
+                                placeholder="Supplier Address"
+                                {...field}
+                                readOnly
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Supplier Address
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

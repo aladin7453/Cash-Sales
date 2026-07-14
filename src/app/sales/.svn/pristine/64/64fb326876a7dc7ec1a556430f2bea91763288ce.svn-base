@@ -1,0 +1,428 @@
+"use client";
+
+import { endOfMonth, startOfMonth } from "date-fns";
+import moment from "moment";
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+
+import SalesReport from "@/components/templates/sales/salesReportTemplate";
+import { DEFAULT_DATA_TABLE_PAGE_SIZE, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+
+import { salesSNProfitLossReportColumns } from "./Generate/columns";
+import SalesSNProfitLossReportDataTable from "./Generate/DataTable";
+import SalesSNProfitLossReportForm from "./Report/SalesSNProfitLossReportForm";
+import SummaryForm from "./Report/SummaryForm";
+
+import type { ColumnFiltersState, SortingState } from "@tanstack/react-table";
+
+const COLUMN_FILTERS_KEY = "sales-s-n-profit-loss-report.table.filters";
+const PAGINATION_KEY = "sales-s-n-profit-loss-report.table.pagination";
+const SORTING_KEY = "sales-s-n-profit-loss-report.table.sorting";
+
+export default function SalesSNProfitLossReportPage() {
+  const [tempGeneratedReportList, setTempGeneratedReportList] = useState<any[]>([]);
+  const [hasGenerated, setHasGenerated] = useState("0");
+  const [showReportTable, setShowReportTable] = useState(false);
+  const [previewPDF, setPreviewPDF] = useState<any>(null);
+  const [salesReportData, setSalesReportData] = useState<any>(null);
+  const [summaryData, setSummaryData] = useState<any>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+  // Add totalCounts state with default total: 0
+  const [totalCounts, setTotalCounts] = useState<{ total: number }>({ total: 0 });
+
+  const [columnFilters, setColumnFilters] = useLocalStorage<ColumnFiltersState>(
+    COLUMN_FILTERS_KEY,
+    [],
+  );
+
+  const [pagination, setPagination] = useLocalStorage(PAGINATION_KEY, {
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+  });
+
+  const [sorting, setSorting] = useLocalStorage<SortingState>(SORTING_KEY, []);
+
+  const headers = getAuthHeaders();
+
+  const filterFields = [
+    "docNo",
+    "docDate",
+    "itemCode",
+    "itemCost",
+    "price",
+    "itemProfitLoss",
+    "status",
+    "profitLossPercentage",
+  ];
+
+  const form = useForm({
+    defaultValues: {
+      docType: "all",
+      docNo: "",
+      startDate: Math.floor(startOfMonth(new Date()).getTime() / 1000).toString(),
+      endDate: Math.floor(endOfMonth(new Date()).getTime() / 1000).toString(),
+
+      docDate: "",
+      itemCode: "",
+      itemCost: "",
+      price: "",
+      itemProfitLoss: "",
+      status: "",
+      profitLossPercentage: "",
+      valid: "1",
+
+      // Add summary fields
+      total: "0",
+      totalCostReport: "0.00",
+      totalPriceReport: "0.00",
+      totalProfitItemCountReport: "0",
+      totalLossItemCountReport: "0",
+      averageProfitPercentageReport: "0.00",
+      averageLossPercentageReport: "0.00",
+
+      groupByDocNo: false,
+      groupByDocDate: false,
+      groupByCustomerName: false,
+      groupByItemCode: false,
+      groupByItemName: false,
+    },
+  });
+
+  const generateReport = async (formData: any) => {
+    try {
+      // Get all form values
+      const allFormValues = form.getValues();
+
+      const filterObject = {};
+
+      filterFields.forEach((key) => {
+        // Map docDate to docDateFormat for the filter
+        const formKey = key === "docDateFormat" ? "docDate" : key;
+
+        if (allFormValues[formKey]) {
+          if (key === "docDateFormat") {
+            // Format docDate as YYYY-MM-DD
+            const formattedDate = moment.unix(allFormValues[formKey]).format("YYYY-MM-DD");
+
+            filterObject[key] = formattedDate;
+          } else {
+            filterObject[key] = allFormValues[formKey];
+          }
+        }
+      });
+
+      // Extract docType for URL parameter and remove from filter
+      const docTypeParam = filterObject.docType || "";
+
+      delete filterObject.docType;
+
+      const params = new FormData();
+
+      // Add sales[docType] explicitly
+      params.append("sales[docType]", docTypeParam);
+
+      params.append(
+        "param[filter]",
+        Object.keys(filterObject).length > 0 ? JSON.stringify(filterObject) : "{}",
+      );
+
+      params.append("param[offset]", `${pagination.pageIndex * pagination.pageSize}`);
+
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "docDateFormat");
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc",
+      );
+
+      // Add valid parameter
+      if (formData.valid) {
+        params.append("param[valid]", formData.valid);
+      }
+
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value) {
+          params.append(`sales[${key}]`, value as string);
+        }
+      });
+
+      const docType = formData.docType || "all";
+
+      const response = await fetch(
+        `${ORIGIN}/sales_report/api/sales-report/generate-report?docType=${docType}&reportType=salesProfitLossSerialNo`,
+        {
+          method: "POST",
+          headers,
+          body: params,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate sales s/n profit/loss report");
+      }
+
+      const result = await response.json();
+      const rows = result.rows || [];
+
+      // Set totalCounts after fetching
+      setTotalCounts({ total: result.total ?? rows.length });
+
+      // Set summary values from backend response
+      form.setValue("total", result.total ?? "0");
+      form.setValue("totalCostReport", result.summary?.totalCostReport ?? "0.00");
+      form.setValue("totalPriceReport", result.summary?.totalPriceReport ?? "0.00");
+      form.setValue(
+        "totalProfitItemCountReport",
+        result.summary?.totalProfitItemCountReport ?? "0",
+      );
+      form.setValue("totalLossItemCountReport", result.summary?.totalLossItemCountReport ?? "0");
+      form.setValue(
+        "averageProfitPercentageReport",
+        result.summary?.averageProfitPercentageReport ?? "0.00",
+      );
+      form.setValue(
+        "averageLossPercentageReport",
+        result.summary?.averageLossPercentageReport ?? "0.00",
+      );
+
+      setTempGeneratedReportList(result.rows || []);
+      setShowReportTable(true);
+      setHasGenerated("1");
+    } catch (error) {
+      console.error("Error generating sales s/n profit/loss report:", error);
+    }
+  };
+
+  const previewReport = async (formData: any) => {
+    setPreviewPDF(null);
+    setIsPreviewLoading(true);
+
+    try {
+      let reportName = null;
+      const docType = formData.docType;
+
+      const reportTypeName = formData.reportTypeName;
+
+      // const levelMatch = reportTypeName.match(/lv(\d+)/i);
+
+      // if (levelMatch) {
+      //   reportName = `level${levelMatch[1]}`;
+      // }
+
+      // Get all form values
+      const allFormValues = form.getValues();
+
+      const filterObject: Record<string, any> = {};
+
+      filterFields.forEach((key) => {
+        if ((allFormValues as any)[key]) {
+          let filterKey = key;
+          let filterValue = (allFormValues as any)[key];
+
+          // if (key === "startDate" || key === "endDate") {
+          //   // Convert Unix timestamp to YYYY-MM-DD format
+          //   filterValue = moment.unix(filterValue).format("YYYY-MM-DD");
+          //   filterKey = key === "docDate" ? "docDateFormat" : "matureDateFormat";
+          // }
+
+          filterObject[filterKey] = filterValue;
+        }
+      });
+
+      const params = new FormData();
+
+      params.append(
+        "param[filter]",
+        Object.keys(filterObject).length > 0 ? JSON.stringify(filterObject) : "{}",
+      );
+
+      // params.append(
+      //   "param[offset]",
+      //   `${pagination.pageIndex * pagination.pageSize}`
+      // );
+
+      // params.append("param[limit]", `${pagination.pageSize}`);
+      params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "docDateFormat");
+
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc",
+      );
+
+      // Add valid parameter
+      if (formData.valid) {
+        params.append("param[valid]", formData.valid);
+      }
+
+      // Add form data to params
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value) params.append(`sales[${key}]`, value as string);
+      });
+
+      if (reportName) {
+        // const hasCustomerName = /customername/i.test(reportTypeName);
+
+        params.append("sales[groupBy][0]", "docDateFormat");
+        params.append("sales[groupBy][1]", "docNo");
+      }
+
+      const baseUrl = `${ORIGIN}/sales_report/api/sales-report/preview-pdf`;
+
+      let url = `${baseUrl}?docType=${docType}&reportType=salesProfitLossSerialNo`;
+
+      if (reportName) {
+        url += `&reportName=${reportName}`;
+      }
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: params,
+      });
+
+      // const filterObject = {};
+
+      // filterFields.forEach((key) => {
+      //   // Map docDate to docDateFormat for the filter
+      //   const formKey = key === "docDateFormat" ? "docDate" : key;
+      //   if (allFormValues[formKey]) {
+      //     if (key === "docDateFormat") {
+      //       // Format docDate as YYYY-MM-DD
+      //       const formattedDate = moment.unix(allFormValues[formKey]).format("YYYY-MM-DD");
+      //       filterObject[key] = formattedDate;
+      //     } else {
+      //       filterObject[key] = allFormValues[formKey];
+      //     }
+      //   }
+      // });
+
+      // // Extract docType for URL parameter and remove from filter
+      // const docTypeParam = filterObject.docType || "";
+
+      // delete filterObject.docType;
+
+      // const params = new FormData();
+
+      // // Add sales[docType] explicitly
+      // params.append("sales[docType]", docTypeParam);
+
+      // params.append(
+      //   "param[filter]",
+      //   Object.keys(filterObject).length > 0
+      //     ? JSON.stringify(filterObject)
+      //     : "{}"
+      // );
+
+      // params.append(
+      //   "param[offset]",
+      //   `${pagination.pageIndex * pagination.pageSize}`
+      // );
+
+      // // params.append("param[limit]", `${pagination.pageSize}`);
+      // params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "docDateFormat");
+
+      // params.append(
+      //   "param[order]",
+      //   sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc",
+      // );
+
+      // // Add valid parameter
+      // if (formData.valid) {
+      //   params.append("param[valid]", formData.valid);
+      // }
+
+      // // Add form data to params
+      // Object.entries(formData).forEach(([key, value]) => {
+      //   if (value) params.append(`sales[${key}]`, value as string);
+      // });
+
+      // const docType = formData.docType || "all";
+
+      // const response = await fetch(
+      //   `${ORIGIN}/sales_report/api/sales-report/preview-pdf?docType=${docType}&reportType=salesProfitLossSerialNo`,
+      //   {
+      //     method: "POST",
+      //     headers,
+      //     body: params,
+      //   }
+      // );
+
+      if (!response.ok) {
+        throw new Error("Failed to preview sales s/n profit/loss report");
+      }
+
+      const result = await response.json();
+      const rows = result.rows || [];
+
+      // Set totalCounts after fetching
+      setTotalCounts({ total: result.total ?? rows.length });
+
+      // Set summary values from backend response
+      form.setValue("total", result.total ?? "0");
+      form.setValue("totalCostReport", result.summary?.totalCostReport ?? "0.00");
+      form.setValue("totalPriceReport", result.summary?.totalPriceReport ?? "0.00");
+      form.setValue(
+        "totalProfitItemCountReport",
+        result.summary?.totalProfitItemCountReport ?? "0",
+      );
+      form.setValue("totalLossItemCountReport", result.summary?.totalLossItemCountReport ?? "0");
+      form.setValue(
+        "averageProfitPercentageReport",
+        result.summary?.averageProfitPercentageReport ?? "0.00",
+      );
+      form.setValue(
+        "averageLossPercentageReport",
+        result.summary?.averageLossPercentageReport ?? "0.00",
+      );
+
+      setPreviewPDF(result);
+      setSalesReportData(formData);
+    } catch (error) {
+      console.error("Error previewing sales s/n profit/loss report:", error);
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  const onSubmit = (data: any) => {
+    setTempGeneratedReportList([]);
+    setShowReportTable(false);
+
+    generateReport(data);
+  };
+
+  return (
+    <>
+      <SalesSNProfitLossReportForm
+        form={form}
+        onSubmit={onSubmit}
+        onPreview={previewReport}
+        previewPDF={previewPDF}
+        salesReportData={salesReportData}
+        generatedReport={tempGeneratedReportList}
+        salesReportColumns={salesSNProfitLossReportColumns}
+        setSorting={setSorting}
+        filterFields={filterFields}
+        sorting={sorting}
+      />
+      <SummaryForm form={form} onSubmit={onSubmit} />
+      {showReportTable && (
+        <SalesSNProfitLossReportDataTable
+          columns={salesSNProfitLossReportColumns}
+          data={tempGeneratedReportList}
+          revalidateSalesSNProfitLossReport={() => generateReport(form.getValues())}
+          columnFilters={columnFilters}
+          setColumnFilters={setColumnFilters}
+          pagination={pagination}
+          setPagination={setPagination}
+          sorting={sorting}
+          setSorting={setSorting}
+          formData={form.getValues()}
+          totalNumOfRows={+totalCounts.total}
+        />
+      )}
+    </>
+  );
+}

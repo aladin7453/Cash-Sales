@@ -1,0 +1,74 @@
+// components/LineChart.tsx
+"use client";
+
+import {
+  CategoryScale,
+  Chart as ChartJS,
+  Legend,
+  LinearScale,
+  LineElement,
+  PointElement,
+  Title,
+  Tooltip,
+} from "chart.js";
+import { Line } from "react-chartjs-2";
+
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+
+interface Dataset {
+  label: string;
+  data: number[];
+  borderColor?: string;
+  backgroundColor?: string;
+}
+
+interface LineChartProps {
+  yAxis: string;
+  labels: string[];
+  datasets: Dataset[];
+}
+
+export default function LineChart({ yAxis, labels, datasets }: LineChartProps) {
+  const chartData = {
+    labels,
+    datasets: datasets.map((ds) => ({
+      ...ds,
+      borderColor: ds.borderColor || "rgba(54, 162, 235, 1)",
+      backgroundColor: ds.backgroundColor || "rgba(54, 162, 235, 0.2)",
+      tension: 0.4,
+      fill: false,
+      pointRadius: 5,
+      pointHoverRadius: 7,
+    })),
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "bottom" as const,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: yAxis,
+        },
+      },
+    },
+  };
+
+  return (
+    <div
+      className="ml-4 flex w-full flex-col text-sm"
+      style={{ marginTop: "10px", height: "200px" }}
+    >
+      <Line data={chartData} options={options} />
+    </div>
+  );
+}

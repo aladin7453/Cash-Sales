@@ -1,0 +1,224 @@
+"use client";
+
+import React from "react";
+
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+
+import type { Company } from "../../../columns";
+
+type Params = {
+  company?: Company | null;
+  form: any;
+  defaultCollapsed?: boolean;
+  slug: string;
+};
+
+export function EInvoiceUsageForm({ form, defaultCollapsed = false, slug }: Params) {
+  const isTesting = form.watch("testing") === "1";
+  const isProduciton = !isTesting || slug === "new";
+
+  const handleTestingChange = (checked: boolean) => {
+    form.setValue("testing", checked);
+    if (checked) {
+      form.setValue("production", false);
+    }
+  };
+
+  const handleProductionChange = (checked: boolean) => {
+    form.setValue("production", checked);
+    if (checked) {
+      form.setValue("testing", false);
+    }
+  };
+
+  return (
+    <Card className="shadow" collapsible={true} defaultCollapsed={defaultCollapsed}>
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">E-Invoice Usage</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form className="space-y-8">
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+              {isTesting && (
+                <div className="space-y-2.5">
+                  <FormField
+                    control={form.control}
+                    name="testing"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2">
+                        <FormControl>
+                          <Checkbox
+                            checked={slug === "clone" ? false : field.value}
+                            onCheckedChange={handleTestingChange}
+                          />
+                        </FormControl>
+                        <FormLabel className="font-normal">Testing</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <FormField
+                      control={form.control}
+                      name="ClientID"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Testing Client ID:</FormLabel>
+                          <FormControl>
+                            <Input
+                              className="h-8"
+                              {...field}
+                              moduleName="company"
+                              fieldName="ClientID"
+                              columnName="Testing Client ID"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <FormField
+                      control={form.control}
+                      name="ClientSecret1"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Testing Client Secret 1:</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="password"
+                              className="h-8"
+                              {...field}
+                              moduleName="company"
+                              fieldName="ClientSecret1"
+                              columnName="Testing Client Secret 1"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="ClientSecret2"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Testing Client Secret 2:</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="password"
+                              className="h-8"
+                              {...field}
+                              moduleName="company"
+                              fieldName="ClientSecret2"
+                              columnName="Testing Client Secret 2"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {isProduciton && (
+                <div className="space-y-2.5">
+                  <FormField
+                    control={form.control}
+                    name="production"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2">
+                        <FormControl>
+                          <Checkbox
+                            checked={slug === "clone" ? false : field.value}
+                            onCheckedChange={handleProductionChange}
+                          />
+                        </FormControl>
+                        <FormLabel className="font-normal">Production</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <FormField
+                      control={form.control}
+                      name="productionClientID"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Production Client ID:</FormLabel>
+                          <FormControl>
+                            <Input
+                              className="h-8"
+                              {...field}
+                              moduleName="company"
+                              fieldName="productionClientID"
+                              columnName="Production Client ID"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <FormField
+                      control={form.control}
+                      name="productionClientSecret1"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Production Client Secret 1:</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="password"
+                              className="h-8"
+                              {...field}
+                              moduleName="company"
+                              fieldName="productionClientSecret1"
+                              columnName="Production Client Secret 1"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="productionClientSecret2"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Production Client Secret 2:</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="password"
+                              className="h-8"
+                              {...field}
+                              moduleName="company"
+                              fieldName="productionClientSecret2"
+                              columnName="Production Client Secret 2"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

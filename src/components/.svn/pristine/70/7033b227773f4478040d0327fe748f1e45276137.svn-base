@@ -1,0 +1,123 @@
+import type { ColumnDef, Table } from "@tanstack/react-table";
+
+export interface TransferFromSource {
+  key: string;
+  label: string;
+  apiDocType: string;
+  transferDocType: string;
+}
+
+export interface TransferFromConfig {
+  module: string;
+  model: string;
+  apiNamespace: string;
+  sources: TransferFromSource[];
+  documentColumns: ColumnDef<any>[];
+  itemColumns: ColumnDef<any>[];
+  documentsEndpoint?: string;
+  documentDetailsEndpoint?: string;
+  transferEndpoint?: string;
+  transferEndpointSuffix?: string;
+  buttonText?: string;
+  dialogTitle?: string;
+  documentPopoverTitle?: string;
+  detailsPopoverTitle?: string;
+}
+
+export type FilterConfig = {
+  column: string;
+  value: string;
+};
+
+export interface TransferFromButtonProps<TData = any> {
+  table?: Table<TData>;
+  id: string;
+  config: TransferFromConfig;
+  slug?: string;
+  onTransferComplete?: () => void;
+  refreshTable?: () => void;
+  isMobile?: boolean;
+  forceEnabled?: boolean;
+  autoOpen?: boolean;
+  onDialogClose?: () => void
+  filterConfig?: FilterConfig[];
+}
+
+export interface TransferFromDialogProps {
+  open: boolean;
+  setOpen: (state: boolean) => void;
+  sources: TransferFromSource[];
+  onSourceSelect: (docType: string) => void;
+  title?: string;
+}
+
+export interface TransferFromDocumentPopoverProps {
+  open: boolean;
+  setOpen: (state: boolean) => void;
+  setOpenDialog: (state: boolean) => void;
+  setOpenDetailsPopover: (state: boolean) => void;
+  columns: ColumnDef<any>[];
+  data: any[];
+  docType: string;
+  onDocumentSelect: (docUUID: string) => void;
+  fetchDocuments: (docType: string) => void;
+  title?: string;
+  filterConfig?: FilterConfig[];
+}
+
+export interface TransferFromDetailsPopoverProps {
+  open: boolean;
+  setOpen: (state: boolean) => void;
+  setOpenDocumentPopover: (state: boolean) => void;
+  columns: ColumnDef<any>[];
+  data: any[];
+  id: string;
+  docType: string;
+  docUUID: string;
+  config: TransferFromConfig;
+  onTransferComplete?: () => void;
+  refreshTable?: () => void;
+  fetchDocumentDetails: (docUUID: string) => void;
+  title?: string;
+}
+
+export interface TransferFromDocumentToolbarProps {
+  table: any;
+  setOpen: (state: boolean) => void;
+  setOpenDialog: (state: boolean) => void;
+  refreshTable: () => void;
+  fetchDocuments: (docType: string) => void;
+  docType: string;
+}
+
+export interface TransferFromDetailsToolbarProps {
+  table: any;
+  setOpen: (state: boolean) => void;
+  setOpenDocumentPopover: (state: boolean) => void;
+  id: string;
+  docUUID: string;
+  docType: string;
+  onSave: (prop: any) => void;
+  refreshTable: (docType: string, docUUID: string) => void;
+  fetchDocumentDetails: (docUUID: string) => void;
+}
+
+export interface TransferFromApiResponse {
+  message: string;
+  data: any;
+}
+
+export interface TransferFromData {
+  selectedRows: any[];
+  sourceDocUUID: string;
+  targetDocUUID: string;
+  docType: string;
+}
+
+export interface TransferFromItem {
+  UUID: string;
+  quantity: string;
+  transferQuantity: string;
+  transferableQuantity: string;
+  [key: string]: any;
+}

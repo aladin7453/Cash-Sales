@@ -1,0 +1,313 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { cn } from "@/lib/utils/cn";
+import {
+  Card,
+  CardContent,
+  CardTitle
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { getAuthHeaders, getCurrentAcc, getCurrentAccount, ORIGIN } from "@/lib/constants";
+
+type Params = {
+  form: any;
+};
+
+export function AutoBillingConfigForm({
+  form,
+}: Params) {
+  const headers = getAuthHeaders();
+  const currentAcc = getCurrentAcc();
+  const currentAccountUUID = getCurrentAccount();
+
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const router = useRouter();
+
+  const dropdownCompanyColumns = [
+    { accessorKey: "companyID", header: "Company Code" },
+    { accessorKey: "company", header: "Company" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+
+  const [customerDropdownData, setCustomerDropdownData] = useState<[]>([]);
+  const [showCustomerTable, setShowCustomerTable] = useState(false);
+  const [customerFilter, setCustomerFilter] = useState("");
+
+
+  const handleClickOutside = (event) => {
+    if (customerDropdownRef.current && !customerDropdownRef.current.contains(event.target) && customerCodeInputRef.current !== event.target) {
+      setShowCustomerTable(false);
+    }
+
+  };
+
+  const customerCodeInputRef = useRef(null);
+  const customerDropdownRef = useRef(null);
+
+  const dropdownCustomerColumns = [
+    { accessorKey: "customerCode", header: "Customer Code", },
+    { accessorKey: "customerGroupCode", header: "Customer Group", },
+    { accessorKey: "customerName", header: "Customer Name", },
+  ];
+
+  const fetchCustomerDropdownData = async () => {
+    try {
+      var form_data = new FormData();
+
+      form_data.append(`table[0]`, "customer");
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch dropdown data');
+      }
+
+      const data = await response.json();
+
+      setCustomerDropdownData(data.rows);
+      setShowCustomerTable(true);
+    } catch (error) {
+      console.error('Error fetching dropdown data:', error);
+
+      throw new Error('Failed to fetch dropdown data');
+    }
+  };
+
+  const onClickRowCustomer = (row) => {
+    form.setValue("customer", row.UUID);
+    form.setValue("customerCode", row.customerCode);
+    form.setValue("customerName", row.customerName);
+    setShowCustomerTable(false);
+    setCustomerFilter("");
+  };
+
+  return (
+    <Card className="w-full h-[533px] shadow-sm">
+      <CardContent className="px-3 py-2">
+        <Form {...form}>
+          <form>
+            <CardTitle className="text-nowrap text-sm font-bold">Charges Details</CardTitle>
+
+            <div className="mt-3 flex flex-col justify-center gap-y-4">
+              {/* First Row */}
+              <div className="grid grid-cols-1 items-center">
+
+                {/* ID */}
+                <FormField
+                  control={form.control}
+                  name="ID"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-8 rounded-md px-2 text-[11px] bg-erp-gray-1 border-gray-200 text-black focus-visible:ring-0 focus-visible:outline-none"
+                                {...field}
+                                readOnly
+                                moduleName="AutoBillingConfig"
+                                fieldName="ID"
+                                columnName="ID"
+                                placeholder="ID"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start">
+                              ID
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Second Row */}
+              <div className="grid grid-cols-1 items-center">
+
+                {/* Customer UUID */}
+                <FormField
+                  control={form.control}
+                  name="customer"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormLabel>Customer UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-8" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Customer Code */}
+                <FormField
+                  control={form.control}
+                  name="customerCode"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormControl className="relative">
+                        <div>
+                          <TooltipProvider delayDuration={1000}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Input
+                                  className={cn(
+                                    "h-8 rounded-md px-2 pr-9 text-[11px] outline-none transition-all duration-300 ease-in-out",
+                                    form.formState.errors.customerCode &&
+                                    "border-red-500 placeholder:text-red-500 focus-visible:ring-red-500",
+                                  )}
+                                  {...field}
+                                  onClick={fetchCustomerDropdownData}
+                                  onChange={(e) => {
+                                    field.onChange(e);
+                                    setCustomerFilter(e.target.value);
+                                  }}
+                                  ref={customerCodeInputRef}
+                                  autoComplete="off"
+                                  moduleName="quotation"
+                                  fieldName="customerCode"
+                                  columnName="Customer Code"
+                                  placeholder={
+                                    form.formState.errors.customerCode
+                                      ? "Required"
+                                      : "Customer Code"
+                                  }
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" align="start">
+                                Customer Code
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="size-3 text-gray-400" />
+                          </div>
+                          {showCustomerTable && (
+                            <div
+                              ref={customerDropdownRef}
+                              className="absolute left-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownCustomerColumns}
+                                  data={customerDropdownData}
+                                  onClickRow={onClickRowCustomer}
+                                  filterValue={customerFilter}
+                                  filterColumn="customerName"
+                                />
+                                <ScrollBar orientation="vertical" />
+                              </ScrollArea>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Third Row */}
+              <div className="grid grid-cols-1 items-center">
+                {/* Customer Name */}
+                <FormField
+                  control={form.control}
+                  name="customerName"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2 flex flex-col space-y-1">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-8 rounded-md px-2 text-[11px] bg-erp-gray-1 border-gray-200 text-black focus-visible:ring-0 focus-visible:outline-none"
+                                {...field}
+                                readOnly
+                                moduleName="AutoBillingConfig"
+                                fieldName="customerName"
+                                columnName="customerName"
+                                placeholder="Customer Name"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start">
+                              Customer Name
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Forth Row */}
+              <div className="grid grid-cols-1 items-center">
+                {/* Description */}
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormControl>
+                        <Textarea
+                          className="px-2 h-[330px] resize-none text-[11px] outline-none transition-all duration-300 ease-in-out"
+                          {...field}
+                          moduleName="autoBillingConfig"
+                          fieldName="description"
+                          columnName="Description"
+                          placeholder="Description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function onReset() {
+  throw new Error("Function not implemented.");
+}

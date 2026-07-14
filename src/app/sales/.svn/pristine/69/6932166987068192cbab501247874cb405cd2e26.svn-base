@@ -1,0 +1,178 @@
+"use client";
+
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useEffect, useState } from "react";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+
+import AuthorizedDetailsFormPopover from "./AuthorizedDetailsFormPopover";
+
+import type { ColumnDef, Row } from "@tanstack/react-table";
+
+import type { AuthorizedUser } from "./columns";
+
+type AgreementDataTableProps = {
+  columns: ColumnDef<AuthorizedUser>[];
+  tempRow: AuthorizedUser[];
+  data: AuthorizedUser[];
+  setTempRowAuthorizedUser: () => void;
+  revalidateAuthorizedUserData: () => void;
+  authorizedUserDropDownData: any;
+};
+
+export default function AuthorizedUserDropDownTable({
+  columns,
+  data,
+  tempRowAuthorizedUser,
+  setTempRowAuthorizedUser,
+  revalidateAuthorizedUserData,
+  authorizedUserDropDownData,
+}: AgreementDataTableProps) {
+  function setTempRowAuthorizedUserData(data, overwrite) {
+    if (overwrite) {
+      setTempRowAuthorizedUser(data);
+    } else {
+      setTempRowAuthorizedUser((tempRowAuthorizedUser) => [
+        ...tempRowAuthorizedUser,
+        data,
+      ]);
+    }
+  }
+
+  const table = useReactTable({
+    columns,
+    data,
+    autoResetPageIndex: false,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<string>("");
+
+  // Prevent text selection when performing multiple row selection with "shift" + click
+  usePreventShiftTextSelect();
+
+  const openDialog = (row: Row<AuthorizedUser>) => {
+    setSelectedRow(row.original);
+    setDialogOpen(true);
+  };
+  const onDoubleClick = (row: Row<AuthorizedUser>) => {
+    setDialogOpen(false);
+    setSelectedRow("");
+    openDialog(row);
+  };
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  useEffect(() => {
+    if (dialogOpen === false) {
+      setSelectedRow("");
+    }
+  }, [dialogOpen]);
+
+  return (
+    <div className="bg-erp-blue-3">
+      <Separator className="bg-erp-blue-11" />
+      <ScrollArea className="h-[100cqh] bg-erp-gray-3 ">
+        <Table className="border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1">
+          <TableHeader className="sticky top-0">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    className="bg-erp-blue-11 font-normal"
+                    key={header.id}
+                  >
+                    <div className="flex flex-col gap-y-0.5">
+                      <span className="font-bold text-white">
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                      </span>
+                      {header.column.id === "validity" ? (
+                        <TableHeadValidityFilter table={table} />
+                      ) : (
+                        <TableHeadColumnTextFilter
+                          column={header.column}
+                          table={table}
+                        />
+                      )}
+                    </div>
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+                  data-state={row.getIsSelected() && "selected"}
+                  onClick={onRowSelection(row)}
+                  key={row.id}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <NoResultsTableRow columns={columns} />
+            )}
+          </TableBody>
+        </Table>
+
+        {selectedRow && (
+          <AuthorizedDetailsFormPopover
+            open={dialogOpen}
+            setOpen={setDialogOpen}
+            row={selectedRow}
+            setTempRowAuthorizedUserData={[]}
+            revalidateAuthorizedUserData={revalidateAuthorizedUserData}
+            authorizedUserDropDownData={[]}
+          />
+        )}
+        {!selectedRow && (
+          <AuthorizedDetailsFormPopover
+            open={dialogOpen}
+            setOpen={setDialogOpen}
+            row={undefined}
+            setTempRowAuthorizedUserData={setTempRowAuthorizedUserData}
+            revalidateAuthorizedUserData={revalidateAuthorizedUserData}
+          />
+        )}
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
+    </div>
+  );
+}

@@ -1,0 +1,88 @@
+"use client";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type CollectionReport = {
+  UUID: string;
+  docNo: string;
+  docDate: string;
+  customerCode: string;
+  customerName: string;
+  description: string;
+  paymentMethod: string;
+  paymentMethodCode: string;
+  customerCodeCode: string;
+  docDateFormat: string;
+  totalPaidAmount: string;
+  invoiceNo: string;
+};
+
+const valueToDateFormat = (seconds) => {
+  if (!seconds) return null;
+  const date = new Date(seconds * 1000);
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const year = date.getFullYear();
+  if (day && month && year) return `${year}-${month}-${day}`;
+  else return seconds;
+};
+
+export const CollectionReportColumns: ColumnDef<CollectionReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docNo",
+    id: "docNo",
+    header: "Payment No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id: "docDateFormat",
+    header: "Payment Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "totalPaidAmount",
+    id: "totalPaidAmount",
+    header: "Amount Received",
+    filterFn: "includesString",
+    cell: ({ row }) => {
+      const value = parseFloat(row.original.totalPaidAmount);
+      return isNaN(value) ? row.original.totalPaidAmount : value.toFixed(2);
+    },
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "invoiceNo",
+    id: "invoiceNo",
+    header: "Related Invoice No.",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+   {
+    accessorKey: "paymentMethodCode",
+    id: "paymentMethodCode",
+    header: "Payment Method",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+];

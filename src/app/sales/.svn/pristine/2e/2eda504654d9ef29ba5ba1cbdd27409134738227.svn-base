@@ -1,0 +1,22 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+
+const ConfirmationDialog = ({ open, setOpen, onConfirm }) => {
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent>
+        <p>Are you sure you want to delete the selected row(s)?</p>
+        <div className="mt-4 flex justify-end gap-4">
+          <Button onClick={onConfirm}>Yes</Button>
+          <Button onClick={() => setOpen(false)} variant="destructive">
+            No
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default ConfirmationDialog;

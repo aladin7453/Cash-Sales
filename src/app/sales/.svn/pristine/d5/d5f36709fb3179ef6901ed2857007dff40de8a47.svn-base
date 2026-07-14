@@ -1,0 +1,166 @@
+"use client";
+
+import React, { useState, useEffect } from "react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { getAuthHeaders } from "@/lib/constants";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+import { TOOLTIP_DELAY_DURATION,ORIGIN } from "@/lib/constants";
+import { Checkbox } from "@/components/ui/checkbox";
+import DropdownTable from "./DropdownTable";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils/cn";
+import {
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+
+
+export default function AutoBillingCustomerFilter({ customerFilterValues, setCustomerFilterValues }) {
+  const headers = getAuthHeaders();
+  const [customerDropdownData, setCustomerDropdownData] = useState([])
+  const [customerInputIsClicked, setCustomerInputIsClicked] = useState(false)
+  const customerColumns = [ 
+    { accessorKey: "customerCode", header: "Customer Code", }, 
+    { accessorKey: "customerName", header: "Customer Name", }, 
+    { accessorKey: "customerGroupCode", header: "Customer Group",}, 
+    { accessorKey: "description", header: "Description", },
+
+  ]
+
+  const fetchDropdownData = async (table:string) => {
+    try {
+      var form_data = new FormData()
+      form_data.append(`table[0]`, table)
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch dropdown data');
+      }
+      const data = await response.json();
+      await setCustomerDropdownData(data.rows)
+    } catch (error) {
+      console.error('Error fetching dropdown data:', error);
+      throw new Error('Failed to fetch dropdown data');
+    }
+  };
+
+  const removeElementFromArray = (array, element) => {
+    const elementIndex = array.indexOf(element)
+    if (elementIndex > -1) {
+      return array.slice(0, elementIndex).concat(array.slice(elementIndex+1))
+    }
+  }
+
+
+  useEffect(() => {
+    if (!customerInputIsClicked) {
+      dropdownTable.getCoreRowModel().rows.forEach((row) => {
+        if (!row.getIsSelected()) onClickRow(row)
+      })
+    }
+  }, [customerDropdownData])
+
+  const onClickRow = (row) => { 
+    if (row.getIsSelected()) {
+      setCustomerFilterValues((customerFilterValues) => removeElementFromArray(customerFilterValues, row.original.customerCode))
+    } else {
+      setCustomerFilterValues((customerFilterValues) => [...customerFilterValues, row.original.customerCode])
+    }
+    row.toggleSelected()
+  }
+
+  const dropdownTable = useReactTable({
+    columns: customerColumns,
+    data: customerDropdownData?? [],
+    autoResetPageIndex: false,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+
+  // Prevent text selection when performing multiple row selection with "shift" + click
+  usePreventShiftTextSelect();
+  
+  return(
+    <div className="flex flex-row space-x-2 px-2">
+      <p className="w-28 text-center">Customer</p>
+      <p>:</p>
+      <div className="h-5.5 w-40 flex-auto">
+        <Popover>
+          <TooltipProvider delayDuration={TOOLTIP_DELAY_DURATION}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <Button
+                    className={cn(
+                      "flex h-5.5 w-full",
+                      !(customerFilterValues.length > 0) && "text-muted-foreground",
+                    )}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setCustomerInputIsClicked(true)
+                      fetchDropdownData("customer")
+                    }}
+                  >
+                    <p className="truncate text-left flex-1">
+                      {customerFilterValues.length > 0
+                      ?  customerFilterValues.join(",")
+                      : `Pick a Customer Filter`}
+                      </p>
+                    <FaMagnifyingGlass className="ml-auto h-4 w-4 text-gray-400" />
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="font-medium text-wrap max-w-[200px] ">
+                  {customerFilterValues.length > 0
+                    ?  customerFilterValues.join(",")
+                    : `No Value`}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <PopoverContent className="w-auto p-0" align="start">
+            
+            <div className="h-[58cqh] p-4">
+              <div className="flex h-full flex-col bg-erp-blue-3">
+                <ScrollArea className="h-full bg-erp-gray-3">
+                <DropdownTable
+                  columns={customerColumns}
+                  dropdownTable={dropdownTable}
+                  onClickRow={onClickRow}
+                />
+                </ScrollArea>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+      <Checkbox className="flex items-center" checked={customerDropdownData.length > 0 ? customerFilterValues.length == customerDropdownData.length : false} onCheckedChange={async (state) => {
+        if (state) {
+          if (!customerInputIsClicked) await fetchDropdownData("customer")
+          else {    
+            dropdownTable.getCoreRowModel().rows.forEach((row) => {
+              if (!row.getIsSelected()) onClickRow(row)
+            })
+          }
+        } else {
+          dropdownTable.getCoreRowModel().rows.forEach((row) => {
+            if (row.getIsSelected()) onClickRow(row)
+          })
+        }
+
+        }} />
+    </div>
+  )
+}

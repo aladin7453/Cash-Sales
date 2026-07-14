@@ -1,0 +1,1980 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { PDFViewer, pdf } from "@react-pdf/renderer";
+import axios from "axios";
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { FaClipboard, FaLayerGroup, FaQrcode } from "react-icons/fa6";
+import { z } from "zod";
+
+import { DateRestrictionContext } from "@/components/custom/DateRestrictionContext";
+import { CustomFieldDefinition, CustomFieldHandle } from "@/components/DisplayCustomField";
+import LoadingUI from "@/components/LoadingUI";
+import {
+  cacheDetails,
+  getCachedDetails,
+  deleteOffline,
+  getOffline,
+  saveOffline,
+  getCachedLastDocNo,
+  cachePreferenceData,
+  getCachedPreferenceData,
+  getCachedCurrentCompany,
+  generateOfflineDocNo,
+} from "@/components/offlineDB";
+import SimplifiedPDF from "@/components/simplifiedTemplate";
+import SimplifiedPDF2 from "@/components/simplifiedWithHeaderTemplate";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { prefetchAllDropdowns, DropdownData } from "@/components/data-table/GetAllDropdown";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Form } from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { TabsNavigator } from "@/components/ui/TabsNavigator";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { useApi } from "@/lib/hooks/useAPI";
+import { cn } from "@/lib/utils/cn";
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+import SlideInAnimation from "@/components/custom/SlideInAnimation";
+
+//Old UI
+import { BuyerDetailsFormOld } from "./e-invoice-details/buyer-details/BuyerDetailsFormOld";
+import { EInvoiceDetailsFormOld } from "./e-invoice-details/e-invoice-details/EInvoiceDetailsFormOld";
+import { ImportExportOfGoodsFormOld } from "./e-invoice-details/import-&-export-of-goods/Import&ExportOfGoodsDetailsFormOld";
+import { PaymentDetailsFormOld } from "./e-invoice-details/payment-details/PaymentDetailsFormOld";
+import { ShippingRecipientDetailsFormOld } from "./e-invoice-details/shipping-recipient-details/ShippingRecipientDetailsFormOld";
+import { SupplierDetailsFormOld } from "./e-invoice-details/supplier-details/SupplierDetailsFormOld";
+import { CashSalesColumns } from "./main-details/cash-sales-details/columns";
+//New UI
+import CashSalesDataTable from "./main-details/cash-sales-details/DataTable";
+import CashSalesDataTableOld from "./main-details/cash-sales-details/DataTableOld";
+import { DocumentDetailsForm } from "./main-details/document-details/DocumentDetailsForm";
+import { CashSalesForm } from "./main-details/general-details/CashSalesForm";
+import { CashSalesFormOld } from "./main-details/general-details/CashSalesFormOld";
+import { OtherDetailsFormOld } from "./more-details/OtherDetailsFormOld";
+import TenderPaymentFormPopover from "./TenderPaymentFormPopover";
+import TopActionBar from "./TopActionBar";
+import VerifyVoucherPopover from "./VerifyVoucherPopover";
+
+export const dynamic = 'force-dynamic';
+
+type PageParams = {
+  params: { slug: string };
+};
+
+const validRoutes = ["new", "edit", "clone", "transfer-to", "transfer-from"] as const;
+
+const fetcher = async (url) => {
+  const headers = getAuthHeaders();
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: params,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+
+      throw new Error(errorData.message || "Failed to fetch data");
+    }
+
+    const responseData = await response.json();
+
+    return responseData;
+  } catch (error) {
+    throw error;
+  }
+};
+
+const params = new FormData();
+params.append("param[limit]", "");
+params.append("param[offset]", "0");
+params.append("param[valid]", "");
+params.append("param[sort]", "createdAt");
+params.append("param[order]", "desc");
+
+type ValidRoute = (typeof validRoutes)[number];
+
+const cashSalesFormSchema = z.object({
+  customerCodeCode: z.string().min(1, {
+    message: "Required",
+  }),
+});
+
+function isValidRoute(route: string): route is ValidRoute {
+  return validRoutes.includes(route as ValidRoute);
+}
+
+export default function CashSalesPage({ params }: PageParams) {
+  const headers = getAuthHeaders();
+  const router = useRouter();
+
+  const slug = params.slug;
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  const { toast } = useToast();
+
+  const [formResetKey, setFormResetKey] = useState(0);
+  const [approvalStatus, setApprovalStatus] = useState({});
+
+  const [cashSalesData, setCashSalesData] = useState({});
+  const [tempRowAttachments, setTempRowAttachments] = useState([]);
+  const [tempRowCashSalesDetailsList, setTempRowCashSalesDetailsList] = useState([]);
+  const [cashSalesDetail, setCashSalesDetails] = useState([]);
+  const [UOMDetails, setUOMDetails] = useState({});
+  const [allowPastRecord, setAllowPastRecord] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isBarcodeScanLoading, setIsBarcodeScanLoading] = useState(false);
+
+  // Create refs for each section
+  const mainDetailsRef = useRef(null);
+  const moreDetailsRef = useRef(null);
+  const eInvoiceDetailsRef = useRef(null);
+  const offlineDraftLoadedRef = useRef(false);
+  const isOfflineRef = useRef(!navigator.onLine);
+  const [offlineIsPaid, setOfflineIsPaid] = useState(false);
+  const offlineCloneLoadedRef = useRef(false);
+
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [allDropdowns, setAllDropdowns] = useState<DropdownData>({});
+
+  const getPdfComponent = (prefData) =>
+    prefData?.data?.cashSalesHeader === "1" ? SimplifiedPDF2 : SimplifiedPDF;
+
+  useEffect(() => {
+    prefetchAllDropdowns().then(setAllDropdowns);
+  }, []);
+
+  useEffect(() => {
+    const ua = navigator.userAgent || "";
+
+    const hasTouch = navigator.maxTouchPoints > 0 || "ontouchstart" in window;
+
+    const smallScreen = window.screen.width <= 1280;
+
+    const isDesktopUA = /Windows NT|Macintosh|X11|Linux x86_64/i.test(ua);
+
+    // Treat touch devices with small screens as mobile/POS
+    const isMobileOrPOS = hasTouch && smallScreen;
+
+    setIsMobileDevice(isMobileOrPOS);
+  }, []);
+
+  const resetForm = () => {
+    setFormResetKey((prevKey) => prevKey + 1);
+  };
+
+  //State
+  const isPaidAmountEmpty = !cashSalesData.paidAmount || cashSalesData.paidAmount === "0.00";
+  const [isPaidAmountManuallyUpdated, setIsPaidAmountManuallyUpdated] = useState(false);
+  const [isTenderPaymentSaved, setIsTenderPaymentSaved] = useState(false);
+  const [isTenderPaymentSavedInNew, setIsTenderPaymentSavedInNew] = useState(false);
+  const [hasUpdatedPaymentDetails, setHasUpdatedPaymentDetails] = useState(false);
+  const [isExpand, setIsExpand] = useState(false);
+  const customFieldRef = useRef<CustomFieldHandle>(null);
+
+  // Add ref to track execution state
+  const updatePaymentDetailsExecutedRef = useRef(false);
+
+  // Add these new state variables for PDF preview
+  const [showSimplifiedPDFDialog, setShowSimplifiedPDFDialog] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
+  const [itemsData, setItemsData] = useState(null);
+  const [currentCompanyData, setCurrentCompanyData] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [PDFPreviewType, setPDFPreviewType] = useState(null);
+  const [previewTemplatePDFData, setPreviewTemplatePDFData] = useState(null);
+  const [isPDFLoading, setIsPDFLoading] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  let username: string = "";
+  let authToken: string = "";
+  let loginUser: string = "";
+  username = JSON.parse(localStorage.getItem("username") || '""');
+  authToken = JSON.parse(localStorage.getItem("authToken") || '""');
+  loginUser = JSON.parse(localStorage.getItem("userFullName") || '"');
+  const currentAccount = JSON.parse(localStorage.getItem("currentAccount") || "null");
+  const currentCompany = JSON.parse(localStorage.getItem("currentCompany") || "null");
+
+  //Voucher logic
+  const [voucherOpen, setVoucherOpen] = useState(false);
+  const [verifyVoucherData, setVerifyVoucherData] = useState([]);
+
+  if (!isValidRoute(slug)) {
+    notFound();
+  }
+
+  const {
+    data: cashSales,
+    error,
+    isLoading,
+    mutate: mutateCashSales,
+  } = useApi(
+    id && !isOfflineRef.current
+      ? `${ORIGIN}/cash_sales/api/cash-sales/get-update-cash-sales-data?id=${id}`
+      : null,
+    { revalidateOnFocus: false },
+  );
+
+  const { data: defaultCurrentCompany } = useApi(
+    !id && !isOfflineRef.current
+      ? `${ORIGIN}/universal/get-current-company?id=${currentCompany?.UUID}`
+      : null,
+    { revalidateOnFocus: false },
+  );
+
+  const {
+    data: cashSalesDetails,
+    error: cashSalesDetailsError,
+    mutate: mutateCashSalesDetails,
+  } = useApi(
+    id && !isOfflineRef.current
+      ? `${ORIGIN}/cash_sales/api/cash-sales/get-update-cash-sales-has-details-data?id=${id}`
+      : null,
+    { revalidateOnFocus: false },
+  );
+
+  const {
+    data: getPermissions,
+    error: getPermissionsError,
+    mutate: mutateGetPermissions,
+  } = useApi(
+    !id && !isOfflineRef.current
+      ? `${ORIGIN}/cash_sales/api/cash-sales/get-permissions`
+      : null,
+    { revalidateOnFocus: false },
+  );
+
+  const viewEInvoiceDetails = [
+    ...(Array.isArray(getPermissions?.data) ? getPermissions.data : []),
+    ...(Array.isArray(cashSales?.rules) ? cashSales.rules : []),
+  ].includes("view-cash-sales-e-invoice-details");
+
+  const tabs = [
+    {
+      id: "mainDetails",
+      name: "Main Details",
+      icon: FaClipboard,
+      shortName: "Main",
+    },
+    {
+      id: "moreDetails",
+      name: "More Details",
+      icon: FaLayerGroup,
+      shortName: "More",
+    },
+    // {
+    //   id: "eInvoiceDetails",
+    //   name: "e-Invoice Details",
+    //   icon: FaQrcode,
+    //   shortName: "E-Inv",
+    // },
+    ...(viewEInvoiceDetails
+      ? [
+        {
+          id: "eInvoiceDetails",
+          name: "e-Invoice Details",
+          icon: FaQrcode,
+          shortName: "E-Inv",
+        },
+      ]
+      : []),
+  ];
+
+  const draftId = searchParams.get("draft");
+
+  const isPaid = slug === "clone" ? false : draftId ? true : cashSales?.isPaid || false;
+
+  function loadDetails(cashSales: any) {
+    if (!id || !navigator.onLine) return;
+    try {
+      fetch(
+        `${ORIGIN}/cash_sales/api/cash-sales/get-update-cash-sales-has-details-data?id=${cashSales.UUID}`,
+        {
+          headers,
+          credentials: "omit",
+        },
+      ).then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to fetch data");
+        }
+        response.json().then((responseData) => {
+          setCashSalesDetails((cashSalesDetails) => ({
+            ...cashSalesDetails,
+            [cashSales.UUID]: responseData.rows,
+          }));
+        });
+      });
+    } catch (error) {
+      console.error(`Failed to fetch data`);
+    }
+  }
+
+  // Preference (State)
+  const [preferenceData, setPreferenceData] = useState<any>(null);
+  const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
+  const [customFieldSavedData, setCustomFieldSavedData] = useState<Record<string, unknown>>({});
+
+  // Preference (Fetch Function)
+  const fetchPreferenceData = async () => {
+    if (!navigator.onLine) {
+      const cached = await getCachedPreferenceData();
+      if (cached) {
+        setPreferenceData(cached.preference);
+        setCustomFieldDefs(cached.customFieldDefs);
+      }
+      return;
+    }
+    try {
+      const headers = getAuthHeaders();
+
+      const response = await fetch(`${ORIGIN}/universal/get-preference?module=sales`, {
+        method: "GET",
+        headers,
+        credentials: "omit",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch preference data");
+      }
+
+      const data = await response.json();
+
+      setPreferenceData(data);
+
+      // Fetch custom field definitions
+      const prefRes = await fetch(
+        `${ORIGIN}/sales_preference/api/sales-preference/get-index-sales-preference`,
+        { method: "GET", headers },
+      );
+      if (!prefRes.ok) throw new Error("Failed to fetch custom field preference");
+      const prefData = await prefRes.json();
+      const raw = prefData?.data?.customDIYFields ?? prefData?.customDIYFields ?? [];
+      const rawFields: CustomFieldDefinition[] = (() => {
+        try {
+          const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })();
+      setCustomFieldDefs(rawFields);
+
+      await cachePreferenceData({
+        preference: data,
+        customFieldDefs: rawFields,
+      });
+    } catch (error) {
+      console.error("Error fetching preference data:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchPreferenceData();
+  }, []);
+
+  //Cash Sales Data Effects
+  useEffect(() => {
+    if (cashSales && slug !== "transfer-to" && slug !== "transfer-from") {
+      if (cashSales.data) {
+        const cashSalesDataCopy = { ...cashSales.data };
+        cashSalesDataCopy.voucherCode = cashSalesDataCopy.voucherDetails?.number; //Voucher logic
+        // Clear docNo if it's a clone page
+        if (slug === "clone") {
+          cashSalesDataCopy.docNo = "";
+          cashSalesDataCopy.docDate = Math.floor(Date.now() / 1000);
+          cashSalesDataCopy.eInvoiceVersion = "";
+          cashSalesDataCopy.digitalSignature = "";
+          cashSalesDataCopy.eInvoiceCode = "";
+          cashSalesDataCopy.oriRefNo = "";
+          cashSalesDataCopy.consolidateTo = "";
+          cashSalesDataCopy.consolidatedInvoiceDocNo = "";
+          cashSalesDataCopy.customerPaymentTransferred = "";
+          cashSalesDataCopy.voucher = ""; //Voucher logic
+          cashSalesDataCopy.voucherCode = ""; //Voucher logic
+          cashSalesDataCopy.paidAmount = "";
+        }
+
+        const qrLink = cashSalesDataCopy.QRAttachmentLink;
+        cashSalesDataCopy.QRAttachmentLink = Array.isArray(qrLink)
+          ? qrLink[0] ?? null
+          : qrLink ?? null;
+
+        loadFiles(id);
+        setCashSalesData(cashSalesDataCopy);
+        setPreferenceData(cashSalesDataCopy.preference);
+        setApprovalStatus(cashSales.approval);
+        setAllowPastRecord(cashSales.data.allowPastDates === "1");
+
+        const rawSaved = cashSales?.customDIYFieldData;
+        const parsedSaved = rawSaved
+          ? (typeof rawSaved === "string" ? JSON.parse(rawSaved) : rawSaved)
+          : {};
+        setCustomFieldSavedData(parsedSaved);
+      }
+    }
+  }, [cashSales, slug]);
+
+  useEffect(() => {
+    if (!navigator.onLine) return;
+    if (
+      cashSales &&
+      cashSales.cashSalesHasDetails &&
+      slug !== "transfer-to" &&
+      slug !== "transfer-from"
+    ) {
+      if (Array.isArray(cashSales.cashSalesHasDetails.rows)) {
+        setTempRowCashSalesDetailsList(cashSales.cashSalesHasDetails.rows);
+
+        // Process UOM details
+        cashSales.cashSalesHasDetails.rows.forEach((detail) => {
+          if (detail.UOMDropdown) {
+            setUOMDetails((prev) => ({
+              ...prev,
+              [detail.item]: detail.UOMDropdown,
+            }));
+          }
+        });
+      }
+    }
+  }, [cashSales, slug]);
+
+  useEffect(() => {
+    if (cashSalesDetails && slug !== "transfer-to" && slug !== "transfer-from") {
+      // Preference (Add Preference Data to Table Details)
+      const detailsWithPreferences = cashSalesDetails.rows.map((row) => ({
+        ...row,
+        voucher: slug == "clone" ? null : row.voucher, //Voucher logic
+        voucherCode: slug == "clone" ? null : row.voucherCode,
+        discountRate: slug == "clone" ? row.voucher ? "0.00" : row.discountRate : row.discountRate,
+        discountAmount: slug == "clone" ? row.voucher ? "0.00" : row.discountAmount : row.discountAmount,
+        voucherOption: slug == "clone" ? "" : row.voucherOption,
+        preferenceData: preferenceData,
+      }));
+
+      setTempRowCashSalesDetailsList(detailsWithPreferences);
+    }
+  }, [cashSalesDetails, slug]);
+
+  const revalidateCashSalesDetails = () => {
+    mutateCashSalesDetails();
+  };
+
+  const revalidateCashSales = () => {
+    mutateCashSales();
+  };
+
+  useEffect(() => {
+    if (!navigator.onLine) return;
+    if (tempRowCashSalesDetailsList && Array.isArray(tempRowCashSalesDetailsList.rows)) {
+      tempRowCashSalesDetailsList.rows.forEach((cashSales) => {
+        loadDetails(cashSales);
+      });
+    }
+  }, [tempRowCashSalesDetailsList]);
+
+  // Validation: Prevent save if invoiceType == "Consolidate" and totalPayable >= 10,000
+  const verifyTotalPayable = () => {
+    var formValues = form.getValues();
+
+    const localNetTotal = document.querySelector(".localNetTotal");
+
+    // For validation use
+    let totalAmount = tempRowCashSalesDetailsList.reduce((sum, row) => {
+      return sum + (row.amount ? parseFloat(row.amount) : 0);
+    }, 0);
+
+    // For validation use
+    let rowTotalDiscount = tempRowCashSalesDetailsList.reduce((sum, row) => {
+      const discount1 = row.discountAmount ? parseFloat(row.discountAmount) : 0;
+      const discount2 = row.discountAmount2 ? parseFloat(row.discountAmount2) : 0;
+      const discount3 = row.discountAmount3 ? parseFloat(row.discountAmount3) : 0;
+
+      return sum + discount1 + discount2 + discount3;
+    }, 0);
+
+    // For validation use
+    let additionalDiscount = parseFloat(formValues.additionalDiscount || 0);
+
+    // For validation use
+    let totalDiscount = rowTotalDiscount + additionalDiscount;
+
+    let totalTax = tempRowCashSalesDetailsList.reduce((sum, row) => {
+      return sum + (row.taxAmount ? parseFloat(row.taxAmount) : 0);
+    }, 0);
+
+    // For validation use
+    let totalSubtotal = totalAmount - totalDiscount;
+
+    let prepaymentAmount = parseFloat(formValues.prepaymentAmount) || 0;
+    let totalFeeAmount = parseFloat(formValues.totalFeeAmount) || 0;
+
+    // For validation use
+    let subtotalTax = totalAmount - totalDiscount + totalTax;
+
+    // For validation use
+    let roundedSubtotalTax = Math.round(subtotalTax * 20) / 20;
+    let roundingAmount = roundedSubtotalTax - subtotalTax;
+
+    // For validation use
+    let totalPayable =
+      totalAmount - totalDiscount + totalTax - prepaymentAmount + totalFeeAmount + roundingAmount;
+
+    // For validation use
+    totalPayable = Math.round(totalPayable * 20) / 20;
+
+    let localNetTotalValue = localNetTotal?.value;
+
+    // Validation: Prevent save if invoiceType == "Consolidate" and totalPayable >= 10,000
+    if (
+      formValues.invoiceType == "Consolidate" &&
+      (totalPayable >= 10000 || localNetTotalValue >= 10000)
+    ) {
+      toast({
+        title: "Error",
+        description: "Total invoice amount cannot exceed RM10,000 for Consolidate Invoice.",
+        variant: "destructive",
+        duration: 4000,
+      });
+      setIsSaving(false);
+      return;
+    }
+    return true;
+  };
+
+  const handleSubmit = async (isTenderPaymentSaved: boolean) => {
+    // Validation: Prevent save if invoiceType == "Consolidate" and totalPayable >= 10,000
+    const isValid = verifyTotalPayable();
+    if (!isValid) return;
+
+    const isFormValid = await form.trigger();
+
+    if (!isFormValid) {
+      const errors = form.formState.errors;
+
+      if (errors.customerCodeCode) {
+        toast({
+          title: "Customer Required",
+          description: "Please select a customer before saving.",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+      return;
+    }
+
+    // Open the tender payment form popover if in new page and tender payment is not saved
+    if ((slug === "new" || slug === "clone") && !isTenderPaymentSaved) {
+      setDialogOpen(true);
+      return;
+    }
+
+    setSubmitAttempted(true);
+    try {
+      await onSubmit();
+    } catch (error) {
+      console.error("Form submission error:", error);
+    }
+  };
+
+  const form = useForm<z.infer<typeof cashSalesFormSchema>>({
+    resolver: zodResolver(cashSalesFormSchema),
+
+    defaultValues: {
+      docNo: cashSales?.docNo ?? "",
+      docDate: cashSales?.docDate ? cashSales.docDate : Math.floor(Date.now() / 1000).toString(),
+      agentName: cashSales?.agentName ?? "",
+      dealerName: cashSales?.dealerName ?? "",
+      creditTermCode: cashSales?.creditTermCode ?? "",
+      description: cashSales?.description ?? "",
+      customerCode: cashSales?.customerCode ?? "",
+      customerCodeCode: cashSales?.customerCodeCode ?? "",
+      customerName: cashSales?.customerName ?? "",
+      BRN: cashSales?.BRN ?? "",
+      attentionName: cashSales?.attentionName ?? "",
+      address: cashSales?.address ?? "",
+      TIN: cashSales?.TIN ?? "",
+      SSTNo: cashSales?.SSTNo ?? "",
+      phoneNo: cashSales?.phoneNo ?? "",
+      email: cashSales?.email ?? "",
+      paymentMethod: cashSales?.paymentMethod ?? "",
+      paymentMethodCode: cashSales?.paymentMethodCode ?? "",
+      bankCharge: cashSales?.bankCharge ?? "",
+      chequeNo: cashSales?.chequeNo ?? "",
+      paidAmount: cashSales?.paidAmount ?? "0",
+      additionalDiscount: cashSales?.additionalDiscount ?? "0",
+      paymentProject: cashSales?.paymentProject ?? "",
+      valid: cashSales?.valid ?? "1",
+      outstandingAmount: cashSales?.outstandingAmount ?? "",
+      currency: cashSales?.currency ?? "",
+      currencyCode: cashSales?.currencyCode ?? "",
+      currencyRate: cashSales?.currencyRate ?? "",
+    },
+  });
+
+  const handleSaveSuccess = useCallback(async (responseData: any, saveType: string, showPDF = true, navigate = true) => {
+    if (responseData?.item) {
+      if (saveType.startsWith("transfer-to")) localStorage.removeItem("transfer-to.cash-sales");
+      else if (saveType.startsWith("transfer-from")) localStorage.removeItem("transfer-from.cash-sales");
+
+      if (customFieldRef.current) {
+        try {
+          await customFieldRef.current.save(responseData.data, responseData.item);
+        } catch (err) {
+          console.error("Failed to save custom fields:", err);
+        }
+      }
+      if (showPDF) {
+        localStorage.setItem("pdfData", JSON.stringify(responseData.tenderPayment));
+        localStorage.setItem("showSimplifiedPDFDialog", "true");
+      }
+
+      setIsTenderPaymentSavedInNew(false);
+      localStorage.removeItem("tenderPaymentSavedInNew");
+      setHasUpdatedPaymentDetails(true);
+
+      if (navigate) {
+        const url = `/sales/cash-sales/edit?item=${responseData.item}&id=${responseData.data}`;
+        router.push(url);
+      }
+
+      toast({ title: responseData.message, duration: 2000 });
+    } else if (responseData?.message) {
+      if (saveType.startsWith("transfer-to")) localStorage.removeItem("transfer-to.cash-sales");
+      else if (saveType.startsWith("transfer-from")) localStorage.removeItem("transfer-from.cash-sales");
+
+      toast({ title: responseData.message, duration: 2000 });
+    }
+  }, [router, toast]);
+
+  const onSubmit = async () => {
+    setIsSaving(true);
+    setSubmitAttempted(true);
+
+    const isCurrentlyOffline = !navigator.onLine;
+
+    let offlineCustomFieldPayload: Awaited<
+      ReturnType<NonNullable<CustomFieldHandle["getOfflinePayload"]>>
+    > | null = null;
+
+    if (isCurrentlyOffline) {
+      const payload = await customFieldRef.current?.getOfflinePayload();
+      if (payload === false) {
+        setIsSaving(false);
+        return;
+      }
+      offlineCustomFieldPayload = payload || null;
+    } else {
+      const ok = await customFieldRef.current?.save();
+      if (ok === false) {
+        setIsSaving(false);
+        return;
+      }
+    }
+    var form_data = new FormData();
+    var formValues = form.getValues();
+
+    const localNetTotal = document.querySelector(".localNetTotal");
+    const netTotal = document.querySelector(".netTotal");
+
+    var saveType =
+      slug == "clone"
+        ? `create-data?c_id=1`
+        : id
+          ? `update-cash-sales-data?id=${id}`
+          : `create-data`;
+
+    var transferType = "";
+    var transferData = "";
+
+    if (slug === "transfer-to") {
+      transferData = JSON.parse(localStorage.getItem("transfer-to.cash-sales") || "{}");
+    } else if (slug === "transfer-from") {
+      transferData = JSON.parse(localStorage.getItem("transfer-from.cash-sales") || "{}");
+    }
+
+    var transferDocType = transferData?.data?.transferDocType;
+
+    // Preference (Get Decimal Places for Calculations)
+    const decimal = preferenceData?.data?.decimal || 2;
+
+    transferType =
+      slug == "transfer-to" || slug == "transfer-from" ? `?transferFrom=${transferDocType}` : "";
+
+    // Ensure all required fields exist and default to 0 if undefined or empty
+    let totalAmount = tempRowCashSalesDetailsList.reduce((sum, row) => {
+      return sum + (row.amount ? parseFloat(row.amount) : 0);
+    }, 0);
+
+    // Get line item discounts
+    let rowTotalDiscount = tempRowCashSalesDetailsList.reduce((sum, row) => {
+      const discount1 = row.discountAmount ? parseFloat(row.discountAmount) : 0;
+      const discount2 = row.discountAmount2 ? parseFloat(row.discountAmount2) : 0;
+      const discount3 = row.discountAmount3 ? parseFloat(row.discountAmount3) : 0;
+
+      return sum + discount1 + discount2 + discount3;
+    }, 0);
+
+    // Get additional total discount
+    let additionalDiscount = parseFloat(formValues.additionalDiscount || 0);
+
+    // Calculate total discount (row discounts + additional discount)
+    let totalDiscount = rowTotalDiscount + additionalDiscount;
+
+    let totalTax = tempRowCashSalesDetailsList.reduce((sum, row) => {
+      return sum + (row.taxAmount ? parseFloat(row.taxAmount) : 0);
+    }, 0);
+
+    // Fix the calculation of totalSubtotal
+    let totalSubtotal = totalAmount - totalDiscount;
+
+    let prepaymentAmount = parseFloat(formValues.prepaymentAmount) || 0;
+    let totalFeeAmount = parseFloat(formValues.totalFeeAmount) || 0;
+
+    // Calculate subtotal tax (amount after discount + tax)
+    let subtotalTax = totalAmount - totalDiscount + totalTax;
+
+    // Calculate Rounding Amount
+    let roundedSubtotalTax = Math.round(subtotalTax * 20) / 20;
+    let roundingAmount = roundedSubtotalTax - subtotalTax;
+
+    // Correct totalPayable Calculation
+    let totalPayable =
+      totalAmount - totalDiscount + totalTax - prepaymentAmount + totalFeeAmount + roundingAmount;
+
+    // Round totalPayable to the nearest 5 cents
+    totalPayable = Math.round(totalPayable * 20) / 20;
+
+    // Set outstanding amount - use subtotal tax if current outstanding amount is null, 0, or 0.00
+    let paidAmount = parseFloat(formValues.paidAmount || 0);
+    let outstandingAmount = Math.max(totalPayable - paidAmount, 0); // Ensure outstandingAmount is not less than 0
+
+    // Preference (Apply Decimal Formatting to Totals)
+    formValues.totalAmount = totalAmount.toFixed(decimal);
+    formValues.totalDiscount = totalDiscount.toFixed(decimal);
+    formValues.totalTax = totalTax.toFixed(decimal);
+    formValues.totalSubtotal = totalSubtotal.toFixed(decimal);
+    formValues.roundingAmount = roundingAmount.toFixed(decimal);
+    formValues.totalPayable = totalPayable.toFixed(decimal);
+    formValues.outstandingAmount = outstandingAmount.toFixed(decimal);
+
+    formValues.localNetTotal = localNetTotal?.value;
+    formValues.netTotal = netTotal?.value;
+
+    const cashSalesData = {
+      ...formValues,
+      docDate: formValues.docDate || Math.floor(Date.now() / 1000).toString(),
+    };
+
+    delete cashSalesData.attachmentLink;
+    delete cashSalesData.attachment;
+
+    // Pass param transferableQuantity
+    const tempRowCashSalesDetailsListToSend = tempRowCashSalesDetailsList.map((item: any) => ({
+      ...item,
+      transferableQuantity: item.quantity,
+    }));
+
+    const combinedData = {
+      cashSales: cashSalesData,
+      cashSalesHasDetails: tempRowCashSalesDetailsListToSend,
+    };
+
+    form_data.append("data", JSON.stringify(combinedData));
+
+    if (saveType === "create-data") {
+      var counter = 0;
+
+      for (const file of tempRowAttachments) {
+        const base64 =
+          slug === "transfer-to" || slug === "transfer-from" ? "" : await getFileToBase64(file);
+
+        form_data.append(`cashSales[attachment][${counter}][Name]`, file.name);
+
+        form_data.append(
+          `cashSales[attachment][${counter}][File]`,
+          slug === "transfer-to" || slug === "transfer-from" ? "" : base64,
+        );
+
+        counter++;
+      }
+    } else {
+      var counter = 0;
+
+      for (const attachment of tempRowAttachments) {
+        if (attachment.link) {
+          form_data.append(`cashSales[attachment][${counter}][Name]`, attachment.name);
+
+          form_data.append(`cashSales[attachment][${counter}][File]`, "");
+        } else {
+          const base64 = await getFileToBase64(attachment);
+
+          form_data.append(`cashSales[attachment][${counter}][Name]`, attachment.name);
+
+          form_data.append(`cashSales[attachment][${counter}][File]`, base64);
+        }
+        counter++;
+      }
+    }
+
+    try {
+      if (!navigator.onLine) {
+        if (!formValues.docNo) {
+          const nextDocNo = await generateNextDocNo();
+          formValues.docNo = nextDocNo;
+          form.setValue("docNo" as any, nextDocNo);
+        }
+
+        const cashSalesDataToSave = {
+          ...formValues,
+          docDate: formValues.docDate || Math.floor(Date.now() / 1000).toString(),
+        };
+
+        delete cashSalesDataToSave.attachmentLink;
+        delete cashSalesDataToSave.attachment;
+
+        const offlineAttachments = await Promise.all(
+          tempRowAttachments.map(async (file: any) => {
+            if (file.link) return { name: file.name, link: file.link };
+            return { name: file.name, base64: await getFileToBase64(file) };
+          }),
+        );
+
+        const existingDraftId = searchParams.get("draft");
+        const draftId = slug === "edit" && id ? id : (existingDraftId ?? crypto.randomUUID());
+
+        await saveOffline({
+          id: draftId,
+          cashSales: cashSalesDataToSave,
+          cashSalesHasDetails: tempRowCashSalesDetailsListToSend,
+          attachments: offlineAttachments,
+          saveType,
+          transferType,
+          status: "pending",
+          synced: false,
+          slug: "edit",
+          customFieldData: offlineCustomFieldPayload,
+          isPaid: isPaid,
+        });
+
+        const PdfTemplate = getPdfComponent(preferenceData);
+
+        const blob = await pdf(
+          <PdfTemplate
+            previewData={cashSalesDataToSave}
+            itemsData={tempRowCashSalesDetailsList}
+            currentCompanyData={currentCompany}
+            currentUser={{ loginUser }}
+            preferenceData={preferenceData}
+          />
+        ).toBlob();
+
+        localStorage.setItem("offlinePdfDraftId", draftId);
+        localStorage.setItem("showSimplifiedPDFDialog", "true");
+
+        toast({
+          title: "Offline Mode",
+          description: "Saved locally.",
+        });
+
+        setIsSaving(false);
+        router.push(`/sales/cash-sales/edit?draft=${draftId}`);
+        return;
+      }
+
+      const response = await fetch(
+        `${ORIGIN}/cash_sales/api/cash-sales/${saveType}${transferType}`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+          credentials: "omit",
+        },
+      );
+
+      if (response.status === 401) {
+        console.error("Session expired. Redirecting to login.");
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "Your session has expired. Redirecting to login page.",
+        });
+        router.push("/login");
+        throw new Error("Session expired");
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        let errorMessage = errorData.message;
+
+        if (errorMessage.includes("Data too long")) {
+          errorMessage = errorMessage.split("\n")[0];
+        }
+
+        toast({
+          title: errorData.name,
+          description: errorMessage,
+          variant: "destructive",
+          duration: 2000,
+        });
+
+        throw new Error("Failed to fetch data");
+      }
+
+      const responseData = await response.json();
+
+      const currentDraftId = searchParams.get("draft");
+      if (currentDraftId) {
+        await deleteOffline(currentDraftId);
+        window.dispatchEvent(new CustomEvent("offlineRecordSynced"));
+      }
+
+      await handleSaveSuccess(responseData, saveType);
+    } catch (error) {
+      console.error("Error creating new job order data:", error);
+
+      toast({
+        title: `${error.message}`,
+        duration: 2000,
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && (slug === "transfer-to" || slug === "transfer-from")) {
+      const transferDataKey =
+        slug === "transfer-to" ? "transfer-to.cash-sales" : "transfer-from.cash-sales";
+
+      const transferData = JSON.parse(localStorage.getItem(transferDataKey) || "{}");
+
+      const mappedData = {
+        ...transferData?.data,
+        description: "",
+        note: "",
+        UUID: "",
+        docDate: Math.floor(Date.now() / 1000),
+      };
+
+      setCashSalesData(mappedData);
+
+      transferData?.subData?.forEach((detail) => {
+        detail["item"] = detail["item"];
+        detail["itemGroup"] = detail["itemGroup"];
+        detail["itemCategory"] = detail["itemCategory"];
+        detail["transferredFrom"] = detail["UUID"];
+      });
+
+      setTempRowAttachments(transferData?.data?.attachmentLink ?? []);
+      setTempRowCashSalesDetailsList(transferData?.subData);
+
+      function beforeUnload(e: BeforeUnloadEvent) {
+        localStorage.removeItem(transferDataKey);
+        e.preventDefault();
+      }
+
+      window.addEventListener("beforeunload", beforeUnload);
+
+      return () => {
+        window.removeEventListener("beforeunload", beforeUnload);
+      };
+    }
+  }, [slug]);
+
+  const loadFiles = async (id: string | null) => {
+    if (!id || !navigator.onLine) return;
+    if (id) {
+      try {
+        const response = await fetch(`${ORIGIN}/cash_sales/api/cash-sales/load-files?id=${id}`, {
+          headers,
+          credentials: "omit",
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load files");
+        }
+
+        const loadedFilesData = await response.json();
+
+        setTempRowAttachments(loadedFilesData);
+
+      } catch (error) {
+        console.error("Error loading files:", error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const shouldShow = localStorage.getItem("showSimplifiedPDFDialog");
+    if (!shouldShow) return;
+
+    const pdfData = localStorage.getItem("pdfData");
+
+    if (pdfData && pdfData !== "undefined") {
+      const parsed = JSON.parse(pdfData);
+      setPreviewData(parsed.data);
+      setPDFPreviewType("Invoice");
+      setItemsData(parsed.itemsData);
+      setCurrentCompanyData(parsed.currentCompany);
+      setCurrentUser(parsed.currentUser);
+      previewTemplatePDF(parsed);
+
+      localStorage.removeItem("showSimplifiedPDFDialog");
+      localStorage.removeItem("pdfData");
+    }
+  }, [searchParams]);
+
+  // F3 key handling
+  useEffect(() => {
+    const handleKeyDown = async (event: KeyboardEvent) => {
+      if (event.key === "F3") {
+        event.preventDefault(); // Prevent default F3 behavior
+
+        await handleSubmit();
+
+        form.reset(); // Reset form values
+
+        setTempRowCashSalesDetailsList([]); // Reset details list
+        setTempRowAttachments([]); // Reset attachments
+
+        resetForm(); // Reset form key
+
+        router.push("/sales/cash-sales/new");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [router, handleSubmit]);
+
+  const openDialog = () => {
+    setDialogOpen(true);
+  };
+
+  // Add useEffect to check localStorage on component mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedFlag = localStorage.getItem("tenderPaymentSavedInNew");
+      if (savedFlag === "true") {
+        setIsTenderPaymentSavedInNew(true);
+      }
+    }
+  }, []);
+
+  // Memoize the update function
+  const updatePaymentDetailsInEdit = useCallback(async () => {
+    // Early return if already executed
+    if (updatePaymentDetailsExecutedRef.current) {
+      return;
+    }
+
+    const formValues = form.getValues();
+
+    if (
+      slug === "edit" &&
+      isTenderPaymentSavedInNew === true &&
+      id &&
+      formValues._actionUUID &&
+      !hasUpdatedPaymentDetails
+    ) {
+      // Mark as executed immediately
+      updatePaymentDetailsExecutedRef.current = true;
+
+      try {
+        const formData = new FormData();
+
+        formData.append("cashSales[totalPayable]", formValues.totalPayable || "");
+        formData.append("cashSales[paymentMethod]", formValues.paymentMethod || "");
+        formData.append("cashSales[paidAmount]", formValues.paidAmount || "");
+        formData.append("cashSales[additionalDiscount]", formValues.additionalDiscount || "");
+        formData.append("cashSales[remark1]", formValues.remark1 || "");
+        formData.append("cashSales[remark2]", formValues.remark2 || "");
+
+        const apiUrl = `${ORIGIN}/cash_sales/api/cash-sales/update-payment-details?id=${id}`;
+
+        const response = await fetch(apiUrl, {
+          method: "POST",
+          headers,
+          body: formData,
+          credentials: "omit",
+        });
+
+        if (!response.ok) throw new Error("Failed to update data");
+
+        const updateResult = await response.json();
+
+        setShowSimplifiedPDFDialog(true);
+        setPDFPreviewType("Invoice");
+        setPreviewData(updateResult.data);
+        setItemsData(updateResult.itemsData);
+        setCurrentCompanyData(updateResult.currentCompany);
+        setCurrentUser(updateResult.currentUser);
+
+        // Reset the flag and clear localStorage after successful update
+        setIsTenderPaymentSavedInNew(false);
+        localStorage.removeItem("tenderPaymentSavedInNew");
+
+        setHasUpdatedPaymentDetails(true);
+      } catch (error) {
+        console.error("Error updating payment details:", error);
+        // Clear localStorage even on error to prevent infinite loops
+        localStorage.removeItem("tenderPaymentSavedInNew");
+        // Reset execution flag on error to allow retry if needed
+        updatePaymentDetailsExecutedRef.current = false;
+      }
+    }
+  }, [slug, isTenderPaymentSavedInNew, id, form, headers, hasUpdatedPaymentDetails]);
+
+  // Modified useEffect to handle payment details update
+  useEffect(() => {
+    updatePaymentDetailsInEdit();
+  }, [updatePaymentDetailsInEdit]);
+
+  //Layout State
+  const [layout, setLayout] = useState<"new" | "old">(() => {
+    if (typeof window === "undefined") return "new";
+    return (localStorage.getItem("Layout") as "new" | "old") || "new";
+  });
+
+  const handleLayoutChange = (newLayout: "new" | "old") => {
+    localStorage.setItem("Layout", newLayout);
+    setLayout(newLayout);
+  };
+
+  //Voucher logic
+  const [isVoucherLoading, setIsVoucherLoading] = useState(false);
+
+  //Verify voucher function
+  const verifyVoucher = async (value) => {
+    if (!value) {
+      clearVoucherData();
+      return false;
+    }
+    const verifyVoucherForm = new FormData();
+    const docId = slug == "clone" ? "" : id || "";
+    verifyVoucherForm.append("voucherNumber", value);
+    verifyVoucherForm.append("docDate", form.getValues("docDate"));
+    verifyVoucherForm.append("doc_id", docId);
+    const itemUUIDs = tempRowCashSalesDetailsList.map((row) => row.item);
+
+    itemUUIDs.forEach((uuid, index) => {
+      verifyVoucherForm.append(`itemUUIDs[${index}]`, uuid);
+    });
+
+    if (itemUUIDs.length == 0) {
+      return false;
+    }
+
+    setIsVoucherLoading(true);
+
+    try {
+      clearVoucherData();
+      const response = await fetch(
+        `${ORIGIN}/promotion_voucher/api/promotion-voucher/verify-voucher`,
+        {
+          method: "POST",
+          headers,
+          body: verifyVoucherForm,
+        },
+      );
+
+      const data = await response.json();
+
+      if (data && data.data.length == 0) {
+        form.setValue("voucher", "");
+        form.setValue("voucherCode", "");
+        setVerifyVoucherData([]);
+        if (data.used) {
+          toast({
+            title: "Voucher Used",
+            description: "This voucher has already been used",
+            variant: "destructive",
+            duration: 3000,
+          });
+        } else {
+          toast({
+            title: "Invalid Voucher",
+            description: "Voucher not available.",
+            variant: "destructive",
+            duration: 3000,
+          });
+        }
+
+        clearVoucherData();
+      } else if (data && data.data) {
+        form.setValue("voucher", data.data.UUID);
+
+        const availableItems = data.data.availableItems;
+        const discountRate = data.data.discountRate;
+        const decimal = preferenceData?.data?.decimal || 2;
+        const voucherCode = data.data.number;
+        const voucherUUID = data.data.UUID;
+
+        let rate = "";
+
+        if (discountRate && discountRate.includes("%")) {
+          rate = parseFloat(discountRate.replace("%", ""));
+        }
+
+        const itemMap = new Map();
+        availableItems.forEach((item) => {
+          itemMap.set(item.item, {
+            voucher: voucherUUID,
+            discountRate: rate,
+            minQuantity: item.minQuantity,
+            voucherCode: voucherCode,
+          });
+        });
+
+        if (data.data.option == "Apply to all item") {
+          tempRowCashSalesDetailsList.forEach((row) => {
+            if (
+              itemMap.has(row.item) &&
+              Number(row.quantity) >= Number(itemMap.get(row.item).minQuantity)
+            ) {
+              const data = itemMap.get(row.item);
+              const price = row.price || 0;
+              const quantity = row.quantity || 0;
+              const minQty = itemMap.get(row.item).minQuantity;
+              const discountAmount = rate ? (price * quantity * rate) / 100 : 0;
+
+              row.voucher = data.voucher;
+              row.voucherCode = data.voucherCode;
+              row.discountRate = parseFloat(data.discountRate).toFixed(decimal);
+              row.discountAmount = parseFloat(discountAmount).toFixed(decimal);
+              row.voucherMinQuantity = minQty;
+              row.voucherOption = "Apply to all item";
+            }
+          });
+
+          setTempRowCashSalesDetailsList([...tempRowCashSalesDetailsList]);
+
+          toast({
+            title: "Voucher Applied",
+            description: "Voucher has been applied successfully.",
+            variant: "success",
+            duration: 3000,
+          });
+        } else {
+          //Apply to single item
+
+          let matchedArray = [];
+
+          tempRowCashSalesDetailsList.forEach((row) => {
+            if (
+              itemMap.has(row.item) &&
+              Number(row.quantity) >= Number(itemMap.get(row.item).minQuantity)
+            ) {
+              const data = itemMap.get(row.item);
+              const price = row.price || 0;
+              const quantity = row.quantity || 0;
+              const minQty = itemMap.get(row.item).minQuantity;
+
+              const newRow = { ...row };
+
+              const discountAmount = rate ? (price * quantity * rate) / 100 : 0;
+              newRow.voucher = data.voucher;
+              newRow.voucherCode = data.voucherCode;
+              newRow.discountRate = parseFloat(data.discountRate).toFixed(decimal);
+              newRow.discountAmount = parseFloat(discountAmount).toFixed(decimal);
+              newRow.voucherMinQuantity = minQty;
+              newRow.voucherOption = "Apply to single item";
+              matchedArray.push(newRow);
+            }
+          });
+          setVerifyVoucherData(matchedArray);
+
+          if (matchedArray.length > 0) {
+            setVoucherOpen(true);
+          } else {
+            toast({
+              title: "Invalid Voucher",
+              description:
+                "This voucher can't be used with the selected item. Please check the voucher conditions.",
+              variant: "destructive",
+              duration: 3000,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Error",
+        description: "Failed to verify voucher. Please try again.",
+        variant: "destructive",
+        duration: 3000,
+      });
+    } finally {
+      setIsVoucherLoading(false);
+    }
+  };
+
+  //Voucher logic
+  const updateSelectedVoucherData = (data, overwrite) => {
+    const updatedList = tempRowCashSalesDetailsList.map((item) => ({
+      ...item,
+      voucher: null,
+      voucherCode: null,
+      discountRate: "0.00",
+      discountAmount: "0.00",
+    }));
+    const updatedArray = updatedList.map((row) => {
+      if (row.seq === data.seq && row.item === data.item) {
+        return data;
+      }
+      return row;
+    });
+    setTempRowCashSalesDetailsList(updatedArray);
+    toast({
+      title: "Voucher Applied",
+      description: "Voucher has been applied successfully.",
+      variant: "success",
+      duration: 3000,
+    });
+  };
+  //Voucher logic
+  const clearVoucherData = () => {
+    const updatedArray = tempRowCashSalesDetailsList.map((row) => {
+      row.voucher = null;
+      row.voucherCode = null;
+      row.discountRate = "0.00";
+      row.discountAmount = "0.00";
+      return row;
+    });
+    setTempRowCashSalesDetailsList(updatedArray);
+  };
+
+  // Shared Props
+  const documentDetailsProps = {
+    form,
+    slug,
+    cashSalesData: cashSales,
+    setIsPaidAmountManuallyUpdated,
+    tempRowAttachments,
+    setTempRowAttachments,
+    isPaid,
+    preferenceData,
+    verifyVoucher,
+    tempRowCashSalesDetailsList,
+    clearVoucherData,
+    cashSalesDetails,
+    isExpand,
+    id,
+    formResetKey,
+  };
+
+  const cashSalesDataTableProps = {
+    columns: CashSalesColumns,
+    data: tempRowCashSalesDetailsList,
+    tempRowCashSalesDetailsList,
+    setTempRowCashSalesDetailsList,
+    revalidateCashSalesDetails,
+    form,
+    cashSalesData,
+    UOMDetails,
+    isPaidAmountEmpty,
+    isPaidAmountManuallyUpdated,
+    isPaid,
+    preferenceData,
+    slug,
+  };
+
+  //Loading State
+  const isFetching = isLoading || isVoucherLoading || isSaving || isBarcodeScanLoading;
+
+  useEffect(() => {
+    if (showSimplifiedPDFDialog && previewTemplatePDFData) {
+      setIsPDFLoading(true);
+      generatePdf();
+    }
+  }, [showSimplifiedPDFDialog, previewTemplatePDFData]);
+
+  const generatePdf = async () => {
+    const blob = new Blob([previewTemplatePDFData], { type: "application/pdf" });
+    setPdfUrl(window.URL.createObjectURL(blob));
+    setIsPDFLoading(false);
+  };
+
+  const previewTemplatePDF = async (data: any) => {
+    setShowSimplifiedPDFDialog(true);
+    setIsPDFLoading(true);
+
+    if (!navigator.onLine) {
+      await generateAndShowOfflinePDF(draftId ?? "preview");
+      setIsPDFLoading(false);
+      return;
+    }
+
+    var form_data = new FormData();
+    form_data.append("previewData", JSON.stringify(data));
+    form_data.append("UUIDs", "");
+    form_data.append("docDate", "");
+
+    const response = await axios.post(
+      `https://1ofis.infollective.com/application/backend/site/api/site/preview-pdf?module=${"CASH SALES"}&account=${currentAccount.account}&company=${currentCompany.UUID}&fileName=${"Simplified.html"}`,
+      form_data,
+      {
+        responseType: "arraybuffer",
+        auth: { username, password: authToken },
+      },
+    );
+
+    if (isMobileDevice) {
+      const blob = new Blob([response.data], {
+        type: "application/pdf",
+      });
+
+      const url = URL.createObjectURL(blob);
+
+      setPdfUrl(url);
+      setIsPDFLoading(false);
+    } else {
+      setPreviewTemplatePDFData(response.data);
+    }
+  };
+
+  const generateAndShowOfflinePDF = async (draftId, overrideData) => {
+    try {
+      setIsPDFLoading(true);
+      setShowSimplifiedPDFDialog(true);
+
+      let prefData = preferenceData;
+      if (!prefData) {
+        const cached = await getCachedPreferenceData();
+        prefData = cached?.preference ?? null;
+      }
+
+      const cachedCurrentCompany = await getCachedCurrentCompany();
+      setCurrentCompanyData(cachedCurrentCompany ?? null);
+
+      const offlinePreviewData = overrideData
+        ? { ...overrideData.cashSales, items: overrideData.items }
+        : { ...cashSalesData, ...form.getValues(), items: tempRowCashSalesDetailsList };
+
+      const itemsForPdf = overrideData ? overrideData.items : tempRowCashSalesDetailsList;
+
+      const PdfTemplate = getPdfComponent(prefData);
+
+      const blob = await pdf(
+        <PdfTemplate
+          previewData={offlinePreviewData}
+          itemsData={itemsForPdf}
+          currentCompanyData={cachedCurrentCompany ?? null}
+          currentUser={{ loginUser }}
+          preferenceData={prefData}
+        />
+      ).toBlob();
+
+      const url = URL.createObjectURL(blob);
+      setPdfUrl(url);
+      setIsPDFLoading(false);
+    } catch (err) {
+      console.error("Offline PDF generation failed:", err);
+      setIsPDFLoading(false);
+      toast({
+        title: "PDF Preview Unavailable",
+        description: "Could not generate receipt preview offline.",
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+  };
+
+  const generateNextDocNo = async (): Promise<string> => {
+    const lastDocNo = await getCachedLastDocNo();
+
+    if (!lastDocNo) return `CS-DRAFT-${Date.now()}`;
+
+    const match = lastDocNo.match(/^([A-Za-z\-\/]+)(\d+)$/);
+    if (!match) return `${lastDocNo}-COPY`;
+
+    const prefix = match[1];
+    const padLength = match[2].length;
+
+    const existingDrafts = await getOffline();
+
+    const allDocNos = [
+      lastDocNo,
+      ...existingDrafts
+        .filter((d) => !d.synced && d.cashSales?.docNo)
+        .map((d) => d.cashSales.docNo),
+    ];
+
+    // Parse all docNos with same prefix and find the max number
+    let maxNum = 0;
+    allDocNos.forEach((docNo) => {
+      const m = docNo?.match(/^([A-Za-z\-\/]+)(\d+)$/);
+      if (m && m[1] === prefix) {
+        const n = parseInt(m[2]);
+        if (n > maxNum) maxNum = n;
+      }
+    });
+
+    const nextNum = maxNum + 1;
+    return `${prefix}${String(nextNum).padStart(padLength, "0")}`;
+  };
+
+  useEffect(() => {
+    if (slug !== "edit") return;
+    if (offlineDraftLoadedRef.current) return;
+    offlineDraftLoadedRef.current = true;
+
+    const draftId = searchParams.get("draft");
+
+    const loadOfflineDraft = async () => {
+      try {
+        const dbItems = await getOffline();
+        const pendingDraft = draftId ? dbItems.find((item) => item.id === draftId) : null;
+        if (!pendingDraft) return;
+
+        const saved = pendingDraft.cashSales;
+        Object.keys(saved).forEach((key) => {
+          if (saved[key] !== undefined && saved[key] !== null) {
+            form.setValue(key, saved[key]);
+          }
+        });
+
+        setCashSalesData(saved);
+
+        setOfflineIsPaid(pendingDraft.isPaid ?? false);
+
+        if (Array.isArray(pendingDraft.cashSalesHasDetails)) {
+          setTempRowCashSalesDetailsList(pendingDraft.cashSalesHasDetails);
+        }
+
+        if (Array.isArray(pendingDraft.attachments)) {
+          setTempRowAttachments(
+            pendingDraft.attachments.map((a) => ({ name: a.name, link: a.link ?? null })),
+          );
+        }
+
+        toast({
+          title: "Draft Restored",
+          description: "Your offline draft has been restored.",
+          duration: 4000,
+        });
+
+        const shouldShowPdf = localStorage.getItem("showSimplifiedPDFDialog");
+        const offlineDraftId = localStorage.getItem("offlinePdfDraftId");
+
+        if (shouldShowPdf && offlineDraftId === draftId) {
+          localStorage.removeItem("showSimplifiedPDFDialog");
+          localStorage.removeItem("offlinePdfDraftId");
+
+          await generateAndShowOfflinePDF(draftId, {
+            cashSales: pendingDraft.cashSales,
+            items: pendingDraft.cashSalesHasDetails,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load offline draft:", err);
+      }
+    };
+
+    loadOfflineDraft();
+  }, []);
+
+  useEffect(() => {
+    if (!id || !navigator.onLine) return;
+    if (!cashSales?.data) return;
+    if (!cashSalesDetails?.rows) return;
+
+    cacheDetails(id, {
+      cashSales: cashSales.data,
+      cashSalesHasDetails: cashSalesDetails.rows,
+    });
+  }, [cashSales, cashSalesDetails, id]);
+
+  // When offline, load from cache:
+  useEffect(() => {
+    if (!navigator.onLine && id) {
+      getCachedDetails(id).then((cached) => {
+        if (cached) {
+          setCashSalesData(cached.cashSales);
+          setTempRowCashSalesDetailsList(cached.cashSalesHasDetails);
+        }
+      });
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (slug !== "clone") return;
+    if (offlineCloneLoadedRef.current) return;
+    if (!id) return;
+
+    const loadOfflineCloneSource = async () => {
+      const dbItems = await getOffline();
+      const source = dbItems.find((item) => item.id === id);
+      if (!source) return; 
+
+      offlineCloneLoadedRef.current = true;
+
+      const saved = {
+        ...source.cashSales,
+        docNo: "",
+        docDate: Math.floor(Date.now() / 1000).toString(),
+        eInvoiceVersion: null,
+        digitalSignature: null,
+        eInvoiceCode: null,
+        oriRefNo: null,
+        consolidateTo: null,
+        consolidatedInvoiceDocNo: null,
+        customerPaymentTransferred: null,
+        voucher: null,
+        voucherCode: null,
+        paidAmount: null,
+      };
+
+      Object.keys(saved).forEach((key) => {
+        if (saved[key] !== undefined && saved[key] !== null) {
+          form.setValue(key, saved[key]);
+        }
+      });
+
+      setCashSalesData(saved);
+
+      if (Array.isArray(source.cashSalesHasDetails)) {
+        setTempRowCashSalesDetailsList(
+          source.cashSalesHasDetails.map((row: any) => ({
+            ...row,
+            voucher: null,
+            voucherCode: null,
+            discountRate: row.voucher ? "0.00" : row.discountRate,
+            discountAmount: row.voucher ? "0.00" : row.discountAmount,
+            voucherOption: "",
+          })),
+        );
+      }
+
+      if (Array.isArray(source.attachments)) {
+        setTempRowAttachments(
+          source.attachments.map((a: any) => ({ name: a.name, link: a.link ?? null })),
+        );
+      }
+    };
+
+    loadOfflineCloneSource();
+  }, [slug, id]);
+
+  return (
+    <DateRestrictionContext.Provider value={{ allowPastRecord, setAllowPastRecord }}>
+      <div className="sticky top-0 z-20">
+        <TopActionBar
+          cashSales={cashSalesData}
+          approvalStatus={approvalStatus}
+          form={form}
+          handleSubmit={handleSubmit}
+          onPayment={openDialog}
+          cashSalesFormSchema={cashSalesFormSchema}
+          tempRowCashSalesDetailsList={tempRowCashSalesDetailsList}
+          setTempRowCashSalesDetailsList={setTempRowCashSalesDetailsList}
+          revalidateCashSalesDetails={revalidateCashSalesDetails}
+          slug={slug}
+          isBarcodeScanLoading={isBarcodeScanLoading}
+          setIsBarcodeScanLoading={setIsBarcodeScanLoading}
+          revalidateCashSales={revalidateCashSales}
+          viewEInvoiceDetails={viewEInvoiceDetails}
+          cashSalesData={cashSales}
+          layout={layout}
+          onLayoutChange={handleLayoutChange}
+          isPaid={isPaid}
+          isLoading={isFetching}
+        />
+      </div>
+
+      {/* New Design */}
+      {layout === "new" && (
+        <div className="box-border flex h-full w-full items-center justify-between gap-x-2 p-1.5">
+          <Form {...form}>
+            {/* Left Container */}
+            <SlideInAnimation>
+              <div className="flex h-full w-[480px] min-w-[380px] flex-col gap-y-2">
+                <CashSalesForm
+                  key={formResetKey}
+                  form={form}
+                  slug={slug}
+                  setIsExpand={setIsExpand}
+                  isExpand={isExpand}
+                  preferenceData={preferenceData}
+                  id={id}
+                  docNo={cashSales?.docNo}
+                  customFieldRef={customFieldRef}
+                  customFieldDefs={customFieldDefs}
+                  customFieldSavedData={customFieldSavedData}
+                  submitAttempted={submitAttempted}
+                  allDropdowns={allDropdowns}
+                />
+                <DocumentDetailsForm {...documentDetailsProps} allDropdowns={allDropdowns} />
+              </div>
+            </SlideInAnimation>
+
+            {/* Right */}
+            <div className="mt-3.5 flex h-full w-full flex-1 flex-col md:mt-0">
+              <CashSalesDataTable {...cashSalesDataTableProps} allDropdowns={allDropdowns} />
+            </div>
+            {dialogOpen && (
+              <TenderPaymentFormPopover
+                open={dialogOpen}
+                setOpen={setDialogOpen}
+                cashSalesData={cashSalesData}
+                tempRowCashSalesDetailsList={tempRowCashSalesDetailsList}
+                form={form}
+                slug={slug}
+                setIsPaidAmountManuallyUpdated={setIsPaidAmountManuallyUpdated}
+                setIsTenderPaymentSaved={setIsTenderPaymentSaved}
+                isTenderPaymentSaved={isTenderPaymentSaved}
+                setIsTenderPaymentSavedInNew={setIsTenderPaymentSavedInNew}
+                handleSubmit={handleSubmit}
+                allDropdowns={allDropdowns}
+              />
+            )}
+
+            {/* Add PDF preview dialog */}
+            <Dialog open={showSimplifiedPDFDialog} onOpenChange={setShowSimplifiedPDFDialog}>
+              <DialogContent className="max-w-md">
+                <DialogTitle>Simplified Receipt - Tender Payment</DialogTitle>
+                <div className="relative h-[550px] w-full">
+                  {isSaving && <LoadingUI />}
+                  {!isPDFLoading && !isMobileDevice && pdfUrl && (
+                    <iframe src={pdfUrl} className="h-full w-full" title="pdf" />
+                  )}
+
+                  {!isPDFLoading && isMobileDevice && pdfUrl && (
+                    <div className="flex h-full items-center justify-center">
+                      <Button onClick={() => window.open(pdfUrl, "_blank")}>
+                        Open PDF Preview
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <DialogFooter className="flex !justify-center gap-x-2">
+                  <DialogClose
+                    className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+                    onClick={() => {
+                      setShowSimplifiedPDFDialog(false);
+                    }}
+                  >
+                    Close
+                  </DialogClose>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </Form>
+        </div>
+      )}
+
+      {/* Old Design */}
+      {layout === "old" && (
+        <div className="grid h-full grid-rows-[auto_1fr]">
+          <Form {...form}>
+            <div className="grid h-full grid-cols-[1fr_auto] gap-x-2">
+              {/* Preference (Pass preferenceData Prop) */}
+              <ScrollArea className="h-full">
+                <div id="mainDetails" className="mt-2" ref={mainDetailsRef}>
+                  {/* Voucher logic */}
+                  <CashSalesFormOld
+                    key={formResetKey}
+                    form={form}
+                    slug={slug}
+                    setIsPaidAmountManuallyUpdated={setIsPaidAmountManuallyUpdated}
+                    isPaid={isPaid}
+                    preferenceData={preferenceData}
+                    verifyVoucher={verifyVoucher}
+                    tempRowCashSalesDetailsList={tempRowCashSalesDetailsList}
+                    clearVoucherData={clearVoucherData}
+                  />
+                </div>
+
+                <div className="mt-2">
+                  <CashSalesDataTableOld
+                    columns={CashSalesColumns}
+                    data={tempRowCashSalesDetailsList}
+                    tempRowCashSalesDetailsList={tempRowCashSalesDetailsList}
+                    setTempRowCashSalesDetailsList={setTempRowCashSalesDetailsList}
+                    revalidateCashSalesDetails={revalidateCashSalesDetails}
+                    form={form}
+                    cashSalesData={cashSalesData}
+                    UOMDetails={UOMDetails}
+                    isPaidAmountEmpty={isPaidAmountEmpty}
+                    isPaidAmountManuallyUpdated={isPaidAmountManuallyUpdated}
+                    isPaid={isPaid}
+                    preferenceData={preferenceData}
+                    slug={slug}
+                  />
+                </div>
+
+                <div id="moreDetails" className="mt-2" ref={moreDetailsRef}>
+                  <OtherDetailsFormOld
+                    key={formResetKey}
+                    tempRowAttachments={tempRowAttachments}
+                    setTempRowAttachments={setTempRowAttachments}
+                    form={form}
+                    slug={slug}
+                    isPaid={isPaid}
+                    preferenceData={preferenceData}
+                  />
+                </div>
+
+                <Card
+                  collapsible
+                  defaultCollapsed={false}
+                  // className="h-auto pb-2 shadow-md"
+                  className={`h-auto pb-2 shadow-md ${!viewEInvoiceDetails ? "hidden" : ""}`}
+                  style={{ marginTop: "10px" }}
+                >
+                  <CardHeader>
+                    <CardTitle className="text-lg font-bold">E-invoice Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-2 py-0">
+                    <div id="eInvoiceDetails" ref={eInvoiceDetailsRef}>
+                      <SupplierDetailsFormOld
+                        form={form}
+                        supplierCode={form.getValues("supplierCode")}
+                        defaultCurrentCompany={slug == "new" ? defaultCurrentCompany : ""}
+                      />
+
+                      <div className="mt-2">
+                        <BuyerDetailsFormOld form={form} />
+                      </div>
+
+                      <div className="mt-2">
+                        <EInvoiceDetailsFormOld
+                          form={form}
+                          cashSalesDetails={
+                            id
+                              ? cashSalesDetails
+                                ? cashSalesDetails.rows
+                                : []
+                              : tempRowCashSalesDetailsList
+                          }
+                          tempRowCashSalesDetailsList={tempRowCashSalesDetailsList}
+                          preferenceData={preferenceData}
+                          cashSalesData={cashSalesData}
+                        />
+                      </div>
+
+                      <div className="mt-2">
+                        <PaymentDetailsFormOld form={form} />
+                      </div>
+
+                      <div className="mt-2">
+                        <ShippingRecipientDetailsFormOld form={form} />
+                      </div>
+
+                      <div className="mt-2">
+                        <ImportExportOfGoodsFormOld form={form} />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </ScrollArea>
+
+              <TabsNavigator tabs={tabs} initialActiveTabId="mainDetails" stickyTop="top-14" />
+            </div>
+          </Form>
+          <VerifyVoucherPopover
+            open={voucherOpen}
+            setOpen={setVoucherOpen}
+            data={verifyVoucherData}
+            tempRowCashSalesDetailsList={tempRowCashSalesDetailsList}
+            updateSelectedVoucherData={updateSelectedVoucherData}
+            form={form}
+          />
+          {dialogOpen && (
+            <TenderPaymentFormPopover
+              open={dialogOpen}
+              setOpen={setDialogOpen}
+              cashSalesData={cashSalesData}
+              tempRowCashSalesDetailsList={tempRowCashSalesDetailsList}
+              form={form}
+              slug={slug}
+              setIsPaidAmountManuallyUpdated={setIsPaidAmountManuallyUpdated}
+              setIsTenderPaymentSaved={setIsTenderPaymentSaved}
+              isTenderPaymentSaved={isTenderPaymentSaved}
+              setIsTenderPaymentSavedInNew={setIsTenderPaymentSavedInNew}
+              handleSubmit={handleSubmit}
+            />
+          )}
+
+          {/* Add PDF preview dialog */}
+          <Dialog open={showSimplifiedPDFDialog} onOpenChange={setShowSimplifiedPDFDialog}>
+            <DialogContent className="max-w-md">
+              <DialogTitle>Simplified Receipt - Tender Payment</DialogTitle>
+              <div className="relative h-[550px] w-full">
+                {isSaving && <LoadingUI />}
+                {!isPDFLoading && !isMobileDevice && pdfUrl && (
+                  <iframe src={pdfUrl} className="h-full w-full" title="pdf" />
+                )}
+
+                {!isPDFLoading && isMobileDevice && pdfUrl && (
+                  <div className="flex h-full items-center justify-center">
+                    <Button onClick={() => window.open(pdfUrl, "_blank")}>Open PDF Preview</Button>
+                  </div>
+                )}
+              </div>
+              <DialogFooter className="flex !justify-center gap-x-2">
+                <DialogClose
+                  className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+                  onClick={() => {
+                    setShowSimplifiedPDFDialog(false);
+                  }}
+                >
+                  Close
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* <Dialog open={showSimplifiedPDFDialog} onOpenChange={setShowSimplifiedPDFDialog}>
+            <DialogContent className="max-w-md">
+              <DialogTitle>Simplified Receipt - Tender Payment</DialogTitle>
+              <div className="relative h-[550px] w-full">
+                <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                  <SimplifiedPDF
+                    previewData={previewData}
+                    itemsData={itemsData}
+                    currentCompanyData={currentCompanyData}
+                    currentUser={currentUser}
+                  />
+                </PDFViewer>
+              </div>
+              <DialogFooter className="flex !justify-center gap-x-2">
+                <DialogClose
+                  className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+                  onClick={() => {
+                    setShowSimplifiedPDFDialog(false);
+                  }}
+                >
+                  Close
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog> */}
+        </div>
+      )}
+
+      {/* Loading */}
+      {isFetching && <LoadingUI />}
+    </DateRestrictionContext.Provider>
+  );
+}

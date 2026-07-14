@@ -1,0 +1,13 @@
+"use client";
+
+import React from "react";
+
+import CustomerDataTable from "./DataTable";
+
+export default function CustomerPage() {
+  return (
+    <div className="h-full">
+      <CustomerDataTable/>
+    </div>
+  );
+}

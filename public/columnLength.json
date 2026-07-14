@@ -1,0 +1,7778 @@
+{
+    "cashSales": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "dealer",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "customerCode",
+            "maxLength": 45
+        },
+        {
+            "name": "customerName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentMethod",
+            "maxLength": 45
+        },
+        {
+            "name": "bankCharge",
+            "maxLength": 10
+        },
+        {
+            "name": "chequeNo",
+            "maxLength": 45
+        },
+        {
+            "name": "paidAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "paymentProject",
+            "maxLength": 10
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "quotation",
+            "maxLength": 45
+        },
+        {
+            "name": "salesOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "jobOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "taxDate",
+            "maxLength": 30
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "additionalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "invoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "outstandingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "consolidateTo",
+            "maxLength": 45
+        },
+        {
+            "name": "customerBRNOld",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerMSICCode",
+            "maxLength": 45
+        },
+        {
+            "name": "TTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceVersion",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceCode",
+            "maxLength": 45
+        },
+        {
+            "name": "oriRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceDate",
+            "maxLength": 30
+        },
+        {
+            "name": "digitalSignature",
+            "maxLength": 45
+        },
+        {
+            "name": "frequency",
+            "maxLength": 45
+        },
+        {
+            "name": "billingPeriod",
+            "maxLength": 45
+        },
+        {
+            "name": "tax",
+            "maxLength": 45
+        },
+        {
+            "name": "discountRate",
+            "maxLength": 10
+        },
+        {
+            "name": "feeRate",
+            "maxLength": 10
+        },
+        {
+            "name": "bankACNo",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "prepaymentAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "prepaymentDate",
+            "maxLength": 30
+        },
+        {
+            "name": "prepaymentRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "billRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo1",
+            "maxLength": 45
+        },
+        {
+            "name": "interTradeRule",
+            "maxLength": 45
+        },
+        {
+            "name": "tariffCode",
+            "maxLength": 45
+        },
+        {
+            "name": "FTA",
+            "maxLength": 45
+        },
+        {
+            "name": "exporterNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo2",
+            "maxLength": 45
+        },
+        {
+            "name": "country",
+            "maxLength": 45
+        },
+        {
+            "name": "otherCharges",
+            "maxLength": 4100
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierMSICCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBusinessNature",
+            "maxLength": 100
+        },
+        {
+            "name": "supplierEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "buyerName",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "recipient",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeIndicator",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeReason",
+            "maxLength": 255
+        },
+        {
+            "name": "location",
+            "maxLength": 45
+        },
+        {
+            "name": "feeAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "discountAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "recipientTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "IRBAction",
+            "maxLength": 45
+        },
+        {
+            "name": "currentCompany",
+            "maxLength": null
+        },
+        {
+            "name": "currentCustomer",
+            "maxLength": null
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        },
+        {
+            "name": "deliveryAttention",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "allowPastDates",
+            "maxLength": null
+        }
+    ],
+    "quotation": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "customerCode",
+            "maxLength": 45
+        },
+        {
+            "name": "customerName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        },
+        {
+            "name": "deliveryAttention",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "allowPastDates",
+            "maxLength": null
+        }
+    ],
+    "salesOrder": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "quotation",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "customerCode",
+            "maxLength": 45
+        },
+        {
+            "name": "customerName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customerTel",
+            "maxLength": 100
+        },
+        {
+            "name": "customerFax",
+            "maxLength": 45
+        },
+        {
+            "name": "customerEmail",
+            "maxLength": 255
+        },
+        {
+            "name": "customerAddress",
+            "maxLength": 255
+        },
+        {
+            "name": "customerPostcode",
+            "maxLength": 10
+        },
+        {
+            "name": "customerCity",
+            "maxLength": 100
+        },
+        {
+            "name": "customerCountry",
+            "maxLength": 100
+        },
+        {
+            "name": "customerCoordinates",
+            "maxLength": 100
+        },
+        {
+            "name": "customerAttentionName",
+            "maxLength": 255
+        },
+        {
+            "name": "customerAttentionTel",
+            "maxLength": 100
+        },
+        {
+            "name": "customerAttentionEmail",
+            "maxLength": 255
+        },
+        {
+            "name": "customerCreditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "customerCreditLimit",
+            "maxLength": 10
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "quotationType",
+            "maxLength": null
+        },
+        {
+            "name": "validityDay",
+            "maxLength": null
+        },
+        {
+            "name": "lastValidDate",
+            "maxLength": 45
+        },
+        {
+            "name": "POLPort",
+            "maxLength": 45
+        },
+        {
+            "name": "POLPortName",
+            "maxLength": 255
+        },
+        {
+            "name": "POLTerminal",
+            "maxLength": 45
+        },
+        {
+            "name": "POLTerminalName",
+            "maxLength": 255
+        },
+        {
+            "name": "POLPortTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "POLFreightTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "POLHandlingOffice",
+            "maxLength": 45
+        },
+        {
+            "name": "POLHandlingOfficeName",
+            "maxLength": 255
+        },
+        {
+            "name": "POLReqETA",
+            "maxLength": 45
+        },
+        {
+            "name": "PODPort",
+            "maxLength": 45
+        },
+        {
+            "name": "PODPortName",
+            "maxLength": 255
+        },
+        {
+            "name": "PODTerminal",
+            "maxLength": 45
+        },
+        {
+            "name": "PODTerminalName",
+            "maxLength": 255
+        },
+        {
+            "name": "PODPortTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "PODFreightTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "PODHandlingOffice",
+            "maxLength": 45
+        },
+        {
+            "name": "PODHandlingOfficeName",
+            "maxLength": 255
+        },
+        {
+            "name": "PODReqETA",
+            "maxLength": 45
+        },
+        {
+            "name": "finalDestination",
+            "maxLength": 45
+        },
+        {
+            "name": "finalDestinationName",
+            "maxLength": 255
+        },
+        {
+            "name": "finalDestinationHandler",
+            "maxLength": 45
+        },
+        {
+            "name": "finalDestinationPortTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "voyageNum",
+            "maxLength": 45
+        },
+        {
+            "name": "voyageName",
+            "maxLength": 255
+        },
+        {
+            "name": "vesselCode",
+            "maxLength": 45
+        },
+        {
+            "name": "vesselName",
+            "maxLength": 255
+        },
+        {
+            "name": "POLETA",
+            "maxLength": 45
+        },
+        {
+            "name": "POLSCNCode",
+            "maxLength": 255
+        },
+        {
+            "name": "PODETA",
+            "maxLength": 45
+        },
+        {
+            "name": "PODSCNCode",
+            "maxLength": 255
+        },
+        {
+            "name": "closingDateTime",
+            "maxLength": 45
+        },
+        {
+            "name": "shipOperator",
+            "maxLength": 45
+        },
+        {
+            "name": "shipOperatorName",
+            "maxLength": 255
+        },
+        {
+            "name": "insistTranshipment",
+            "maxLength": 1
+        },
+        {
+            "name": "applyDND",
+            "maxLength": 1
+        },
+        {
+            "name": "DNDCombined",
+            "maxLength": 1
+        },
+        {
+            "name": "DNDCombinedDay",
+            "maxLength": null
+        },
+        {
+            "name": "detention",
+            "maxLength": null
+        },
+        {
+            "name": "demurrage",
+            "maxLength": null
+        },
+        {
+            "name": "autoBilling",
+            "maxLength": 1
+        },
+        {
+            "name": "remark",
+            "maxLength": null
+        },
+        {
+            "name": "header",
+            "maxLength": 255
+        },
+        {
+            "name": "footer",
+            "maxLength": 45
+        },
+        {
+            "name": "tnc",
+            "maxLength": null
+        },
+        {
+            "name": "jobNo",
+            "maxLength": 45
+        },
+        {
+            "name": "cargoType",
+            "maxLength": 45
+        },
+        {
+            "name": "docType",
+            "maxLength": 45
+        },
+        {
+            "name": "POLETD",
+            "maxLength": 45
+        },
+        {
+            "name": "PODETD",
+            "maxLength": 45
+        },
+        {
+            "name": "oceanBL",
+            "maxLength": 45
+        },
+        {
+            "name": "POLTGSCNCode",
+            "maxLength": 45
+        },
+        {
+            "name": "PODTGSCNCode",
+            "maxLength": 45
+        },
+        {
+            "name": "POLBerth",
+            "maxLength": 45
+        },
+        {
+            "name": "PODBerth",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        },
+        {
+            "name": "deliveryAttention",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "allowPastDates",
+            "maxLength": null
+        }
+    ],
+    "salesInvoice": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "customerCode",
+            "maxLength": 45
+        },
+        {
+            "name": "customerName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "TTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "quotation",
+            "maxLength": 45
+        },
+        {
+            "name": "salesOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "jobOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "taxDate",
+            "maxLength": 30
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "eInvoiceVersion",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceCode",
+            "maxLength": 45
+        },
+        {
+            "name": "oriRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceDate",
+            "maxLength": 30
+        },
+        {
+            "name": "digitalSignature",
+            "maxLength": 45
+        },
+        {
+            "name": "frequency",
+            "maxLength": 45
+        },
+        {
+            "name": "billingPeriod",
+            "maxLength": 45
+        },
+        {
+            "name": "tax",
+            "maxLength": 45
+        },
+        {
+            "name": "discountRate",
+            "maxLength": 10
+        },
+        {
+            "name": "feeRate",
+            "maxLength": 10
+        },
+        {
+            "name": "paymentMethod",
+            "maxLength": 45
+        },
+        {
+            "name": "bankACNo",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "prepaymentAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "prepaymentDate",
+            "maxLength": 30
+        },
+        {
+            "name": "prepaymentRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "billRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo1",
+            "maxLength": 45
+        },
+        {
+            "name": "interTradeRule",
+            "maxLength": 45
+        },
+        {
+            "name": "tariffCode",
+            "maxLength": 45
+        },
+        {
+            "name": "FTA",
+            "maxLength": 45
+        },
+        {
+            "name": "exporterNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo2",
+            "maxLength": 45
+        },
+        {
+            "name": "country",
+            "maxLength": 45
+        },
+        {
+            "name": "otherCharges",
+            "maxLength": 4100
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierMSICCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBusinessNature",
+            "maxLength": 100
+        },
+        {
+            "name": "supplierEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "buyerName",
+            "maxLength": 85
+        },
+        {
+            "name": "buyerTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "recipient",
+            "maxLength": 85
+        },
+        {
+            "name": "recipientTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeIndicator",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeReason",
+            "maxLength": 255
+        },
+        {
+            "name": "location",
+            "maxLength": 45
+        },
+        {
+            "name": "dealer",
+            "maxLength": 45
+        },
+        {
+            "name": "feeAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "discountAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        },
+        {
+            "name": "deliveryAttention",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "allowPastDates",
+            "maxLength": null
+        },
+        {
+            "name": "recipientTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "IRBAction",
+            "maxLength": 45
+        },
+        {
+            "name": "currentCompany",
+            "maxLength": null
+        },
+        {
+            "name": "currentCustomer",
+            "maxLength": null
+        },
+        {
+            "name": "invoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "outstandingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "consolidateTo",
+            "maxLength": 45
+        },
+        {
+            "name": "customerBRNOld",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerMSICCode",
+            "maxLength": 45
+        }
+    ],
+    "salesCreditNote": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "customerCode",
+            "maxLength": 45
+        },
+        {
+            "name": "customerName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "INVNo",
+            "maxLength": 45
+        },
+        {
+            "name": "CSNo",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "taxDate",
+            "maxLength": 30
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "eInvoiceVersion",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceCode",
+            "maxLength": 45
+        },
+        {
+            "name": "digitalSignature",
+            "maxLength": 45
+        },
+        {
+            "name": "frequency",
+            "maxLength": 45
+        },
+        {
+            "name": "billingPeriod",
+            "maxLength": 45
+        },
+        {
+            "name": "oriRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "tax",
+            "maxLength": 45
+        },
+        {
+            "name": "discountRate",
+            "maxLength": 10
+        },
+        {
+            "name": "discountAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "feeRate",
+            "maxLength": 10
+        },
+        {
+            "name": "feeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentMethod",
+            "maxLength": 45
+        },
+        {
+            "name": "bankACNo",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "prepaymentAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "prepaymentDate",
+            "maxLength": 30
+        },
+        {
+            "name": "prepaymentRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "billRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipient",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "recipientTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo1",
+            "maxLength": 45
+        },
+        {
+            "name": "interTradeRule",
+            "maxLength": 45
+        },
+        {
+            "name": "tariffCode",
+            "maxLength": 45
+        },
+        {
+            "name": "FTA",
+            "maxLength": 45
+        },
+        {
+            "name": "exporterNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo2",
+            "maxLength": 45
+        },
+        {
+            "name": "country",
+            "maxLength": 45
+        },
+        {
+            "name": "otherCharges",
+            "maxLength": 4100
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierMSICCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBusinessNature",
+            "maxLength": 100
+        },
+        {
+            "name": "supplierEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "buyerName",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "chargeIndicator",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeReason",
+            "maxLength": 255
+        },
+        {
+            "name": "location",
+            "maxLength": 45
+        },
+        {
+            "name": "dealer",
+            "maxLength": 45
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        },
+        {
+            "name": "deliveryAttention",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "allowPastDates",
+            "maxLength": null
+        },
+        {
+            "name": "recipientSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "TTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "IRBAction",
+            "maxLength": 45
+        },
+        {
+            "name": "currentCompany",
+            "maxLength": null
+        },
+        {
+            "name": "currentCustomer",
+            "maxLength": null
+        },
+        {
+            "name": "recipientTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "invoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "outstandingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "cashSales",
+            "maxLength": 45
+        },
+        {
+            "name": "salesDebitNote",
+            "maxLength": 45
+        },
+        {
+            "name": "quantityControl",
+            "maxLength": null
+        },
+        {
+            "name": "consolidateTo",
+            "maxLength": 45
+        }
+    ],
+    "salesDebitNote": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "customerCode",
+            "maxLength": 45
+        },
+        {
+            "name": "customerName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "INVNo",
+            "maxLength": 45
+        },
+        {
+            "name": "CSNo",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "taxDate",
+            "maxLength": 30
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "eInvoiceVersion",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceCode",
+            "maxLength": 45
+        },
+        {
+            "name": "digitalSignature",
+            "maxLength": 45
+        },
+        {
+            "name": "frequency",
+            "maxLength": 45
+        },
+        {
+            "name": "billingPeriod",
+            "maxLength": 45
+        },
+        {
+            "name": "oriRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "tax",
+            "maxLength": 45
+        },
+        {
+            "name": "discountRate",
+            "maxLength": 10
+        },
+        {
+            "name": "discountAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "feeRate",
+            "maxLength": 10
+        },
+        {
+            "name": "feeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentMethod",
+            "maxLength": 45
+        },
+        {
+            "name": "bankACNo",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "prepaymentAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "prepaymentDate",
+            "maxLength": 30
+        },
+        {
+            "name": "prepaymentRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "billRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipient",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "recipientTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo1",
+            "maxLength": 45
+        },
+        {
+            "name": "interTradeRule",
+            "maxLength": 45
+        },
+        {
+            "name": "tariffCode",
+            "maxLength": 45
+        },
+        {
+            "name": "FTA",
+            "maxLength": 45
+        },
+        {
+            "name": "exporterNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo2",
+            "maxLength": 45
+        },
+        {
+            "name": "country",
+            "maxLength": 45
+        },
+        {
+            "name": "otherCharges",
+            "maxLength": 4100
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierMSICCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBusinessNature",
+            "maxLength": 100
+        },
+        {
+            "name": "supplierEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "buyerName",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "chargeIndicator",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeReason",
+            "maxLength": 255
+        },
+        {
+            "name": "location",
+            "maxLength": 45
+        },
+        {
+            "name": "dealer",
+            "maxLength": 45
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        },
+        {
+            "name": "deliveryAttention",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "allowPastDates",
+            "maxLength": null
+        },
+        {
+            "name": "recipientSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "TTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "IRBAction",
+            "maxLength": 45
+        },
+        {
+            "name": "currentCompany",
+            "maxLength": null
+        },
+        {
+            "name": "currentCustomer",
+            "maxLength": null
+        },
+        {
+            "name": "recipientTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "invoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "outstandingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "quotation",
+            "maxLength": 45
+        },
+        {
+            "name": "jobOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "salesOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "consolidateTo",
+            "maxLength": 45
+        }
+    ],
+    "deliveryOrder": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "closingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "customerCode",
+            "maxLength": 45
+        },
+        {
+            "name": "customerName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "quotation",
+            "maxLength": 45
+        },
+        {
+            "name": "salesOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "jobOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "salesInvoice",
+            "maxLength": 45
+        },
+        {
+            "name": "cashSales",
+            "maxLength": 45
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "containerNo",
+            "maxLength": 45
+        },
+        {
+            "name": "containerType",
+            "maxLength": 45
+        },
+        {
+            "name": "containerSize",
+            "maxLength": 45
+        },
+        {
+            "name": "jobOrderHasAssignment",
+            "maxLength": 45
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "location",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        },
+        {
+            "name": "deliveryAttention",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "allowPastDates",
+            "maxLength": null
+        },
+        {
+            "name": "pdfAttachment",
+            "maxLength": null
+        }
+    ],
+    "consolidatedInvoice": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "customerCode",
+            "maxLength": 45
+        },
+        {
+            "name": "customerName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "quotation",
+            "maxLength": 45
+        },
+        {
+            "name": "salesOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "jobOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "taxDate",
+            "maxLength": 30
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "eInvoiceVersion",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceCode",
+            "maxLength": 45
+        },
+        {
+            "name": "oriRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceDate",
+            "maxLength": 30
+        },
+        {
+            "name": "digitalSignature",
+            "maxLength": 45
+        },
+        {
+            "name": "frequency",
+            "maxLength": 45
+        },
+        {
+            "name": "billingPeriod",
+            "maxLength": 45
+        },
+        {
+            "name": "tax",
+            "maxLength": 45
+        },
+        {
+            "name": "discountRate",
+            "maxLength": 10
+        },
+        {
+            "name": "discountAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "feeRate",
+            "maxLength": 10
+        },
+        {
+            "name": "feeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentMethod",
+            "maxLength": 45
+        },
+        {
+            "name": "bankACNo",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "prepaymentAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "prepaymentDate",
+            "maxLength": 30
+        },
+        {
+            "name": "prepaymentRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "billRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipient",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "recipientTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo1",
+            "maxLength": 45
+        },
+        {
+            "name": "interTradeRule",
+            "maxLength": 45
+        },
+        {
+            "name": "tariffCode",
+            "maxLength": 45
+        },
+        {
+            "name": "FTA",
+            "maxLength": 45
+        },
+        {
+            "name": "exporterNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo2",
+            "maxLength": 45
+        },
+        {
+            "name": "country",
+            "maxLength": 45
+        },
+        {
+            "name": "otherCharges",
+            "maxLength": 4100
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierMSICCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBusinessNature",
+            "maxLength": 100
+        },
+        {
+            "name": "supplierEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "buyerName",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeIndicator",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeReason",
+            "maxLength": 255
+        },
+        {
+            "name": "location",
+            "maxLength": 45
+        },
+        {
+            "name": "dealer",
+            "maxLength": 45
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "recipientSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "TTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "IRBAction",
+            "maxLength": 45
+        },
+        {
+            "name": "currentCompany",
+            "maxLength": null
+        },
+        {
+            "name": "currentCustomer",
+            "maxLength": null
+        },
+        {
+            "name": "recipientTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "invoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "consolidateDocType",
+            "maxLength": 45
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        },
+        {
+            "name": "allowPastDates",
+            "maxLength": null
+        }
+    ],
+    "customer": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "customerGroup",
+            "maxLength": 45
+        },
+        {
+            "name": "GLCode",
+            "maxLength": 45
+        },
+        {
+            "name": "location",
+            "maxLength": 45
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "customerName",
+            "maxLength": 85
+        },
+        {
+            "name": "description",
+            "maxLength": 255
+        },
+        {
+            "name": "customerCode",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "businessNature",
+            "maxLength": null
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "creditLimit",
+            "maxLength": 45
+        },
+        {
+            "name": "overdueLimit",
+            "maxLength": 45
+        },
+        {
+            "name": "billingAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "TaxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "TaxExNoExpiry",
+            "maxLength": 45
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "postcode",
+            "maxLength": 45
+        },
+        {
+            "name": "city",
+            "maxLength": 255
+        },
+        {
+            "name": "state",
+            "maxLength": 45
+        },
+        {
+            "name": "country",
+            "maxLength": 45
+        },
+        {
+            "name": "MISC",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 60
+        },
+        {
+            "name": "email",
+            "maxLength": 100
+        },
+        {
+            "name": "invoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "outstandingAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "customerCategory",
+            "maxLength": 45
+        },
+        {
+            "name": "coordinate",
+            "maxLength": 90
+        },
+        {
+            "name": "SQLCode",
+            "maxLength": 10
+        },
+        {
+            "name": "ID",
+            "maxLength": 45
+        },
+        {
+            "name": "membershipID",
+            "maxLength": 45
+        },
+        {
+            "name": "BRNOld",
+            "maxLength": 45
+        }
+    ],
+    "customerCategory": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "customerCategoryCode",
+            "maxLength": 45
+        },
+        {
+            "name": "customerCategory",
+            "maxLength": 45
+        },
+        {
+            "name": "description",
+            "maxLength": 255
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        }
+    ],
+    "customerGroup": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "customerGroupCode",
+            "maxLength": 45
+        },
+        {
+            "name": "customerGroupName",
+            "maxLength": 45
+        },
+        {
+            "name": "description",
+            "maxLength": 255
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        }
+    ],
+    "agent": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "agentCode",
+            "maxLength": 45
+        },
+        {
+            "name": "user",
+            "maxLength": 45
+        },
+        {
+            "name": "agentName",
+            "maxLength": 100
+        },
+        {
+            "name": "description",
+            "maxLength": 255
+        },
+        {
+            "name": "gender",
+            "maxLength": null
+        },
+        {
+            "name": "title",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 60
+        },
+        {
+            "name": "email",
+            "maxLength": 100
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "DOB",
+            "maxLength": 30
+        },
+        {
+            "name": "NRIC",
+            "maxLength": 45
+        },
+        {
+            "name": "nationality",
+            "maxLength": 45
+        },
+        {
+            "name": "race",
+            "maxLength": 45
+        },
+        {
+            "name": "religion",
+            "maxLength": 45
+        },
+        {
+            "name": "maritalStatus",
+            "maxLength": null
+        },
+        {
+            "name": "profileImage",
+            "maxLength": null
+        },
+        {
+            "name": "agentType",
+            "maxLength": 45
+        },
+        {
+            "name": "commission",
+            "maxLength": 45
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        }
+    ],
+    "agentType": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "agentTypeCode",
+            "maxLength": 45
+        },
+        {
+            "name": "agentType",
+            "maxLength": 45
+        },
+        {
+            "name": "description",
+            "maxLength": 255
+        },
+        {
+            "name": "moreDescription",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": null
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        }
+    ],
+    "customerTag": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "customerTagCode",
+            "maxLength": 45
+        },
+        {
+            "name": "customerTag",
+            "maxLength": 45
+        },
+        {
+            "name": "description",
+            "maxLength": 255
+        },
+        {
+            "name": "moreDescription",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": null
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        }
+    ],
+    "company": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "MISCCode",
+            "maxLength": 45
+        },
+        {
+            "name": "companyID",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "parentCompany",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 13
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 17
+        },
+        {
+            "name": "TTxNo",
+            "maxLength": 17
+        },
+        {
+            "name": "businessNature",
+            "maxLength": null
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 60
+        },
+        {
+            "name": "faxNo",
+            "maxLength": 60
+        },
+        {
+            "name": "email",
+            "maxLength": 100
+        },
+        {
+            "name": "website",
+            "maxLength": 100
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "coordinate",
+            "maxLength": 90
+        },
+        {
+            "name": "bankACNo",
+            "maxLength": 150
+        },
+        {
+            "name": "description",
+            "maxLength": 255
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "ClientID",
+            "maxLength": 100
+        },
+        {
+            "name": "ClientSecret1",
+            "maxLength": 100
+        },
+        {
+            "name": "ClientSecret2",
+            "maxLength": 100
+        },
+        {
+            "name": "postcode",
+            "maxLength": 45
+        },
+        {
+            "name": "city",
+            "maxLength": 255
+        },
+        {
+            "name": "state",
+            "maxLength": 45
+        },
+        {
+            "name": "country",
+            "maxLength": 45
+        },
+        {
+            "name": "logo",
+            "maxLength": null
+        },
+        {
+            "name": "IRBToken",
+            "maxLength": null
+        },
+        {
+            "name": "IRBTokenExpiredAt",
+            "maxLength": 45
+        },
+        {
+            "name": "productionClientID",
+            "maxLength": 100
+        },
+        {
+            "name": "productionClientSecret1",
+            "maxLength": 100
+        },
+        {
+            "name": "productionClientSecret2",
+            "maxLength": 100
+        },
+        {
+            "name": "testing",
+            "maxLength": null
+        },
+        {
+            "name": "production",
+            "maxLength": null
+        },
+        {
+            "name": "BRNOld",
+            "maxLength": 45
+        }
+    ],
+    "purchaseOrder": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "purchaseRequisition",
+            "maxLength": 45
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        }
+    ],
+    "purchaseInvoice": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "taxDate",
+            "maxLength": 30
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "purchaseRequisition",
+            "maxLength": 45
+        },
+        {
+            "name": "purchaseOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierDeliveryOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceVersion",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceCode",
+            "maxLength": 45
+        },
+        {
+            "name": "oriRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "digitalSignature",
+            "maxLength": 45
+        },
+        {
+            "name": "frequency",
+            "maxLength": 45
+        },
+        {
+            "name": "billingPeriod",
+            "maxLength": 45
+        },
+        {
+            "name": "tax",
+            "maxLength": 45
+        },
+        {
+            "name": "discountRate",
+            "maxLength": 10
+        },
+        {
+            "name": "discountAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "feeRate",
+            "maxLength": 10
+        },
+        {
+            "name": "feeAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "paymentMethod",
+            "maxLength": 45
+        },
+        {
+            "name": "bankACNo",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "prepaymentAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "prepaymentDate",
+            "maxLength": 30
+        },
+        {
+            "name": "prepaymentRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "billRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipient",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "recipientTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo1",
+            "maxLength": 45
+        },
+        {
+            "name": "interTradeRule",
+            "maxLength": 45
+        },
+        {
+            "name": "tariffCode",
+            "maxLength": 45
+        },
+        {
+            "name": "FTA",
+            "maxLength": 45
+        },
+        {
+            "name": "exporterNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo2",
+            "maxLength": 45
+        },
+        {
+            "name": "country",
+            "maxLength": 45
+        },
+        {
+            "name": "otherCharges",
+            "maxLength": 100
+        },
+        {
+            "name": "supplierCompanyName",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierMSICCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBusinessNature",
+            "maxLength": 100
+        },
+        {
+            "name": "supplierEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "buyerName",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "location",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeIndicator",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeReason",
+            "maxLength": 255
+        },
+        {
+            "name": "chargeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "TTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "IRBAction",
+            "maxLength": 45
+        },
+        {
+            "name": "currentCompany",
+            "maxLength": null
+        },
+        {
+            "name": "currentCustomer",
+            "maxLength": null
+        },
+        {
+            "name": "recipientTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "invoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        },
+        {
+            "name": "outstandingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "supplierBRNOld",
+            "maxLength": 45
+        },
+        {
+            "name": "consolidateTo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerMSICCode",
+            "maxLength": 45
+        }
+    ],
+    "purchaseCreditNote": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "taxDate",
+            "maxLength": 30
+        },
+        {
+            "name": "location",
+            "maxLength": 45
+        },
+        {
+            "name": "purchaseInvoice",
+            "maxLength": 45
+        },
+        {
+            "name": "cashPurchase",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceVersion",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceCode",
+            "maxLength": 45
+        },
+        {
+            "name": "oriRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "digitalSignature",
+            "maxLength": 45
+        },
+        {
+            "name": "frequency",
+            "maxLength": 45
+        },
+        {
+            "name": "billingPeriod",
+            "maxLength": 45
+        },
+        {
+            "name": "tax",
+            "maxLength": 45
+        },
+        {
+            "name": "discountRate",
+            "maxLength": 10
+        },
+        {
+            "name": "discountAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "feeRate",
+            "maxLength": 10
+        },
+        {
+            "name": "feeAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "paymentMethod",
+            "maxLength": 45
+        },
+        {
+            "name": "bankACNo",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "prepaymentAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "prepaymentDate",
+            "maxLength": 30
+        },
+        {
+            "name": "prepaymentRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "billRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipient",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "recipientTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo1",
+            "maxLength": 45
+        },
+        {
+            "name": "interTradeRule",
+            "maxLength": 45
+        },
+        {
+            "name": "tariffCode",
+            "maxLength": 45
+        },
+        {
+            "name": "FTA",
+            "maxLength": 45
+        },
+        {
+            "name": "exporterNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo2",
+            "maxLength": 45
+        },
+        {
+            "name": "country",
+            "maxLength": 45
+        },
+        {
+            "name": "otherCharges",
+            "maxLength": 100
+        },
+        {
+            "name": "supplierCompanyName",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierMSICCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBusinessNature",
+            "maxLength": 100
+        },
+        {
+            "name": "supplierEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "buyerName",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "chargeIndicator",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeReason",
+            "maxLength": 255
+        },
+        {
+            "name": "purchaseDebitNote",
+            "maxLength": 45
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "TTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "IRBAction",
+            "maxLength": 45
+        },
+        {
+            "name": "currentCompany",
+            "maxLength": null
+        },
+        {
+            "name": "currentCustomer",
+            "maxLength": null
+        },
+        {
+            "name": "recipientTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "invoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "outstandingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        }
+    ],
+    "purchaseDebitNote": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "taxDate",
+            "maxLength": 30
+        },
+        {
+            "name": "purchaseRequisition",
+            "maxLength": 45
+        },
+        {
+            "name": "purchaseOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierDeliveryOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "location",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceVersion",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceCode",
+            "maxLength": 45
+        },
+        {
+            "name": "oriRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "digitalSignature",
+            "maxLength": 45
+        },
+        {
+            "name": "frequency",
+            "maxLength": 45
+        },
+        {
+            "name": "billingPeriod",
+            "maxLength": 45
+        },
+        {
+            "name": "tax",
+            "maxLength": 45
+        },
+        {
+            "name": "discountRate",
+            "maxLength": 10
+        },
+        {
+            "name": "discountAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "feeRate",
+            "maxLength": 10
+        },
+        {
+            "name": "feeAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "paymentMethod",
+            "maxLength": 45
+        },
+        {
+            "name": "bankACNo",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "prepaymentAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "prepaymentDate",
+            "maxLength": 30
+        },
+        {
+            "name": "prepaymentRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "billRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipient",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "recipientTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo1",
+            "maxLength": 45
+        },
+        {
+            "name": "interTradeRule",
+            "maxLength": 45
+        },
+        {
+            "name": "tariffCode",
+            "maxLength": 45
+        },
+        {
+            "name": "FTA",
+            "maxLength": 45
+        },
+        {
+            "name": "exporterNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo2",
+            "maxLength": 45
+        },
+        {
+            "name": "country",
+            "maxLength": 45
+        },
+        {
+            "name": "otherCharges",
+            "maxLength": 100
+        },
+        {
+            "name": "supplierCompanyName",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierMSICCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBusinessNature",
+            "maxLength": 100
+        },
+        {
+            "name": "supplierEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "buyerName",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "chargeIndicator",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeReason",
+            "maxLength": 255
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "TTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "IRBAction",
+            "maxLength": 45
+        },
+        {
+            "name": "currentCompany",
+            "maxLength": null
+        },
+        {
+            "name": "currentCustomer",
+            "maxLength": null
+        },
+        {
+            "name": "recipientTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "invoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "purchaseInvoice",
+            "maxLength": 45
+        },
+        {
+            "name": "outstandingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        }
+    ],
+    "purchaseRequisition": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        },
+        {
+            "name": "deliveryAttention",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryEmail",
+            "maxLength": 45
+        }
+    ],
+    "supplierDeliveryOrder": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "purchaseRequisition",
+            "maxLength": 45
+        },
+        {
+            "name": "purchaseOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        }
+    ],
+    "supplierPayment": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentMethod",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "bankCharge",
+            "maxLength": 10
+        },
+        {
+            "name": "chequeNo",
+            "maxLength": 10
+        },
+        {
+            "name": "paidAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "taxDate",
+            "maxLength": 30
+        },
+        {
+            "name": "location",
+            "maxLength": 45
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "bank",
+            "maxLength": 100
+        },
+        {
+            "name": "PDCDate",
+            "maxLength": 30
+        }
+    ],
+    "consolidatedPurchaseInvoice": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "code",
+            "maxLength": 45
+        },
+        {
+            "name": "name",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "quotation",
+            "maxLength": 45
+        },
+        {
+            "name": "salesOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "jobOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "taxDate",
+            "maxLength": 30
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "eInvoiceVersion",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceCode",
+            "maxLength": 45
+        },
+        {
+            "name": "oriRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "eInvoiceDate",
+            "maxLength": 30
+        },
+        {
+            "name": "digitalSignature",
+            "maxLength": 45
+        },
+        {
+            "name": "frequency",
+            "maxLength": 45
+        },
+        {
+            "name": "billingPeriod",
+            "maxLength": 45
+        },
+        {
+            "name": "tax",
+            "maxLength": 45
+        },
+        {
+            "name": "discountRate",
+            "maxLength": 10
+        },
+        {
+            "name": "discountAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "feeRate",
+            "maxLength": 10
+        },
+        {
+            "name": "feeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentMethod",
+            "maxLength": 45
+        },
+        {
+            "name": "bankACNo",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "prepaymentAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "prepaymentDate",
+            "maxLength": 30
+        },
+        {
+            "name": "prepaymentRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "billRefNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipient",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "recipientTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo1",
+            "maxLength": 45
+        },
+        {
+            "name": "interTradeRule",
+            "maxLength": 45
+        },
+        {
+            "name": "tariffCode",
+            "maxLength": 45
+        },
+        {
+            "name": "FTA",
+            "maxLength": 45
+        },
+        {
+            "name": "exporterNo",
+            "maxLength": 45
+        },
+        {
+            "name": "customFormRefNo2",
+            "maxLength": 45
+        },
+        {
+            "name": "country",
+            "maxLength": 45
+        },
+        {
+            "name": "otherCharges",
+            "maxLength": 4100
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierMSICCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierBusinessNature",
+            "maxLength": 100
+        },
+        {
+            "name": "supplierEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "buyerName",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTIN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerBRN",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeIndicator",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "chargeReason",
+            "maxLength": 255
+        },
+        {
+            "name": "location",
+            "maxLength": 45
+        },
+        {
+            "name": "dealer",
+            "maxLength": 45
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "recipientSSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "TTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "buyerTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "IRBAction",
+            "maxLength": 45
+        },
+        {
+            "name": "currentCompany",
+            "maxLength": null
+        },
+        {
+            "name": "currentCustomer",
+            "maxLength": null
+        },
+        {
+            "name": "recipientTTXNo",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientEmail",
+            "maxLength": 45
+        },
+        {
+            "name": "recipientPhoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "invoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "consolidateDocType",
+            "maxLength": 45
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        }
+    ],
+    "cashPurchase": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "docNo",
+            "maxLength": 45
+        },
+        {
+            "name": "docDate",
+            "maxLength": 30
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "attention",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 45
+        },
+        {
+            "name": "paymentMethod",
+            "maxLength": 45
+        },
+        {
+            "name": "bankCharge",
+            "maxLength": 10
+        },
+        {
+            "name": "chequeNo",
+            "maxLength": 45
+        },
+        {
+            "name": "paidAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "paymentProject",
+            "maxLength": 10
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "currencyRate",
+            "maxLength": 45
+        },
+        {
+            "name": "project",
+            "maxLength": 45
+        },
+        {
+            "name": "docValidity",
+            "maxLength": 10
+        },
+        {
+            "name": "shipper",
+            "maxLength": 45
+        },
+        {
+            "name": "taxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "remark1",
+            "maxLength": 50
+        },
+        {
+            "name": "remark2",
+            "maxLength": 50
+        },
+        {
+            "name": "remark3",
+            "maxLength": 50
+        },
+        {
+            "name": "remark4",
+            "maxLength": 50
+        },
+        {
+            "name": "purchaseRequisition",
+            "maxLength": 45
+        },
+        {
+            "name": "purchaseOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierDeliveryOrder",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "postingDate",
+            "maxLength": 30
+        },
+        {
+            "name": "taxDate",
+            "maxLength": 30
+        },
+        {
+            "name": "note",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": 255
+        },
+        {
+            "name": "description",
+            "maxLength": 300
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "totalAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalTax",
+            "maxLength": 45
+        },
+        {
+            "name": "totalPayable",
+            "maxLength": 45
+        },
+        {
+            "name": "totalFeeAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "totalSubtotal",
+            "maxLength": 45
+        },
+        {
+            "name": "additionalDiscount",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "invoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "salesAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "servicingAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "collectionAgent",
+            "maxLength": 45
+        },
+        {
+            "name": "outstandingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "roundingAmount",
+            "maxLength": 10
+        },
+        {
+            "name": "netTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "localNetTotal",
+            "maxLength": 15
+        },
+        {
+            "name": "totalExclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalInclTax",
+            "maxLength": 15
+        },
+        {
+            "name": "totalNetAmount",
+            "maxLength": 15
+        },
+        {
+            "name": "supplierBRNOld",
+            "maxLength": 45
+        }
+    ],
+    "supplier": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierGroup",
+            "maxLength": 45
+        },
+        {
+            "name": "GLCode",
+            "maxLength": 45
+        },
+        {
+            "name": "location",
+            "maxLength": 45
+        },
+        {
+            "name": "agent",
+            "maxLength": 45
+        },
+        {
+            "name": "currency",
+            "maxLength": 45
+        },
+        {
+            "name": "creditTerm",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierName",
+            "maxLength": 85
+        },
+        {
+            "name": "description",
+            "maxLength": 255
+        },
+        {
+            "name": "supplierCode",
+            "maxLength": 45
+        },
+        {
+            "name": "BRN",
+            "maxLength": 45
+        },
+        {
+            "name": "businessNature",
+            "maxLength": null
+        },
+        {
+            "name": "address",
+            "maxLength": 500
+        },
+        {
+            "name": "TIN",
+            "maxLength": 45
+        },
+        {
+            "name": "SSTNo",
+            "maxLength": 45
+        },
+        {
+            "name": "creditLimit",
+            "maxLength": 45
+        },
+        {
+            "name": "overdueLimit",
+            "maxLength": 45
+        },
+        {
+            "name": "billingAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "TaxExNo",
+            "maxLength": 45
+        },
+        {
+            "name": "TaxExNoExpiry",
+            "maxLength": 45
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        },
+        {
+            "name": "deliveryAddress",
+            "maxLength": 500
+        },
+        {
+            "name": "postcode",
+            "maxLength": 45
+        },
+        {
+            "name": "city",
+            "maxLength": 255
+        },
+        {
+            "name": "state",
+            "maxLength": 45
+        },
+        {
+            "name": "country",
+            "maxLength": 45
+        },
+        {
+            "name": "MSIC",
+            "maxLength": 45
+        },
+        {
+            "name": "phoneNo",
+            "maxLength": 45
+        },
+        {
+            "name": "email",
+            "maxLength": 255
+        },
+        {
+            "name": "invoiceType",
+            "maxLength": 45
+        },
+        {
+            "name": "outstandingAmount",
+            "maxLength": 45
+        },
+        {
+            "name": "coordinate",
+            "maxLength": 90
+        },
+        {
+            "name": "supplierCategory",
+            "maxLength": 45
+        },
+        {
+            "name": "SQLCode",
+            "maxLength": 10
+        },
+        {
+            "name": "ID",
+            "maxLength": 45
+        },
+        {
+            "name": "membershipID",
+            "maxLength": 45
+        },
+        {
+            "name": "BRNOld",
+            "maxLength": 45
+        }
+    ],
+    "supplierGroup": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierGroupCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierGroupName",
+            "maxLength": 45
+        },
+        {
+            "name": "description",
+            "maxLength": 255
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        }
+    ],
+    "supplierTag": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTagCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierTag",
+            "maxLength": 45
+        },
+        {
+            "name": "description",
+            "maxLength": 255
+        },
+        {
+            "name": "moreDescription",
+            "maxLength": 500
+        },
+        {
+            "name": "attachment",
+            "maxLength": null
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        }
+    ],
+    "supplierCategory": [
+        {
+            "name": "UUID",
+            "maxLength": 45
+        },
+        {
+            "name": "account",
+            "maxLength": 45
+        },
+        {
+            "name": "company",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierCategoryCode",
+            "maxLength": 45
+        },
+        {
+            "name": "supplierCategory",
+            "maxLength": 45
+        },
+        {
+            "name": "description",
+            "maxLength": 255
+        },
+        {
+            "name": "createdAt",
+            "maxLength": 30
+        },
+        {
+            "name": "createdBy",
+            "maxLength": 45
+        },
+        {
+            "name": "updatedAt",
+            "maxLength": 30
+        },
+        {
+            "name": "updatedBy",
+            "maxLength": 45
+        },
+        {
+            "name": "valid",
+            "maxLength": null
+        },
+        {
+            "name": "_version",
+            "maxLength": null
+        },
+        {
+            "name": "_actionUUID",
+            "maxLength": 45
+        }
+    ]
+}

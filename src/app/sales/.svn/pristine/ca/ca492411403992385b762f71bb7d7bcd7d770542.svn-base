@@ -1,0 +1,33 @@
+import type { TransferToConfig } from "@/components/features/transfer/transferTo";
+import { deliveryOrderTransferToColumns } from "./columns";
+
+export const deliveryOrderTransferToConfig: TransferToConfig = {
+  module: "delivery_order",
+  model: "delivery-order",
+  apiNamespace: "sales",
+  transferDocType: "deliveryOrder",
+  itemsEndpointSuffix: "get-delivery-order-has-details",
+  transferEndpointSuffix: "transfer-data",
+  queryParam: ["deliveryOrderUUID", "id"],
+  destinations: [
+    {
+      key: "salesInvoice",
+      label: "Sales Invoice",
+      route: "sales/sales-invoice", 
+    },
+    {
+      key: "cashSales",
+      label: "Cash Sales",
+      route: "sales/cash-sales",
+    },
+    {
+      key: "salesDebitNote",
+      label: "Sales Debit Note",
+      route: "sales/sales-debit-note",
+    },
+  ],
+  columns: deliveryOrderTransferToColumns,
+  buttonText: "T-To",
+  dialogTitle: "Transfer to",
+  popoverTitle: "Select Item",
+};

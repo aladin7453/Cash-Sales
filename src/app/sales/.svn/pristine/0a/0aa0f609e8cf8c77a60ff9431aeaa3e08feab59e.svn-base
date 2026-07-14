@@ -1,0 +1,1139 @@
+"use client";
+
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import moment from "moment";
+import { useSearchParams } from "next/navigation";
+// Column Drag and Drop and Resize (Imports)
+import { memo, useEffect, useRef, useState } from "react";
+import { FaMagnifyingGlass, FaSort, FaSortDown, FaSortUp, FaXmark } from "react-icons/fa6";
+
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+// Mobile View (Imports)
+import MobileFormDataTable from "@/components/form/MobileFormDataTable";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input, NumberInputCell } from "@/components/ui/input";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  DATA_TABLE_DEFAULT_COLUMN_SIZING,
+  DATE_FORMAT,
+  DEFAULT_DATA_TABLE_PAGE_SIZE,
+  getAuthHeaders,
+  ORIGIN,
+} from "@/lib/constants";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { cn } from "@/lib/utils/cn";
+import getExcludedColumns from "@/lib/utils/data-table/getExcludedColumns";
+import handleDndDragEnd from "@/lib/utils/data-table/handleDndDragEnd";
+
+import KnockOffDetailsDataTableToolbar from "./DataTableToolbarOld";
+
+import type {
+  ColumnDef,
+  ColumnOrderState,
+  ColumnSizingState,
+  Row,
+  SortingState,
+  Table as TableType,
+  VisibilityState,
+} from "@tanstack/react-table";
+import type { MouseEvent } from "react";
+
+import type { KnockOffDetails } from "./columns";
+
+type AgreementDataTableProps = {
+  columns: ColumnDef<KnockOffDetails>[];
+  tempRowKnockOffDetails: KnockOffDetails[];
+  data: KnockOffDetails[];
+  setTempRowKnockOffDetails: (data: any) => void;
+  revalidateKnockOffDetailsData: () => void;
+  currencyRate: any;
+  docDate: any;
+  modifiedKnockOffDetails: any[];
+  setModifiedKnockOffDetails: (data: any) => void;
+  form: any; // Add form prop to access payment form data
+};
+
+// Column Drag and Drop and Resize (Local Storage Keys)
+const COLUMN_ORDERING_KEY = "customer-payment.knock-off-details.bs.table.ordering";
+const COLUMN_SIZING_KEY = "customer-payment.knock-off-details.bs.table.sizing";
+const COLUMN_VISIBILITY_KEY = "customer-payment.knock-off-details.bs.table.columns";
+
+export default function KnockOffDetailsDataTable({
+  columns,
+  data,
+  tempRowKnockOffDetails,
+  setTempRowKnockOffDetails,
+  revalidateKnockOffDetailsData,
+  currencyRate,
+  docDate,
+  modifiedKnockOffDetails,
+  setModifiedKnockOffDetails,
+  form, // Add form parameter
+}: AgreementDataTableProps) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+
+  function setTempRowKnockOffDetailsData(data: any, overwrite: boolean) {
+    if (overwrite) {
+      setTempRowKnockOffDetails(data);
+    } else {
+      setTempRowKnockOffDetails((tempRowKnockOffDetails: KnockOffDetails[]) => [
+        ...tempRowKnockOffDetails,
+        data,
+      ]);
+    }
+  }
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+
+  // Column Drag and Drop and Resize (Constants)
+  const initialColumnOrder =
+    columns?.filter((column) => column?.id).map((column) => column.id!) || [];
+  const [columnOrder, setColumnOrder] = useLocalStorage<ColumnOrderState>(
+    COLUMN_ORDERING_KEY,
+    initialColumnOrder,
+  );
+  const [columnSizing, setColumnSizing] = useLocalStorage<ColumnSizingState>(COLUMN_SIZING_KEY, {});
+  const defaultColumns: Array<keyof KnockOffDetails> = [
+    "docType",
+    "docNo",
+    "amount",
+    "paidAmount",
+    "outstandingAmount",
+  ];
+  const defaultColumnVisibility: VisibilityState = getExcludedColumns(
+    columns || [],
+    defaultColumns,
+  );
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    COLUMN_VISIBILITY_KEY,
+    defaultColumnVisibility,
+  );
+
+  // Column Drag and Drop and Resize (Data Table)
+  const table = useReactTable({
+    columns,
+    data,
+    state: {
+      sorting,
+      columnOrder,
+      columnSizing,
+      columnVisibility,
+    },
+    onSortingChange: setSorting,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+    onColumnVisibilityChange: setColumnVisibility,
+    autoResetPageIndex: false,
+    columnResizeMode: "onChange",
+    defaultColumn: DATA_TABLE_DEFAULT_COLUMN_SIZING,
+    enableColumnResizing: true,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      },
+    },
+  });
+
+  const sensors = useDndSensors();
+  const columnSizeVars = useColumnSizeVars(table);
+
+  useEffect(() => {
+    localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<KnockOffDetails | string>("");
+  const [numberInputs, setNumberInputs] = useState<Record<string, Record<string, string>>>({});
+  const [autoAllocatedRows, setAutoAllocatedRows] = useState<Set<string>>(new Set());
+
+  usePreventShiftTextSelect();
+
+  const openDialog = (row: Row<KnockOffDetails>) => {
+    setSelectedRow(row.original);
+    setDialogOpen(true);
+  };
+
+  const onDoubleClick = (row: Row<KnockOffDetails>) => {
+    setDialogOpen(false);
+    setSelectedRow("");
+    openDialog(row);
+  };
+
+  // Function to calculate maximum allowable paid amount for a row
+  const getMaxAllowablePaidAmount = (row: Row<KnockOffDetails>) => {
+    const lastPaidAmount = Number(row.original.lastPaidAmount) || 0;
+    const originalAmount = Number(row.original.outstandingAmount) || 0;
+
+    return Math.max(0, originalAmount + lastPaidAmount);
+  };
+
+  // Function to calculate total allocated amount from all rows
+  const calculateTotalAllocatedAmount = (excludeRowId?: string) => {
+    let total = 0;
+    table.getRowModel().rows.forEach((row) => {
+      if (excludeRowId && row.id === excludeRowId) return;
+
+      const currentPaidAmount = numberInputs["paidAmount"]?.[row.id] ?? row.original.paidAmount;
+      const paidAmountValue = Number(currentPaidAmount) || 0;
+      total += paidAmountValue;
+    });
+    return total;
+  };
+
+  // Function to get current unapplied amount from form
+  const getCurrentUnappliedAmount = () => {
+    const formPaidAmount = Number(form?.getValues("paidAmount")) || 0;
+    const totalAllocated = calculateTotalAllocatedAmount();
+    return formPaidAmount - totalAllocated;
+  };
+
+  // Add auto-allocation logic for row clicks
+  const handleRowClickAllocation = (row: Row<KnockOffDetails>) => {
+    // Check if this row has already been auto-allocated
+    if (autoAllocatedRows.has(row.id)) {
+      return; // Skip auto-allocation for already allocated rows
+    }
+
+    // Get current unapplied amount
+    const currentUnappliedAmount = getCurrentUnappliedAmount();
+
+    // Get outstanding amount for this row
+    const currentPaidAmount = numberInputs["paidAmount"]?.[row.id] ?? row.original.paidAmount;
+    const paidAmountValue = Number(currentPaidAmount) || 0;
+    const originalAmount = Number(row.original.outstandingAmount) || 0;
+    const lastPaidAmount = Number(row.original.lastPaidAmount) || 0;
+    const outstandingAmount = originalAmount + lastPaidAmount - paidAmountValue;
+
+    // If there's no unapplied amount available
+    if (currentUnappliedAmount <= 0) {
+      toast({
+        variant: "destructive",
+        title: "Inadequate Amount",
+        description: `Maximum amount available: ${currentUnappliedAmount.toFixed(2)}`,
+        duration: 3000,
+      });
+      return;
+    }
+
+    // Calculate the amount to allocate (minimum of outstanding amount and available unapplied amount)
+    const amountToAllocate = Math.min(Math.max(0, outstandingAmount), currentUnappliedAmount);
+
+    if (amountToAllocate <= 0) {
+      toast({
+        variant: "destructive",
+        title: "No Amount to Allocate",
+        description: "This row has no outstanding amount or no funds available.",
+        duration: 3000,
+      });
+      return;
+    }
+
+    // Set the paid amount for this row
+    const newPaidAmount = (paidAmountValue + amountToAllocate).toFixed(2);
+
+    // Update the row data
+    row.original.paidAmount = newPaidAmount;
+    setNumberInputs((numberInputs) => ({
+      ...numberInputs,
+      paidAmount: { ...numberInputs.paidAmount, [row.id]: newPaidAmount },
+    }));
+
+    // Calculate the new outstanding amount
+    const newOutstandingAmount = outstandingAmount - amountToAllocate;
+
+    // Track modifications using the helper function
+    trackRowModification(row, {
+      paidAmount: newPaidAmount,
+      outstandingAmount: newOutstandingAmount.toFixed(2),
+    });
+
+    // Update unapplied amount in form
+    if (form) {
+      const formPaidAmount = Number(form.getValues("paidAmount")) || 0;
+      const newTotalAllocated = calculateTotalAllocatedAmount() + amountToAllocate;
+      const remainingUnapplied = formPaidAmount - newTotalAllocated;
+      form.setValue("unappliedAmount", remainingUnapplied.toFixed(2));
+    }
+
+    // Mark this row as auto-allocated
+    setAutoAllocatedRows((prev) => new Set(prev).add(row.id));
+
+    // Set as selected row
+    setSelectedRow(row.original);
+  };
+
+  // Replace the useHandleRowSelect with direct onClick handler
+  const handleRowClick = (row: Row<KnockOffDetails>, event?: React.MouseEvent) => {
+    // Check if the click is on an input cell - if so, don't auto-allocate
+    const target = event?.target as HTMLElement;
+    const isInputCell = target?.tagName === "INPUT" || target?.closest(".number-input-cell");
+
+    // Get current selection state
+    const isCurrentlySelected = row.getIsSelected();
+    const currentRowSelection = table.getState().rowSelection;
+
+    if (isCurrentlySelected) {
+      // Remove from selection
+      const newSelection = { ...currentRowSelection };
+      delete newSelection[row.id];
+      table.setRowSelection(newSelection);
+    } else {
+      // Add to selection and run auto-allocation
+      table.setRowSelection({ ...currentRowSelection, [row.id]: true });
+      setSelectedRow(row.original);
+
+      // Focus and select all text in the paid amount input for this row
+      setTimeout(() => {
+        // Try multiple selectors to find the input
+        let paidAmountInput = document.querySelector(
+          `tr[data-row-id="${row.id}"] .number-input-cell input`,
+        ) as HTMLInputElement;
+
+        if (!paidAmountInput) {
+          // Fallback: find by row index and paid amount column
+          const rowElement = document.querySelector(`tr[data-row-id="${row.id}"]`);
+          if (rowElement) {
+            paidAmountInput = rowElement.querySelector(
+              ".number-input-cell input",
+            ) as HTMLInputElement;
+          }
+        }
+
+        if (paidAmountInput) {
+          paidAmountInput.focus();
+          paidAmountInput.select();
+        }
+      }, 50); // Reduced timeout for faster response
+
+      // Only auto-allocate if not clicking on input cell
+      if (!isInputCell) {
+        handleRowClickAllocation(row);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (dialogOpen === false) {
+      setSelectedRow("");
+    }
+  }, [dialogOpen]);
+
+  const calculateTotal = (field: string) => {
+    let total = 0;
+
+    table.getRowModel().rows.forEach((row) => {
+      if (field === "outstandingAmount") {
+        const currentPaidAmount = numberInputs["paidAmount"]?.[row.id] ?? row.original.paidAmount;
+        const paidAmountValue = Number(currentPaidAmount) || 0;
+        const originalAmount = Number(row.original.outstandingAmount) || 0;
+        const lastPaidAmount = Number(row.original.lastPaidAmount) || 0;
+        const calculated = Math.max(0, originalAmount + lastPaidAmount - paidAmountValue);
+
+        total += isNaN(calculated) ? 0 : calculated;
+      } else if (field === "gainLoss") {
+        const paidAmount = parseFloat(row.original.paidAmount) || 0;
+        const currencyRateValue = parseFloat(row.original.currencyRate) || 1;
+        const localPaid = paidAmount * currencyRateValue;
+        const currentLocalPaid = paidAmount * currencyRate;
+        const gainLoss = localPaid - currentLocalPaid;
+
+        total += isNaN(gainLoss) ? 0 : gainLoss;
+      } else {
+        const value = Number(row.original[field]) || 0;
+
+        total += isNaN(value) ? 0 : value;
+      }
+    });
+
+    return isNaN(total) ? "0.00" : total.toFixed(2);
+  };
+
+  const numberInputCell = (
+    { row, column: { id } }: { row: Row<KnockOffDetails>; column: { id: string } },
+    onBlurUpdate: boolean,
+    decimalPoint: number,
+  ) => {
+    const handleValueChange = (newValue: string) => {
+      if (id === "paidAmount") {
+        const newPaidAmount = Number(newValue) || 0;
+
+        // Get maximum allowable paid amount (outstanding amount)
+        const maxAllowablePaidAmount = getMaxAllowablePaidAmount(row);
+
+        // Check if paid amount exceeds outstanding amount
+        if (newPaidAmount > maxAllowablePaidAmount) {
+          toast({
+            variant: "destructive",
+            title: "Amount Exceeds Outstanding",
+            description: `Maximum outstanding amount: ${maxAllowablePaidAmount.toFixed(2)}`,
+            duration: 3000,
+          });
+
+          // Set the value to maximum outstanding amount
+          newValue = maxAllowablePaidAmount.toFixed(2);
+        } else {
+          // Get current paid amount from form
+          const formPaidAmount = Number(form?.getValues("paidAmount")) || 0;
+
+          // Calculate total allocated amount excluding current row
+          const totalAllocatedExcludingCurrent = calculateTotalAllocatedAmount(row.id);
+
+          // Calculate available amount for this row
+          const availableAmount = formPaidAmount - totalAllocatedExcludingCurrent;
+
+          // Validate if new amount exceeds available unapplied amount
+          if (newPaidAmount > availableAmount) {
+            toast({
+              variant: "destructive",
+              title: "Inadequate Amount",
+              description: `Maximum amount available: ${availableAmount.toFixed(2)}`,
+              duration: 3000,
+            });
+
+            // Set the value to minimum of available amount and outstanding amount
+            const maxAvailable = Math.min(Math.max(0, availableAmount), maxAllowablePaidAmount);
+            newValue = maxAvailable.toFixed(2);
+          }
+        }
+      } else if (id === "CNknockoffAmount") {
+        // CN Paid Amount Calculation Update
+        const newCNPaidAmount = Number(newValue) || 0;
+
+        // Get original credit note outstanding amount (before any usage)
+        const originalCNOutstanding =
+          Number(row.original.salesCreditNoteOutstanding || "0") +
+          Number(row.original.CNknockoffAmount || "0");
+
+        // Check if CN paid amount exceeds original CN outstanding
+        if (newCNPaidAmount > originalCNOutstanding) {
+          toast({
+            variant: "destructive",
+            title: "CN Amount Exceeds Outstanding",
+            description: `Maximum CN outstanding amount: ${originalCNOutstanding.toFixed(2)}`,
+            duration: 3000,
+          });
+
+          // Set the value to maximum CN outstanding amount
+          newValue = originalCNOutstanding.toFixed(2);
+        }
+
+        // Calculate new CN outstanding amount
+        const newCNOutstanding = Math.max(0, originalCNOutstanding - Number(newValue));
+
+        // Update CN outstanding amount
+        row.original.salesCreditNoteOutstanding = newCNOutstanding.toFixed(2);
+
+        // Get current row's original outstanding amount (before CN application)
+        const originalRowOutstanding =
+          Number(row.original.amount || "0") - Number(row.original.paidAmount || "0");
+
+        // Calculate new row outstanding (original outstanding minus CN paid amount)
+        const newRowOutstanding = Math.max(0, originalRowOutstanding - Number(newValue));
+        row.original.outstandingAmount = newRowOutstanding.toFixed(2);
+      }
+
+      // Store original value for comparison
+      const originalValue = row.original[id];
+
+      // Update the row data
+      row.original[id] = newValue;
+      setNumberInputs((numberInputs) => ({
+        ...numberInputs,
+        [id]: { ...numberInputs[id], [row.id]: newValue },
+      }));
+
+      // Track modifications for both paidAmount and CN paid amount changes
+      if ((id === "paidAmount" || id === "CNknockoffAmount") && originalValue !== newValue) {
+        let updateData: any = {};
+
+        if (id === "paidAmount") {
+          // Calculate the new outstanding amount using original amount
+          const originalAmount = Number(row.original.outstandingAmount) || 0;
+          const lastPaidAmount = Number(row.original.lastPaidAmount) || 0;
+          const paidAmount = Number(newValue) || 0;
+          const calculatedOutstanding = Math.max(0, originalAmount + lastPaidAmount - paidAmount);
+
+          updateData = {
+            paidAmount: newValue,
+            outstandingAmount: calculatedOutstanding.toFixed(2),
+          };
+        } else if (id === "CNknockoffAmount") {
+          // CN Paid Amount Calculation Update
+          updateData = {
+            CNknockoffAmount: newValue,
+            salesCreditNoteOutstanding: row.original.salesCreditNoteOutstanding,
+            outstandingAmount: row.original.outstandingAmount,
+          };
+        }
+
+        // Use the helper function to track modifications
+        trackRowModification(row, updateData);
+
+        // Update unapplied amount in form for paid amount changes
+        if (id === "paidAmount" && form) {
+          const formPaidAmount = Number(form.getValues("paidAmount")) || 0;
+          const totalAllocated = calculateTotalAllocatedAmount();
+          const remainingUnapplied = formPaidAmount - totalAllocated;
+          form.setValue("unappliedAmount", remainingUnapplied.toFixed(2));
+        }
+      }
+
+      // Clear number inputs after update
+      if (id === "paidAmount" || id === "CNknockoffAmount") {
+        setNumberInputs({});
+      }
+    };
+
+    // Use the current input value or the original value, but don't default to "0.00"
+    const value = numberInputs[id]?.[row.id] ?? (row.original[id] || "");
+
+    return (
+      <div className="number-input-cell" data-row-id={row.id}>
+        <NumberInputCell
+          className="h-7.5 text-right"
+          value={value}
+          onValueChange={handleValueChange}
+          allowDecimal={decimalPoint > 0}
+        />
+      </div>
+    );
+  };
+
+  // Credit Note Dropdown - New Implementation
+  const [creditNoteData, setCreditNoteData] = useState<any[]>([]);
+  const [showCreditNoteDropdown, setShowCreditNoteDropdown] = useState<Record<string, boolean>>({});
+  const [creditNoteInputValues, setCreditNoteInputValues] = useState<Record<string, string>>({});
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleClickOutside = (event: any) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowCreditNoteDropdown({});
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  const creditNoteTableColumns = [
+    { accessorKey: "docNo", header: "Doc. No." },
+    { accessorKey: "docDateFormat", header: "Doc. Date" },
+    { accessorKey: "outstandingAmount", header: "Outstanding Amount" },
+  ];
+
+  const fetchCreditNoteData = async () => {
+    try {
+      var form_data = new FormData();
+
+      form_data.append(`param[limit]`, "20");
+      form_data.append(`param[offset]`, "0");
+      form_data.append(`param[filter]`, "{}");
+      form_data.append(`param[order]`, "desc");
+      form_data.append(`param[valid]`, "1");
+      form_data.append(`param[sort]`, "createdAt");
+
+      // Add currency and customer parameters
+      const currencyUUID = form?.getValues("currency") || "";
+      const customerUUID = form?.getValues("customerCode") || "";
+
+      form_data.append(`param[currency]`, currencyUUID);
+      form_data.append(`param[customerCode]`, customerUUID);
+
+      const response = await fetch(
+        `${ORIGIN}/customer_payment/api/customer-payment/get-sales-credit-note`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch credit note data");
+      }
+
+      const data = await response.json();
+      setCreditNoteData(data.rows || []);
+    } catch (error) {
+      console.error("Error fetching credit note data:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch credit note data",
+        duration: 3000,
+      });
+    }
+  };
+
+  // Helper function to track row modifications
+  const trackRowModification = (row: any, updatedData: any) => {
+    const existingIndex = modifiedKnockOffDetails.findIndex(
+      (item) => item.UUID === row.original.UUID,
+    );
+
+    if (existingIndex >= 0) {
+      // Update existing modified row
+      const updatedModified = [...modifiedKnockOffDetails];
+      updatedModified[existingIndex] = { ...updatedModified[existingIndex], ...updatedData };
+      setModifiedKnockOffDetails(updatedModified);
+    } else {
+      // Add new modified row
+      const newModifiedRow = { ...row.original, ...updatedData };
+      setModifiedKnockOffDetails([...modifiedKnockOffDetails, newModifiedRow]);
+    }
+  };
+
+  // Credit Note Selection Handler
+  const handleCreditNoteSelection = (selectedCreditNote: any, row: Row<KnockOffDetails>) => {
+    // Store UUID in salesDocument and display docNo
+    row.original.salesDocument = selectedCreditNote.UUID;
+    row.original.salesCreditNoteDocNo = selectedCreditNote.docNo;
+
+    // Get credit note outstanding amount
+    const creditNoteOutstandingAmount = Number(selectedCreditNote.outstandingAmount) || 0;
+
+    // Calculate current outstanding amount for this row
+    const currentOutstanding = Number(row.original.outstandingAmount) || 0;
+
+    // Calculate how much credit note amount will be used (minimum of both amounts)
+    const usedAmount = Math.min(creditNoteOutstandingAmount, currentOutstanding);
+
+    // Set the used amount as CN paid amount
+    row.original.CNknockoffAmount = usedAmount.toFixed(2);
+
+    // Calculate remaining credit note amount after usage
+    const remainingCreditNote = creditNoteOutstandingAmount - usedAmount;
+    row.original.salesCreditNoteOutstanding = remainingCreditNote.toFixed(2);
+
+    // Update the outstanding amount (reduce by the used amount)
+    const newOutstanding = Math.max(0, currentOutstanding - usedAmount);
+    row.original.outstandingAmount = newOutstanding.toFixed(2);
+
+    // Update input value display
+    setCreditNoteInputValues((prev) => ({
+      ...prev,
+      [row.id]: selectedCreditNote.docNo,
+    }));
+
+    // Hide dropdown
+    setShowCreditNoteDropdown({});
+
+    // Update tempRowKnockOffDetails
+    setTempRowKnockOffDetails((prevList: KnockOffDetails[]) =>
+      prevList.map((item: KnockOffDetails, idx: number) => {
+        if ((item.UUID && item.UUID === row.original.UUID) || idx === row.index) {
+          return {
+            ...item,
+            salesDocument: selectedCreditNote.UUID,
+            salesCreditNoteDocNo: selectedCreditNote.docNo,
+            CNknockoffAmount: usedAmount.toFixed(2),
+            salesCreditNoteOutstanding: remainingCreditNote.toFixed(2),
+            outstandingAmount: newOutstanding.toFixed(2),
+          };
+        }
+        return item;
+      }),
+    );
+
+    // CN Paid Amount Calculation Update - Track modifications
+    trackRowModification(row, {
+      salesDocument: selectedCreditNote.UUID,
+      salesCreditNoteDocNo: selectedCreditNote.docNo,
+      CNknockoffAmount: usedAmount.toFixed(2),
+      salesCreditNoteOutstanding: remainingCreditNote.toFixed(2),
+      outstandingAmount: newOutstanding.toFixed(2),
+    });
+  };
+
+  // Clear Credit Note Selection Handler
+  const handleClearCreditNoteSelection = (selectedCreditNote: any, row: Row<KnockOffDetails>) => {
+    const CNKnockOff = Number(row.original.CNknockoffAmount) || 0;
+    const currentOutstanding = Number(row.original.outstandingAmount) || 0;
+    const newOutStanding = CNKnockOff + currentOutstanding;
+
+    row.original.salesDocument = "";
+    row.original.salesCreditNoteDocNo = "";
+    row.original.CNknockoffAmount = "0.00";
+    row.original.salesCreditNoteOutstanding = "0.00";
+    row.original.outstandingAmount = newOutStanding.toFixed(2);
+
+    // Clear input UI
+    setCreditNoteInputValues((prev) => ({
+      ...prev,
+      [row.id]: "",
+    }));
+
+    // Update the tempRowKnockOffDetails list
+    setTempRowKnockOffDetails((prevList) =>
+      prevList.map((item, idx) => {
+        if ((item.UUID && item.UUID === row.original.UUID) || idx === row.index) {
+          return {
+            ...item,
+            salesDocument: "",
+            salesCreditNoteDocNo: "",
+            CNknockoffAmount: "0.00",
+            salesCreditNoteOutstanding: "0.00",
+            outstandingAmount: newOutStanding.toFixed(2),
+          };
+        }
+        return item;
+      }),
+    );
+
+    // Mark modification
+    trackRowModification(row, {
+      salesDocument: "",
+      salesCreditNoteDocNo: "",
+      CNknockoffAmount: "0.00",
+      salesCreditNoteOutstanding: "0.00",
+    });
+  };
+
+  // Credit Note Dropdown Cell Component
+  const creditNoteDropdownCell = ({ row }: { row: Row<KnockOffDetails> }) => {
+    const currentValue = creditNoteInputValues[row.id] || row.original.salesCreditNoteDocNo || "";
+    const isDropdownOpen = showCreditNoteDropdown[row.id] || false;
+
+    return (
+      <div className="relative">
+        <Input
+          className="h-7.5 pr-14"
+          value={currentValue}
+          readOnly
+          onClick={async () => {
+            await fetchCreditNoteData();
+            setShowCreditNoteDropdown((prev) => ({
+              ...prev,
+              [row.id]: true,
+            }));
+          }}
+          ref={inputRef}
+          autoComplete="off"
+        />
+
+        {currentValue && (
+          <button
+            type="button"
+            className="absolute inset-y-0 right-7 flex items-center pr-2 text-gray-400 hover:text-red-500"
+            onClick={(selectedCreditNote) => {
+              handleClearCreditNoteSelection(selectedCreditNote, row); // clear logic
+            }}
+          >
+            <FaXmark className="h-3.5 w-3.5" />
+          </button>
+        )}
+
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+          <FaMagnifyingGlass className="text-gray-400" />
+        </div>
+
+        {isDropdownOpen && (
+          <div
+            ref={dropdownRef}
+            className="dropdown-table-class absolute right-0 top-full z-50 rounded border border-gray-200 bg-white shadow-md"
+          >
+            <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+              <DropdownTable
+                columns={creditNoteTableColumns}
+                data={creditNoteData}
+                onClickRow={(selectedCreditNote) =>
+                  handleCreditNoteSelection(selectedCreditNote, row)
+                }
+              />
+              <ScrollBar orientation="vertical" />
+            </ScrollArea>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <Card collapsible defaultCollapsed={false} className="h-auto p-0 shadow-md">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Knock Off Details</CardTitle>
+      </CardHeader>
+      <CardContent className="px-2 py-0">
+        <div className="h-[98cqh] p-2 md:h-[58cqh]">
+          <div className="flex h-[95cqh] flex-col rounded-md bg-erp-blue-3 @container-[size] md:h-[55cqh]">
+            <KnockOffDetailsDataTableToolbar
+              table={table}
+              revalidateKnockOffDetailsData={revalidateKnockOffDetailsData}
+            />
+            <Separator className="bg-erp-blue-11" />
+            <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+              {/* Mobile View (Form Data Table) */}
+              <MobileFormDataTable
+                table={table as any}
+                headerFields={["docNo", "docType"]}
+                initialVisibleFields={4}
+                setTempRowDetailsList={setTempRowKnockOffDetails as any}
+                onFieldChange={() => {}}
+              />
+
+              {/* Web View (Data Table) */}
+              <div className="hidden md:block">
+                {/* Column Drag and Drop and Resize (DND Context) */}
+                <DndContext
+                  collisionDetection={closestCenter}
+                  modifiers={[restrictToHorizontalAxis]}
+                  onDragEnd={(event) => handleDndDragEnd(event, setColumnOrder)}
+                  sensors={sensors}
+                >
+                  {/* Column Drag and Drop and Resize (Table) */}
+                  <Table
+                    className="table-fixed border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1"
+                    style={{ ...columnSizeVars, width: table.getTotalSize() }}
+                  >
+                    <TableHeader className="sticky top-0 z-10">
+                      {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id}>
+                          {/* Column Drag and Drop and Resize (Sortable Context) */}
+                          <SortableContext
+                            items={columnOrder}
+                            strategy={horizontalListSortingStrategy}
+                          >
+                            {headerGroup.headers.map((header) => (
+                              // Column Drag and Drop and Resize (Dragable Table Head)
+                              <DragableTableHead
+                                key={header.id}
+                                header={header}
+                                className="bg-erp-blue-11 font-normal"
+                                style={{
+                                  width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                                }}
+                              >
+                                {header.column.id === "validity" ? (
+                                  <TableHeadValidityFilter table={table} />
+                                ) : (
+                                  <TableHeadColumnTextFilter column={header.column} table={table} />
+                                )}
+                                <ColumnResizer header={header} />
+                              </DragableTableHead>
+                            ))}
+                          </SortableContext>
+                        </TableRow>
+                      ))}
+                    </TableHeader>
+                    {/* Column Drag and Drop and Resize (Table Body) */}
+                    {table.getState().columnSizingInfo.isResizingColumn ? (
+                      <MemoizedTableBody
+                        table={table}
+                        handleRowClick={handleRowClick}
+                        numberInputCell={numberInputCell}
+                        numberInputs={numberInputs}
+                        docDate={docDate}
+                        creditNoteDropdownCell={creditNoteDropdownCell}
+                      />
+                    ) : (
+                      <NonMemoizedTableBody
+                        table={table}
+                        handleRowClick={handleRowClick}
+                        numberInputCell={numberInputCell}
+                        numberInputs={numberInputs}
+                        docDate={docDate}
+                        creditNoteDropdownCell={creditNoteDropdownCell}
+                      />
+                    )}
+                  </Table>
+                </DndContext>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+
+            <div className="flex flex-grow flex-row bg-white">
+              <div className="flex flex-grow flex-row border-2 border-solid border-erp-blue-18">
+                <div className="flex w-max items-center justify-center bg-erp-blue-14 px-[1rem] text-white">
+                  Total
+                </div>
+
+                <div className="flex flex-col justify-start p-[0.5rem]">
+                  <p className="text-left text-sm">No. of Record:</p>
+                  <Input
+                    className="h-3 w-28 text-right text-sm"
+                    readOnly
+                    value={table.getRowModel().rows ? table.getRowModel().rows.length : 0}
+                  />
+                </div>
+
+                <div className="flex flex-col justify-start p-[0.5rem]">
+                  <p className="text-left text-sm">Amount:</p>
+                  <Input
+                    className="h-3 w-28 text-right text-sm"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateTotal("amount") : 0}
+                  />
+                </div>
+
+                <div className="flex flex-col justify-start p-[0.5rem]">
+                  <p className="text-left text-sm">Outstanding:</p>
+                  <Input
+                    className="h-3 w-28 text-right text-sm"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateTotal("outstandingAmount") : 0}
+                  />
+                </div>
+
+                <div className="flex flex-col justify-start p-[0.5rem]">
+                  <p className="text-left text-sm">Paid:</p>
+                  <Input
+                    className="h-3 w-28 text-right text-sm"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateTotal("paidAmount") : 0}
+                  />
+                </div>
+
+                <div className="flex flex-col justify-start p-[0.5rem]">
+                  <p className="text-left text-sm">CN Paid:</p>
+                  <Input
+                    className="h-3 w-28 text-right text-sm"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateTotal("CNknockoffAmount") : 0}
+                  />
+                </div>
+
+                <div className="flex flex-col justify-start p-[0.5rem]">
+                  <p className="text-left text-sm">GainLoss:</p>
+                  <Input
+                    className="h-3 w-28 text-right text-sm"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateTotal("gainLoss") : 0}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Column Drag and Drop and Resize (Table Body)
+type TableBodyProps = {
+  table: TableType<KnockOffDetails>;
+  handleRowClick: (row: Row<KnockOffDetails>, event?: React.MouseEvent) => void;
+  numberInputCell: any;
+  numberInputs: any;
+  docDate: any;
+  creditNoteDropdownCell: (props: { row: Row<KnockOffDetails> }) => JSX.Element;
+};
+
+function NonMemoizedTableBody({
+  table,
+  handleRowClick,
+  numberInputCell,
+  numberInputs,
+  docDate,
+  creditNoteDropdownCell,
+}: TableBodyProps) {
+  return (
+    <TableBody>
+      {table.getRowModel().rows?.length ? (
+        table.getRowModel().rows.map((row) => (
+          <TableRow
+            className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+            data-state={row.getIsSelected() && "selected"}
+            onClick={(event) => handleRowClick(row, event)}
+            key={row.id}
+            data-row-id={row.id}
+            style={{
+              width: table.getTotalSize(),
+            }}
+          >
+            {row.getVisibleCells().map((cell) => {
+              if (cell.column.id === "paidAmount" || cell.column.id === "CNknockoffAmount") {
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className="text-center"
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                    }}
+                  >
+                    {numberInputCell(cell, false, 2)}
+                  </TableCell>
+                );
+              } else if (cell.column.id === "salesDocument") {
+                return (
+                  // Column Drag and Drop and Resize Dropdown Fix (Add overflow-visible, relative and style)
+                  <TableCell
+                    key={cell.id}
+                    className="relative overflow-visible text-center"
+                    title={(cell.getValue() ?? "").toString()}
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                      overflow: "visible",
+                      position: "relative",
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {creditNoteDropdownCell({ row })}
+                  </TableCell>
+                );
+              } else if (cell.column.id === "localPaid") {
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className="text-right"
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                    }}
+                  >
+                    <p className="text-right">
+                      {`${(
+                        Number(row.original.paidAmount) * (Number(row.original.currencyRate) || 1)
+                      ).toFixed(2)}`}
+                    </p>
+                  </TableCell>
+                );
+              } else if (cell.column.id === "outstandingAmount") {
+                const currentPaidAmount =
+                  numberInputs["paidAmount"]?.[row.id] ?? row.original.paidAmount;
+                const paidAmountValue = Number(currentPaidAmount) || 0;
+                const originalAmount = Number(row.original.outstandingAmount) || 0;
+                const lastPaidAmount = Number(row.original.lastPaidAmount) || 0;
+                const outstandingAmount = Math.max(
+                  0,
+                  originalAmount + lastPaidAmount - paidAmountValue,
+                );
+
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className="text-right"
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                    }}
+                  >
+                    <p className="text-right">{outstandingAmount.toFixed(2)}</p>
+                  </TableCell>
+                );
+              } else if (cell.column.id === "gainLoss") {
+                const localPaid =
+                  parseFloat(row.original.paidAmount || "0") *
+                  (parseFloat(row.original.currencyRate || "1") || 1);
+                const localAmount = parseFloat(row.original.localAmount || "0");
+                const gainLoss = localPaid - localAmount;
+
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className="text-right"
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                    }}
+                  >
+                    <p className="text-right">{isNaN(gainLoss) ? "0.00" : gainLoss.toFixed(2)}</p>
+                  </TableCell>
+                );
+              } else if (cell.column.id === "knockOffTaxDate") {
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className="text-right"
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                    }}
+                  >
+                    <p className="text-left">
+                      {docDate ? moment.unix(docDate).format(DATE_FORMAT) : ""}
+                    </p>
+                  </TableCell>
+                );
+              } else if (cell.column.id === "dateGainLoss") {
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className="text-right"
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                    }}
+                  >
+                    <p className="text-left">
+                      {docDate ? moment.unix(docDate).format(DATE_FORMAT) : ""}
+                    </p>
+                  </TableCell>
+                );
+              } else {
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className="truncate"
+                    title={(cell.getValue() ?? "").toString()}
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                    }}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                );
+              }
+            })}
+          </TableRow>
+        ))
+      ) : (
+        <NoResultsTableRow columns={table.getVisibleLeafColumns()} />
+      )}
+    </TableBody>
+  );
+}
+
+const MemoizedTableBody = memo(
+  NonMemoizedTableBody,
+  (prev, next) => prev.table.options.data === next.table.options.data,
+) as typeof NonMemoizedTableBody;

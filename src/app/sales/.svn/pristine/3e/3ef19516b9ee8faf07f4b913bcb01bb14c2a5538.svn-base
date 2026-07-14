@@ -1,0 +1,111 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type SalesPickingListReport = {
+  UUID?: string;
+  docNo?: string;
+  customerName?: string;
+  itemCode?: string;
+  itemName?: string;
+  itemGroupName?: string;
+  collectionAgentName?: string;
+  locationCode?: string;
+  quantity?: string;
+};
+
+export const salesPickingListReportColumns: ColumnDef<SalesPickingListReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "docNo",
+    id: "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "itemCode",
+    id: "itemCode",
+    header: "Item Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "itemName",
+    id: "itemName",
+    header: "Item Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "itemGroupName",
+    id: "itemGroupName",
+    header: "Group",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "collectionAgentName",
+    id: "collectionAgentName",
+    header: "Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "locationCode",
+    id: "locationCode",
+    header: "Location",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "quantity",
+    id: "quantity",
+    header: "Quantity",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{row.original.quantity}</div>
+    ),
+  },
+];

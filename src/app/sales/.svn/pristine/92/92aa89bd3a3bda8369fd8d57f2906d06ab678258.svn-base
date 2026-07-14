@@ -1,0 +1,227 @@
+"use client";
+
+import React from "react";
+
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Card, 
+  CardHeader, 
+  CardContent, 
+  CardTitle 
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+
+import { useVerify } from "@/lib/hooks/useVerify";
+
+import type { CashInCashOut } from "../../../columns";
+
+type Params = {
+  cashInCashOut?: CashInCashOut | null;
+};
+
+export function CashInCashOutForm({
+  cashInCashOut,
+  customInformationData,
+  tempRowCustomInfo,
+  form,
+  slug,
+}: Params) {
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Cash In/Cash Out</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form className="space-y-4">
+            <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5">
+              <FormField
+                control={form.control}
+                name="action"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 col-span-1">
+                    <FormLabel>Action:</FormLabel>
+                    <FormControl>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <SelectTrigger className="h-7.5">
+                          <SelectValue placeholder="Cash In/Cash Out" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Cash In">Cash In</SelectItem>
+                          <SelectItem value="Cash Out">Cash Out</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="counterNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 col-span-1">
+                    <FormLabel>
+                      Counter No.:
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        moduleName="cashInCashOut"
+                        fieldName="counterNo"
+                        columnName="Counter No."
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="currentBalance"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 col-span-1">
+                    <FormLabel>Current Balance:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5 bg-erp-gray-2 text-gray-500" 
+                        {...field}
+                        readOnly
+                        moduleName="cashInCashOut"
+                        fieldName="currentBalance"
+                        columnName="Current Balance"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 col-span-1">
+                    <FormLabel>
+                      Amount:
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        moduleName="cashInCashOut"
+                        fieldName="amount"
+                        columnName="Amount"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="endBalance"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 col-span-1">
+                    <FormLabel>End Balance:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5 bg-erp-gray-2 text-gray-500" 
+                        {...field}
+                        readOnly
+                        moduleName="cashInCashOut"
+                        fieldName="endBalance"
+                        columnName="End Balance"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5">
+              <FormField
+                control={form.control}
+                name="methodCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 col-span-1">
+                    <FormLabel>Method:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        moduleName="cashInCashOut"
+                        fieldName="methodCode"
+                        columnName="Method"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="referenceNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 col-span-1">
+                    <FormLabel> Reference No.: </FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        moduleName="cashInCashOut"
+                        fieldName="referenceNo"
+                        columnName="Reference No."
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5">
+              <FormField
+                control={form.control}
+                name="remarks"
+                render={({ field }) => (
+                  <FormItem className="col-span-5 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Remarks:</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        className="h-7" 
+                        {...field} 
+                        moduleName="cashInCashOut"
+                        fieldName="remarks"
+                        columnName="Remarks"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

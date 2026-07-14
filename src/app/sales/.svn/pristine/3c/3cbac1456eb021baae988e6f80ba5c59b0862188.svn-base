@@ -1,0 +1,880 @@
+"use client";
+
+import { PDFDownloadLink, PDFViewer } from "@react-pdf/renderer";
+import { endOfMonth, startOfMonth } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import moment from "moment";
+import React, { useEffect, useRef, useState } from "react";
+import { UseFormReturn } from "react-hook-form";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import ReportPreviewButton from "@/components/form/ActionButton/ReportPreview";
+import SalesReport from "@/components/templates/sales/salesReportTemplate";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { DATE_FORMAT, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+
+import { SalesReportColumns } from "../Generate/columns";
+
+type DropdownConfig = {
+  tableName: string;
+  columns: { accessorKey: string; header: string; cell? }[];
+  valueField: string;
+  displayField: string;
+  formValueField: string;
+  formDisplayField: string;
+  additionalMappings?: { sourceField: string; targetFormField: string }[];
+};
+
+interface SalesReportFormProps {
+  form: UseFormReturn<any>;
+  onSubmit: (data: any) => void;
+  onPreview?: (data: any, isGenerated?: boolean) => void;
+  previewPDF?: any;
+  salesReportData?: any; // Add this property
+  generatedReport?: any;
+  filterFields?: string[];
+  sorting?: any;
+}
+
+export default function SalesReportForm({
+  form,
+  onSubmit,
+  onPreview,
+  previewPDF,
+  salesReportData,
+  salesReportColumns,
+  generatedReport,
+  filterFields,
+  sorting,
+}: SalesReportFormProps & { salesReportColumns?: any[] }) {
+  const headers = getAuthHeaders();
+  const systemAccount = JSON.parse(localStorage.getItem("system-account"));
+  const formData = form.getValues();
+  const docType = formData.docType || "salesInvoice";
+
+  const [dropdownState, setDropdownState] = useState({
+    currentDropdown: null as string | null,
+    data: [] as any[],
+    originalData: [] as any[],
+    showTable: false,
+  });
+
+  const dropdownInputRef = useRef(null);
+  const dropdownTableRef = useRef(null);
+  const [fromDateOpen, setFromDateOpen] = useState(false);
+  const [toDateOpen, setToDateOpen] = useState(false);
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+
+  const dropdownConfigs: Record<string, DropdownConfig> = {
+    customer: {
+      tableName: "customer",
+      columns: [
+        { accessorKey: "customerCode", header: "Customer Code" },
+        { accessorKey: "customerGroupCode", header: "Customer Group" },
+        { accessorKey: "customerName", header: "Customer Name" },
+      ],
+      valueField: "UUID",
+      displayField: "customerName",
+      formValueField: "customerCode",
+      formDisplayField: "customerCodeCode",
+    },
+    customerGroup: {
+      tableName: "customerGroup",
+      columns: [
+        { accessorKey: "customerGroupCode", header: "Customer Group Code" },
+        {
+          accessorKey: "description",
+          header: "Description",
+          cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+        },
+      ],
+      valueField: "UUID",
+      displayField: "customerGroupName",
+      formValueField: "customerGroup",
+      formDisplayField: "customerGroupName",
+    },
+  };
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownTableRef.current &&
+      !dropdownTableRef.current.contains(event.target) &&
+      dropdownInputRef.current !== event.target
+    ) {
+      setDropdownState((prev) => ({ ...prev, showTable: false }));
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  const fetchDropdownData = async (dropdownKey: string) => {
+    try {
+      const config = dropdownConfigs[dropdownKey];
+
+      if (!config) return;
+
+      var form_data = new FormData();
+
+      form_data.append(`table[0]`, config.tableName);
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${dropdownKey} data`);
+      }
+
+      const data = await response.json();
+
+      setDropdownState({
+        currentDropdown: dropdownKey,
+        data: data.rows,
+        originalData: data.rows,
+        showTable: true,
+      });
+    } catch (error) {
+      console.error(`Error fetching ${dropdownKey} data:`, error);
+
+      throw new Error(`Failed to fetch ${dropdownKey} data`);
+    }
+  };
+
+  const onClickRow = (row: any) => {
+    const config = dropdownConfigs[dropdownState.currentDropdown!];
+
+    if (config) {
+      form.setValue(config.formValueField, row[config.valueField]);
+      form.setValue(config.formDisplayField, row[config.displayField]);
+
+      if (config.additionalMappings) {
+        config.additionalMappings.forEach((mapping) => {
+          if (row[mapping.sourceField]) {
+            form.setValue(mapping.targetFormField, row[mapping.sourceField]);
+          }
+        });
+      }
+    }
+
+    setDropdownState((prev) => ({ ...prev, showTable: false }));
+  };
+
+  const handleReset = () => {
+    form.reset({
+      customerCode: "",
+      customerCodeCode: "",
+      customerGroup: "",
+      customerGroupName: "",
+      status: "",
+      startDate: Math.floor(startOfMonth(new Date()).getTime() / 1000).toString(), // Default to current date
+      endDate: (() => {
+        const end = endOfMonth(new Date());
+
+        end.setHours(23, 59, 59, 999);
+
+        return Math.floor(end.getTime() / 1000).toString();
+      })(),
+      valid: "1",
+    });
+  };
+
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
+  const [reportType, setReportType] = useState("Customer Monthly Sales Report");
+
+  // Orientation Option (Constant)
+  const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
+
+  const handlePreview = () => {
+    if (generatedReport.length == 0) {
+      setIsAlertOpen(true);
+      return false;
+    }
+
+    if (onPreview) {
+      onPreview(formData, false);
+    }
+
+    setReportType("Customer Monthly Sales Report");
+    setShowPreviewDialog(false);
+    setTimeout(() => {
+      setShowPreviewDialog(true);
+    }, 0);
+  };
+
+  const handleDropdownSearchChange = (dropdownKey: string, searchTerm: string) => {
+    const config = dropdownConfigs[dropdownKey];
+    if (!config) return;
+
+    form.setValue(config.formDisplayField, searchTerm);
+
+    if (searchTerm.trim() === "") {
+      // Clear related fields: hidden UUID, and additional mappings (like supplierCode)
+      form.setValue(config.formValueField, ""); // clear UUID
+
+      if (config.additionalMappings) {
+        config.additionalMappings.forEach((mapping) => {
+          form.setValue(mapping.targetFormField, ""); // clear mapped fields
+        });
+      }
+
+      return; // Exit early — no filtering needed
+    }
+
+    if (!dropdownState.originalData || dropdownState.currentDropdown !== dropdownKey) {
+      fetchDropdownData(dropdownKey);
+      return;
+    }
+
+    const filtered = dropdownState.originalData.filter((row: any) =>
+      row[config.displayField]?.toString().toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+
+    setDropdownState((prev) => ({
+      ...prev,
+      data: filtered,
+      showTable: true,
+      currentDropdown: dropdownKey,
+    }));
+  };
+
+  return (
+    <div className="mx-auto">
+      <Card collapsible defaultCollapsed={false} className="shadow-md">
+        <CardHeader></CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              {/* Main Filters Section */}
+              <div>
+                <h3 className="text-md mb-2 font-semibold">Main Filters:</h3>
+                <div className="grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                  <FormField
+                    control={form.control}
+                    name="customerCode"
+                    render={({ field }) => (
+                      <FormItem className="hidden">
+                        <FormLabel>Customer UUID:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="customerCodeCode"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Customer:</FormLabel>
+                        <FormControl className="relative">
+                          <div className="relative">
+                            <Input
+                              className="h-7.5 pr-8"
+                              {...field}
+                              // readOnly
+                              onChange={(e) =>
+                                handleDropdownSearchChange("customer", e.target.value)
+                              }
+                              onClick={() => fetchDropdownData("customer")}
+                              ref={
+                                dropdownState.currentDropdown === "customer"
+                                  ? dropdownInputRef
+                                  : null
+                              }
+                              autoComplete="off"
+                            />
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                              <FaMagnifyingGlass className="text-gray-400" />
+                            </div>
+                            {dropdownState.showTable &&
+                              dropdownState.currentDropdown === "customer" && (
+                                <div
+                                  ref={dropdownTableRef}
+                                  className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                                >
+                                  <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                                    <DropdownTable
+                                      columns={dropdownConfigs.customer.columns}
+                                      data={dropdownState.data}
+                                      onClickRow={onClickRow}
+                                    />
+                                    <ScrollBar orientation="vertical" />
+                                  </ScrollArea>
+                                </div>
+                              )}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="customerGroup"
+                    render={({ field }) => (
+                      <FormItem className="hidden">
+                        <FormLabel>Customer Group UUID:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="customerGroupName"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Customer Group:</FormLabel>
+                        <FormControl className="relative">
+                          <div className="relative">
+                            <Input
+                              className="h-7.5 pr-8"
+                              {...field}
+                              // readOnly
+                              onChange={(e) =>
+                                handleDropdownSearchChange("customerGroup", e.target.value)
+                              }
+                              onClick={() => fetchDropdownData("customerGroup")}
+                              ref={
+                                dropdownState.currentDropdown === "customerGroup"
+                                  ? dropdownInputRef
+                                  : null
+                              }
+                              autoComplete="off"
+                            />
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                              <FaMagnifyingGlass className="text-gray-400" />
+                            </div>
+                            {dropdownState.showTable &&
+                              dropdownState.currentDropdown === "customerGroup" && (
+                                <div
+                                  ref={dropdownTableRef}
+                                  className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                                >
+                                  <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                                    <DropdownTable
+                                      columns={dropdownConfigs.customerGroup.columns}
+                                      data={dropdownState.data}
+                                      onClickRow={onClickRow}
+                                    />
+                                    <ScrollBar orientation="vertical" />
+                                  </ScrollArea>
+                                </div>
+                              )}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Invoice Status:</FormLabel>
+                        <FormControl>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger className="h-7.5 w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="paid">Paid</SelectItem>
+                              <SelectItem value="unpaid">Unpaid</SelectItem>
+                              <SelectItem value="partially">Partially Paid</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="startDate"
+                    render={({ field }) => (
+                      <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                        <FormLabel>From Date:</FormLabel>
+                        <Popover open={fromDateOpen} onOpenChange={setFromDateOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                className={cn(
+                                  "flex h-7.5 w-full",
+                                  !field.value && "text-muted-foreground",
+                                )}
+                                variant="outline"
+                                size="sm"
+                              >
+                                {field.value
+                                  ? moment.unix(field.value).format(DATE_FORMAT)
+                                  : moment().format(DATE_FORMAT)}
+                                <CalendarIcon className="ml-auto h-4 w-4 text-gray-400" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={
+                                field.value ? moment.unix(field.value).toDate() : new Date()
+                              }
+                              onSelect={(date) => {
+                                const unixTimestamp = date
+                                  ? Math.floor(date.getTime() / 1000)
+                                  : Math.floor(Date.now() / 1000);
+                                field.onChange(unixTimestamp.toString());
+                                setFromDateOpen(false); // Close popover after select
+                              }}
+                              initialFocus
+                              defaultMonth={
+                                field.value ? moment.unix(field.value).toDate() : new Date()
+                              }
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="endDate"
+                    render={({ field }) => (
+                      <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                        <FormLabel>To Date:</FormLabel>
+                        <Popover open={toDateOpen} onOpenChange={setToDateOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                className={cn(
+                                  "flex h-7.5 w-full",
+                                  !field.value && "text-muted-foreground",
+                                )}
+                                variant="outline"
+                                size="sm"
+                              >
+                                {field.value
+                                  ? moment.unix(field.value).format(DATE_FORMAT)
+                                  : moment().format(DATE_FORMAT)}
+                                <CalendarIcon className="ml-auto h-4 w-4 text-gray-400" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={
+                                field.value ? moment.unix(field.value).toDate() : new Date()
+                              }
+                              onSelect={(date) => {
+                                const endOfDay = date ? new Date(date) : new Date();
+                                endOfDay.setHours(23, 59, 59, 999);
+                                const unixTimestamp = Math.floor(endOfDay.getTime() / 1000);
+                                field.onChange(unixTimestamp.toString());
+                                setToDateOpen(false); // Close popover after select
+                              }}
+                              initialFocus
+                              defaultMonth={
+                                field.value ? moment.unix(field.value).toDate() : new Date()
+                              }
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Document Type */}
+                  <FormField
+                    control={form.control}
+                    name="docType"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Document Type:</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-7.5">
+                              <SelectValue placeholder="Select Document Type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="salesInvoice">Sales Invoice</SelectItem>
+                            <SelectItem value="cashSales">Cash Sales</SelectItem>
+                            <SelectItem value="salesDebitNote">Sales Debit Note</SelectItem>
+                            <SelectItem value="salesCreditNote">Sales Credit Note</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Separator Line */}
+              <hr className="my-6 border-gray-300" />
+
+              <div className="mt-4">
+                <h3 className="text-md mb-2 font-semibold">Column Filters:</h3>
+                <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                  <FormField
+                    control={form.control}
+                    name="docNo"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Invoice No:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="docDateFormat"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Invoice Date:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="customerName"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Customer Name:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="totalTax"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Tax:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="totalDiscount"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Discount:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="netTotal"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Invoice Amount:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-6">
+                  <FormField
+                    control={form.control}
+                    name="totalPaidAmount"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Amount Paid:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="outstandingAmount"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Balance:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="paymentDateFormat"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Payment Date:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 pr-7" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="valid"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Validity:</FormLabel>
+                        <FormControl>
+                          <Select
+                            value={field.value ?? "1"}
+                            onValueChange={field.onChange}
+                            defaultValue="1"
+                          >
+                            <SelectTrigger className="h-7.5 w-full">
+                              <SelectValue placeholder="Valid" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All</SelectItem>
+                              <SelectItem value="1">Valid</SelectItem>
+                              <SelectItem value="0">Invalid</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="mr-16 mt-6 flex flex-row justify-center space-x-4">
+                <Button
+                  type="button"
+                  className="erp-blue-12 w-28 text-white hover:bg-blue-800"
+                  onClick={form.handleSubmit(onSubmit)}
+                >
+                  Generate
+                </Button>
+                <Button
+                  type="button"
+                  className="erp-blue-12 w-28 text-white hover:bg-blue-800"
+                  onClick={handlePreview}
+                >
+                  Preview
+                </Button>
+                <Button
+                  type="button"
+                  className="erp-blue-12 w-28 text-white hover:bg-blue-800"
+                  onClick={handleReset}
+                >
+                  Reset
+                </Button>
+                {systemAccount === "dev" || systemAccount === "infollectivetesting" ? (
+                  <>
+                    <ReportPreviewButton
+                      form={form}
+                      formData={formData}
+                      previewType={"MONTHLY REPORT"}
+                      docType={docType}
+                      reportType={"monthlyReport"}
+                      modelType={"sales"}
+                      filterFields={filterFields}
+                      sorting={sorting}
+                      generatedReport={generatedReport}
+                      setIsAlertOpen={setIsAlertOpen}
+                      showPreviewDialog={showDialog}
+                      setShowPreviewDialog={setShowDialog}
+                    />
+                  </>
+                ) : null}
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      {/* Preview Dialog */}
+      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+        <DialogContent className="max-w-6xl">
+          {/* Orientation Option (Add to Dialog Title) */}
+          <DialogTitle className="flex items-center justify-between">
+            <span>{reportType} - Report Preview</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Orientation:</span>
+              <Button
+                type="button"
+                variant={orientation === "portrait" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setOrientation("portrait")}
+                className="h-8 px-3"
+              >
+                Portrait
+              </Button>
+              <Button
+                type="button"
+                variant={orientation === "landscape" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setOrientation("landscape")}
+                className="h-8 px-3"
+              >
+                Landscape
+              </Button>
+            </div>
+          </DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {previewPDF ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                {/* Orientation Option (Add Orientation Prop) */}
+                <SalesReport
+                  type={reportType}
+                  data={previewPDF}
+                  salesReportData={salesReportData}
+                  salesReportColumns={salesReportColumns}
+                  generatedReport={generatedReport}
+                  orientation={orientation}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <p className="animate-pulse text-lg">
+                  Loading preview
+                  <span className="ml-1 inline-block">
+                    <span>. </span>
+                    <span className="animation-delay-200">. </span>
+                    <span className="animation-delay-400">.</span>
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                // Orientation Option (Add Orientation Prop)
+                <SalesReport
+                  type={reportType}
+                  data={previewPDF}
+                  salesReportData={salesReportData}
+                  salesReportColumns={salesReportColumns}
+                  generatedReport={generatedReport}
+                  orientation={orientation}
+                />
+              }
+              fileName={`${previewPDF?.currentCompany?.company || ""} - Customer Monthly Sales Report ${orientation}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowPreviewDialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent className="max-w-sm">
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-md text-center text-erp-blue-14">kindly generate first.</p>
+          </div>
+          <AlertDialogFooter className="mt-2 flex items-center !justify-center justify-center gap-3 [&>*]:m-0">
+            <AlertDialogAction className="h-9 w-24" autoFocus onClick={() => setShowDialog(false)}>
+              Close
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

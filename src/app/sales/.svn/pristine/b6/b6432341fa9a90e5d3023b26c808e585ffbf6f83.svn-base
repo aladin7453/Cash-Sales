@@ -1,0 +1,8 @@
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+
+  title: "Sales Collection Report",
+};
+export default function SalesCollectionReportPageLayout({ children }: { children: React.ReactNode }) {
+  return children;
+}

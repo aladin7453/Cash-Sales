@@ -1,0 +1,765 @@
+import {
+  ColumnFiltersState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  PaginationState,
+  SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+import useSWR from "swr";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import LoadingUI from "@/components/LoadingUI";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  checkAccessToken,
+  DEFAULT_DATA_TABLE_PAGE_SIZE,
+  getAuthHeaders,
+  ORIGIN,
+} from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+
+import { columns } from "./column";
+import DynamicSection from "./dynamicSection";
+
+let tokenValidationPromise: Promise<boolean> | null = null;
+
+const validateToken = async () => {
+  if (!tokenValidationPromise) {
+    const username = JSON.parse(localStorage.getItem("username") || "null");
+    const authToken = JSON.parse(localStorage.getItem("authToken") || "null");
+
+    tokenValidationPromise = checkAccessToken(username, authToken);
+  }
+
+  return tokenValidationPromise;
+};
+
+const fetcher = async (url: string, options: { method?: string; body?: FormData } = {}) => {
+  const isValid = await validateToken();
+
+  if (!isValid) {
+    console.error("Session expired. Redirecting to login.");
+    throw new Error("Session expired");
+  }
+
+  const headers = getAuthHeaders();
+
+  return fetch(url, {
+    method: options.method || "GET",
+    headers,
+    ...(options.body ? { body: options.body } : {}),
+  }).then(async (res) => {
+    if (!res.ok) {
+      if (res.status === 403) {
+        throw new Error("You do not have access towards this content.");
+      } else {
+        throw new Error("Failed to fetch data");
+      }
+    }
+
+    try {
+      return await res.json();
+    } catch (error) {
+      throw new Error("Failed to parse response JSON");
+    }
+  });
+};
+
+const AccessControl = ({
+  form,
+  onSave,
+  userUUID,
+  selectedUsername,
+  selectedCompany,
+  grantAllPermissions,
+  revokeAllPermissions,
+  toggleTableTemplate,
+  inputRef,
+  dropdownRef,
+  showTableTemplate,
+  dropdownTemplateColumns,
+  templateDropdownTableData,
+  onClickRowTemplateCode,
+  setShowSaveTemplateForm,
+  showSaveTemplateForm,
+  handleConfirmSaveTemplate,
+  isSaving,
+  rules,
+  baseRules,
+  setBaseRules,
+  isUpdateRBAC,
+  setIsUpdateRBAC,
+}) => {
+  type PermissionAction = {
+    value: boolean;
+    disabled: boolean;
+  };
+
+  type SubModulePermissions = Record<string, PermissionAction>;
+  type CategoryPermissions = Record<string, SubModulePermissions>;
+  type PermissionsMap = Record<string, CategoryPermissions>;
+
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+  const [selectedAccounts, setSelectedAccounts] = useState([]);
+
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+  });
+  const [sorting, setSorting] = useState<SortingState>([{ id: "createdAt", desc: true }]);
+  const companyUUID = selectedCompany;
+
+  const {
+    data: accessTableData,
+    error,
+    isLoading,
+  } = useSWR([`${ORIGIN}/user/api/user/generate-access-table`], ([url]) => {
+    const params = new FormData();
+
+    params.append("param[limit]", `${pagination.pageSize}`);
+    params.append("param[offset]", `${pagination.pageIndex * pagination.pageSize}`);
+
+    const columnFiltersWithoutValid = columnFilters.filter((filter) => filter.id !== "valid");
+    params.append(
+      "param[filter]",
+      columnFiltersWithoutValid.length > 0
+        ? JSON.stringify(
+            columnFiltersWithoutValid.reduce<Record<string, unknown>>((acc, curr) => {
+              acc[curr.id] = curr.value;
+              return acc;
+            }, {}),
+          )
+        : "{}",
+    );
+
+    params.append("param[order]", sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc");
+    params.append("param[valid]", columnFilters.find((row) => row.id === "valid")?.value || "");
+    params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "createdAt");
+
+    params.append("user", userUUID);
+    params.append("company", companyUUID);
+
+    return fetcher(url, {
+      method: "POST",
+      body: params,
+    });
+  });
+
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Something went wrong",
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
+
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
+  const [isLoadedSuccessfully, setIsLoadedSuccessfully] = useState<boolean>(false);
+  const [isDataLoading, setIsDataLoading] = useState(false);
+
+  useEffect(() => {
+    if (isLoading || !accessTableData) {
+      setLoadingProgress(90);
+    } else {
+      setIsLoadedSuccessfully(true);
+    }
+  }, [isLoading, accessTableData]);
+
+  const buildPermissionsFromApi = (data: any[]) => {
+    const defaultKeys = [
+      "view",
+      "create",
+      "update",
+      "throw",
+      "restore",
+      "delete",
+      "preview",
+      "transfer-from",
+      "transfer-to",
+      "export",
+      "confirm",
+      "verify",
+      "assignment",
+      "progress",
+      "generate-qr-code",
+      "disable",
+      "download",
+      "print",
+    ];
+
+    const normalizeKey = (key: string) => key.trim().toLowerCase().replace(/\s+/g, "-");
+
+    const isCapitalized = (str: string) => {
+      const cleaned = str.trim().replace(/^[^A-Za-z]+/, "");
+      return /^[A-Z]/.test(cleaned);
+    };
+
+    const normalizeRules = (rules: string[], module: string) => {
+      const allowedActions: Set<string> = new Set();
+      const moduleKey = normalizeKey(module);
+
+      rules.forEach((rule) => {
+        let action = "";
+        let ruleModuleKey = "";
+
+        if (rule.startsWith("transfer-from-") || rule.startsWith("transfer-to-")) {
+          const parts = rule.split("-");
+          action = `${parts[0]}-${parts[1]}`;
+          ruleModuleKey = normalizeKey(parts.slice(2).join("-"));
+        } else {
+          const parts = rule.split("-");
+          action = parts[0];
+          ruleModuleKey = normalizeKey(parts.slice(1).join("-"));
+        }
+
+        if (ruleModuleKey === moduleKey) {
+          allowedActions.add(action);
+        }
+      });
+
+      return allowedActions;
+    };
+
+    const buildNode = (module: any, allowChildren: boolean): any => {
+      const allowedActions = normalizeRules(module.rules || [], module.module);
+
+      const actionsWithMetadata: Record<string, any> = {};
+      defaultKeys.forEach((key) => {
+        if (allowedActions.has(key)) {
+          actionsWithMetadata[key] = { value: false, disabled: false };
+        } else {
+          actionsWithMetadata[key] = { value: false, disabled: true };
+        }
+      });
+
+      const result: any = {
+        ...actionsWithMetadata,
+      };
+
+      if (allowChildren && Array.isArray(module.children)) {
+        const children: Record<string, any> = {};
+        module.children.forEach((child) => {
+          const childKey = normalizeKey(child.module);
+          const includeChildChildren = isCapitalized(child.module);
+          children[childKey] = buildNode(child, includeChildChildren);
+        });
+        if (Object.keys(children).length > 0) {
+          result.children = children;
+        }
+      }
+
+      return result;
+    };
+
+    const permissions: Record<string, any> = {};
+
+    data.forEach((category) => {
+      const categoryKey = normalizeKey(category.module);
+      if (!permissions[categoryKey]) {
+        permissions[categoryKey] = {};
+      }
+      if (Array.isArray(category.children)) {
+        category.children.forEach((childModule) => {
+          const subKey = normalizeKey(childModule.module);
+          const allowChildren = isCapitalized(childModule.module);
+          permissions[categoryKey][subKey] = buildNode(childModule, allowChildren);
+        });
+      }
+    });
+
+    return permissions;
+  };
+
+  const [permissions, setPermissions] = useState<PermissionsMap>({});
+
+  const applyRuleToPermissions = (permissions: Record<string, any>, ruleValue: string) => {
+    const normalizeKey = (key: string) => key.trim().toLowerCase().replace(/\s+/g, "-");
+
+    let action = "";
+    let moduleKey = "";
+
+    if (ruleValue.startsWith("transfer-from-") || ruleValue.startsWith("transfer-to-")) {
+      const parts = ruleValue.split("-");
+      action = `${parts[0]}-${parts[1]}`;
+      moduleKey = normalizeKey(parts.slice(2).join("-"));
+    } else {
+      const [actionPart, ...rest] = ruleValue.split("-");
+      action = normalizeKey(actionPart);
+      moduleKey = normalizeKey(rest.join("-"));
+    }
+
+    const traverse = (node: any, path: string[]): boolean => {
+      const currentPath = normalizeKey(path.join("/"));
+      const lastSegment = path[path.length - 1];
+
+      const isMatch = normalizeKey(lastSegment) === moduleKey || currentPath === moduleKey;
+
+      if (isMatch && node[action] && node[action].disabled === false) {
+        node[action].value = true;
+        return true;
+      }
+
+      if (node.children) {
+        for (const childKey in node.children) {
+          if (traverse(node.children[childKey], [...path, childKey])) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    };
+
+    for (const categoryKey in permissions) {
+      const category = permissions[categoryKey];
+
+      for (const subKey in category) {
+        const node = category[subKey];
+        traverse(node, [subKey]);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const buildAndFetchPermissions = async () => {
+      if (!accessTableData || !Array.isArray(accessTableData) || !userUUID || rules?.userHasRule)
+        return;
+
+      const parsedPermissions = buildPermissionsFromApi(accessTableData);
+
+      try {
+        setIsDataLoading(true);
+
+        const response = await fetch(
+          `${ORIGIN}/user/api/user/get-update-user-has-rule-data?id=${userUUID}&company=${companyUUID}`,
+          {
+            method: "GET",
+            headers,
+          },
+        );
+
+        if (!response.ok) throw new Error("Failed to fetch user permissions");
+
+        const data = await response.json();
+        const updated = JSON.parse(JSON.stringify(parsedPermissions));
+        const appliedRules = new Set();
+        const normalizedRules = {};
+
+        (data.userHasRule || []).forEach((ruleValue: string) => {
+          if (typeof ruleValue !== "string") return;
+          if (appliedRules.has(ruleValue)) return;
+          appliedRules.add(ruleValue);
+
+          applyRuleToPermissions(updated, ruleValue);
+          normalizedRules[ruleValue] = 1;
+        });
+
+        setBaseRules?.(normalizedRules);
+        setPermissions(updated);
+        setIsDataLoading(false);
+      } catch (error) {
+        console.error("Error fetching user permissions:", error);
+        setPermissions(parsedPermissions);
+        setIsDataLoading(false);
+      } finally {
+        setIsDataLoading(false);
+      }
+    };
+
+    buildAndFetchPermissions();
+  }, [accessTableData, userUUID]);
+
+  useEffect(() => {
+    if (!accessTableData || !Array.isArray(accessTableData) || !rules?.userHasRule?.length) return;
+
+    const parsedPermissions = buildPermissionsFromApi(accessTableData);
+
+    const data = rules;
+    const updated = JSON.parse(JSON.stringify(parsedPermissions));
+    const appliedRules = new Set();
+
+    (data.userHasRule || []).forEach((ruleValue: string) => {
+      if (typeof ruleValue !== "string") return;
+      if (appliedRules.has(ruleValue)) return;
+      appliedRules.add(ruleValue);
+
+      applyRuleToPermissions(updated, ruleValue);
+    });
+
+    setPermissions(updated);
+  }, [rules]);
+
+  useEffect(() => {
+    const fetchVerifyUser = async () => {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/user/api/user/verify-user-has-update-rbac?view=user`,
+          {
+            method: "GET",
+            headers,
+          },
+        );
+
+        if (!response.ok) throw new Error("Failed to fetch verify user data");
+
+        const data = await response.json();
+
+        if (data === true) {
+          setIsUpdateRBAC(true);
+        } else {
+          setIsUpdateRBAC(false);
+        }
+      } catch (error) {
+        console.error("Error fetching verify user data:", error);
+        setIsUpdateRBAC(false);
+      }
+    };
+
+    fetchVerifyUser();
+  }, []);
+
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+
+  const table = useReactTable({
+    columns,
+    data: [],
+    autoResetPageIndex: false,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  const toggleSection = (section) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
+  const getPermissionPath = (
+    permissions: Record<string, any>,
+    category: string,
+    subCategory: string,
+    childCategory?: string,
+  ) => {
+    let node = permissions?.[category]?.[subCategory];
+
+    if (!node) return null;
+
+    if (childCategory) {
+      const keys = childCategory.split("/");
+
+      for (const key of keys) {
+        node = node.children?.[key];
+        if (!node) break;
+      }
+    }
+
+    return node || null;
+  };
+
+  const handleCheckboxChange = (
+    category: string,
+    subCategory: string,
+    action: string,
+    childCategory?: string,
+  ) => {
+    setPermissions((prevPermissions) => {
+      const updatedPermissions = JSON.parse(JSON.stringify(prevPermissions));
+      let target = getPermissionPath(updatedPermissions, category, subCategory);
+
+      if (!target) return updatedPermissions;
+
+      // Handle third-level
+      if (childCategory && target.children?.[childCategory]) {
+        target = target.children[childCategory];
+      }
+
+      if (action === "toggleAll") {
+        const allChecked = Object.values(target).every(
+          (a: any) => typeof a === "object" && a.value,
+        );
+        Object.keys(target).forEach((key) => {
+          if (target[key]?.disabled === false) {
+            target[key].value = !allChecked;
+          }
+        });
+      } else {
+        if (
+          Object.prototype.hasOwnProperty.call(target, action) &&
+          target[action].disabled === false
+        ) {
+          target[action].value = !target[action].value;
+        }
+      }
+
+      return updatedPermissions;
+    });
+  };
+
+  useEffect(() => {
+    if (onSave) {
+      onSave(permissions, selectedAccounts);
+    }
+  }, [onSave, permissions, selectedAccounts]);
+
+  useEffect(() => {
+    if (grantAllPermissions) {
+      setPermissions((prevPermissions) => {
+        const updatedPermissions = JSON.parse(JSON.stringify(prevPermissions));
+
+        const setAllToTrue = (obj) => {
+          Object.keys(obj).forEach((key) => {
+            if (typeof obj[key] === "object" && obj[key] !== null) {
+              if ("value" in obj[key] && "disabled" in obj[key]) {
+                if (!obj[key].disabled) {
+                  obj[key].value = true;
+                }
+              } else {
+                setAllToTrue(obj[key]);
+              }
+            }
+          });
+        };
+
+        setAllToTrue(updatedPermissions);
+        return updatedPermissions;
+      });
+    }
+  }, [grantAllPermissions]);
+
+  useEffect(() => {
+    if (revokeAllPermissions) {
+      setPermissions((prevPermissions) => {
+        const updatedPermissions = JSON.parse(JSON.stringify(prevPermissions));
+
+        const setAllToFalse = (obj) => {
+          Object.keys(obj).forEach((key) => {
+            if (typeof obj[key] === "object" && obj[key] !== null) {
+              if ("value" in obj[key] && "disabled" in obj[key]) {
+                if (!obj[key].disabled) {
+                  obj[key].value = false;
+                }
+              } else {
+                setAllToFalse(obj[key]);
+              }
+            }
+          });
+        };
+
+        setAllToFalse(updatedPermissions);
+        return updatedPermissions;
+      });
+    }
+  }, [revokeAllPermissions]);
+
+  return (
+    <div>
+      <Form {...form}>
+        <FormField
+          control={form.control}
+          name="account"
+          render={({ field }) => (
+            <FormItem className="col-span-4 row-span-1 grid hidden h-full grid-rows-[auto_1fr] space-y-1">
+              <FormLabel>UUID:</FormLabel>
+              <FormControl>
+                <Input className="h-7" {...field} readOnly={true} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="mb-5 flex items-center justify-between">
+          <h1>Access Control Rights - {selectedUsername}</h1>
+
+          <div className="mr-5 flex items-center gap-3">
+            <Button
+              className="h-7.5 px-3 text-xs 2xl:text-sm"
+              onClick={() => setShowSaveTemplateForm(true)}
+            >
+              <span>Save Template</span>
+            </Button>
+
+            <div className="relative w-fit">
+              <FormField
+                control={form.control}
+                name="ruleTemplate"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 flex flex-col space-y-1">
+                    <FormControl>
+                      <div className="relative">
+                        <Button
+                          type="button"
+                          className="flex h-7.5 w-full items-center justify-between gap-x-2 px-3 text-xs 2xl:text-sm"
+                          onClick={toggleTableTemplate}
+                          ref={inputRef}
+                        >
+                          <span>{field.value ? "Template: " + field.value : "Load Template"}</span>
+                        </Button>
+
+                        {showTableTemplate && (
+                          <div
+                            ref={dropdownRef}
+                            className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                          >
+                            <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownTemplateColumns}
+                                data={templateDropdownTableData}
+                                onClickRow={onClickRowTemplateCode}
+                              />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        </div>
+
+        <Separator className="bg-erp-blue-11" />
+        <ScrollArea className="h-[400px] overflow-auto">
+          <Table className="border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1">
+            <TableHeader className="sticky top-0">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead
+                      className={cn(
+                        "h-16 bg-erp-blue-11 px-2.5 font-normal",
+                        header.column.id === "description" ? "flex-[2]" : "flex-1",
+                      )}
+                      style={{
+                        minWidth: header.column.id === "description" ? "200px" : "100px",
+                      }}
+                      key={header.id}
+                    >
+                      <div className="flex flex-col gap-y-0.5">
+                        <div
+                          className={cn(
+                            "flex items-center gap-x-0.5 text-white",
+                            header.column.getCanSort() ? "cursor-pointer select-none" : "",
+                          )}
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          <span className="font-bold">
+                            {header.isPlaceholder
+                              ? null
+                              : flexRender(header.column.columnDef.header, header.getContext())}
+                          </span>
+                        </div>
+                      </div>
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHeader>
+
+            <TableBody>
+              {Object.keys(permissions).map((category) => (
+                <DynamicSection
+                  key={category}
+                  category={category}
+                  sectionPermissions={permissions[category]}
+                  handleCheckboxChange={handleCheckboxChange}
+                  expandedSections={expandedSections}
+                  toggleSection={toggleSection}
+                />
+              ))}
+            </TableBody>
+          </Table>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
+      </Form>
+
+      <Dialog open={showSaveTemplateForm} onOpenChange={setShowSaveTemplateForm}>
+        <DialogContent className="max-w-l rounded-md bg-white p-6">
+          <Form {...form}>
+            <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+              <DialogTitle className="text-center text-2xl font-bold">
+                Save RBAC Template
+              </DialogTitle>
+
+              <Separator className="bg-erp-blue-11" />
+
+              <FormField
+                control={form.control}
+                name="ruleTemplate"
+                render={({ field }) => (
+                  <FormItem className="block">
+                    <FormLabel className="w-36 text-left text-sm font-semibold">
+                      Template Name:
+                    </FormLabel>
+                    <FormControl className="space-y-5">
+                      <Input className="h-8 w-full" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="mt-[5px] flex justify-center gap-4 p-10">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setShowSaveTemplateForm(false);
+                  }}
+                  className="h-10 w-40 bg-erp-blue-14 text-white hover:bg-erp-blue-13 hover:text-white"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConfirmSaveTemplate}
+                  className="h-10 w-40 border border-erp-blue-14 bg-white text-erp-blue-14"
+                >
+                  OK
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      {(isSaving || isLoading || isDataLoading) && <LoadingUI />}
+    </div>
+  );
+};
+
+export default AccessControl;

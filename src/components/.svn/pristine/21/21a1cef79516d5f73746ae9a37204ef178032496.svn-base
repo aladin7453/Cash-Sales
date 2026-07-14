@@ -1,0 +1,439 @@
+"use client";
+
+import { ToastAction } from "@radix-ui/react-toast";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useEffect, useState } from "react";
+import { FaSort, FaSortDown, FaSortUp } from "react-icons/fa6";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { buttonVariants } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useToast } from "@/components/ui/use-toast";
+import { DIRECTORY,versionPath } from "@/lib/constants";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { cn } from "@/lib/utils/cn";
+
+import { useTransferFromAPI } from "./hooks/useTransferFromAPI";
+import TransferFromDetailsToolbar from "./TransferFromDetailsToolbar";
+
+import type { Row, SortingState } from "@tanstack/react-table";
+
+import type { TransferFromDetailsPopoverProps } from "./types";
+
+export default function TransferFromDetailsPopover({
+  open,
+  setOpen,
+  setOpenDocumentPopover,
+  columns,
+  data,
+  id,
+  docType,
+  docUUID,
+  config,
+  onTransferComplete,
+  refreshTable,
+  fetchDocumentDetails,
+  title = "Transfer Details",
+}: TransferFromDetailsPopoverProps) {
+  const { transferItems } = useTransferFromAPI(config);
+  const { toast } = useToast();
+
+  const showTransferFailToast = (items: any[]) => {
+    toast({
+      title: "Transfer Failed",
+      description: `The following record(s) cannot be transferred: ${items
+        .reduce((acc, curr) => acc + (curr.itemCode || curr.item) + ", ", "")
+        .slice(0, -2)}`,
+      action: (
+        <ToastAction
+          className={cn(buttonVariants({ variant: "default", size: "sm" }))}
+          altText="OK"
+        >
+          OK
+        </ToastAction>
+      ),
+    });
+  };
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [transferQuantities, setTransferQuantities] = useState<Record<string, string>>({});
+
+  const table = useReactTable({
+    columns,
+    data,
+    state: { sorting },
+    onSortingChange: setSorting,
+    autoResetPageIndex: false,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  // Select all rows when data changes
+  useEffect(() => {
+    if (data.length > 0) {
+      const allRowIds = data.map((_, index) => index.toString());
+      table.setRowSelection(allRowIds.reduce((acc, id) => ({ ...acc, [id]: true }), {}));
+    }
+  }, [data, table]);
+
+  usePreventShiftTextSelect();
+
+  // Detect if this is stock adjustment module
+  const isStockAdjustment = config.module === "stock_adjustment";
+
+  const numberInputCell = ({ row, column: { id } }) => {
+    const onBlur = async () => {
+      if (isStockAdjustment) {
+        const totalQuantity = Number(row.original.totalTransferableQuantity || 0);
+        if (totalQuantity - row.original[id] < 0) {
+          row.original[id] = totalQuantity.toString();
+          row.original.physicalQuantity = "0";
+          setTransferQuantities((prev) => ({
+            ...prev,
+            [row.id]: totalQuantity.toString(),
+          }));
+        }
+      } else {
+        const totalQuantity = Number(row.original.quantity || 0);
+        if (totalQuantity - row.original[id] < 0) {
+          row.original[id] = totalQuantity.toString();
+          row.original.transferableQuantity = "0";
+          setTransferQuantities((prev) => ({
+            ...prev,
+            [row.id]: totalQuantity.toString(),
+          }));
+        }
+      }
+    };
+
+    const onChange = (e) => {
+      let newValue = Number(e.target.value.replace(/[^0-9]/g, ""));
+
+      if (isStockAdjustment) {
+        const totalQuantity = Number(row.original.totalTransferableQuantity || 0);
+        row.original[id] = `${newValue}`;
+        row.original.physicalQuantity = `${totalQuantity - newValue}`;
+      } else {
+        const totalQuantity = Number(row.original.quantity || 0);
+        row.original[id] = `${newValue}`;
+        row.original.transferableQuantity = `${totalQuantity - newValue}`;
+      }
+
+      setTransferQuantities((prev) => ({
+        ...prev,
+        [row.id]: `${newValue}`,
+      }));
+    };
+
+    return (
+      <Input
+        className="h-7.5 text-right"
+        value={transferQuantities[row.id] || row.original.transferQuantity}
+        onChange={onChange}
+        onBlur={onBlur}
+      />
+    );
+  };
+
+  useEffect(() => {
+    setTransferQuantities({});
+  }, [data]);
+
+  const onSave = async (prop: any) => {
+    let selectedRows: any[] = [];
+    let failed: any[] = [];
+
+    if (prop.table) {
+      selectedRows = prop.table.getSelectedRowModel().rows;
+    } else {
+      selectedRows.push(prop.row);
+    }
+
+    try {
+      const isDev = process.env.NODE_ENV === "development";
+
+      let moduleSegment = config.module.replace("_", "-");
+      if (config.module === "delivery_order") moduleSegment = "sales-delivery-order";
+      else if (config.module === "supplier_delivery_order")
+        moduleSegment = "supplier-delivery-order";
+      else if (config.module === "sales_credit_note") moduleSegment = "sales-credit-note";
+      else if (config.module === "sales_debit_note") moduleSegment = "sales-debit-note";
+      else if (config.module === "purchase_credit_note") moduleSegment = "purchase-credit-note";
+      else if (config.module === "purchase_debit_note") moduleSegment = "purchase-debit-note";
+      else if (config.module === "meeting_agenda") moduleSegment = "meeting-agenda";
+
+      const route = isDev
+        ? `${config.apiNamespace}/${moduleSegment}`
+        : `${versionPath}/${config.apiNamespace}/${moduleSegment}`;
+
+      const storageKey = isDev
+        ? moduleSegment !== "meeting-agenda"
+          ? `transfer-from.${route.split("/")[1]}`
+          : `transfer-from.${route.split("/")[2]}`
+        : moduleSegment !== "meeting-agenda"
+          ? `transfer-from.${route.split("/")[2]}`
+          : `transfer-from.${route.split("/")[3]}`;
+
+      const sourceConfig = config.sources.find((source) => source.key === docType);
+      const transferDocType = sourceConfig ? sourceConfig.transferDocType : docType;
+
+      // Group selected rows by their source document UUID
+      const grouped = new Map<string, any[]>();
+      selectedRows.forEach((row) => {
+        const uuid = row.original._sourceDocUUID || docUUID;
+        if (!grouped.has(uuid)) grouped.set(uuid, []);
+        grouped.get(uuid)!.push(row);
+      });
+
+      const subDataKey = config.subDataKey || "subData";
+      const groupedKeys = [...grouped.keys()];
+      const allResponses: { response: any; srcUUID: string; rows: any[] }[] = [];
+
+      await Promise.all(
+        [...grouped.entries()].map(async ([srcUUID, rows]) => {
+          const response = await transferItems({
+            selectedRows: rows,
+            sourceDocUUID: srcUUID,
+            targetDocUUID: id,
+            docType,
+          });
+          allResponses.push({ response, srcUUID, rows });
+        }),
+      );
+
+      allResponses.sort((a, b) => groupedKeys.indexOf(a.srcUUID) - groupedKeys.indexOf(b.srcUUID));
+
+      const baseResponse = allResponses[allResponses.length - 1].response;
+
+      const dataFromTransfer = {
+        UUID: baseResponse.data?.UUID || "",
+        transferDocType,
+        ...Object.keys(baseResponse.data || {}).reduce(
+          (acc, key) => {
+            if (config.module === "meeting_agenda" && key !== "UUID") {
+              acc[key] = baseResponse.data[key] || "";
+            } else if (key !== "UUID" && key !== "docNo") {
+              acc[key] = baseResponse.data[key] || "";
+            }
+            return acc;
+          },
+          {} as Record<string, any>,
+        ),
+      };
+
+      const firstRaw = allResponses[0]?.response[subDataKey];
+      const isRowsShape = !Array.isArray(firstRaw) && firstRaw?.rows !== undefined;
+
+      const mergedRows = allResponses.flatMap(({ response, srcUUID, rows }) => {
+        const raw = response[subDataKey];
+        const items = Array.isArray(raw) ? raw : raw?.rows || [];
+        const sourceDocNo = rows[0]?.original?._sourceDocNo || "";
+        return items.map((item: any) => ({
+          ...item,
+          transferFromDocuments: { UUID: srcUUID, docNo: sourceDocNo, docType },
+        }));
+      });
+
+      const mergedSubData = isRowsShape
+        ? { total: mergedRows.length, rows: mergedRows }
+        : mergedRows;
+
+      const combinedPayload = {
+        ...baseResponse,
+        data: dataFromTransfer,
+        [subDataKey]: mergedSubData,
+      };
+
+      localStorage.setItem(storageKey, JSON.stringify(combinedPayload));
+
+      // Navigate using anchor click — works after async calls without popup blocker issues
+      const link = document.createElement("a");
+      link.href = `${DIRECTORY}/${route}/transfer-from`;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Trigger refresh AFTER navigation
+      if (onTransferComplete) onTransferComplete();
+      if (refreshTable) refreshTable();
+    } catch (error) {
+      failed = selectedRows.map((row) => row.original);
+    }
+
+    if (failed.length > 0) {
+      showTransferFailToast(failed);
+    }
+
+    setOpen(false);
+  };
+
+  const onDoubleClick = (row: Row<any>) => {
+    onSave({ row: row });
+  };
+
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="min-h-[75vh] min-w-[75vw] max-w-3xl bg-erp-blue-3 p-2">
+        <div className="h-[73cqh] w-full p-4">
+          <div className="flex h-[70cqh] flex-col bg-erp-blue-3 @container-[size]">
+            <h2 className="text-sm font-bold">{title}</h2>
+            <TransferFromDetailsToolbar
+              table={table}
+              setOpen={setOpen}
+              setOpenDocumentPopover={setOpenDocumentPopover}
+              id={id}
+              docUUID={docUUID}
+              docType={docType}
+              onSave={onSave}
+              refreshTable={() => fetchDocumentDetails(docUUID)}
+              fetchDocumentDetails={fetchDocumentDetails}
+            />
+            <Separator className="bg-erp-blue-11" />
+            <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+              <Table className="border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1">
+                <TableHeader className="sticky top-0">
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => (
+                        <TableHead className="bg-erp-blue-11 font-normal" key={header.id}>
+                          <div className="flex flex-col gap-y-0.5">
+                            <div
+                              className={cn(
+                                "flex items-center gap-x-0.5 text-white",
+                                header.column.getCanSort() ? "cursor-pointer select-none" : "",
+                              )}
+                              onClick={header.column.getToggleSortingHandler()}
+                            >
+                              <span className="font-bold">
+                                {header.isPlaceholder
+                                  ? null
+                                  : flexRender(header.column.columnDef.header, header.getContext())}
+                              </span>
+                              {{
+                                asc: <FaSortUp />,
+                                desc: <FaSortDown />,
+                              }[header.column.getIsSorted() as string] ?? <FaSort />}
+                            </div>
+                            <TableHeadColumnTextFilter column={header.column} table={table} />
+                          </div>
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {table.getRowModel().rows?.length ? (
+                    table.getRowModel().rows.map((row) => (
+                      <TableRow
+                        className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+                        data-state={row.getIsSelected() && "selected"}
+                        onClick={onRowSelection(row)}
+                        key={row.id}
+                      >
+                        {row.getVisibleCells().map((cell) => {
+                          if (cell.column.id === "transferQuantity") {
+                            if (!transferQuantities[cell.row.id]) {
+                              if (isStockAdjustment) {
+                                // Store original physical quantity as total transferable quantity first
+                                if (!cell.row.original.totalTransferableQuantity) {
+                                  cell.row.original.totalTransferableQuantity =
+                                    cell.row.original.physicalQuantity;
+                                }
+
+                                const sourceQuantity = Number(
+                                  cell.row.original.totalTransferableQuantity || 0,
+                                );
+
+                                if (sourceQuantity > 0)
+                                  cell.row.original.transferQuantity = sourceQuantity.toString();
+                                else cell.row.original.transferQuantity = "0";
+                              } else {
+                                const sourceQuantity = Number(cell.row.original.quantity || 0);
+
+                                if (sourceQuantity > 0)
+                                  cell.row.original.transferQuantity = sourceQuantity.toString();
+                                else cell.row.original.transferQuantity = "0";
+                              }
+                            }
+
+                            // Calculate remaining quantities
+                            if (isStockAdjustment) {
+                              // Ensure totalTransferableQuantity is set
+                              if (!cell.row.original.totalTransferableQuantity) {
+                                cell.row.original.totalTransferableQuantity =
+                                  cell.row.original.physicalQuantity;
+                              }
+
+                              const totalQty = Number(
+                                cell.row.original.totalTransferableQuantity || 0,
+                              );
+                              const transferQty = Number(cell.row.original.transferQuantity || 0);
+
+                              cell.row.original.physicalQuantity = (
+                                totalQty - transferQty
+                              ).toString();
+                            } else {
+                              const totalQty = Number(cell.row.original.quantity || 0);
+                              const transferQty = Number(cell.row.original.transferQuantity || 0);
+
+                              cell.row.original.transferableQuantity = totalQty - transferQty;
+                            }
+
+                            return (
+                              <TableCell
+                                key={cell.id}
+                                className=""
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {numberInputCell(cell)}
+                              </TableCell>
+                            );
+                          } else {
+                            return (
+                              <TableCell key={cell.id} className="">
+                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              </TableCell>
+                            );
+                          }
+                        })}
+                      </TableRow>
+                    ))
+                  ) : (
+                    <NoResultsTableRow columns={columns} />
+                  )}
+                </TableBody>
+              </Table>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

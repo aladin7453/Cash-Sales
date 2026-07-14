@@ -1,0 +1,90 @@
+"use client";
+
+import { useSearchParams } from "next/navigation";
+import { ORIGIN } from "@/lib/constants";
+import ChangelogDataTable from "@/components/features/changelog/DataTable";
+import { ChangelogConfig } from "@/components/features/changelog/types";
+import { ColumnDef } from "@tanstack/react-table";
+
+// Define the type changelog config
+const AgentTypeChangelogConfig: ChangelogConfig = {
+  getHistoryUrl: (id: string) => `${ORIGIN}/agent_type/api/agent-type/get-agent-type-log?id=${id}`,
+  getDetailsUrl: (id: string, action: string) => `${ORIGIN}/agent_type/api/agent-type/get-agent-type-log-details?id=${id}&action=${action}`,
+  
+  fieldNameMapping: {
+    "agentTypeCode":"Agent Type Code",
+    "agentType":"Agent Type",
+    "description": "Description",
+  },
+  
+  fieldsToFilter: [
+    "UUID",
+    "account",
+    "historyUUID",
+    "createdAt",
+    "createdBy",
+    "createdByUsername",
+    "_actionUUID",
+    "_version",
+    "action",
+    "date_created",
+    "user_id",
+    "updatedAt",
+    "updatedBy",
+    "valid",
+    "company",
+  ],
+  
+  entityName: "agentType",
+  
+  defaultSortField: "createdAt",
+
+   tabs: [
+    {
+      value: "agentType",
+      label: "Agent Type",
+      referenceField: "agentType",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/agent_type/api/agent-type/get-agent-type-log?id=${id}&tableName=agentType`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/agent_type/api/agent-type/get-agent-type-log-details?id=${id}&action=${action}&tableName=agentType`,
+    },
+    {
+      value: "agentTypeHasCustomInfo",
+      label: "Custom Information",
+      referenceField: "fieldName",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/agent_type/api/agent-type/get-agent-type-log?id=${id}&tableName=agentTypeHasCustomInfo`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/agent_type/api/agent-type/get-agent-type-log-details?id=${id}&action=${action}&tableName=agentTypeHasCustomInfo`,
+    }
+  ],
+  
+};
+
+export default function AgentTypeChangelogDataTable<TData, TValue>({
+  columns,
+  initialData,
+  onTableParamsChange,
+}: {
+  columns: ColumnDef<TData, TValue>[];
+  initialData?: any | null;
+  onTableParamsChange?: any;
+}) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return <div>Missing entity ID</div>;
+  }
+
+  return (
+    <ChangelogDataTable
+      columns={columns}
+      initialData={initialData}
+      config={AgentTypeChangelogConfig}
+      entityId={id}
+      onTableParamsChange={onTableParamsChange}
+    />
+  );
+}

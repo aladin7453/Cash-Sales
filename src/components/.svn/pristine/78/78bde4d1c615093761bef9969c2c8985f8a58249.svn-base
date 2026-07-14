@@ -1,0 +1,208 @@
+import React, { useEffect } from "react";
+import ReactQuill from "react-quill";
+import "react-quill/dist/quill.snow.css";
+import { toast } from "@/components/ui/use-toast";
+import { ORIGIN, getAuthHeaders } from "@/lib/constants";
+import { getColumnLength } from "@/components/ui/columnLengthService";
+
+interface TextEditorModalProps {
+  title: string;
+  initialValue: string;
+  onSave?: (value: string) => void;
+  onClose: () => void;
+  saveAsHtml?: boolean;
+  hideSaveButton?: boolean;
+  charLimit?: number;
+  moduleName?: string;
+  fieldName?: string;
+  columnName?: string;
+}
+
+// Use the same cache system as Input component
+const cache: Record<string, Record<string, number>> = {};
+const promiseCache: Record<string, Promise<void> | undefined> = {};
+const headers = getAuthHeaders();
+
+const TextEditorModal: React.FC<TextEditorModalProps> = ({
+  title,
+  initialValue,
+  onSave,
+  onClose,
+  saveAsHtml = true,
+  hideSaveButton = false,
+  charLimit = 1000,
+  moduleName,
+  fieldName,
+  columnName
+}) => {
+  const [maxLength, setMaxLength] = React.useState<number | undefined>(charLimit);
+
+  // Fetch column length limit
+  React.useEffect(() => {
+    if (!moduleName || !fieldName) return;
+
+    getColumnLength(moduleName, headers).then((data) => {
+      setMaxLength(data[fieldName] ?? charLimit);
+    });
+  }, [moduleName, fieldName]);
+  // Convert plain text with line breaks to HTML for the editor
+  const plainTextToHtml = (text: string) => {
+    if (typeof text !== 'string' || !text) return '';
+    // Check if text already contains HTML formatting
+    if (text.includes('<') && text.includes('>')) {
+      return text; // Already HTML, return as is
+    }
+    // Replace line breaks with <p> tags for proper display in the editor
+    return `<p>${text.replace(/\n/g, '</p><p>')}</p>`.replace(/<p><\/p>/g, '<p><br></p>');
+  };
+
+  // Initialize with converted HTML value
+  const [value, setValue] = React.useState('');
+
+  // Set the initial value after converting from plain text to HTML
+  useEffect(() => {
+    setValue(plainTextToHtml(initialValue));
+  }, [initialValue]);
+
+  // Modified function to preserve line breaks when converting to plain text
+  const htmlToPlainTextWithLineBreaks = (html: string) => {
+    // Create a temporary div element
+    const tempDiv = document.createElement('div');
+    // Set the HTML content
+    tempDiv.innerHTML = html;
+
+    // Replace <p> and <div> tags with newlines
+    const content = tempDiv.innerHTML
+      .replace(/<p>/gi, '')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<br>/gi, '\n')
+      .replace(/<br\/>/gi, '\n')
+      .replace(/<div>/gi, '')
+      .replace(/<\/div>/gi, '\n');
+
+    // Set the modified content back to the div
+    tempDiv.innerHTML = content;
+
+    // Get the text content
+    let plainText = tempDiv.textContent || tempDiv.innerText || '';
+
+    // Normalize line breaks (avoid duplicate line breaks)
+    plainText = plainText.replace(/\n\s*\n/g, '\n\n');
+
+    return plainText.trim();
+  };
+
+  const modules = {
+    toolbar: [
+      // [{ header: [1, 2, 3, 4, 5, 6, false] }],
+      ["bold", "italic", "underline", "strike"],
+      [{ color: [] }, { background: [] }],
+      [{ script: "sub" }, { script: "super" }],
+      [{ list: "ordered" }, { list: "bullet" }, { indent: "-1" }, { indent: "+1" }],
+      ["blockquote", "code-block"],
+      ["link", "image", "video"],
+      ["clean"]
+    ]
+  };
+
+  // Handle text change with character limit validation
+  const handleChange = (content: string) => {
+    if (maxLength) {
+      // Convert HTML to plain text for length checking
+      const plainText = htmlToPlainTextWithLineBreaks(content);
+
+      // if (plainText.length > maxLength) {
+      //   const errorMessage =
+      //     !moduleName || !fieldName
+      //       ? `Exceeded the maximum length of ${maxLength} characters. Please shorten it and try again.`
+      //       : `The "${columnName}" exceeds the maximum length of ${maxLength} characters. Please shorten it and try again.`;
+
+      //   toast({
+      //     title: "Character Limit Exceeded",
+      //     description: errorMessage,
+      //     variant: "destructive",
+      //     duration: 4000,
+      //   });
+
+      //   // Don't update the value if it exceeds the limit
+      //   return;
+      // }
+    }
+    setValue(content);
+  };
+
+  const handleSave = () => {
+    if (!onSave) return;
+
+    // Check character limit before saving
+    if (maxLength) {
+      const plainText = htmlToPlainTextWithLineBreaks(value);
+
+      if (plainText.length > maxLength) {
+        const errorMessage =
+          !moduleName || !fieldName
+            ? `Cannot save. Content exceeds the maximum length of ${maxLength} characters.`
+            : `Cannot save. The "${columnName}" exceeds the maximum length of ${maxLength} characters.`;
+
+        toast({
+          title: "Save Failed",
+          description: errorMessage,
+          variant: "destructive",
+          duration: 4000,
+        });
+        return;
+      }
+    }
+
+    if (saveAsHtml) {
+      onSave(value);
+    } else {
+      const plainTextWithLineBreaks = htmlToPlainTextWithLineBreaks(value);
+      onSave(plainTextWithLineBreaks);
+    }
+  };
+
+  // Calculate current character count for display
+  const currentLength = maxLength ? htmlToPlainTextWithLineBreaks(value).length : 0;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-auto">
+      <div className="bg-white rounded-lg shadow-lg w-2.5/4 p-4 max-h-screen overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-bold">{title}</h2>
+          {/* {maxLength && (
+            <span className={`text-sm ${currentLength > maxLength ? 'text-red-500' : 'text-gray-500'}`}>
+              {currentLength}/{maxLength} characters
+            </span>
+          )} */}
+        </div>
+        <div className="overflow-auto">
+          <ReactQuill
+            value={value}
+            onChange={handleChange}
+            theme="snow"
+            modules={modules}
+          />
+        </div>
+        <div className="flex justify-end mt-4">
+          <button
+            className="bg-gray-300 text-black px-4 py-2 rounded"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          {!hideSaveButton && (
+            <button
+              className="bg-blue-500 text-white px-4 py-2 rounded ml-2"
+              onClick={handleSave}
+            >
+              Save
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TextEditorModal;

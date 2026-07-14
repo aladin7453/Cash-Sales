@@ -1,0 +1,549 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+export type UOMList = {
+  seq: string;
+  UUID: string;
+  quotation: string;
+  item: string;
+  itemName: string;
+  type: number;
+  description: string;
+  "2ndDescription": string;
+  moreDescription: string;
+  itemGroup: string;
+  itemCategory: string;
+  tariff: string;
+  classification: string;
+  permitNo: string;
+  project: string;
+  quantity: number;
+  quantity2?: number;
+  quantity3?: number;
+  UOM: string;
+  UOM2?: string;
+  UOM3?: string;
+  UOMDropdown2?: any[];
+  UOMDropdown3?: any[];
+  itemRate: string;
+  price: number;
+  discountRate: number;
+  discountAmount: number;
+  discountRate2?: number;
+  discountAmount2?: number;
+  discountRate3?: number;
+  discountAmount3?: number;
+  //New Code
+  discount?: string;
+  tax: string;
+  deliveryDate: string;
+  billingFrequency: number;
+  billingInterval: string;
+  startAt: string;
+  endAt: string;
+  remark1: string;
+  remark2: string;
+  serviceName: string;
+  serviceCode: string;
+  createdAt: string;
+  createdBy: string;
+  updatedBy: string;
+  updatedAt: string;
+  valid: string;
+  taxInclusive: string;
+  master: string;
+  showTemplate: string;
+  transferTo: string;
+  transferToDocuments: Array<{
+    UUID: string;
+    docNo: string;
+    docType: string;
+  }>;
+  preferenceData?: any;
+  customerCodeCode: string;
+  customerName: string;
+  customerBRN: string;
+  customerID: string;
+  customermembershipID: string;
+  customerDescription: string;
+  template: string;
+  module: string;
+  email: string;
+  nextGenerateAt: string;
+};
+
+// Preference (Format Number Function)
+const formatNumber = (value: string | number, decimalPlaces: number = 2): string => {
+  if (value === null || value === undefined || value === '') {
+    return (0).toFixed(decimalPlaces);
+  }
+
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+
+  if (isNaN(numValue)) {
+    return (0).toFixed(decimalPlaces);
+  }
+
+  return numValue.toFixed(decimalPlaces);
+};
+
+const isDev = process.env.NODE_ENV === "development";
+
+const urlMap = {
+  quotation: isDev ? "sales/quotation" : "view/sales/quotation",
+  cashSales: isDev ? "sales/cash-sales" : "view/sales/cash-sales",
+  deliveryOrder: isDev ? "sales/delivery-order" : "view/sales/delivery-order",
+  jobOrder: isDev ? "job-management/job-order" : "view/job-management/job-order",
+  salesInvoice: isDev ? "sales/sales-invoice" : "view/sales/sales-invoice",
+  salesDebitNote: isDev ? "sales/sales-debit-note" : "view/sales/sales-debit-note",
+  salesOrder: isDev ? "sales/sales-order" : "view/sales/sales-order",
+};
+
+export const QuotationColumns: ColumnDef<UOMList>[] = [
+  {
+    id: "seq",
+    accessorKey: "seq",
+    header: "Seq",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemCode",
+    accessorKey: "itemCode",
+    header: "Item",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemName",
+    accessorKey: "itemName",
+    header: "Item Name",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerCodeCode",
+    accessorKey: "customerCodeCode",
+    header: "Customer Code",
+    filterFn: "includesString",
+  },
+
+  {
+    id: "customerName",
+    accessorKey: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+  },
+
+  {
+    id: "customerBRN",
+    accessorKey: "customerBRN",
+    header: "BRN",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerID",
+    accessorKey: "customerID",
+    header: "ID",
+    filterFn: "includesString",
+  },
+  {
+    id: "customermembershipID",
+    accessorKey: "customermembershipID",
+    header: "Membership ID",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerDescription",
+    accessorKey: "customerDescription",
+    header: "Cust. Desc",
+    filterFn: "includesString",
+  },
+  {
+    id: "type",
+    accessorKey: "type",
+    header: "Type",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemUOM",
+    accessorKey: "itemUOM",
+    header: "UOM[1]",
+    filterFn: "includesString",
+  },
+  {
+    id: "quantity",
+    accessorKey: "quantity",
+    header: "Quantity[1]",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemUOM2",
+    accessorKey: "itemUOM2",
+    header: "UOM[2]",
+    filterFn: "includesString",
+  },
+  {
+    id: "quantity2",
+    accessorKey: "quantity2",
+    header: "Quantity[2]",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemUOM3",
+    accessorKey: "itemUOM3",
+    header: "UOM[3]",
+    filterFn: "includesString",
+  },
+  {
+    id: "quantity3",
+    accessorKey: "quantity3",
+    header: "Quantity[3]",
+    filterFn: "includesString",
+  },
+  {
+    id: "price",
+    accessorKey: "price",
+    header: "Price",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+      return (
+        <div className="flex items-center justify-between gap-1">
+          <p className="text-right flex-1">{formatNumber(row.original.price, decimal)}</p>
+        </div>
+      );
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "subtotalTax",
+    accessorKey: "subtotalTax",
+    header: "Subtotal (Tax)",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+      return <p className="text-right">{formatNumber(row.original.subtotalTax, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    filterFn: "includesString",
+  },
+  {
+    id: "2ndDescription",
+    accessorKey: "2ndDescription",
+    header: "2nd Description",
+    filterFn: "includesString",
+  },
+  {
+    id: "moreDescription",
+    accessorKey: "moreDescription",
+    header: "More Description",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemGroupCode",
+    accessorKey: "itemGroupCode",
+    header: "Group",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemCategoryCode",
+    accessorKey: "itemCategoryCode",
+    header: "Category",
+    filterFn: "includesString",
+  },
+  {
+    id: "masterItem",
+    accessorKey: "masterItem",
+    header: "Master Item",
+    filterFn: "includesString",
+  },
+  {
+    id: "tariffCode",
+    accessorKey: "tariffCode",
+    header: "Tariff",
+    filterFn: "includesString",
+  },
+  {
+    id: "classificationCode",
+    accessorKey: "classificationCode",
+    header: "Classification",
+    filterFn: "includesString",
+  },
+  {
+    id: "permitNo",
+    accessorKey: "permitNo",
+    header: "Permit No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "projectCode",
+    accessorKey: "projectCode",
+    header: "Project",
+    filterFn: "includesString",
+  },
+  {
+    id: "itemRate",
+    accessorKey: "itemRate",
+    header: "Rate",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+      return <p className="text-right">{formatNumber(row.original.itemRate, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "amount",
+    accessorKey: "amount",
+    header: "Amount",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+      return <p className="text-right">{formatNumber(row.original.amount, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  // Three Discount (Start)
+  {
+    accessorKey: "discountRate",
+    header: "Discount Rate (%) [1]",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+      return <p className="text-right">{formatNumber(row.original.discountRate, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "discountAmount",
+    header: "Discount Amount [1]",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+      return <p className="text-right">{formatNumber(row.original.discountAmount, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "discountRate2",
+    header: "Discount Rate (%) [2]",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+      return <p className="text-right">{formatNumber(row.original.discountRate2, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "discountAmount2",
+    header: "Discount Amount [2]",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+      return <p className="text-right">{formatNumber(row.original.discountAmount2, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "discountRate3",
+    header: "Discount Rate (%) [3]",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+      return <p className="text-right">{formatNumber(row.original.discountRate3, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    accessorKey: "discountAmount3",
+    header: "Discount Amount [3]",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+      return <p className="text-right">{formatNumber(row.original.discountAmount3, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  //New Code
+  {
+    id: "discount",
+    accessorKey: "discount",
+    header: "Discount",
+    filterFn: "includesString",
+  },
+  // Three Discount (End)
+  {
+    id: "subTotal",
+    accessorKey: "subTotal",
+    header: "Subtotal",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+      return <p className="text-right">{formatNumber(row.original.subTotal, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "taxCode",
+    accessorKey: "taxCode",
+    header: "Tax",
+    filterFn: "includesString",
+  },
+  {
+    id: "taxRate",
+    accessorKey: "taxRate",
+    header: "Tax Rate",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+      return <p className="text-right">{formatNumber(row.original.taxRate, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "taxInclusive",
+    accessorKey: "taxInclusive",
+    header: "Tax Inclusive",
+    filterFn: "includesString",
+  },
+  {
+    id: "taxAmount",
+    accessorKey: "taxAmount",
+    header: "Tax Amount",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+      return <p className="text-right">{formatNumber(row.original.taxAmount, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "localTaxAmount",
+    accessorKey: "localTaxAmount",
+    header: "Local Tax Amount",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+      return <p className="text-right">{formatNumber(row.original.localTaxAmount || 0, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "deliveryDate",
+    accessorKey: "deliveryDate",
+    header: "Delivery Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "billingFrequency",
+    accessorKey: "billingFrequency",
+    header: "Billing Frequency",
+    cell: ({ row }) => <p className="text-right">{row.original.billingFrequency}</p>,
+    filterFn: "includesString",
+  },
+  {
+    id: "billingInterval",
+    accessorKey: "billingInterval",
+    header: "Billing Interval",
+    filterFn: "includesString",
+  },
+  {
+    id: "nextGenerateAt",
+    accessorKey: "nextGenerateAt",
+    header: "Next Generate At",
+    filterFn: "includesString",
+  },
+  {
+    id: "startAt",
+    accessorKey: "startAt",
+    header: "Start Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "endAt",
+    accessorKey: "endAt",
+    header: "End Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "module",
+    accessorKey: "module",
+    header: "Module",
+    filterFn: "includesString",
+  },
+  {
+    id: "template",
+    accessorKey: "template",
+    header: "Template",
+    filterFn: "includesString",
+  },
+  {
+    id: "email",
+    accessorKey: "email",
+    header: "Email",
+    filterFn: "includesString",
+  },
+  {
+    id: "remark1",
+    accessorKey: "remark1",
+    header: "Remark 1",
+    filterFn: "includesString",
+  },
+  {
+    id: "remark2",
+    accessorKey: "remark2",
+    header: "Remark 2",
+    filterFn: "includesString",
+  },
+  {
+    id: "transferTo",
+    accessorKey: "transferTo",
+    header: "Transfer To",
+    cell: ({ row }) => {
+      const transferToDocuments = row.original.transferToDocuments;
+
+      if (!transferToDocuments || transferToDocuments.length === 0) {
+        return <span className="text-gray-400">-</span>;
+      }
+
+      return (
+        <div className="flex flex-wrap">
+          {transferToDocuments.map((doc, index) => {
+            const docNo = doc.docNo || "";
+            const docType = doc.docType || "";
+            const url = `/${urlMap[docType as keyof typeof urlMap]}/edit?item=${docNo}&id=${doc.UUID}`;
+
+            return (
+              <span key={index}>
+                <a
+                  href={url}
+                  className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {doc.docNo}
+                </a>
+                {index < transferToDocuments.length - 1 && ", "}
+              </span>
+            );
+          })}
+        </div>
+      );
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as UOMList["valid"];
+      return validity ? "Valid" : "Invalid";
+    },
+    filterFn: filterWithStringConversion,
+  },
+  {
+    id: "master",
+    accessorKey: "master",
+    header: "Master Service",
+    filterFn: "includesString",
+  },
+  {
+    id: "showTemplate",
+    accessorKey: "showTemplate",
+    header: "Show in PDF",
+    filterFn: "includesString",
+  },
+];

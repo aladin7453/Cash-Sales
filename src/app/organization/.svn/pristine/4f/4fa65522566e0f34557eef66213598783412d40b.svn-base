@@ -1,0 +1,90 @@
+"use client";
+
+import React from "react";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input";
+import type { Company } from "../../../columns";
+
+type Params = {
+  company?: Company | null;
+  form: any;
+};
+
+export function EInvoiceSettingForm({ form }: Params) {
+  return (
+    <Form {...form}>
+      <form className="space-y-8">
+        
+      <Card style={{ marginTop: "10px"}}>
+        <CardTitle></CardTitle>
+        <CardDescription></CardDescription>
+        <CardContent className={"pt-05 pb-0"}>
+          <div className="space-y-2.5 px-4" style={{ marginBottom: "5px" }}>
+              <h2 className="font-bold">e-Invoice Setting</h2>
+              <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4">
+                <FormField
+                  control={form.control}
+                  name="ClientID"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Client Id:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+              <FormField
+                control={form.control}
+                name="ClientSecret1"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Client Secret 1:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5 " {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ClientSecret2"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Client Secret 2:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5 " {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              </div>
+              </div>
+          </CardContent>
+          <CardFooter>
+          </CardFooter>
+        </Card>
+      </form>
+    </Form>
+  );
+}

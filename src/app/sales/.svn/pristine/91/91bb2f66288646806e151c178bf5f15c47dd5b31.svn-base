@@ -1,0 +1,435 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { CalendarIcon } from "lucide-react";
+import { FaFileCirclePlus, FaCircleXmark, FaMagnifyingGlass } from "react-icons/fa6";
+import type { Dispatch, SetStateAction } from "react";
+
+import moment from 'moment';
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { FaAddressCard, FaBoxes } from "react-icons/fa";
+import { HiOutlineClipboardDocumentList } from "react-icons/hi2";
+import { IoDocumentOutline } from "react-icons/io5";
+import { Tab, TabList, TabPanel, Tabs } from "react-tabs";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PaymentDetailsForm } from "../e-invoice-details/payment-details/PaymentDetailsForm";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils/cn";
+import { DATE_FORMAT, ORIGIN, getAuthHeaders } from "@/lib/constants";
+
+import type { CustomerPayment } from "../../columns";
+
+type Params = {
+  tempRowAttachments: any;
+  setTempRowAttachments: ([]) => void;
+  customerPayment?: CustomerPayment | null;
+  setcustomerPayment: Dispatch<SetStateAction<CustomerPayment[]>>;
+  form: any;
+  slug?: string;
+};
+
+// HTML Utility Function
+function stripHtml(html) {
+  if (!html) return "";
+  // Replace <br> and <br/> with newlines
+  let text = html.replace(/<br\s*\/?>/gi, '\n');
+  // Replace <p> with nothing, </p> with newline
+  text = text.replace(/<p[^>]*>/gi, '').replace(/<\/p>/gi, '\n');
+  // Remove all other HTML tags
+  text = text.replace(/<[^>]+>/g, '');
+  // Replace HTML entities
+  text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+
+  return text;
+}
+
+export default function MoreDetailsForm({
+  customerPayment,
+  tempRowAttachments,
+  form,
+  setTempRowAttachments,
+  slug
+}: Params) {
+  const headers = getAuthHeaders();
+
+  const inputRef = useRef(null);
+
+  // Project Dropdown
+  const [showProjectTable, setShowProjectTable] = useState(false);
+  const [projectDropdownData, setProjectDropdownTableData] = useState([]);
+  const [projectFilter, setProjectFilter] = useState("");
+
+  const projectInputRef = useRef(null);
+  const projectDropdownRef = useRef(null);
+
+  const dropdownProjectColumns = [
+    { accessorKey: "projectCode", header: "Project Code" },
+    { accessorKey: "description", header: "Description" },
+  ];
+
+  const handleClickOutside = (event) => {
+    if (
+      projectDropdownRef.current &&
+      !projectDropdownRef.current.contains(event.target) &&
+      projectInputRef.current !== event.target
+    ) {
+      setShowProjectTable(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener('click', handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  const toggleTableProject = async () => {
+    const formData = new FormData();
+    const project = "project";
+
+    formData.append('table[]', project);
+
+    if (!showProjectTable) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/universal/get-all-drop-down-table-data`,
+          {
+            method: "POST",
+            headers,
+            body: formData,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch user list drop-down data");
+        }
+
+        const projectCodeData = await response.json();
+
+        setProjectDropdownTableData(projectCodeData.rows);
+        setShowProjectTable(true);
+      } catch (error) {
+        console.error("Error fetching user list drop-down data:", error);
+      }
+    } else {
+      setShowProjectTable(false);
+    }
+  };
+
+  // Fetch Dropdown Data
+  const fetchDropdownData = async (table: string) => {
+    try {
+      var formData = new FormData;
+
+      formData.append("table[0]", table);
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`,
+        {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch dropdown data');
+      }
+
+      const data = await response.json();
+
+      setProjectDropdownTableData(data.rows);
+      setShowProjectTable(true);
+
+    } catch (error) {
+      console.error('Error fetching dropdown data:', error);
+
+      throw new Error('Failed to fetch dropdown data');
+    }
+  };
+
+  const onClickRowProject = (row) => {
+    form.setValue('project', row.UUID);
+    form.setValue('projectCode', row.projectCode);
+
+    setProjectFilter("");
+    setShowProjectTable(false);
+  };
+
+  return (
+    <Card className="h-[244px] w-full border-none !shadow-none">
+      <CardContent className="p-0">
+        <Form {...form}>
+          <form>
+            <Tabs>
+              <div className="min-w-0 flex-1">
+                {/* General Details*/}
+                <TabPanel
+                  forceRender
+                  className="hidden"
+                  selectedClassName="react-tabs__tab-panel--selected"
+                >
+                  <div className="flex flex-col gap-y-2 pt-1.5">
+                    {/* First Row */}
+                    <div className="flex items-center justify-center gap-x-2">
+                      {/* Project UUID */}
+                      <FormField
+                        control={form.control}
+                        name="project"
+                        render={({ field }) => (
+                          <FormItem className="hidden">
+                            <FormLabel>Project UUID:</FormLabel>
+                            <FormControl>
+                              <Input className="h-7.5" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Project */}
+                      <FormField
+                        control={form.control}
+                        name="projectCode"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormControl className="relative">
+                              <div className="relative">
+                                <TooltipProvider delayDuration={1000}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Input
+                                        className="h-7 rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                        {...field}
+                                        onClick={() => fetchDropdownData("project")}
+                                        onChange={(e) => {
+                                          field.onChange(e);
+                                          setProjectFilter(e.target.value);
+                                        }}
+                                        ref={projectInputRef}
+                                        autoComplete="off"
+                                        placeholder="Project"
+                                      />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Project</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                  <FaMagnifyingGlass className="size-3 text-gray-400" />
+                                  {/* Using the search icon */}
+                                </div>
+                                {showProjectTable && (
+                                  <div
+                                    ref={projectDropdownRef}
+                                    className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                                  >
+                                    <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+                                      <DropdownTable
+                                        columns={dropdownProjectColumns}
+                                        data={projectDropdownData}
+                                        onClickRow={onClickRowProject}
+                                        filterValue={projectFilter}
+                                        filterColumn="projectCode"
+                                      />
+                                      <ScrollBar orientation="vertical" />
+                                    </ScrollArea>
+                                  </div>
+                                )}
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Posting Date */}
+                      <FormField
+                        control={form.control}
+                        name="postingDate"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <Popover>
+                              <TooltipProvider delayDuration={1000}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <PopoverTrigger asChild>
+                                      <FormControl>
+                                        <Button
+                                          className={cn(
+                                            "h-7 w-full rounded-xl px-2 text-[11px] outline-none transition-all duration-300 ease-in-out",
+                                            !field.value && "text-muted-foreground",
+                                          )}
+                                          variant="outline"
+                                          size="lg"
+                                        >
+                                          {field.value
+                                            ? moment.unix(Number(field.value)).format(DATE_FORMAT)
+                                            : "Posting Date"}
+                                          <CalendarIcon className="ml-auto size-3.5 text-gray-400" />
+                                        </Button>
+                                      </FormControl>
+                                    </PopoverTrigger>
+                                  </TooltipTrigger>
+
+                                  <TooltipContent>Posting Date</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={
+                                    field.value
+                                      ? moment.unix(Number(field.value)).toDate()
+                                      : undefined
+                                  }
+                                  onSelect={(date) => {
+                                    if (!date) {
+                                      field.onChange(null);
+                                      return;
+                                    }
+
+                                    const unixTimestamp = Math.floor(date.getTime() / 1000);
+                                    field.onChange(unixTimestamp);
+                                  }}
+                                  initialFocus
+                                  defaultMonth={
+                                    field.value
+                                      ? moment.unix(Number(field.value)).toDate()
+                                      : new Date()
+                                  }
+                                />
+                              </PopoverContent>
+                            </Popover>
+
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Tax Date */}
+                      <FormField
+                        control={form.control}
+                        name="taxDate"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <Popover>
+                              <TooltipProvider delayDuration={1000}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <PopoverTrigger asChild>
+                                      <FormControl>
+                                        <Button
+                                          className={cn(
+                                            "h-7 w-full rounded-xl px-2 text-[11px] outline-none transition-all duration-300 ease-in-out",
+                                            !field.value && "text-muted-foreground",
+                                          )}
+                                          variant="outline"
+                                          size="lg"
+                                        >
+                                          {field.value
+                                            ? moment.unix(Number(field.value)).format(DATE_FORMAT)
+                                            : "Tax Date"}
+                                          <CalendarIcon className="ml-auto size-3.5 text-gray-400" />
+                                        </Button>
+                                      </FormControl>
+                                    </PopoverTrigger>
+                                  </TooltipTrigger>
+
+                                  <TooltipContent>Tax Date</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={
+                                    field.value
+                                      ? moment.unix(Number(field.value)).toDate()
+                                      : undefined
+                                  }
+                                  onSelect={(date) => {
+                                    if (!date) {
+                                      field.onChange(null);
+                                      return;
+                                    }
+
+                                    const unixTimestamp = Math.floor(date.getTime() / 1000);
+                                    field.onChange(unixTimestamp);
+                                  }}
+                                  initialFocus
+                                  defaultMonth={
+                                    field.value
+                                      ? moment.unix(Number(field.value)).toDate()
+                                      : new Date()
+                                  }
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Second Row */}
+                    <div className="flex items-center justify-center gap-x-2">
+                      {/* UUID */}
+                      <FormField
+                        control={form.control}
+                        name="UUID"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <Popover>
+                              <TooltipProvider delayDuration={1000}>
+                                <Tooltip>
+                                  <FormControl>
+                                    <Input
+                                      className={cn(
+                                        "h-7 rounded-xl px-2 text-[11px] outline-none transition-all duration-300 ease-in-out",
+                                        slug === "edit" && "bg-erp-gray-1 text-gray-500",
+                                        form.formState.errors.docNo &&
+                                        "border-red-500 text-red-500 focus-visible:ring-red-500",
+                                      )}
+                                      {...field}
+                                      readOnly={true}
+                                      ref={inputRef}
+                                      autoComplete="off"
+                                      placeholder="UUID"
+                                    />
+                                  </FormControl>
+                                  <TooltipContent>UUID</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </TabPanel>
+              </div>
+            </Tabs>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

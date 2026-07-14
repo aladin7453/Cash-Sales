@@ -1,0 +1,185 @@
+"use client";
+
+import { endOfMonth, startOfMonth } from "date-fns";
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+
+import { DEFAULT_DATA_TABLE_PAGE_SIZE, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+
+import { columnDefinitionsByDocType } from "./Generate/columns";
+import MonthlyComparisonByCompanyReportDataTable from "./Generate/DataTable";
+import MonthlyComparisonByCompanyReportForm from "./Report/MonthlyComparisionByCompanyReportForm";
+
+import type { ColumnFiltersState, SortingState } from "@tanstack/react-table";
+
+const COLUMN_FILTERS_KEY = "monthly-comparison-by-company-report.table.filters";
+const PAGINATION_KEY = "monthly-comparison-by-company-report.table.pagination";
+const SORTING_KEY = "monthly-comparison-by-company-report.table.sorting";
+
+export default function MonthlyComparisionByCompanyReportPage() {
+  const [tempGeneratedReportList, setTempGeneratedReportList] = useState<any[]>([]);
+  const [hasGenerated, setHasGenerated] = useState("0");
+  const [showReportTable, setShowReportTable] = useState(false);
+  const [previewPDF, setPreviewPDF] = useState<any>(null);
+  const [salesReportData, setSalesReportData] = useState<any>(null);
+  const [summaryData, setSummaryData] = useState<any>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+  const [totalCounts, setTotalCounts] = useState<{ total: number }>({ total: 0 });
+
+  const [columnFilters, setColumnFilters] = useLocalStorage<ColumnFiltersState>(
+    COLUMN_FILTERS_KEY,
+    [],
+  );
+
+  const [pagination, setPagination] = useLocalStorage(PAGINATION_KEY, {
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+  });
+
+  const [sorting, setSorting] = useLocalStorage<SortingState>(SORTING_KEY, []);
+
+  const headers = getAuthHeaders();
+
+  const filterFields = [
+    "quotationNo",
+    "salesOrderNo",
+    "salesOrdersNo",
+    "salesInvoices",
+    "UUID",
+    "customerCode",
+    "customerName",
+    "docNo",
+    "docType",
+    "docDate",
+    "docDateFormat",
+    "NewSales",
+    "Renewal",
+    "totalDiscount",
+    "totalSubtotal",
+    "outstandingAmount",
+    "Overdue",
+    "ThisYearMonthlyCollection",
+    "LastYearMonthlyCollection",
+  ];
+
+  const form = useForm({
+    defaultValues: {
+      customerCode: "",
+      customerName: "",
+      startDate: Math.floor(startOfMonth(new Date()).getTime() / 1000).toString(),
+      endDate: Math.floor(endOfMonth(new Date()).getTime() / 1000).toString(),
+      option: "itemized",
+    },
+  });
+
+  const generateReport = async (formData: any) => {
+    try {
+      const allFormValues = form.getValues();
+
+      const filterObject = {};
+
+      filterFields.forEach((key) => {
+        if (allFormValues[key]) {
+          filterObject[key] = allFormValues[key];
+        }
+      });
+
+      const params = new FormData();
+
+      params.append(
+        "param[filter]",
+        Object.keys(filterObject).length > 0 ? JSON.stringify(filterObject) : "{}",
+      );
+
+      params.append("param[offset]", `${pagination.pageIndex * pagination.pageSize}`);
+
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "docDateFormat");
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc",
+      );
+
+      const validFormValues = form.getValues();
+
+      const validfilterFields = ["valid"];
+
+      const validfilterObject = {};
+
+      validfilterFields.forEach((key) => {
+        if (validFormValues[key]) {
+          validfilterObject[key] = validFormValues[key];
+        }
+      });
+
+      if (validFormValues.valid) {
+        params.append("param[valid]", validFormValues.valid);
+      }
+
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value && key !== "docType") {
+          params.append(`sales[${key}]`, value as string);
+        }
+      });
+
+      const response = await fetch(
+        `${ORIGIN}/sales_report/api/sales-report/generate-report?docType=salesInvoice&reportType=monthlyComparisonbyCompany`,
+        {
+          method: "POST",
+          headers,
+          body: params,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate report");
+      }
+
+      const result = await response.json();
+      const rows = result.rows || [];
+
+      setTotalCounts({ total: result.total ?? rows.length });
+
+      setTempGeneratedReportList(result.rows || []);
+      setShowReportTable(true);
+      setHasGenerated("1");
+    } catch (error) {
+      console.error("Error generating report:", error);
+    }
+  };
+
+  const onSubmit = (data: any) => {
+    setTempGeneratedReportList([]);
+    setShowReportTable(false);
+    generateReport(data);
+  };
+
+  return (
+    <>
+      <MonthlyComparisonByCompanyReportForm
+        form={form}
+        onSubmit={onSubmit}
+        generatedReport={tempGeneratedReportList}
+        filterFields={filterFields}
+        sorting={sorting}
+      />
+      {showReportTable && (
+        <MonthlyComparisonByCompanyReportDataTable
+          columns={columnDefinitionsByDocType}
+          data={tempGeneratedReportList}
+          revalidateMonthlyComparisonByCompanyReport={() => generateReport(form.getValues())}
+          columnFilters={columnFilters}
+          setColumnFilters={setColumnFilters}
+          pagination={pagination}
+          setPagination={setPagination}
+          sorting={sorting}
+          setSorting={setSorting}
+          formData={form.getValues()}
+          totalNumOfRows={+totalCounts.total}
+        />
+      )}
+    </>
+  );
+}

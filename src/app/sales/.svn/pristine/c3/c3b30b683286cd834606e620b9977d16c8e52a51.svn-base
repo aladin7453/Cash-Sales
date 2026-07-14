@@ -1,0 +1,178 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { CalendarIcon } from "lucide-react";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { notFound, useSearchParams, useRouter } from "next/navigation";
+
+import { useForm } from "react-hook-form";
+
+import moment from 'moment';
+
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+
+import { DATE_FORMAT } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+
+type Params = {
+  form: any;
+};
+
+export function BuyerDetailsFormOld({ form }: Params) {
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Customer Information</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form>
+            {/* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns) */}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6">
+              <FormField
+                control={form.control}
+                name="buyerName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Buyer Name:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} readOnly style={{ backgroundColor: '#f2f2f2', color: 'gray' }}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="buyerPhoneNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Buyer Phone No.:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} readOnly style={{ backgroundColor: '#f2f2f2', color: 'gray' }}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="buyerTIN"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Buyer TIN:</FormLabel>
+                    <FormControl>
+                        <Input className="h-7.5" {...field} readOnly style={{ backgroundColor: '#f2f2f2', color: 'gray' }}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="buyerBRN"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Buyer BRN/NRIC/Passport:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} readOnly style={{ backgroundColor: '#f2f2f2', color: 'gray' }}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="buyerSSTNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Buyer SST No.:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} readOnly style={{ backgroundColor: '#f2f2f2', color: 'gray' }}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="buyerEmail"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Buyer Email:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        moduleName="consolidatedInvoice" 
+                        fieldName="buyerEmail" 
+                        columnName="Buyer Email" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            {/* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns) */}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6 mt-4">
+              <FormField
+                control={form.control}
+                name="buyerAddress"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 md:col-span-6">
+                    <FormLabel>Buyer Address:</FormLabel>
+                    <FormControl>
+                    <Textarea className="h-7.5 resize-none" {...field} readOnly style={{ backgroundColor: '#f2f2f2', color: 'gray' }}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

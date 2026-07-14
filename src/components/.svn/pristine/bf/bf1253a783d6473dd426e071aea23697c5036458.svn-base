@@ -1,0 +1,3057 @@
+import React from 'react';
+import {
+  Document,
+  Page,
+  StyleSheet,
+  Text,
+  View,
+  Image,
+  Font
+} from "@react-pdf/renderer";
+import moment from 'moment';
+
+import { formatNumberWithCommas } from "@/components/ui/number-formatter";
+
+// Avoid double registration in dev
+let fontsRegistered = false;
+if (!fontsRegistered) {
+  const isDev = process.env.NODE_ENV === 'development';
+  Font.register({
+    family: 'NotoSansSC',
+    src: isDev
+      ? '/fonts/NotoSansSC-Regular.ttf'
+      : '/view/fonts/NotoSansSC-Regular.ttf',
+  });
+  Font.register({
+    family: 'NotoSansSC-Black',
+    src: isDev
+      ? '/fonts/NotoSansSC-Black.ttf'
+      : '/view/fonts/NotoSansSC-Black.ttf',
+  });
+  fontsRegistered = true;
+}
+
+const styles = StyleSheet.create({
+  page: {
+    flexDirection: "column",
+    backgroundColor: "#FFFFFF",
+    padding: 30,
+    fontFamily: 'NotoSansSC'
+  },
+  logoContainer: {
+    position: "absolute",
+    top: 0,
+    left: 20,
+    width: 100,
+    height: 100,
+    marginBottom: 60,
+    overflow: "hidden",
+  },
+  logoImage: {
+    width: 100,
+    height: 100,
+    objectFit: "contain",
+  },
+  header: {
+    fontSize: 9,
+    minHeight: 90,
+    marginLeft: 150,
+    marginTop: 5,
+    marginBottom: 5,
+    textAlign: "left",
+  },
+  headerRow: {
+    flexDirection: "row",
+  },
+  headerText: {
+    fontSize: 8,
+    marginRight: 10,
+    marginTop: 5,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "right",
+  },
+  firstSeparator: {
+    width: "100%",
+    height: 1,
+    backgroundColor: "#000000",
+    marginTop: 30,
+    marginBottom: 2,
+  },
+  table: {
+    width: "100%",
+    marginTop: 10,
+    borderStyle: "solid",
+    borderColor: "#000000",
+    // borderBottomWidth: 1,
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderColor: "#000000",
+    borderBottomWidth: 1,
+  },
+  tableHeader: {
+    backgroundColor: "#deebf7",
+    fontWeight: "bold",
+    borderTopWidth: 1,
+  },
+  tableCellNo: {
+    padding: 5,
+    fontSize: 7,
+    flex: 1,
+    textAlign: "center",
+    borderRightWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: "#000000",
+  },
+  tableCell: {
+    padding: 5,
+    fontSize: 7,
+    flex: 4,
+    textAlign: "center",
+    borderRightWidth: 1,
+    borderColor: "#000000",
+  },
+  tableCellMerged: {
+    padding: 5,
+    fontSize: 7,
+    flex: 16,
+    textAlign: "center",
+    borderRightWidth: 1,
+    borderColor: "#000000",
+  },
+  summaryBox: {
+    backgroundColor: "#deebf7",
+    padding: 5,
+    marginTop: 5,
+    borderRadius: 2,
+  },
+  summaryText: {
+    fontSize: 7,
+  },
+  summaryTitle: {
+    fontSize: 8,
+    fontWeight: "bold",
+  },
+  summaryField: {
+    backgroundColor: "#FFFFFF",
+    padding: 1,
+    marginTop: 2,
+    borderWidth: 1,
+    borderRadius: 3,
+    borderColor: "#CCCCCC",
+    width: 70,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  summaryField2: {
+    backgroundColor: "#FFFFFF",
+    padding: 2,
+    marginTop: 2,
+    borderWidth: 1,
+    borderRadius: 2,
+    borderColor: "#CCCCCC",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 80,
+    height: 18,
+  },
+  footerLine: {
+    width: "100%",
+    height: 1,
+    backgroundColor: "#000000",
+    marginTop: 5,
+  },
+  footerContainer: {
+    position: "absolute",
+    bottom: 10,
+    left: 30,
+    right: 30,
+  },
+  footerText: {
+    fontSize: 7,
+  },
+
+  boldText: {
+    fontFamily: 'NotoSansSC-Black',
+    fontWeight: 'bold',
+  },
+  subtotalRow: {
+    backgroundColor: "#deebf7",
+    borderBottomWidth: 1,
+    borderColor: "#000",
+  },
+  groupTitle: {
+    fontSize: 8,
+    fontWeight: "bold",
+    marginTop: 1,
+    marginBottom: 1,
+    fontFamily: 'NotoSansSC-Black',
+  },
+
+  tableCellSOItemCode: {
+    padding: 5,
+    fontSize: 7,
+    flex: 4,
+    textAlign: "center",
+    borderRightWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: "#000000",
+  },
+  tableCellSO: {
+    padding: 5,
+    fontSize: 7,
+    flex: 4,
+    textAlign: "center",
+    borderRightWidth: 1,
+    borderColor: "#000000",
+  },
+});
+
+const PurchaseReport = ({
+  type,
+  data,
+  purchaseReportData,
+  generatedReport,
+  purchaseReportColumns,
+  orientation = 'portrait',
+  adtReportName,
+  checkboxIsPurchase,
+  checkboxIsPayment,
+}: {
+  type: string;
+  data?: any;
+  purchaseReportData?: any;
+  generatedReport?: any;
+  purchaseReportColumns?: any[];
+  orientation?: 'portrait' | 'landscape';
+  adtReportName: string;
+  checkboxIsPurchase: boolean;
+  checkboxIsPayment: boolean;
+}) => {
+  let image64 = data?.currentCompany?.logoLink[0]?.base64;
+
+  // Format the date range
+  const formatDateRange = () => {
+    if (!purchaseReportData?.startDate || !purchaseReportData?.endDate)
+      return "";
+
+    const startDate = moment
+      .unix(Number(purchaseReportData.startDate))
+      .format("YYYY-MM-DD");
+    const endDate = moment
+      .unix(Number(purchaseReportData.endDate))
+      .format("YYYY-MM-DD");
+
+    return `${startDate} to ${endDate}`;
+  };
+
+  let finalRows = data?.rows || generatedReport || [];
+
+  const isLevel2 = type === "Purchase Multi - Debit Note Listing - Level 2" || type === "Purchase Multi - Goods Received Listing - Level 2" ||
+    type === "Purchase Multi - Purchase Order Listing - Level 2" || type === "Purchase Multi - Purchase Invoice Listing - Level 2" || type === "Purchase Outstanding Cash Purchase Listing - Level 2 (with SO Info)";
+  //type === "Supplier Analysis By Document - Level 2" ||
+  if (isLevel2 && finalRows.length > 0) {
+    const transformedRows: any[] = [];
+
+    const groups: Record<string, any> = {};
+
+    finalRows.forEach((item: any) => {
+      const key = item.supplierName || "Unknown";
+
+      // const key = item.docNo || "Unknown";
+
+      if (!groups[key]) {
+        groups[key] = {
+          supplierName: item.supplierName,
+          supplierCode: item.supplierCode,
+          docNo: item.docNo,
+          docDateFormat: item.docDateFormat,
+
+          items: [],
+          totals: {
+            bf: 0,
+            invoice: 0,
+            debitNote: 0,
+            creditNote: 0,
+            payment: 0,
+            contra: 0,
+            cf: 0,
+            totalAmount: 0,
+            totalDiscount: 0,
+            amountAfterDiscount: 0,
+            totalTax: 0,
+            totalSubtotalTax: 0,
+          }
+        };
+      }
+
+      const bf = parseFloat(item.localBalanceBringForward || 0);
+      const invoice = parseFloat(item.invoiceLocalNetTotal || 0);
+      const debitNote = parseFloat(item.debitNoteLocalNetTotal || 0);
+      const creditNote = parseFloat(item.creditNoteLocalNetTotal || 0);
+      const payment = parseFloat(item.localSupplierPayment || 0);
+      const contra = parseFloat(item.contraAmountNetTotal || 0);
+      const cf = parseFloat(item.localCurrentAmount || 0);
+      const totalAmount = parseFloat(item.totalAmount || 0);
+      const totalDiscount = parseFloat(item.totalDiscount || 0);
+      const amountAfterDiscount = parseFloat(item.amountAfterDiscount || 0);
+      const totalTax = parseFloat(item.totalTax || 0);
+      const totalSubtotalTax = parseFloat(item.totalSubtotalTax || 0);
+
+
+      groups[key].items.push(item);
+      groups[key].totals.bf += bf;
+      groups[key].totals.invoice += invoice;
+      groups[key].totals.debitNote += debitNote;
+      groups[key].totals.creditNote += creditNote;
+      groups[key].totals.payment += payment;
+      groups[key].totals.contra += contra;
+      groups[key].totals.cf += cf;
+      groups[key].totals.totalAmount += totalAmount;
+      groups[key].totals.totalDiscount += totalDiscount;
+      groups[key].totals.amountAfterDiscount += amountAfterDiscount;
+      groups[key].totals.totalTax += totalTax;
+      groups[key].totals.totalSubtotalTax += totalSubtotalTax;
+    });
+
+    let globalIndex = 1;
+    Object.values(groups).forEach((group: any) => {
+
+      transformedRows.push({
+        _rowType: 'header',
+        _index: globalIndex++,
+        supplierCode: group.supplierCode,
+        supplierName: group.supplierName,
+        docNo: group.docNo,
+        docDateFormat: group.docDateFormat
+      });
+
+      group.items.forEach((item: any) => {
+        transformedRows.push({
+          _rowType: 'item',
+          ...item
+        });
+      });
+
+      transformedRows.push({
+        _rowType: 'subtotal',
+        supplierName: group.supplierName, // Use supplierName for subtotal label
+        supplierCode: group.supplierCode,
+        docNo: group.docNo,
+        docDateFormat: group.docDateFormat,
+
+        subtotalBF: group.totals.bf,
+        subtotalInvoice: group.totals.invoice,
+        subtotalDebitNote: group.totals.debitNote,
+        subtotalCreditNote: group.totals.creditNote,
+        subtotalPayment: group.totals.payment,
+        subtotalContra: group.totals.contra,
+        subtotalCF: group.totals.cf,
+        subtotalTotalAmount: group.totals.totalAmount,
+        subtotalTotalDiscount: group.totals.totalDiscount,
+        subtotalAmountAfterDiscount: group.totals.amountAfterDiscount,
+        subtotalTotalTax: group.totals.totalTax,
+        subtotalTotalSubtotalTax: group.totals.totalSubtotalTax,
+      });
+    });
+
+    finalRows = transformedRows;
+  }
+  const rows = finalRows;
+  // const rows = data?.rows || generatedReport || [];
+
+  // Dynamic styles based on orientation
+  const getPageStyles = () => ({
+    ...styles.page,
+    padding: orientation === 'landscape' ? 20 : 30,
+  });
+
+  const getTableCellStyles = () => ({
+    ...styles.tableCell,
+    fontSize: orientation === 'landscape' ? 6 : 7,
+    padding: orientation === 'landscape' ? 3 : 5,
+  });
+
+  const getTableCellNoStyles = () => ({
+    ...styles.tableCellNo,
+    fontSize: orientation === 'landscape' ? 6 : 7,
+    padding: orientation === 'landscape' ? 3 : 5,
+  });
+
+  const getHeaderStyles = () => ({
+    ...styles.header,
+    fontSize: orientation === 'landscape' ? 8 : 9,
+    marginLeft: orientation === 'landscape' ? 120 : 150,
+  });
+
+  const getLogoStyles = () => ({
+    ...styles.logoContainer,
+    width: orientation === 'landscape' ? 80 : 100,
+    height: orientation === 'landscape' ? 80 : 100,
+  });
+
+  const getLogoImageStyles = () => ({
+    ...styles.logoImage,
+    width: orientation === 'landscape' ? 80 : 100,
+    height: orientation === 'landscape' ? 80 : 100,
+  });
+
+  const getSummaryStyles = () => ({
+    ...styles.summaryBox,
+    padding: orientation === 'landscape' ? 3 : 5,
+  });
+
+  const getTableCellSOStyles = () => ({
+    ...styles.tableCellSO,
+    fontSize: orientation === 'landscape' ? 6 : 7,
+    padding: orientation === 'landscape' ? 3 : 5,
+  });
+
+  const getTableCellSOItemCodeStyles = () => ({
+    ...styles.tableCellSOItemCode,
+    fontSize: orientation === 'landscape' ? 6 : 7,
+    padding: orientation === 'landscape' ? 3 : 5,
+  });
+
+  // Common header content with dynamic styles
+  const renderHeader = () => (
+    <>
+      <View style={getLogoStyles()}>
+        {image64 ? (
+          <Image
+            src={{
+              uri: image64,
+              method: "GET",
+              headers: { "Cache-Control": "no-cache" },
+              body: "",
+            }}
+            style={getLogoImageStyles()}
+          />
+        ) : null}
+      </View>
+
+      <View style={getHeaderStyles()}>
+        <Text>
+          {data?.currentCompany?.company ?? ""}
+          {data?.currentCompany?.BRN ? ` (${data.currentCompany.BRN})` : ""}
+        </Text>
+        <Text style={styles.headerText}>
+          {data?.currentCompany?.address ?? ""}
+        </Text>
+        <View style={styles.headerRow}>
+          {data?.currentCompany?.phoneNo && (
+            <Text style={styles.headerText}>
+              Phone No.: {data.currentCompany.phoneNo}
+            </Text>
+          )}
+          {data?.currentCompany?.email && (
+            <Text style={styles.headerText}>
+              Email: {data.currentCompany.email}
+            </Text>
+          )}
+        </View>
+      </View>
+
+      <View>
+        <View style={styles.firstSeparator} />
+      </View>
+
+      <View>
+        <Text style={[styles.sectionTitle, { textAlign: "center" }]}>
+          {type.toUpperCase()}
+        </Text>
+        {type === "Supplier Post Dated Cheque Listing" && (
+          <Text style={[styles.sectionTitle, { textAlign: "center" }]}>
+            AS AT {data?.pdfTitle ?? ""}
+          </Text>
+        )}
+        {(type === "Supplier Bills And Payment Analysis" || type === "Supplier Analysis By Document" || type === "Supplier Document (Interbank GIRO) Listing" || type === "Purchase Analysis By Document") && (
+          <Text style={[styles.sectionTitle, { textAlign: "center" }]}>
+            AS AT {data?.toDate ?? ""}
+          </Text>
+        )}
+      </View>
+
+      <View style={{ marginTop: orientation === 'landscape' ? 20 : 30 }}>
+        <Text style={{ fontSize: orientation === 'landscape' ? 6 : 7, textAlign: "left" }}>
+          Generated By: {data?.currentCompany?.currentUser ?? data?.currentUser ?? ""}
+        </Text>
+        <Text style={{ fontSize: orientation === 'landscape' ? 6 : 7, textAlign: "left" }}>
+          {type !== "Supplier Post Dated Cheque Listing" && type !== "Supplier Bills And Payment Analysis" && type !== "Supplier Analysis By Document" ? "Date Range: " : ""}
+          {type !== "Supplier Post Dated Cheque Listing" && type !== "Supplier Bills And Payment Analysis" && type !== "Supplier Analysis By Document" ? formatDateRange() : ""}
+        </Text>
+      </View>
+    </>
+  );
+
+  // Common table header with dynamic styles
+  const renderTableHeader = () => (
+    <View style={[styles.tableRow, styles.tableHeader]}>
+      {purchaseReportColumns?.map((column, index) => (
+        <Text
+          key={index}
+          style={
+            column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()
+          }
+        >
+          {column.header}
+        </Text>
+      ))}
+    </View>
+  );
+
+  const renderDynamicValue = (prefix: string, month: string) => {
+    if (!data?.summary) return "";
+    const regex = new RegExp(`^${prefix}_[0-9]{4}_${month}$`, "i");
+    const key = Object.keys(data.summary).find((k) => regex.test(k));
+    return key ? data.summary[key] : "";
+  };
+
+  // Summary box content with dynamic styles
+  const renderSummaryBox = () => (
+    <View style={getSummaryStyles()}>
+      <Text style={styles.summaryTitle}>Summary: </Text>
+      <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 6 : 10 }}>
+        {type === "Supplier Monthly Purchase Report" ? (
+          <>
+            <View>
+              <Text style={styles.summaryText}>
+                Total Purchase Amount:
+              </Text>
+              <View style={styles.summaryField}>
+                <Text style={styles.summaryText}>
+                  {data?.summary?.totalSubtotalTaxReport ?? ""}
+                </Text>
+              </View>
+            </View>
+            <View>
+              <Text style={styles.summaryText}>
+                Total Paid to Supplier:
+              </Text>
+              <View style={styles.summaryField}>
+                <Text style={styles.summaryText}>
+                  {data?.summary?.totalPaidAmountReport ?? ""}
+                </Text>
+              </View>
+            </View>
+            <View>
+              <Text style={styles.summaryText}>
+                Outstanding Payables:
+              </Text>
+              <View style={styles.summaryField}>
+                <Text style={styles.summaryText}>
+                  {data?.summary?.totalOutstandingReport ?? ""}
+                </Text>
+              </View>
+            </View>
+          </>
+        ) : type === "Supplier Payment Report" ? (
+          <>
+            <View>
+              <Text style={styles.summaryText}>
+                Total No. Of Documents:
+              </Text>
+              <View style={styles.summaryField}>
+                <Text style={styles.summaryText}>
+                  {data?.total ?? ""}
+                </Text>
+              </View>
+            </View>
+            <View>
+              <Text style={styles.summaryText}>Total Amount Paid:</Text>
+              <View style={styles.summaryField}>
+                <Text style={styles.summaryText}>
+                  {data?.summary?.totalPaidAmountReport ?? ""}
+                </Text>
+              </View>
+            </View>
+            <View>
+              <Text style={styles.summaryText}>
+                Average Payment Monthly:
+              </Text>
+              <View style={styles.summaryField}>
+                <Text style={styles.summaryText}>
+                  {data?.summary?.averageMonthlyPayment ?? ""}
+                </Text>
+              </View>
+            </View>
+          </>
+        ) : type === "Purchase Document Listing" || type === "Purchase Multi - Debit Note Listing - Level 2" || type === "Purchase Multi - Goods Received Listing - Level 2" ||
+          type === "Purchase Multi - Purchase Order Listing - Level 2" || type === "Purchase Multi - Purchase Invoice Listing - Level 2" ? (
+          <>
+            <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 4 : 6 }}>
+              <View>
+                <Text style={styles.summaryText}>
+                  Total No.Of Document:
+                </Text>
+                <View style={styles.summaryField2}>
+                  <Text style={styles.summaryText}>
+                    {data?.total ?? ""}
+                  </Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>
+                  Total Purchase Amount:
+                </Text>
+                <View style={styles.summaryField2}>
+                  <Text style={styles.summaryText}>
+                    {data?.summary?.totalAmountReport ?? ""}
+                  </Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Tax:</Text>
+                <View style={styles.summaryField2}>
+                  <Text style={styles.summaryText}>
+                    {data?.summary?.totalTaxReport ?? ""}
+                  </Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Discount:</Text>
+                <View style={styles.summaryField2}>
+                  <Text style={styles.summaryText}>
+                    {data?.summary?.totalDiscountReport ?? ""}
+                  </Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>
+                  Total Amount After Tax:
+                </Text>
+                <View style={styles.summaryField2}>
+                  <Text style={styles.summaryText}>
+                    {data?.summary?.totalSubtotalTaxReport ?? ""}
+                  </Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>
+                  Total Amount After Discount:
+                </Text>
+                <View style={styles.summaryField2}>
+                  <Text style={styles.summaryText}>
+                    {data?.summary?.totalAmountAfterDiscountReport ?? ""}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </>
+        ) : type === "Supplier Balance Report" ? (
+          <>
+            {purchaseReportData.reportTypeName === "supplierBalanceReportMultiBalanceSummary" ? (
+              <>
+                <View>
+                  <Text style={styles.summaryText}>
+                    Count of Supplier:
+                  </Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>
+                      {data?.total ?? ""}
+                    </Text>
+                  </View>
+                </View>
+                {/* <View>
+                  <Text style={styles.summaryText}>Total Current Balance:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>
+                      {data?.summary?.totalCurrentBalance ?? ""}
+                    </Text>
+                  </View>
+                </View> */}
+                <View>
+                  <Text style={styles.summaryText}>
+                    Total Amount:
+                  </Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>
+                      {data?.summary?.totalCurrentBalanceCarryForward ?? ""}
+                    </Text>
+                  </View>
+                </View>
+              </>
+            ) : (
+              <>
+                <View>
+                  <Text style={styles.summaryText}>
+                    Count of Supplier:
+                  </Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>
+                      {data?.total ?? ""}
+                    </Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Current Balance:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>
+                      {data?.summary?.totalCurrentBalance ?? ""}
+                    </Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>
+                    Total C/F Balance:
+                  </Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>
+                      {data?.summary?.totalCurrentBalanceCarryForward ?? ""}
+                    </Text>
+                  </View>
+                </View>
+              </>
+            )}
+          </>
+        ) : type === "Supplier Due Document Listing" ? (
+          <>
+            <View>
+              <Text style={styles.summaryText}>
+                Total Count of No.:
+              </Text>
+              <View style={styles.summaryField}>
+                <Text style={styles.summaryText}>
+                  {data?.total ?? ""}
+                </Text>
+              </View>
+            </View>
+            <View>
+              <Text style={styles.summaryText}>
+                Total Amount:
+              </Text>
+              <View style={styles.summaryField}>
+                <Text style={styles.summaryText}>
+                  {data?.summary?.totalNetTotal ?? ""}
+                </Text>
+              </View>
+            </View>
+            <View>
+              <Text style={styles.summaryText}>
+                Total Payment:
+              </Text>
+              <View style={styles.summaryField}>
+                <Text style={styles.summaryText}>
+                  {data?.summary?.totalPaidAmount ?? ""}
+                </Text>
+              </View>
+            </View>
+            <View>
+              <Text style={styles.summaryText}>
+                Total Outstanding:
+              </Text>
+              <View style={styles.summaryField}>
+                <Text style={styles.summaryText}>
+                  {data?.summary?.totalOutstandingAmount ?? ""}
+                </Text>
+              </View>
+            </View>
+          </>
+        ) : type === "Supplier Aging Report" || type === "Supplier Statement Report" ? (
+          <>
+            <View>
+              <Text style={styles.summaryText}>
+                Total Count of No.:
+              </Text>
+              <View style={styles.summaryField}>
+                <Text style={styles.summaryText}>
+                  {data?.total ?? ""}
+                </Text>
+              </View>
+            </View>
+            <View>
+              <Text style={styles.summaryText}>
+                Total Outstanding Balance:
+              </Text>
+              <View style={styles.summaryField}>
+                <Text style={styles.summaryText}>
+                  {data?.summary?.totalOutstandingAmount ?? ""}
+                </Text>
+              </View>
+            </View>
+          </>
+        ) : type === "Outstanding Purchase Document Listing" || type === "Purchase Outstanding Cash Purchase Listing - Level 2 (with SO Info)" ? (
+          <>
+            <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 4 : 6 }}>
+              <View>
+                <Text style={styles.summaryText}>Total No. of Document:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.total ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Orig. Qty:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalOriginalQuantity ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total O/S Qty:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalOSQuantity ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total O/S Amt:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalOSAmount ?? ""}</Text>
+                </View>
+              </View>
+              {/* <View>
+                <Text style={styles.summaryText}>Total Purchase Amount:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalAmountReport ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Discount:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalDiscountReport ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Subtotal:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalSubtotalReport ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Tax:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalTaxReport ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Subtotal (Tax):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalSubtotalTaxReport ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Outstanding Amount:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalOutstandingAmountReport ?? ""}</Text>
+                </View>
+              </View> */}
+            </View>
+          </>
+        ) : type === "Purchase Price History Report" ? (
+          <>
+            <View>
+              <Text style={styles.summaryText}>
+                Total Count of Item:
+              </Text>
+              <View style={styles.summaryField}>
+                <Text style={styles.summaryText}>
+                  {data?.total ?? ""}
+                </Text>
+              </View>
+            </View>
+            <View>
+              <Text style={styles.summaryText}>
+                Total Amount:
+              </Text>
+              <View style={styles.summaryField}>
+                <Text style={styles.summaryText}>
+                  {data?.summary?.totalAmount ?? ""}
+                </Text>
+              </View>
+            </View>
+          </>
+        ) : type === "Supplier Post Dated Cheque Listing" ? (
+          <>
+            <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 6 : 10 }}>
+              <View>
+                <Text style={styles.summaryText}>Total PD Cheque:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.total ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Amount PD Cheque:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalAmount ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Unapplied:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalUnappliedAmount ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Knock Off:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalKnockOffAmount ?? ""}</Text>
+                </View>
+              </View>
+            </View>
+          </>
+        ) : type === "Supplier Bills And Payment Analysis" ? (
+          <>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: orientation === 'landscape' ? 6 : 10 }}>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total Supplier:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.total ?? ""}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total Currency:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalCurrencyCount ?? ""}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 1:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPurchase", "01")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 1 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPurchase", "01")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 1:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPayment", "01")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 1 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPayment", "01")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 2:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPurchase", "02")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 2 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPurchase", "02")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 2:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPayment", "02")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 2 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPayment", "02")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 3:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPurchase", "03")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 3 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPurchase", "03")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 3:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPayment", "03")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 3 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPayment", "03")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 4:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPurchase", "04")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 4 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPurchase", "04")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 4:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPayment", "04")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 4 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPayment", "04")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 5:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPurchase", "05")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 5 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPurchase", "05")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 5:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPayment", "05")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 5 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPayment", "05")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 6:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPurchase", "06")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 6 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPurchase", "06")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 6:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPayment", "06")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 6 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPayment", "06")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 7:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPurchase", "07")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 7 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPurchase", "07")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 7:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPayment", "07")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 7 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPayment", "07")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 8:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPurchase", "08")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 8 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPurchase", "08")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 8:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPayment", "08")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 8 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPayment", "08")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 9:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPurchase", "09")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 9 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPurchase", "09")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 9:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPayment", "09")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 9 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPayment", "09")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 10:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPurchase", "10")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 10 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPurchase", "10")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 10:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPayment", "10")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 10 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPayment", "10")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 11:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPurchase", "11")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 11 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPurchase", "11")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 11:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPayment", "11")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 11 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPayment", "11")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 12:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPurchase", "12")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Month 12 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPurchase", "12")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 12:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalPayment", "12")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Month 12 (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{renderDynamicValue("totalLocalPayment", "12")}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Amount:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalPurchaseAmount ?? ""}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PH Amount (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalLocalPurchaseAmount ?? ""}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Amount:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalPaymentAmount ?? ""}</Text>
+                </View>
+              </View>
+              <View style={{ width: "18%" }}>
+                <Text style={styles.summaryText}>Total PM Amount (Local):</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalLocalPaymentAmount ?? ""}</Text>
+                </View>
+              </View>
+            </View>
+          </>
+        ) : type === "Supplier Analysis By Document" || type === "Supplier Analysis By Document - Level 2" ? (
+          <>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: orientation === 'landscape' ? 6 : 10 }}>
+              {/* <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 6 : 10 }}> */}
+              <View>
+                <Text style={styles.summaryText}>Total Count of No.:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.total ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total B/F:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalLocalBalanceBringForward ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Invoice:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalInvoiceLocalNetTotal ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Credit Note:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalDebitNoteLocalNetTotal ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Debit Note:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalCreditNoteLocalNetTotal ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Payment:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalLocalSupplierPayment ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Contra:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalContraAmountNetTotal ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total C/F:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalLocalCurrentAmount ?? ""}</Text>
+                </View>
+              </View>
+            </View>
+          </>
+        ) : type === "Supplier Document (Interbank GIRO) Listing" ? (
+          <>
+            {purchaseReportData.docType === "salesPurchaseContra" && (
+              <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 6 : 10 }}>
+                {/* <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 6 : 10 }}> */}
+                <View>
+                  <Text style={styles.summaryText}>Total Count of No.:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.total ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Contra Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalContraAmount ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Local Contra Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalLocalContraAmount ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Cust. Contra Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalCustomerContraAmount ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Local Cust. Contra Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalCustomerLocalContraAmount ?? ""}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {purchaseReportData.docType === "purchaseCreditNote" && (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: orientation === 'landscape' ? 6 : 10 }}>
+                {/* <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 6 : 10 }}> */}
+                <View>
+                  <Text style={styles.summaryText}>Total Count of No.:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.total ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalNetTotal ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Local Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalLocalNetTotal ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Knock Off Amt.:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalKnockOffAmount ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Local Knock Off Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalLocalKnockOffAmount ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Outstanding Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalOutstandingAmount ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Local Outstanding Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalLocalOutstandingAmount ?? ""}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {purchaseReportData.docType === "purchaseDebitNote" && (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: orientation === 'landscape' ? 6 : 10 }}>
+                {/* <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 6 : 10 }}> */}
+                <View>
+                  <Text style={styles.summaryText}>Total Count of No.:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.total ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalNetTotal ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Paid Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalPaidAmount ?? ""}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {purchaseReportData.docType === "invoice" && (
+              <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 6 : 10 }}>
+                {/* <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 6 : 10 }}> */}
+                <View>
+                  <Text style={styles.summaryText}>Total Count of No.:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.total ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalNetTotal ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Paid Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalPaidAmount ?? ""}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {purchaseReportData.docType === "supplierPayment" && (
+              <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 6 : 10 }}>
+                {/* <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 6 : 10 }}> */}
+                <View>
+                  <Text style={styles.summaryText}>Total Count of No.:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.total ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Paid Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalPaidAmount ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Unapplied Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalUnappliedAmount ?? ""}</Text>
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.summaryText}>Total Knockoff Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.summary?.totalKnockAmount ?? ""}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+          </>
+        ) : type === "Purchase Analysis By Document" ? (
+          <>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: orientation === 'landscape' ? 6 : 10 }}>
+              {/* <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 6 : 10 }}> */}
+              <View>
+                <Text style={styles.summaryText}>Total Count of No.:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.total ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Purchase Invoice:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalPurInv ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Cash Purchase:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalCashPur ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Credit Note:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalCN ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total Debit Note:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalDN ?? ""}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.summaryText}>Total:</Text>
+                <View style={styles.summaryField}>
+                  <Text style={styles.summaryText}>{data?.summary?.totalTotalAmt ?? ""}</Text>
+                </View>
+              </View>
+            </View>
+          </>
+        ) : type === "Yearly Purchase Analysis" || type.includes("Yearly Purchase Analysis - Level 2") ? (
+          (() => {
+            let grandTotalPurchase = 0;
+            let grandTotalQuantity = 0;
+
+            const relevantRows = (rows || []).filter((r: any) => !r._rowType || r._rowType === 'item');
+
+            relevantRows.forEach((row: any) => {
+              const pAmt = parseFloat(row.totalPurchaseAmount || row.totallocalPurchaseAmount || "0");
+              const pQty = parseFloat(row.totalQuantity || "0");
+
+              grandTotalPurchase += isNaN(pAmt) ? 0 : pAmt;
+              grandTotalQuantity += isNaN(pQty) ? 0 : pQty;
+            });
+
+            return (
+              <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 6 : 10 }}>
+                <View>
+                  <Text style={styles.summaryText}>Total Count of No.:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{data?.total ?? (relevantRows.length || 0)}</Text>
+                  </View>
+                </View>
+
+                <View>
+                  <Text style={styles.summaryText}>Total Purchase Amount:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{formatDecimal(grandTotalPurchase)}</Text>
+                  </View>
+                </View>
+
+                <View>
+                  <Text style={styles.summaryText}>Total Quantity:</Text>
+                  <View style={styles.summaryField}>
+                    <Text style={styles.summaryText}>{grandTotalQuantity.toFixed(0)}</Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })()
+        ) : (
+          <>
+            <Text style={styles.summaryText}>No Summary!</Text>
+          </>
+        )}
+      </View>
+    </View>
+  );
+
+  // Format decimal values to 2 decimal places with thousand separators
+  const formatDecimal = (value: any) => {
+    return formatNumberWithCommas(value, 2);
+  };
+
+  const isPurchaseOrPaymentColumn = (
+    column: { accessorKey?: string; header?: string },
+    value: unknown
+  ): boolean => {
+    if (!column?.accessorKey) return false;
+
+    const key = column.accessorKey.toLowerCase();
+    const numericPrefixes = ["purchase_", "localpurchase_", "payment_", "localpayment_"];
+
+    const matchesKeyword = numericPrefixes.some(prefix => key.startsWith(prefix));
+
+    const isNumber =
+      typeof value === "number" ||
+      (!isNaN(parseFloat(String(value))) && value !== "");
+
+    return matchesKeyword && isNumber;
+  };
+
+
+  // Helper for Level 2 columns
+  const renderLevel2Row = (item: any) => {
+    const commonStyle = getTableCellStyles();
+    const noStyle = getTableCellNoStyles();
+    const mergedStyle = { ...getTableCellStyles(), flex: 16, textAlign: 'right' };
+
+    //Header Row
+    if (item._rowType === 'header') {
+      // if(type === "Supplier Analysis By Document - Level 2"){
+      //   return (
+      //     <View style={styles.tableRow} wrap={false}>
+      //       <Text style={noStyle}>{item._index}</Text>
+      //       <Text style={[commonStyle, styles.boldText, {borderRightColor: "#ffffff" }]}>{item.supplierName}</Text>
+      //       <Text style={[commonStyle, styles.boldText, {borderRightColor: "#ffffff" }]}>{item.supplierCode}</Text>
+
+      //       <Text style={[commonStyle,{borderRightColor: "#ffffff" }]}></Text>
+      //       <Text style={[commonStyle,{borderRightColor: "#ffffff" }]}></Text>
+      //       <Text style={[commonStyle,{borderRightColor: "#ffffff" }]}></Text>
+      //       <Text style={[commonStyle,{borderRightColor: "#ffffff" }]}></Text>
+      //       <Text style={[commonStyle,{borderRightColor: "#ffffff" }]}></Text>
+      //       <Text style={[commonStyle,{borderRightColor: "#ffffff" }]}></Text>
+      //       <Text style={commonStyle}></Text>
+      //     </View>   
+      //   );
+      // } else 
+      if (type === "Purchase Multi - Debit Note Listing - Level 2" || type === "Purchase Multi - Goods Received Listing - Level 2" || type === "Purchase Multi - Purchase Order Listing - Level 2" ||
+        type === "Purchase Multi - Purchase Invoice Listing - Level 2") {
+        return (
+          <View style={styles.tableRow} wrap={false}>
+            <Text style={noStyle}>{item._index}</Text>
+            <Text style={[commonStyle, styles.boldText, { borderRightColor: "#ffffff" }]}>{item.supplierName}</Text>
+            <Text style={[commonStyle, styles.boldText, { borderRightColor: "#ffffff" }]}>{item.docDateFormat}</Text>
+            <Text style={[commonStyle, { borderRightColor: "#ffffff" }]}></Text>
+            <Text style={[commonStyle, { borderRightColor: "#ffffff" }]}></Text>
+            <Text style={[commonStyle, { borderRightColor: "#ffffff" }]}></Text>
+            <Text style={[commonStyle, { borderRightColor: "#ffffff" }]}></Text>
+            <Text style={[commonStyle, { borderRightColor: "#ffffff" }]}></Text>
+            <Text style={commonStyle}></Text>
+          </View>
+        );
+      } else if (type === "Purchase Outstanding Cash Purchase Listing - Level 2 (with SO Info)") {
+        return (
+          <View style={styles.tableRow} wrap={false}>
+            <Text style={noStyle}>{item._index}</Text>
+            <Text style={[commonStyle, styles.boldText, { borderRightColor: "#ffffff" }]}>{item.supplierName}</Text>
+            <Text style={[commonStyle, styles.boldText, { borderRightColor: "#ffffff" }]}>{item.docDateFormat}</Text>
+
+            <Text style={[commonStyle, { borderRightColor: "#ffffff" }]}></Text>
+            <Text style={[commonStyle, { borderRightColor: "#ffffff" }]}></Text>
+            <Text style={[commonStyle, { borderRightColor: "#ffffff" }]}></Text>
+            <Text style={[commonStyle, { borderRightColor: "#ffffff" }]}></Text>
+            <Text style={[commonStyle, { borderRightColor: "#ffffff" }]}></Text>
+            <Text style={[commonStyle, { borderRightColor: "#ffffff" }]}></Text>
+            <Text style={[commonStyle, { borderRightColor: "#ffffff" }]}></Text>
+            <Text style={commonStyle}></Text>
+          </View>
+        );
+      }
+
+      //Subtotal Row
+    } else if (item._rowType === 'subtotal') {
+      // if(type === "Supplier Analysis By Document - Level 2"){
+      //   return (
+      //     <View style={[styles.tableRow, styles.subtotalRow]} wrap={false}>
+      //       <Text style={[noStyle, { borderRightWidth: 1,borderRightColor: "#deebf7", borderLeftWidth: 1, borderColor: "#000000" }]}></Text>
+      //       <Text style={[commonStyle, { borderRightWidth: 1,borderRightColor: "#deebf7", borderColor: "#000000" }]}></Text>
+
+      //       <Text style={[commonStyle, { borderRightWidth: 1,borderColor: "#000000", textAlign: "left" }]}>
+      //         <Text style={[commonStyle , styles.boldText]}>Subtotal of {item.supplierName}</Text>
+      //       </Text>
+
+      //       <Text style={[commonStyle, { borderColor: "#000000" }]}>{formatDecimal(item.subtotalBF)}</Text> 
+      //       <Text style={[commonStyle, { borderColor: "#000000" }]}>{formatDecimal(item.subtotalInvoice)}</Text> 
+      //       <Text style={[commonStyle, { borderColor: "#000000" }]}>{formatDecimal(item.subtotalDebitNote)}</Text>
+      //       <Text style={[commonStyle, { borderColor: "#000000" }]}>{formatDecimal(item.subtotalCreditNote)}</Text>
+      //       <Text style={[commonStyle, { borderColor: "#000000" }]}>{formatDecimal(item.subtotalPayment)}</Text>
+      //       <Text style={[commonStyle, { borderColor: "#000000" }]}>{formatDecimal(item.subtotalContra)}</Text>
+      //       <Text style={[commonStyle, { borderColor: "#000000" }]}>{formatDecimal(item.subtotalCF)}</Text>
+      //     </View>
+      //   );
+      // } else 
+      if (type === "Purchase Multi - Debit Note Listing - Level 2" || type === "Purchase Multi - Goods Received Listing - Level 2" || type === "Purchase Multi - Purchase Order Listing - Level 2" || type === "Purchase Multi - Purchase Invoice Listing - Level 2") {
+        return (
+          <View style={[styles.tableRow, styles.subtotalRow]} wrap={false}>
+            <Text style={[noStyle, { borderRightWidth: 1, borderRightColor: "#deebf7", borderLeftWidth: 1, borderColor: "#000000" }]}></Text>
+
+            <Text style={[commonStyle, { borderRightWidth: 1, borderRightColor: "#deebf7", borderColor: "#000000" }]}></Text>
+            <Text style={[commonStyle, { borderRightWidth: 1, borderRightColor: "#deebf7", borderColor: "#000000", textAlign: "left" }]}>
+              <Text style={[commonStyle, styles.boldText]}>Subtotal of {item.supplierName}</Text>
+            </Text>
+            <Text style={[commonStyle, { borderRightWidth: 1, borderColor: "#000000" }]}></Text>
+
+            <Text style={[commonStyle, { borderColor: "#000000" }]}>{formatDecimal(item.subtotalTotalAmount)}</Text>
+            <Text style={[commonStyle, { borderColor: "#000000" }]}>{formatDecimal(item.subtotalTotalDiscount)}</Text>
+            <Text style={[commonStyle, { borderColor: "#000000" }]}>{formatDecimal(item.subtotalAmountAfterDiscount)}</Text>
+            <Text style={[commonStyle, { borderColor: "#000000" }]}>{formatDecimal(item.subtotalTotalTax)}</Text>
+            <Text style={[commonStyle, { borderColor: "#000000" }]}>{formatDecimal(item.subtotalTotalSubtotalTax)}</Text>
+          </View>
+        );
+      }
+
+      //Normal row
+    }
+    // else if (type === "Supplier Analysis By Document - Level 2") {
+    //   return (
+    //     <View style={styles.tableRow} wrap={false}>
+    //        <Text style={noStyle}></Text> {/* No */}
+    //        <Text style={commonStyle}>{item.supplierName}</Text> 
+    //        <Text style={commonStyle}>{item.supplierCode}</Text> 
+    //        <Text style={commonStyle}>{formatDecimal(item.localBalanceBringForward)}</Text>
+    //        <Text style={commonStyle}>{formatDecimal(item.invoiceLocalNetTotal)}</Text>
+    //        <Text style={commonStyle}>{formatDecimal(item.debitNoteLocalNetTotal)}</Text>
+    //        <Text style={commonStyle}>{formatDecimal(item.creditNoteLocalNetTotal)}</Text>
+    //        <Text style={commonStyle}>{formatDecimal(item.localSupplierPayment)}</Text>
+    //        <Text style={commonStyle}>{formatDecimal(item.contraAmountNetTotal)}</Text>
+    //        <Text style={commonStyle}>{formatDecimal(item.localCurrentAmount)}</Text>
+    //     </View>
+    //   );
+    // } 
+    else if (type === "Purchase Multi - Debit Note Listing - Level 2" || type === "Purchase Multi - Goods Received Listing - Level 2" ||
+      type === "Purchase Multi - Purchase Order Listing - Level 2" || type === "Purchase Multi - Purchase Invoice Listing - Level 2") {
+      return (
+        <View style={styles.tableRow} wrap={false}>
+          <Text style={noStyle}></Text> {/* No */}
+          <Text style={commonStyle}>{item.docNo}</Text>
+          <Text style={commonStyle}>{item.docDateFormat}</Text>
+          <Text style={commonStyle}>{item.supplierName}</Text>
+          <Text style={commonStyle}>{formatDecimal(item.totalAmount)}</Text>
+          <Text style={commonStyle}>{formatDecimal(item.totalDiscount)}</Text>
+          <Text style={commonStyle}>{formatDecimal(item.amountAfterDiscount)}</Text>
+          <Text style={commonStyle}>{formatDecimal(item.totalTax)}</Text>
+          <Text style={commonStyle}>{formatDecimal(item.totalSubtotalTax)}</Text>
+        </View>
+      );
+    } else if (type === "Purchase Outstanding Cash Purchase Listing - Level 2 (with SO Info)") {
+      return (
+        <View style={styles.tableRow} wrap={false}>
+          <Text style={noStyle}></Text> {/* No */}
+          <Text style={commonStyle}>{item.itemCode}</Text>
+          <Text style={commonStyle}>{item.supplierName}</Text>
+          <Text style={commonStyle}>{item.description}</Text>
+          <Text style={commonStyle}>{formatDecimal(item.price)}</Text>
+          <Text style={commonStyle}>{item.deliveryDateFormat}</Text>
+          <Text style={commonStyle}>{formatDecimal(item.originalQuantity)}</Text>
+          <Text style={commonStyle}>{formatDecimal(item.osQuantity)}</Text>
+          <Text style={commonStyle}>{item.docDateFormat}</Text>
+          <Text style={commonStyle}>{item.docNo}</Text>
+          <Text style={commonStyle}>{formatDecimal(item.transferQuantity)}</Text>
+        </View>
+      );
+    }
+  };
+  if (type.includes("Yearly Purchase Analysis")) {
+    const groupedData = (data?.rows || []).reduce((acc: any, row: any) => {
+      const key = row.itemCode || row.itemType || "Unknown";
+
+      if (!acc[key]) {
+        acc[key] = {
+          name: `Item Code:${row.itemCode} , Item Type:${row.itemType}`,
+          rows: [],
+          totals: {}
+        };
+      }
+
+      acc[key].rows.push(row);
+
+      // Accumulate totals for dynamic month columns and main totals
+      Object.keys(row).forEach(k => {
+        const match = k.match(/^([A-Za-z]{3})[-_](\d{2})$/);
+        if (match || k === 'totallocalPurchaseAmount' || k === 'totalQuantity') {
+          const val = parseFloat(row[k] || 0);
+          acc[key].totals[k] = (acc[key].totals[k] || 0) + (isNaN(val) ? 0 : val);
+        }
+      });
+
+      return acc;
+    }, {});
+
+    return (
+      <Document title={type}>
+        <Page size="A4" orientation={orientation} style={getPageStyles()}>
+          <View fixed>{renderHeader()}</View>
+
+          {Object.values(groupedData).map((group: any, groupIndex) => (
+            <View key={groupIndex} style={{ marginBottom: 10 }} wrap={false}>
+              {/* Group Title */}
+              <Text style={styles.groupTitle}>
+                {group.name}
+              </Text>
+
+              {/* Table */}
+              <View style={styles.table}>
+                {/* Header */}
+                <View style={[styles.tableRow, styles.tableHeader]}>
+                  {purchaseReportColumns?.map((column, index) => (
+                    <Text
+                      key={index}
+                      style={column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                    >
+                      {column.header}
+                    </Text>
+                  ))}
+                </View>
+
+                {/* Rows */}
+                {group.rows.map((row: any, rowIndex: number) => (
+                  <View key={rowIndex} style={styles.tableRow}>
+                    {purchaseReportColumns?.map((column, colIndex) => {
+                      if (column.header === "No") {
+                        return (
+                          <Text key={colIndex} style={getTableCellNoStyles()}>
+                            {rowIndex + 1}
+                          </Text>
+                        );
+                      }
+                      const val = row[column.accessorKey];
+                      const isNumeric =
+                        typeof val === 'number' ||
+                        (!isNaN(parseFloat(String(val))) && val !== "" && (column.header !== "Item Code" && column.header !== "Item Type"));
+
+                      return (
+                        <Text key={colIndex} style={getTableCellStyles()}>
+                          {isNumeric ? formatDecimal(val) : (val || "")}
+                        </Text>
+                      );
+                    })}
+                  </View>
+                ))}
+
+                {/* Subtotal Row */}
+                <View style={[styles.tableRow, styles.subtotalRow]}>
+                  {purchaseReportColumns?.map((column, colIndex) => {
+                    if (column.header === "No") {
+                      return <Text key={colIndex} style={getTableCellNoStyles()}></Text>;
+                    }
+
+                    if (column.header === "Item Code" || (colIndex === 1 && !column.header.toLowerCase().includes("qty"))) {
+                      return (
+                        <Text key={colIndex} style={[getTableCellStyles(), styles.boldText, { textAlign: 'left' }]}>
+                          Subtotal:
+                        </Text>
+                      );
+                    }
+
+                    const key = column.accessorKey;
+                    const totalVal = group.totals[key];
+
+                    if (totalVal !== undefined) {
+                      return (
+                        <Text key={colIndex} style={[getTableCellStyles(), styles.boldText]}>
+                          {formatDecimal(totalVal)}
+                        </Text>
+                      );
+                    }
+
+                    return <Text key={colIndex} style={getTableCellStyles()}></Text>;
+                  })}
+                </View>
+              </View>
+            </View>
+          ))}
+
+          <View
+            render={({ pageNumber, totalPages }) =>
+              pageNumber === totalPages ? renderSummaryBox() : null
+            }
+            style={{ width: "100%" }}
+          />
+
+          <View fixed style={styles.footerContainer}>
+            <View style={styles.footerLine} />
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                paddingTop: 5,
+              }}
+            >
+              <Text style={styles.footerText}>
+                Date Generated: {moment().format("YYYY-MM-DD")}
+              </Text>
+              <Text
+                style={styles.footerText}
+                render={({ pageNumber, totalPages }) =>
+                  `Page ${pageNumber} of ${totalPages}`
+                }
+              />
+            </View>
+          </View>
+        </Page>
+      </Document>
+    );
+  } else if (type.includes("Supplier Analysis By Document - Level 2")) {
+    const groupedData = (data?.rows || []).reduce((acc: any, row: any) => {
+      const key = row.supplierName || row.supplierCode || "Unknown";
+
+      if (!acc[key]) {
+        acc[key] = {
+          name: `Supplier Name:${row.supplierName} , Supplier Code:${row.supplierCode}`,
+          rows: [],
+          totals: {}
+        };
+      }
+
+      acc[key].rows.push(row);
+
+      // Accumulate totals for dynamic month columns and main totals
+      Object.keys(row).forEach(k => {
+        const match = k.match(/^([A-Za-z]{3})[-_](\d{2})$/);
+        if (match || k === 'totallocalPurchaseAmount' || k === 'totalQuantity') {
+          const val = parseFloat(row[k] || 0);
+          acc[key].totals[k] = (acc[key].totals[k] || 0) + (isNaN(val) ? 0 : val);
+        }
+      });
+
+      return acc;
+    }, {});
+
+    return (
+      <Document title={type}>
+        <Page size="A4" orientation={orientation} style={getPageStyles()}>
+          <View fixed>{renderHeader()}</View>
+
+          {Object.values(groupedData).map((group: any, groupIndex) => (
+            <View key={groupIndex} style={{ marginBottom: 10 }} wrap={false}>
+              {/* Group Title */}
+              <Text style={styles.groupTitle}>
+                {group.name}
+              </Text>
+
+              {/* Table */}
+              <View style={styles.table}>
+                {/* Header */}
+                <View style={[styles.tableRow, styles.tableHeader]}>
+                  {purchaseReportColumns?.map((column, index) => (
+                    <Text
+                      key={index}
+                      style={column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                    >
+                      {column.header}
+                    </Text>
+                  ))}
+                </View>
+
+                {/* Rows */}
+                {group.rows.map((row: any, rowIndex: number) => (
+                  <View key={rowIndex} style={styles.tableRow}>
+                    {purchaseReportColumns?.map((column, colIndex) => {
+                      if (column.header === "No") {
+                        return (
+                          <Text key={colIndex} style={getTableCellNoStyles()}>
+                            {rowIndex + 1}
+                          </Text>
+                        );
+                      }
+                      const val = row[column.accessorKey];
+                      const isNumeric =
+                        typeof val === 'number' ||
+                        (!isNaN(parseFloat(String(val))) && val !== "" && (column.header !== "Item Code" && column.header !== "Item Type"));
+
+                      return (
+                        <Text key={colIndex} style={getTableCellStyles()}>
+                          {isNumeric ? formatDecimal(val) : (val || "")}
+                        </Text>
+                      );
+                    })}
+                  </View>
+                ))}
+
+              </View>
+            </View>
+          ))}
+
+          <View
+            render={({ pageNumber, totalPages }) =>
+              pageNumber === totalPages ? renderSummaryBox() : null
+            }
+            style={{ width: "100%" }}
+          />
+
+          <View fixed style={styles.footerContainer}>
+            <View style={styles.footerLine} />
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                paddingTop: 5,
+              }}
+            >
+              <Text style={styles.footerText}>
+                Date Generated: {moment().format("YYYY-MM-DD")}
+              </Text>
+              <Text
+                style={styles.footerText}
+                render={({ pageNumber, totalPages }) =>
+                  `Page ${pageNumber} of ${totalPages}`
+                }
+              />
+            </View>
+          </View>
+        </Page>
+      </Document>
+    );
+  }
+
+  const shouldShowColumn = (colHeader: string, isPurchase: boolean, isPayment: boolean) => {
+    const hideWhenPurchase = ["Total Payment Amount", "Total Payment Amount (Local)"];
+    const hideWhenPayment = ["Total Purchase Amount", "Total Purchase Amount (Local)"];
+
+    // both checked → show all
+    if (isPurchase && isPayment) return true;
+    if (isPurchase && hideWhenPurchase.includes(colHeader)) return false;
+    if (isPayment && hideWhenPayment.includes(colHeader)) return false;
+    return true;
+  };
+
+  return (
+    <Document title={type}>
+      <Page size="A4" orientation={orientation} style={getPageStyles()}>
+        {/* Header (fixed on every page) */}
+        <View fixed>{renderHeader()}</View>
+
+        {purchaseReportData?.reportNameType === "outstandingPurchaseInvoiceLv2DocNo" ||
+          purchaseReportData?.reportNameType === "outstandingPurchaseOrderLv2DocNo" ||
+          purchaseReportData?.reportNameType === "outstandingSupplierDeliveryOrderLv2DocNo" ||
+          purchaseReportData?.reportNameType === "outstandingPurchaseRequisitionLv2DocNo" ||
+          purchaseReportData?.reportNameType === "outstandingCashPurchaseLv2DocNo" ? (
+          <View style={styles.table}>
+            {/* Loop first-level group (date) */}
+            {Object.values(data?.rows || {}).map((firstGroup: any) => (
+              <View key={firstGroup.group} style={{ marginBottom: 10 }}>
+                <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9, marginBottom: 2 }}>
+                  {`Date: ${firstGroup.group}`}
+                </Text>
+
+                {/* Loop second-level group (item code) */}
+                {Object.values(firstGroup.rows || {}).map((secondGroup: any) => (
+                  <View key={secondGroup.group} style={{ marginBottom: 6 }}>
+                    <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 8, marginBottom: 2 }}>
+                      {`Doc No: ${secondGroup.group}`}
+                    </Text>
+
+                    {/* Table Header */}
+                    <View style={[styles.tableRow, styles.tableHeader]}>
+                      {(purchaseReportColumns ?? []).map((col, idx) => (
+                        <Text
+                          key={idx}
+                          style={col.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                        >
+                          {col.header}
+                        </Text>
+                      ))}
+                    </View>
+
+                    {/* Table Rows */}
+                    {secondGroup.items.map((item: any, rowIdx: number) => (
+                      <View key={rowIdx} style={[styles.tableRow, { borderBottomWidth: 1, borderColor: "#000" }]}>
+                        {(purchaseReportColumns ?? []).map((column, colIdx) => {
+                          const value = item[column.accessorKey];
+                          return (
+                            <Text
+                              key={colIdx}
+                              style={column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                            >
+                              {column.header === "No"
+                                ? rowIdx + 1
+                                : typeof value === "number" || column.header.toLowerCase().includes("price")
+                                  ? formatDecimal(value)
+                                  : value || ""}
+                            </Text>
+                          );
+                        })}
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            ))}
+
+            {/* Back Order Summary */}
+            <View style={{ borderWidth: 1, borderColor: "#000", marginTop: 8, marginBottom: 8, padding: 8 }}>
+              <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9, marginBottom: 5 }}>
+                Back Order Summary
+              </Text>
+
+              {/* Header */}
+              <View style={[styles.tableRow, styles.tableHeader]}>
+                {["Item Code", "Description", "O/S Qty", "On Hand", "Avail. Qty", "S/O Qty", "Future Qty"].map((header, i) => (
+                  <Text key={i} style={header === "Item Code" ? getTableCellSOItemCodeStyles() : getTableCellSOStyles()}>
+                    {header}
+                  </Text>
+                ))}
+              </View>
+
+              {(data?.summaryData?.data ?? []).map((row: any, idx: number) => (
+                <View key={idx} style={[styles.tableRow, { borderBottomWidth: 1, borderColor: "#000" }]}>
+                  <Text style={[getTableCellStyles(), { borderLeftWidth: 1, borderColor: "#000" }]}>
+                    {row.itemCode || "-"}
+                  </Text>
+                  <Text style={getTableCellStyles()}>{row.description || "-"}</Text>
+                  <Text style={getTableCellStyles()}>{formatDecimal(row.osQuantity)}</Text>
+                  <Text style={getTableCellStyles()}>{formatDecimal(row.onHand)}</Text>
+                  <Text style={getTableCellStyles()}>{formatDecimal(row.availableQty)}</Text>
+                  <Text style={getTableCellStyles()}>{formatDecimal(row.soQty)}</Text>
+                  <Text style={getTableCellStyles()}>{formatDecimal(row.futureQty)}</Text>
+                </View>
+              ))}
+
+              <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 5 }}>
+                <Text style={{ fontSize: 8 }}>
+                  Total Outstanding Item : {data?.summaryData?.totalOutstandingItem || 0}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : purchaseReportData?.reportTypeName === "supplierBillsAndPaymentAnalysisLv2SupplierName" ? (
+          <View style={styles.table}>
+            {/* Loop first-level group */}
+            {Object.values(data?.rows || {}).map((firstGroup: any) => (
+              <View key={firstGroup.group} style={{ marginBottom: 6 }} wrap={false}>
+                <Text style={styles.groupTitle}>
+                  {`Code: ${firstGroup.group}`}
+                </Text>
+
+                {/* Loop second-level group*/}
+                {Object.values(firstGroup.rows || {}).map((secondGroup: any) => (
+                  <View key={secondGroup.group}>
+                    <Text style={styles.groupTitle}>
+                      {`Supp Name: ${secondGroup.group}`}
+                      {/* {salesReportData?.reportTypeName === "yearlySalesAnalysisLv2ItemCode" 
+                        ? `Item Code: ${secondGroup.group}`
+                        : `Doc No: ${secondGroup.group}`} */}
+                    </Text>
+
+                    {/* Table Header */}
+                    <View style={[styles.tableRow, styles.tableHeader]}>
+                      {(purchaseReportColumns ?? [])
+                        .filter((col) =>
+                          shouldShowColumn(col.header, checkboxIsPurchase, checkboxIsPayment)
+                        )
+                        .map((col, idx) => (
+                          <Text
+                            key={idx}
+                            style={col.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                          >
+                            {col.header}
+                          </Text>
+                        ))}
+                    </View>
+
+                    {/* Table Rows */}
+                    {(() => {
+                      const rows = secondGroup.invoices || secondGroup.items || secondGroup.rows || [];
+
+                      // Static keys to always sum
+                      const staticSumKeys = ["totalPurchaseAmount", "totalLocalPurchaseAmount", "totalPaymentAmount", "totalLocalPaymentAmount",];
+
+                      // Dynamic prefix patterns
+                      const sumPrefixes = [
+                        "purchase_",
+                        "localPurchase_",
+                        "payment_",
+                        "localPayment_",
+                      ];
+
+                      // Compute sums
+                      const columnSums: Record<string, number> = {};
+
+                      (purchaseReportColumns ?? []).forEach((column) => {
+                        const accessor = column.accessorKey;
+
+                        // Check if the column is in the static list or matches a dynamic prefix
+                        const shouldSum =
+                          staticSumKeys.includes(accessor) ||
+                          sumPrefixes.some((prefix) => accessor?.startsWith(prefix));
+
+                        if (shouldSum) {
+                          columnSums[accessor] = rows.reduce(
+                            (sum, row) => sum + (parseFloat(row[accessor]) || 0),
+                            0
+                          );
+                        }
+                      });
+
+                      return (
+                        <>
+                          {rows.map((row: any, rowIdx: number) => (
+                            <View
+                              key={rowIdx}
+                              style={[styles.tableRow, { borderColor: "#000" }]}
+                            >
+                              {(purchaseReportColumns ?? [])
+                                .filter((col) =>
+                                  shouldShowColumn(col.header, checkboxIsPurchase, checkboxIsPayment)
+                                )
+                                .map((column, colIdx) => {
+                                  const value = row[column.accessorKey];
+
+                                  // Static columns you always want formatted as amount
+                                  const amountColumns = ["Total Purchase Amount", "Total Purchase Amount (Local)", "Total Payment Amount", "Total Payment Amount (Local)",];
+
+                                  // Dynamic check: columns starting with "PH" or "PM"
+                                  const isDynamicAmount = /^(PH|PM)\s/i.test(column.header);
+
+                                  // Unified condition
+                                  const isAmountColumn =
+                                    amountColumns.includes(column.header) || isDynamicAmount;
+
+                                  const displayValue =
+                                    column.header === "No"
+                                      ? rowIdx + 1
+                                      : isAmountColumn
+                                        ? formatDecimal(value)
+                                        : typeof value === "string"
+                                          ? insertZeroWidthSpace(value, orientation)
+                                          : value || "";
+
+                                  return (
+                                    <Text
+                                      key={colIdx}
+                                      style={column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                                    >
+                                      {displayValue}
+                                    </Text>
+                                  );
+                                })}
+                            </View>
+                          ))}
+
+                          {/* Total Row */}
+                          <View style={[styles.tableRow, { borderColor: "#000" }]}>
+                            {(purchaseReportColumns ?? [])
+                              .filter((col) =>
+                                shouldShowColumn(col.header, checkboxIsPurchase, checkboxIsPayment)
+                              )
+                              .map((column, colIdx) => {
+                                const accessor = column.accessorKey;
+                                const sumValue = columnSums[accessor];
+
+                                return (
+                                  <Text
+                                    key={colIdx}
+                                    style={[
+                                      column.header === "No"
+                                        ? getTableCellNoStyles()
+                                        : getTableCellStyles(),
+                                      { fontFamily: "Helvetica-Bold" },
+                                    ]}
+                                  >
+                                    {sumValue !== undefined
+                                      ? formatDecimal(sumValue)
+                                      : colIdx === 2
+                                        ? "Total"
+                                        : ""}
+                                  </Text>
+                                );
+                              })}
+                          </View>
+                        </>
+                      );
+                    })()}
+                  </View>
+                ))}
+              </View>
+            ))}
+          </View>
+        ) : purchaseReportData?.reportTypeName === "purchaseRequisitionListingLv2DocNo" ||
+          purchaseReportData?.reportTypeName === "cashPurchaseListingLv2DocNo" ||
+          purchaseReportData?.reportTypeName === "purchaseDebitNoteListingLv2DocNo" ||
+          purchaseReportData?.reportTypeName === "purchaseOrderListingLv2DocNo" ||
+          purchaseReportData?.reportTypeName === "purchaseDeliveryOrderListingLv2DocNo" ||
+          purchaseReportData?.reportTypeName === "purchaseInvoiceListingLv2DocNo" ? (
+          <View style={styles.table}>
+            {Object.values(data?.rows || {}).map((firstGroup: any) => {
+              // --- Accumulate totals for the whole firstGroup (Date)
+              const groupRows = Object.values(firstGroup.rows || {}).flatMap(
+                (secondGroup: any) => secondGroup.invoices || secondGroup.items || secondGroup.rows || []
+              );
+
+              // Define columns to sum
+              const columnsToSum = [
+                "totalAmount", "totalDiscount", "amountAfterDiscount", "totalTax", "totalSubtotalTax"
+              ]; // adjust to your columns
+
+              // Compute totals
+              const groupSums: Record<string, number> = {};
+              columnsToSum.forEach((key) => {
+                groupSums[key] = groupRows.reduce((sum, row) => {
+                  const numericValue = parseFloat(String(row[key]).replace(/,/g, "").trim());
+                  return sum + (isNaN(numericValue) ? 0 : numericValue);
+                }, 0);
+              });
+
+              return (
+                <View key={firstGroup.group} style={{ marginBottom: 10 }}>
+                  <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9, marginBottom: 2 }}>
+                    {`Date: ${firstGroup.group}`}
+                  </Text>
+
+                  {/* Second-Level Groups */}
+                  {Object.values(firstGroup.rows || {}).map((secondGroup: any) => (
+                    <View key={secondGroup.group} style={{ marginBottom: 6 }}>
+                      <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 8, marginBottom: 2 }}>
+                        {`Doc No: ${secondGroup.group}`}
+                      </Text>
+
+                      {/* Table Header */}
+                      <View style={[styles.tableRow, styles.tableHeader]}>
+                        {(purchaseReportColumns ?? []).map((col, idx) => (
+                          <Text
+                            key={idx}
+                            style={col.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                          >
+                            {col.header}
+                          </Text>
+                        ))}
+                      </View>
+
+                      {/* Table Rows */}
+                      {(secondGroup.invoices || secondGroup.items || secondGroup.rows || []).map(
+                        (row: any, rowIdx: number) => (
+                          <View
+                            key={rowIdx}
+                            style={[styles.tableRow, { borderBottomWidth: 1, borderColor: "#000" }]}
+                          >
+                            {(purchaseReportColumns ?? []).map((column, colIdx) => {
+                              const value = row[column.accessorKey];
+
+                              // List of numeric/amount columns
+                              const amountColumns = [
+                                "Total Amount", "Discount", "Subtotal (After Discount)", "Tax", "Subtotal (Tax)"
+                              ];
+
+                              const displayValue =
+                                column.header === "No"
+                                  ? rowIdx + 1
+                                  : amountColumns.includes(column.header)
+                                    ? formatDecimal(value)
+                                    : typeof value === "string"
+                                      ? insertZeroWidthSpace(value, orientation)
+                                      : value || "";
+
+                              return (
+                                <Text
+                                  key={colIdx}
+                                  style={column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                                >
+                                  {displayValue}
+                                </Text>
+                              );
+                            })}
+                          </View>
+                        )
+                      )}
+                    </View>
+                  ))}
+
+                  {/* Group-Level Total Row */}
+                  <View
+                    style={[
+                      styles.tableRow,
+                      { borderTopWidth: 1, borderColor: "#000" },
+                    ]}
+                  >
+                    {(purchaseReportColumns ?? []).map((column, colIdx) => {
+                      const accessor = column.accessorKey;
+                      const sumValue = groupSums[accessor];
+
+                      return (
+                        <Text
+                          key={colIdx}
+                          style={[
+                            column.header === "No" ? getTableCellNoStyles() : getTableCellStyles(),
+                            { fontFamily: "Helvetica-Bold" },
+                          ]}
+                        >
+                          {sumValue !== undefined
+                            ? formatDecimal(sumValue)
+                            : colIdx === 1
+                              ? "Total"
+                              : ""}
+                        </Text>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : purchaseReportData?.reportTypeName === "purchasePriceHistoryReportLv2Date" ? (
+          <View style={styles.table}>
+            {Object.values(data?.rows || {}).map((firstGroup: any) => {
+              // --- Accumulate totals for the whole firstGroup (Date)
+              const groupRows = Object.values(firstGroup.rows || {}).flatMap(
+                (secondGroup: any) => secondGroup.invoices || secondGroup.items || secondGroup.rows || []
+              );
+
+              // Define columns to sum
+              const columnsToSum = [
+                "price", "totalDiscountAmount", "subtotalTax"
+              ]; // adjust to your columns
+
+              // Compute totals
+              const groupSums: Record<string, number> = {};
+              columnsToSum.forEach((key) => {
+                groupSums[key] = groupRows.reduce((sum, row) => {
+                  const numericValue = parseFloat(String(row[key]).replace(/,/g, "").trim());
+                  return sum + (isNaN(numericValue) ? 0 : numericValue);
+                }, 0);
+              });
+
+              return (
+                <View key={firstGroup.group} style={{ marginBottom: 10 }}>
+                  <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9, marginBottom: 2 }}>
+                    {`Item Code: ${firstGroup.group}`}
+                  </Text>
+
+                  {/* Second-Level Groups */}
+                  {Object.values(firstGroup.rows || {}).map((secondGroup: any) => (
+                    <View key={secondGroup.group} style={{ marginBottom: 6 }}>
+                      <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 8, marginBottom: 2 }}>
+                        {`Date: ${secondGroup.group}`}
+                      </Text>
+
+                      {/* Table Header */}
+                      <View style={[styles.tableRow, styles.tableHeader]}>
+                        {(purchaseReportColumns ?? []).map((col, idx) => (
+                          <Text
+                            key={idx}
+                            style={col.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                          >
+                            {col.header}
+                          </Text>
+                        ))}
+                      </View>
+
+                      {/* Table Rows */}
+                      {(secondGroup.invoices || secondGroup.items || secondGroup.rows || []).map(
+                        (row: any, rowIdx: number) => (
+                          <View
+                            key={rowIdx}
+                            style={[styles.tableRow, { borderBottomWidth: 1, borderColor: "#000" }]}
+                          >
+                            {(purchaseReportColumns ?? []).map((column, colIdx) => {
+                              const value = row[column.accessorKey];
+
+                              // List of numeric/amount columns
+                              const amountColumns = [
+                                "Unit Price", "Discount", "Subtotal"
+                              ];
+
+                              const displayValue =
+                                column.header === "No"
+                                  ? rowIdx + 1
+                                  : amountColumns.includes(column.header)
+                                    ? formatDecimal(value)
+                                    : typeof value === "string"
+                                      ? insertZeroWidthSpace(value, orientation)
+                                      : value || "";
+
+                              return (
+                                <Text
+                                  key={colIdx}
+                                  style={column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                                >
+                                  {displayValue}
+                                </Text>
+                              );
+                            })}
+                          </View>
+                        )
+                      )}
+                    </View>
+                  ))}
+
+                  {/* Group-Level Total Row */}
+                  <View
+                    style={[
+                      styles.tableRow,
+                      { borderTopWidth: 1, borderColor: "#000" },
+                    ]}
+                  >
+                    {(purchaseReportColumns ?? []).map((column, colIdx) => {
+                      const accessor = column.accessorKey;
+                      const sumValue = groupSums[accessor];
+
+                      return (
+                        <Text
+                          key={colIdx}
+                          style={[
+                            column.header === "No" ? getTableCellNoStyles() : getTableCellStyles(),
+                            { fontFamily: "Helvetica-Bold" },
+                          ]}
+                        >
+                          {sumValue !== undefined
+                            ? formatDecimal(sumValue)
+                            : colIdx === 1
+                              ? "Total"
+                              : ""}
+                        </Text>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : purchaseReportData?.reportTypeName === "purchaseAnalysisByDocumentLv2Date" ? (
+          <View style={styles.table}>
+            {Object.values(data?.rows || {}).map((firstGroup: any) => {
+              // --- Accumulate totals for the whole firstGroup (Date)
+              const groupRows = Object.values(firstGroup.rows || {}).flatMap(
+                (secondGroup: any) => secondGroup.invoices || secondGroup.items || secondGroup.rows || []
+              );
+
+              // Define columns to sum
+              const columnsToSum = [
+                "purInv", "cashPur", "cNote", "dNote", "totalAmt"
+              ]; // adjust to your columns
+
+              // Compute totals
+              const groupSums: Record<string, number> = {};
+              columnsToSum.forEach((key) => {
+                groupSums[key] = groupRows.reduce((sum, row) => {
+                  const numericValue = parseFloat(String(row[key]).replace(/,/g, "").trim());
+                  return sum + (isNaN(numericValue) ? 0 : numericValue);
+                }, 0);
+              });
+
+              return (
+                <View key={firstGroup.group} style={{ marginBottom: 10 }}>
+                  <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9, marginBottom: 2 }}>
+                    {`Supplier: ${firstGroup.group}`}
+                  </Text>
+
+                  {/* Second-Level Groups */}
+                  {Object.values(firstGroup.rows || {}).map((secondGroup: any) => (
+                    <View key={secondGroup.group} style={{ marginBottom: 6 }}>
+                      <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 8, marginBottom: 2 }}>
+                        {`Date: ${secondGroup.group}`}
+                      </Text>
+
+                      {/* Table Header */}
+                      <View style={[styles.tableRow, styles.tableHeader]}>
+                        {(purchaseReportColumns ?? []).map((col, idx) => (
+                          <Text
+                            key={idx}
+                            style={col.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                          >
+                            {col.header}
+                          </Text>
+                        ))}
+                      </View>
+
+                      {/* Table Rows */}
+                      {(secondGroup.invoices || secondGroup.items || secondGroup.rows || []).map(
+                        (row: any, rowIdx: number) => (
+                          <View
+                            key={rowIdx}
+                            style={[styles.tableRow, { borderBottomWidth: 1, borderColor: "#000" }]}
+                          >
+                            {(purchaseReportColumns ?? []).map((column, colIdx) => {
+                              const value = row[column.accessorKey];
+
+                              // List of numeric/amount columns
+                              const amountColumns = [
+                                "Unit Price", "Discount", "Subtotal"
+                              ];
+
+                              const displayValue =
+                                column.header === "No"
+                                  ? rowIdx + 1
+                                  : amountColumns.includes(column.header)
+                                    ? formatDecimal(value)
+                                    : typeof value === "string"
+                                      ? insertZeroWidthSpace(value, orientation)
+                                      : value || "";
+
+                              return (
+                                <Text
+                                  key={colIdx}
+                                  style={column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                                >
+                                  {displayValue}
+                                </Text>
+                              );
+                            })}
+                          </View>
+                        )
+                      )}
+                    </View>
+                  ))}
+
+                  {/* Group-Level Total Row */}
+                  <View
+                    style={[
+                      styles.tableRow,
+                      { borderTopWidth: 1, borderColor: "#000" },
+                    ]}
+                  >
+                    {(purchaseReportColumns ?? []).map((column, colIdx) => {
+                      const accessor = column.accessorKey;
+                      const sumValue = groupSums[accessor];
+
+                      return (
+                        <Text
+                          key={colIdx}
+                          style={[
+                            column.header === "No" ? getTableCellNoStyles() : getTableCellStyles(),
+                            { fontFamily: "Helvetica-Bold" },
+                          ]}
+                        >
+                          {sumValue !== undefined
+                            ? formatDecimal(sumValue)
+                            : colIdx === 3
+                              ? "Total"
+                              : ""}
+                        </Text>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : purchaseReportData?.reportTypeName === "supplierPostDatedChequeListingListLv2SuppCode" ? (
+          <View style={styles.table}>
+            {Object.values(data?.rows || {}).map((firstGroup: any) => {
+              // --- Accumulate totals for the whole firstGroup (Date)
+              const groupRows = Object.values(firstGroup.rows || {}).flatMap(
+                (secondGroup: any) => secondGroup.invoices || secondGroup.items || secondGroup.rows || []
+              );
+
+              // Define columns to sum
+              const columnsToSum = [
+                "paidAmount"
+              ]; // adjust to your columns
+
+              // Compute totals
+              const groupSums: Record<string, number> = {};
+              columnsToSum.forEach((key) => {
+                groupSums[key] = groupRows.reduce((sum, row) => {
+                  const numericValue = parseFloat(String(row[key]).replace(/,/g, "").trim());
+                  return sum + (isNaN(numericValue) ? 0 : numericValue);
+                }, 0);
+              });
+
+              return (
+                <View key={firstGroup.group} style={{ marginBottom: 10 }}>
+                  <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9, marginBottom: 2 }}>
+                    {`Date: ${firstGroup.group}`}
+                  </Text>
+
+                  {/* Second-Level Groups */}
+                  {Object.values(firstGroup.rows || {}).map((secondGroup: any) => (
+                    <View key={secondGroup.group} style={{ marginBottom: 6 }}>
+                      <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 8, marginBottom: 2 }}>
+                        {`Supplier Code: ${secondGroup.group}`}
+                      </Text>
+
+                      {/* Table Header */}
+                      <View style={[styles.tableRow, styles.tableHeader]}>
+                        {(purchaseReportColumns ?? []).map((col, idx) => (
+                          <Text
+                            key={idx}
+                            style={col.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                          >
+                            {col.header}
+                          </Text>
+                        ))}
+                      </View>
+
+                      {/* Table Rows */}
+                      {(secondGroup.invoices || secondGroup.items || secondGroup.rows || []).map(
+                        (row: any, rowIdx: number) => (
+                          <View
+                            key={rowIdx}
+                            style={[styles.tableRow, { borderBottomWidth: 1, borderColor: "#000" }]}
+                          >
+                            {(purchaseReportColumns ?? []).map((column, colIdx) => {
+                              const value = row[column.accessorKey];
+
+                              // List of numeric/amount columns
+                              const amountColumns = [
+                                "Amount"
+                              ];
+
+                              const displayValue =
+                                column.header === "No"
+                                  ? rowIdx + 1
+                                  : amountColumns.includes(column.header)
+                                    ? formatDecimal(value)
+                                    : typeof value === "string"
+                                      ? insertZeroWidthSpace(value, orientation)
+                                      : value || "";
+
+                              return (
+                                <Text
+                                  key={colIdx}
+                                  style={column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                                >
+                                  {displayValue}
+                                </Text>
+                              );
+                            })}
+                          </View>
+                        )
+                      )}
+                    </View>
+                  ))}
+
+                  {/* Group-Level Total Row */}
+                  <View
+                    style={[
+                      styles.tableRow,
+                      { borderTopWidth: 1, borderColor: "#000" },
+                    ]}
+                  >
+                    {(purchaseReportColumns ?? []).map((column, colIdx) => {
+                      const accessor = column.accessorKey;
+                      const sumValue = groupSums[accessor];
+
+                      return (
+                        <Text
+                          key={colIdx}
+                          style={[
+                            column.header === "No" ? getTableCellNoStyles() : getTableCellStyles(),
+                            { fontFamily: "Helvetica-Bold" },
+                          ]}
+                        >
+                          {sumValue !== undefined
+                            ? formatDecimal(sumValue)
+                            : colIdx === 1
+                              ? "Total"
+                              : ""}
+                        </Text>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : purchaseReportData?.reportTypeName === "supplierCreditNoteListingLv2DocNo" ||
+          purchaseReportData?.reportTypeName === "supplierInvoiceListingLv2DocNo" ||
+          purchaseReportData?.reportTypeName === "supplierContraListingLv2DocNo" ||
+          purchaseReportData?.reportTypeName === "supplierDebitNoteListingLv2DocNo" ||
+          purchaseReportData?.reportTypeName === "supplierPaymentListingLv2DocNo" ? (
+          <View style={styles.table}>
+            {Object.values(data?.rows || {}).map((firstGroup: any) => {
+              // --- Accumulate totals for the whole firstGroup (Date)
+              const groupRows = Object.values(firstGroup.rows || {}).flatMap(
+                (secondGroup: any) => secondGroup.invoices || secondGroup.items || secondGroup.rows || []
+              );
+
+              // Define columns to sum
+              const columnsToSum = [
+                "paidAmount", "unappliedAmount", "knockOffAmount", "netTotal", "localNetTotal"
+              ]; // adjust to your columns
+
+              // Compute totals
+              const groupSums: Record<string, number> = {};
+              columnsToSum.forEach((key) => {
+                groupSums[key] = groupRows.reduce((sum, row) => {
+                  const numericValue = parseFloat(String(row[key]).replace(/,/g, "").trim());
+                  return sum + (isNaN(numericValue) ? 0 : numericValue);
+                }, 0);
+              });
+
+              return (
+                <View key={firstGroup.group} style={{ marginBottom: 10 }}>
+                  <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9, marginBottom: 2 }}>
+                    {`Date: ${firstGroup.group}`}
+                  </Text>
+
+                  {/* Second-Level Groups */}
+                  {Object.values(firstGroup.rows || {}).map((secondGroup: any) => (
+                    <View key={secondGroup.group} style={{ marginBottom: 6 }}>
+                      <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 8, marginBottom: 2 }}>
+                        {`Doc No: ${secondGroup.group}`}
+                      </Text>
+
+                      {/* Table Header */}
+                      <View style={[styles.tableRow, styles.tableHeader]}>
+                        {(purchaseReportColumns ?? []).map((col, idx) => (
+                          <Text
+                            key={idx}
+                            style={col.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                          >
+                            {col.header}
+                          </Text>
+                        ))}
+                      </View>
+
+                      {/* Table Rows */}
+                      {(secondGroup.invoices || secondGroup.items || secondGroup.rows || []).map(
+                        (row: any, rowIdx: number) => (
+                          <View
+                            key={rowIdx}
+                            style={[styles.tableRow, { borderBottomWidth: 1, borderColor: "#000" }]}
+                          >
+                            {(purchaseReportColumns ?? []).map((column, colIdx) => {
+                              const value = row[column.accessorKey];
+
+                              // List of numeric/amount columns
+                              const amountColumns = [
+                                "Paid Amount", "Unapplied Amount", "Knock Off Amount", "Total Amount", "Local Total Amount"
+                              ];
+
+                              const displayValue =
+                                column.header === "No"
+                                  ? rowIdx + 1
+                                  : amountColumns.includes(column.header)
+                                    ? formatDecimal(value)
+                                    : typeof value === "string"
+                                      ? insertZeroWidthSpace(value, orientation)
+                                      : value || "";
+
+                              return (
+                                <Text
+                                  key={colIdx}
+                                  style={column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                                >
+                                  {displayValue}
+                                </Text>
+                              );
+                            })}
+                          </View>
+                        )
+                      )}
+                    </View>
+                  ))}
+
+                  {/* Group-Level Total Row */}
+                  <View
+                    style={[
+                      styles.tableRow,
+                      { borderTopWidth: 1, borderColor: "#000" },
+                    ]}
+                  >
+                    {(purchaseReportColumns ?? []).map((column, colIdx) => {
+                      const accessor = column.accessorKey;
+                      const sumValue = groupSums[accessor];
+
+                      return (
+                        <Text
+                          key={colIdx}
+                          style={[
+                            column.header === "No" ? getTableCellNoStyles() : getTableCellStyles(),
+                            { fontFamily: "Helvetica-Bold" },
+                          ]}
+                        >
+                          {sumValue !== undefined
+                            ? formatDecimal(sumValue)
+                            : colIdx === 1
+                              ? "Total"
+                              : ""}
+                        </Text>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : purchaseReportData?.reportTypeName === "supplierDueInvoiceListingLv2DocNo" ||
+          purchaseReportData?.reportTypeName === "supplierDueDebitNoteListingLv2DocNo" ? (
+          <View style={styles.table}>
+            {/* Loop first-level group */}
+            {Object.values(data?.rows || {}).map((firstGroup: any) => (
+              <View key={firstGroup.group} style={{ marginBottom: 10 }}>
+                <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9, marginBottom: 2 }}>
+                  {`Date: ${firstGroup.group}`}
+                </Text>
+
+                {/* Loop second-level group*/}
+                {Object.values(firstGroup.rows || {}).map((secondGroup: any) => (
+                  <View key={secondGroup.group} style={{ marginBottom: 6 }}>
+                    <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 8, marginBottom: 2 }}>
+                      {`Doc No: ${secondGroup.group}`}
+                      {/* {salesReportData?.reportTypeName === "yearlySalesAnalysisLv2ItemCode" 
+                        ? `Item Code: ${secondGroup.group}`
+                        : `Doc No: ${secondGroup.group}`} */}
+                    </Text>
+
+                    {/* Table Header */}
+                    <View style={[styles.tableRow, styles.tableHeader]}>
+                      {(purchaseReportColumns ?? []).map((col, idx) => (
+                        <Text
+                          key={idx}
+                          style={col.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                        >
+                          {col.header}
+                        </Text>
+                      ))}
+                    </View>
+
+                    {/* Table Rows */}
+                    {secondGroup.items.map((row: any, rowIdx: number) => (
+                      <View key={rowIdx} style={[styles.tableRow, { borderBottomWidth: 1, borderColor: "#000" }]}>
+                        {(purchaseReportColumns ?? []).map((column, colIdx) => {
+                          const value = row[column.accessorKey];
+                          return (
+                            <Text
+                              key={colIdx}
+                              style={column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                            >
+                              {column.header === "No"
+                                ? rowIdx + 1
+                                : typeof value === "number" || column.header.toLowerCase().includes("price")
+                                  ? formatDecimal(value)
+                                  : value || ""}
+                            </Text>
+                          );
+                        })}
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            ))}
+          </View>
+        ) : (
+          // Default table
+          <View style={styles.table}>
+            {/* Table Header (fixed on every page) */}
+            <View fixed>{renderTableHeader()}</View>
+            {/* Table Rows */}
+            {rows.length > 0 ? (
+              rows.map((item, rowIndex) => {
+                if (isLevel2) {
+                  return <React.Fragment key={rowIndex}>{renderLevel2Row(item)}</React.Fragment>;
+                }
+
+                return (
+                  <View style={styles.tableRow} key={item.UUID || rowIndex} wrap={false}>
+                    {purchaseReportColumns?.map((column, colIndex) => (
+                      <Text
+                        key={colIndex}
+                        style={column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                      >
+                        {column.header === "No"
+                          ? rowIndex + 1
+                          : isPurchaseOrPaymentColumn(column, item[column.accessorKey])
+                            ? formatDecimal(item[column.accessorKey])
+                            : [
+                              "Purchase Amount",
+                              "Amount Paid",
+                              "Balance",
+                              "Tax",
+                              "Total",
+                              "Subtotal (Tax)",
+                              "Discount",
+                              "Subtotal",
+                              "Subtotal (After Discount)",
+                              "Amount",
+                              "Paid Amount",
+                              "Outstanding Amount",
+                              "Outstanding",
+                              "Total Amount",
+                              "Total B/F Balance",
+                              "Total Current Balance",
+                              "Total C/F Balance",
+                              "Current Month",
+                              "1 Month",
+                              "2 Months",
+                              "3 Mths & Above",
+                              "Unit Price",
+                              "Local Amount",
+                              "Local Outstanding Amount",
+                              "Unapplied",
+                              "Knock Off Amount",
+                              "Total Purchase Amount",
+                              "Total Purchase Amount (Local)",
+                              "Total Payment Amount",
+                              "Total Payment Amount (Local)",
+                              "B/F",
+                              "Invoice",
+                              "Debit Note",
+                              "Credit Note",
+                              "Payment",
+                              "Contra",
+                              "C/F",
+                              "Contra Amount",
+                              "Local Contra Amount",
+                              "Cust. Contra Amount",
+                              "Local Cust. Contra Amount",
+                              "Local Total Amount",
+                              "Local Knock Off Amount",
+                              "Payment Amount",
+                              "Local B/F Bal.",
+                              "Local Current Bal.",
+                              "Local C/F Bal.",
+                              "B/F Bal.",
+                              "Current Bal.",
+                            ].includes(column.header)
+                              ? formatDecimal(item[column.accessorKey])
+                              // Handle Chinese characters with zero-width space
+                              : typeof item[column.accessorKey] === "string"
+                                ? insertZeroWidthSpace(item[column.accessorKey], orientation)
+                                : item[column.accessorKey]}
+                      </Text>
+                    ))}
+                  </View>
+                );
+              })
+            ) : (
+              <View style={styles.tableRow} wrap={false}>
+                <Text style={{ fontSize: orientation === 'landscape' ? 7 : 8, textAlign: "center", width: "100%" }}>
+                  No Result
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Summary Box: Only render on last page with full design */}
+        {type !== "Supplier Bills And Payment Analysis" && (
+          <View
+            render={({ pageNumber, totalPages }) =>
+              pageNumber === totalPages ? renderSummaryBox() : null
+            }
+            style={{ width: "100%" }}
+          />
+        )}
+
+        {/* Footer (fixed on every page) */}
+        <View fixed style={styles.footerContainer}>
+          <View style={styles.footerLine} />
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              paddingTop: 5,
+            }}
+          >
+            <Text style={styles.footerText}>
+              Generated: {moment().format("YYYY-MM-DD hh:mm:ss A")}
+            </Text>
+            <Text
+              style={styles.footerText}
+              render={({ pageNumber, totalPages }) =>
+                `Page ${pageNumber} of ${totalPages}`
+              }
+            />
+          </View>
+        </View>
+      </Page>
+
+      {/* Special case for Supplier Bills And Payment Analysis */}
+      {(type === "Supplier Bills And Payment Analysis" || adtReportName === "supplierBillsAndPaymentAnalysisLv2SupplierName") && (
+        <Page size="A4" orientation={orientation} style={getPageStyles()}>
+          <View fixed>{renderHeader()}</View>
+
+          <View style={{ marginTop: 5 }}>{renderSummaryBox()}</View>
+
+          <View fixed style={styles.footerContainer}>
+            <View style={styles.footerLine} />
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                paddingTop: 5,
+              }}
+            >
+              <Text style={styles.footerText}>
+                Date Generated: {moment().format("DD-MM-YYYY")}
+              </Text>
+              <Text
+                style={styles.footerText}
+                render={({ pageNumber, totalPages }) =>
+                  `Page ${pageNumber} of ${totalPages}`
+                }
+              />
+            </View>
+          </View>
+        </Page>
+      )}
+    </Document>
+  );
+};
+
+export default PurchaseReport;
+
+function insertZeroWidthSpace(str: string, orientation: 'portrait' | 'landscape') {
+  const charLimit = orientation === 'landscape' ? 18 : 12; // Allow more characters in landscape
+
+  if (!str) return "";
+
+  // For long numbers only
+  if (/^\d+$/.test(str) && str.length > charLimit) {
+    return str.replace(new RegExp(`(.{${charLimit}})`, 'g'), '$1-\n');
+  }
+
+  // For long alphanumeric strings without spaces
+  if (/^[\w\d\-]+$/.test(str) && str.length > charLimit) {
+    return str.replace(new RegExp(`(.{${charLimit}})`, 'g'), '$1-\n');
+  }
+
+  // For Chinese characters
+  return str.replace(/([\u4e00-\u9fa5])/g, '$1\u200B');
+}

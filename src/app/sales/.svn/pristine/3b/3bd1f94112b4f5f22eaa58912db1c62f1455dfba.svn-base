@@ -1,0 +1,12 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Monthly Comparision By Company",
+};
+export default function MonthlyComparisionByCompanyPageLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return children;
+}

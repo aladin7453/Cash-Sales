@@ -1,0 +1,883 @@
+"use client";
+
+import React from "react";
+import { useEffect, useState, useRef } from "react";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { FaPenClip, FaMagnifyingGlass } from "react-icons/fa6";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Separator } from "@/components/ui/separator";
+
+type Params = {
+  form: any;
+  salesCreditNoteDetails: [];
+  tempRowSalesCreditNoteDetailsList?: any[];
+  preferenceData?: any;
+  salesCreditNoteData?: any;
+};
+
+type DropdownConfig = {
+  tableName: string;
+  columns: { accessorKey: string; header: string }[];
+  valueField: string;
+  displayField: string;
+  formValueField: string;
+  formDisplayField: string;
+  additionalMappings?: { sourceField: string; targetFormField: string }[];
+};
+
+export function EInvoiceDetailsForm({ 
+  form, 
+  salesCreditNoteDetails, 
+  tempRowSalesCreditNoteDetailsList, 
+  preferenceData,
+  salesCreditNoteData,
+}: Params) {
+  const headers = getAuthHeaders();
+
+  const [dropdownState, setDropdownState] = useState({
+    currentDropdown: null as string | null,
+    data: [] as any[],
+    originalData: [] as any[],
+    showTable: false,
+  });
+
+  const dropdownInputRef = useRef(null);
+  const dropdownTableRef = useRef(null);
+
+  const dropdownConfigs: Record<string, DropdownConfig> = {
+    tax: {
+      tableName: "tax",
+      columns: [
+        { accessorKey: "taxCode", header: "Tax Code" },
+        { accessorKey: "taxType", header: "Tax Type" },
+        { accessorKey: "taxRate", header: "Tax Rate" },
+        { accessorKey: "description", header: "Description" }
+      ],
+      valueField: "UUID",
+      displayField: "taxCode",
+      formValueField: "tax",
+      formDisplayField: "taxCode"
+    },
+  };
+
+  const fetchDropdownData = async (dropdownKey: string) => {
+    try {
+      const config = dropdownConfigs[dropdownKey];
+
+      if (!config) return;
+
+      var form_data = new FormData();
+
+      form_data.append(`table[0]`, config.tableName);
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${dropdownKey} data`);
+      }
+
+      const data = await response.json();
+
+      setDropdownState({
+        currentDropdown: dropdownKey,
+        data: data.rows,
+        originalData: data.rows,
+        showTable: true,
+      });
+    } catch (error) {
+      console.error(`Error fetching ${dropdownKey} data:`, error);
+
+      throw new Error(`Failed to fetch ${dropdownKey} data`);
+    }
+  };
+
+  const onClickRow = (row: any) => {
+    const config = dropdownConfigs[dropdownState.currentDropdown!];
+
+    if (config) {
+      form.setValue(config.formValueField, row[config.valueField]);
+      form.setValue(config.formDisplayField, row[config.displayField]);
+
+      if (config.additionalMappings) {
+        config.additionalMappings.forEach((mapping) => {
+          if (row[mapping.sourceField]) {
+            form.setValue(mapping.targetFormField, row[mapping.sourceField]);
+          }
+        });
+      }
+    }
+
+    setDropdownState((prev) => ({ ...prev, showTable: false }));
+  };
+
+  const [discountRateReadOnly, setDiscountRateReadOnly] = useState(false)
+  const [discountAmountReadOnly, setDiscountAmountReadOnly] = useState(false)
+
+  const handleFieldChange = (e, decimalPoint:2) => {
+    let newValue = e.target.value
+      .replace(/(?<=\.\d*)\./g, "")  // Allow only one decimal point
+      .replace(/[^\d.]/g, "")        // Remove non-numeric characters except dot
+      .replace(".", "");             // Ensure only one decimal point is kept
+  
+    // Ensure the value is correctly formatted with the specified decimal places
+    newValue =
+      (newValue.substr(0, newValue.length - decimalPoint)
+        ? newValue.substr(0, newValue.length - decimalPoint)
+        : "0") +
+      "." +
+      newValue.slice(newValue.length - decimalPoint);
+  
+    // Convert to number with fixed decimal places
+    newValue = Number(newValue).toFixed(decimalPoint);
+  
+    // Update form value with the formatted number
+    form.setValue(e.target.name, newValue);
+
+    switch (e.target.name) {
+      case "discountRate": {
+        // calculate discountAmount
+      }
+      case "discountAmount": {
+        // calculate discountRate
+      }
+      case "feeRate" : {
+        // calculate feeAmount
+      }
+      case "feeAmount" : {
+        // calculate feeRate
+      }
+      
+    }
+    updateTaxRelatedFields({ totalSubTotalEInvoice, totalDiscountAmount, totalFeeAmount, totalTaxAmount })
+  };
+
+  const [feeRateReadOnly, setFeeRateReadOnly] = useState(false)
+  const [feeAmountReadOnly, setFeeAmountReadOnly] = useState(false)
+  const [totalSubTotalEInvoice, setTotalSubTotalEInvoice] = useState(0)
+  const [totalDiscountAmount, setTotalDiscountAmount] = useState(0)
+  const [totalFeeAmount, setTotalFeeAmount] = useState(0)
+  const [totalTaxAmount, setTotalTaxAmount] = useState(0)
+  const [billingPeriodError, setBillingPeriodError] = useState("");
+
+  // Add state to track manual rounding changes
+  const [isRoundingManuallyChanged, setIsRoundingManuallyChanged] = useState(false);
+  
+  // Get decimal places from preference data
+  const decimal = preferenceData?.data?.decimal || 2;
+
+  // Use tempRowSalesCreditNoteDetailsList if available, otherwise use salesCreditNoteDetails
+  const currentSalesCreditNoteDetails = tempRowSalesCreditNoteDetailsList && tempRowSalesCreditNoteDetailsList.length > 0 
+    ? tempRowSalesCreditNoteDetailsList 
+    : salesCreditNoteDetails || [];
+
+  const updateTaxRelatedFields = ({ totalSubTotalEInvoice, totalDiscountAmount, totalFeeAmount, totalTaxAmount }) => {
+    const totalExclTax = totalSubTotalEInvoice - totalDiscountAmount + totalFeeAmount;
+    const totalInclTax = totalSubTotalEInvoice - totalDiscountAmount + totalTaxAmount + totalFeeAmount;
+    const prepaymentAmount = form.getValues("prepaymentAmount") ? Number(form.getValues("prepaymentAmount")) : 0;
+    
+    // Calculate total payable before rounding
+    let totalPayableBeforeRounding = totalSubTotalEInvoice - totalDiscountAmount + totalTaxAmount - prepaymentAmount + totalFeeAmount;
+
+    // Calculate automatic rounding amount (round to nearest 5 cents)
+    const roundedTotalPayable = Math.round(totalPayableBeforeRounding * 20) / 20;
+
+    // Fix floating-point precision issue by rounding to 2 decimal places
+    const autoRoundingAmount = parseFloat((roundedTotalPayable - totalPayableBeforeRounding).toFixed(decimal));
+
+    // Use manual rounding amount if it was manually changed, otherwise use automatic calculation
+    const currentRoundingAmount = form.getValues("roundingAmount") ? Number(form.getValues("roundingAmount")) : 0;
+    const finalRoundingAmount = isRoundingManuallyChanged ? currentRoundingAmount : autoRoundingAmount;
+
+    // Final total payable with rounding applied
+    const totalPayableAmount = totalPayableBeforeRounding + finalRoundingAmount;
+
+    form.setValue("taxAmount", totalTaxAmount.toFixed(decimal));
+    form.setValue("totalExclTax", totalExclTax.toFixed(decimal));
+    form.setValue("totalNetAmount", totalExclTax.toFixed(decimal));
+    form.setValue("totalInclTax", totalInclTax.toFixed(decimal));
+    form.setValue("totalPayableAmount", totalPayableAmount.toFixed(decimal));
+    
+    // Only auto-set rounding amount if it hasn't been manually changed
+    if (!isRoundingManuallyChanged) {
+      form.setValue("roundingAmount", autoRoundingAmount.toFixed(decimal));
+    }
+  };
+
+  useEffect(() => {
+    var totalSubTotalEInvoice = 0;
+    var totalDiscountAmount = 0;
+    var totalFeeAmount = 0;
+    var totalTaxAmount = 0;
+
+    currentSalesCreditNoteDetails.forEach((detail: any) => {
+      // Use subTotalEInvoice if available, otherwise calculate from amount
+      totalSubTotalEInvoice += detail.subTotalEInvoice ? Number(detail.subTotalEInvoice) : (detail.amount ? Number(detail.amount) : 0);
+      
+      // Sum all three discount tiers
+      const discount1 = detail.discountAmount ? Number(detail.discountAmount) : 0;
+      const discount2 = detail.discountAmount2 ? Number(detail.discountAmount2) : 0;
+      const discount3 = detail.discountAmount3 ? Number(detail.discountAmount3) : 0;
+      totalDiscountAmount += discount1 + discount2 + discount3;
+      
+      totalFeeAmount += detail.feeAmount ? Number(detail.feeAmount) : 0;
+      totalTaxAmount += detail.taxAmount ? Number(detail.taxAmount) : 0;
+    });
+
+    // Check if there's an existing rounding amount from form data on initial load
+    const existingRoundingAmount = salesCreditNoteData?.roundingAmount;
+
+    let useExistingRounding = Number(existingRoundingAmount) !== 0 && !isRoundingManuallyChanged;
+
+    if (useExistingRounding) {
+      // If there's an existing non-zero rounding amount, mark it as manually changed
+      setIsRoundingManuallyChanged(true);
+    } else {
+      // Nothing
+    }
+
+    updateTaxRelatedFields({ totalSubTotalEInvoice, totalDiscountAmount, totalFeeAmount, totalTaxAmount });
+
+    setTotalSubTotalEInvoice(totalSubTotalEInvoice);
+    setTotalDiscountAmount(totalDiscountAmount);
+    setTotalFeeAmount(totalFeeAmount);
+    setTotalTaxAmount(totalTaxAmount);
+  }, [currentSalesCreditNoteDetails, preferenceData, form.watch("prepaymentAmount"), salesCreditNoteData]);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownTableRef.current &&
+      !dropdownTableRef.current.contains(event.target) &&
+      dropdownInputRef.current !== event.target
+    ) {
+      setDropdownState((prev) => ({ ...prev, showTable: false }));
+    }
+    
+    if (taxDropdownRef.current && !taxDropdownRef.current.contains(event.target) && taxCodeInputRef.current !== event.target) {
+      setShowTaxTable(false);
+    }
+    if(frequencyDropdownRef.current && !frequencyDropdownRef.current.contains(event.target) && frequencyCodeInputRef.current !== event.target) {
+      setShowFrequencyTable(false);
+      }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener('click', handleClickOutside);
+    
+    return () => {
+      document.body.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+  
+  const [frequencyDropdownData, setFrequencyDropdownData] = useState<[]>([]);
+  const [showFrequencyTable, setShowFrequencyTable] = useState(false)
+
+  const dropdownTaxColumns = [ 
+    { accessorKey: "taxCode", header: "Tax Code", }, 
+    { accessorKey: "taxTypeCode", header: "Tax Type", },
+    { accessorKey: "taxRate", header: "Tax Rate", },  
+    { accessorKey: "description", header: "Description", }, 
+  ];
+
+  const dropdownFrequencyColumns = [ 
+    { accessorKey: "code", header: "Frequency", },  
+    { accessorKey: "description", header: "Description", }, 
+  ];
+
+  const taxCodeInputRef = useRef(null);
+  const taxDropdownRef = useRef(null);
+  
+  const frequencyCodeInputRef = useRef(null);
+  const frequencyDropdownRef = useRef(null);
+
+  const onClickRowFrequency = (row) => {
+    form.setValue("frequency", row.UUID)
+    form.setValue("frequencyCode", row.code)
+    setShowFrequencyTable(false)
+  }
+  
+  useEffect(() => {
+    form.setValue("eInvoiceType", "02");
+    form.setValue("eInvoiceTypeDescription", "Credit Note");
+  }, []);
+
+  const fetchFrequencyDropdownData = async () => {
+    try {
+      var form_data = new FormData()
+      form_data.append(`table[0]`, "frequency")
+      
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch dropdown data');
+      }
+      const data = await response.json();
+      setFrequencyDropdownData(data.rows)
+      setShowFrequencyTable(true);
+    } catch (error) {
+      throw new Error('Failed to fetch dropdown data');
+    }
+  };
+
+  const validateBillingPeriod = (value) => {
+    const regex = /^\d{4}-\d{2}-\d{2} - \d{4}-\d{2}-\d{2}$/;
+    return regex.test(value);
+  };
+
+  const handleBillingPeriodChange = (e) => {
+    const { value } = e.target;
+    form.setValue("billingPeriod", value);
+    if (!validateBillingPeriod(value)) {
+      setBillingPeriodError("Billing period must be in the format YYYY-MM-DD - YYYY-MM-DD");
+    } else {
+      setBillingPeriodError("");
+    }
+  };
+
+  const handleDropdownSearchChange = (dropdownKey: string, searchTerm: string) => {
+    const config = dropdownConfigs[dropdownKey];
+    if (!config) return;
+
+    form.setValue(config.formDisplayField, searchTerm);
+
+    if (!dropdownState.originalData || dropdownState.currentDropdown !== dropdownKey) {
+      fetchDropdownData(dropdownKey);
+      return;
+    }
+
+    const filtered = dropdownState.originalData.filter((row: any) =>
+      row[config.displayField]
+        ?.toString()
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
+    );
+
+    setDropdownState((prev) => ({
+      ...prev,
+      data: filtered,
+      showTable: true,
+      currentDropdown: dropdownKey,
+    }));
+  };
+
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Document Details</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form>
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6">
+              <FormField
+                control={form.control}
+                name="eInvoiceVersion"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Version:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5 bg-erp-gray-1 text-gray-500" 
+                        readOnly
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="eInvoiceType"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Type:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5 bg-erp-gray-1 text-gray-500" 
+                        readOnly
+                        {...field} 
+                           value="02"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="eInvoiceTypeDescription"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 md:col-span-2">
+                    <FormLabel>Type Description:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5 bg-erp-gray-1 text-gray-500" 
+                        readOnly
+                        {...field} 
+                                      value="Credit Note"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="eInvoiceCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 md:col-span-2">
+                    <FormLabel>Code:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5 bg-erp-gray-1 text-gray-500" 
+                        readOnly
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6 mt-4">
+              <FormField
+                control={form.control}
+                name="digitalSignature"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 md:col-span-2">
+                    <FormLabel>Digital Signature:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5 bg-erp-gray-1 text-gray-500" 
+                        readOnly
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="frequency"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field}  readOnly={true}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="frequencyCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Frequency of Billing: </FormLabel>
+                    <FormControl className="relative">
+                        <div className="relative">
+                          <Input className="h-7.5 pr-8" {...field} onClick={fetchFrequencyDropdownData} ref={frequencyCodeInputRef} autoComplete="off" />
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <FaMagnifyingGlass className="text-gray-400" />
+                          </div>
+                          {showFrequencyTable&& (
+                            <div ref={frequencyDropdownRef} className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px]">
+                              <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownFrequencyColumns}
+                                  data={frequencyDropdownData}
+                                  onClickRow={onClickRowFrequency}
+
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="billingPeriod"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Billing Period:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        moduleName="salesCreditNote" 
+                        fieldName="billingPeriod" 
+                        columnName="Billing Period" 
+                      />
+                    </FormControl>
+                    {billingPeriodError && (
+                      <FormMessage>
+                        <p>{billingPeriodError}</p>
+                      </FormMessage>
+                    )}
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="oriRefNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 md:col-span-2">
+                    <FormLabel>Ori. Ref. No.:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5 bg-erp-gray-1 text-gray-500" 
+                        readOnly
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <Separator className="bg-erp-gray-3 h-0.5 mt-4" />
+
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6 mt-4">
+              <FormField
+                control={form.control}
+                name="taxCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Tax:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          // readOnly
+                          onChange={(e) => handleDropdownSearchChange("tax", e.target.value)}
+                          onClick={() => fetchDropdownData('tax')}
+                          ref={dropdownState.currentDropdown === 'tax' ? dropdownInputRef : null}
+                          autoComplete="off"
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable && dropdownState.currentDropdown === 'tax' && (
+                          <div ref={dropdownTableRef} className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px]">
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownConfigs.tax.columns}
+                                data={dropdownState.data}
+                                onClickRow={onClickRow}
+                              />
+                              <ScrollBar orientation="vertical" />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />   
+
+              <FormField
+                control={form.control}
+                name="tax"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>Tax UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+        
+              <FormField
+                control={form.control}
+                name="taxTypeCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Tax Type:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} readOnly style={{ backgroundColor: '#f2f2f2', color: 'gray' }}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+        
+              <FormField
+                control={form.control}
+                name="taxRate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Tax Rate:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5 text-right" {...field} readOnly style={{ backgroundColor: '#f2f2f2', color: 'gray' }}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+        
+              <FormField
+                control={form.control}
+                name="taxAmount"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Tax Amount:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5 text-right" {...field} readOnly style={{ backgroundColor: '#f2f2f2', color: 'gray' }}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+        
+              <FormField
+                control={form.control}
+                name="totalExclTax"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Total Excl. Tax:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5 text-right" {...field} readOnly style={{ backgroundColor: '#f2f2f2', color: 'gray' }}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+        
+              <FormField
+                control={form.control}
+                name="totalNetAmount"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Total Net Amount:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5 text-right" {...field} readOnly style={{ backgroundColor: '#f2f2f2', color: 'gray' }}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6 mt-4">
+              <FormField
+                control={form.control}
+                name="totalInclTax"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Total Incl. Tax:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5 text-right" {...field} readOnly style={{ backgroundColor: '#f2f2f2', color: 'gray' }}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="totalPayableAmount"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Total Payable Amount:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5 text-right" {...field} readOnly style={{ backgroundColor: '#f2f2f2', color: 'gray' }}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="roundingAmount"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Rounding Amount:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7.5 text-right bg-erp-gray-2 text-gray-500"
+                        {...field}
+                        value={field.value || "0.00"}
+                        readOnly
+                        onChange={(e) => {
+                          const newValue = e.target.value;
+                          
+                          // Mark as manually changed only if value is not 0
+                          const numericValue = Number(newValue) || 0;
+
+                          setIsRoundingManuallyChanged(numericValue !== 0);
+                          
+                          form.setValue("roundingAmount", newValue);
+                          
+                          // Recalculate total payable with manual rounding amount
+                          const prepaymentAmount = form.getValues("prepaymentAmount") ? Number(form.getValues("prepaymentAmount")) : 0;
+                          const totalPayableBeforeRounding = totalSubTotalEInvoice - totalDiscountAmount + totalTaxAmount - prepaymentAmount + totalFeeAmount;
+                          const manualRoundingAmount = Number(newValue) || 0;
+                          const newTotalPayable = totalPayableBeforeRounding + manualRoundingAmount;
+                          
+                          form.setValue("totalPayableAmount", newTotalPayable.toFixed(decimal));
+                        }}
+                        onBlur={
+                          () => updateTaxRelatedFields({ totalSubTotalEInvoice, totalDiscountAmount, totalFeeAmount, totalTaxAmount })
+                        }
+                        moduleName="salesCreditNote" 
+                        fieldName="roundingAmount" 
+                        columnName="Rounding Amount" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <Separator className="bg-erp-gray-3 h-0.5 mt-4" />
+
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6 mt-4">
+              <FormField
+                control={form.control}
+                name="discountRate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Discount Rate:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5 text-right" 
+                        readOnly={discountRateReadOnly} 
+                        {...field}
+                        value={field.value || "0.00"}
+                        onClick={() => {
+                          if (!(discountAmountReadOnly || discountRateReadOnly)) setDiscountAmountReadOnly(true)
+                        }}
+                        onChange={(e) => handleFieldChange(e, 2)} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="discountAmount"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Discount Amount:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5 text-right" 
+                        readOnly={discountAmountReadOnly} 
+                        {...field}
+                        value={field.value || "0.00"}
+                        onClick={() => {
+                          if (!(discountAmountReadOnly || discountRateReadOnly)) setDiscountRateReadOnly(true)
+                        }}  
+                        onChange={(e) => handleFieldChange(e, 2)} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="feeRate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Fee Rate:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5 text-right" 
+                        readOnly={feeRateReadOnly} 
+                        {...field}
+                        value={field.value || "0.00"}
+                        onClick={() => {
+                          if (!(feeRateReadOnly || feeAmountReadOnly)) setFeeAmountReadOnly(true)
+                        }}  
+                        onChange={(e) => handleFieldChange(e, 2)} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="feeAmount"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Fee Amount:</FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5 text-right" 
+                        readOnly={feeAmountReadOnly} 
+                        {...field}
+                        value={field.value || "0.00"}
+                        onClick={() => {
+                          if (!(feeRateReadOnly || feeAmountReadOnly)) setFeeRateReadOnly(true)
+                        }} 
+                        onChange={(e) => handleFieldChange(e, 2)} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

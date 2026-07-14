@@ -1,0 +1,469 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { FaClipboard, FaLayerGroup, FaObjectUngroup } from "react-icons/fa6";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+
+import useSWR from "swr";
+
+import { useToast } from "@/components/ui/use-toast";
+import LoadingUI from "@/components/LoadingUI";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { TabsNavigator } from "@/components/ui/TabsNavigator";
+
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+import {
+  ORIGIN,
+  getAuthHeaders,
+  getCurrentAcc,
+  getCurrentAccount,
+  getCurrentCompany,
+  getCurrentCompanyUUID,
+  removeKeys
+} from "@/lib/constants";
+
+import { AuthorizedLocationForm } from "./authorized-location/AuthorizedLocationForm";
+import { authorizedUserColumns } from "./authorized-user/columns";
+import AuthorizedUserDataTable from "./authorized-user/DataTable";
+import { CustomerGroupForm } from "./main-details/general-details/CustomerGroupForm";
+import { customInformationColumns } from "./more-details/custom-information/columns";
+import CustomInformationDataTable from "./more-details/custom-information/DataTable";
+import TopActionBar from "./TopActionBar";
+import { OtherDetailForm } from "./more-details/custom-information/OtherDetailForm";
+
+type PageParams = {
+  params: { slug: string };
+};
+
+const validRoutes = ["new", "edit", "clone"] as const;
+
+const fetcher = async (url: string) => {
+  const headers = getAuthHeaders();
+
+  return fetch(url, { headers }).then((res) => {
+    if (!res.ok) {
+      throw new Error("Failed to fetch data");
+    }
+    return res.json();
+  });
+};
+
+type ValidRoute = (typeof validRoutes)[number];
+
+const customerGroupFormSchema = z.object({
+  accountName: z.union([z.string(), z.literal("")]).optional(),
+  company: z.union([z.string(), z.literal("")]).optional(),
+  companyName: z.union([z.string(), z.literal("")]).optional(),
+  // customerGroupCode: z.string().min(2, {
+  //   message: "Customer Group Code must be at least 2 characters.",
+  // }),
+  customerGroupName: z.string().min(2, {
+    message: "Customer Group Name is required and must be at least 2 characters.",
+  }),
+});
+
+function isValidRoute(route: string): route is ValidRoute {
+  return validRoutes.includes(route as ValidRoute);
+}
+
+const tabs = [
+  {
+    id: "mainDetails",
+    name: "Main Details",
+    icon: FaClipboard,
+    shortName: "Main",
+  },
+  {
+    id: "moreDetails",
+    name: "More Details",
+    icon: FaLayerGroup,
+    shortName: "More",
+  },
+  // {
+  //   id: "authorizedLocation",
+  //   name: "Authorized Location",
+  //   icon: FaObjectUngroup,
+  //   shortName: "Auth",
+  // },
+];
+
+export default function CustomerGroupDetailsPage({ params }: PageParams) {
+  const headers = getAuthHeaders();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const id = searchParams.get("id");
+
+  const { toast } = useToast();
+
+  const slug = params.slug;
+
+  const [customerGroupData, setCustomerGroupData] = useState({});
+  const [tempRowCustomInfo, setTempRowCustomInfo] = useState([]);
+  const [tempRowAuthorizedUser, setTempRowAuthorizedUser] = useState([]);
+
+  const [formResetKey, setFormResetKey] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const currentAccountUUID = getCurrentAccount();
+  const currentAccountName = getCurrentAcc();
+  const currentCompanyUUID = getCurrentCompanyUUID();
+  const currentCompanyName = getCurrentCompany();
+
+  const mainDetailsRef = useRef(null);
+  const moreDetailsRef = useRef(null);
+  const authorizedLocationRef = useRef(null);
+
+  const resetForm = () => {
+    setFormResetKey((prevKey) => prevKey + 1);
+  };
+
+  if (!isValidRoute(slug)) {
+    notFound();
+  }
+
+  const {
+    data: customerGroup,
+    error,
+    isLoading,
+    isValidating,
+    mutate: mutateCustomerGroup,
+  } = useSWR(
+    id
+      ? `${ORIGIN}/customer_group/api/customer-group/get-update-customer-group-data?id=${id}`
+      : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+
+  const {
+    data: customInformationData,
+    error: customInfoError,
+    mutate: mutateCustomInfo,
+  } = useSWR(
+    id
+      ? `${ORIGIN}/customer_group/api/customer-group/get-update-customer-group-has-custom-info-data?id=${id}`
+      : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+
+  // const {
+  //   data: authorizedUserData,
+  //   error: authorizedUserError,
+  //   mutate: mutateAuthorizedUser,
+  // } = useSWR(
+  //   id
+  //     ? `${ORIGIN}/customer_group/api/customer-group/get-update-customer-group-has-authorized-user-data?id=${id}`
+  //     : null,
+  //   fetcher,
+  //   { revalidateOnFocus: false }
+  // );
+
+  const isFetching = isLoading || isValidating;
+
+  useEffect(() => {
+    if (error || customInfoError) {
+      toast({
+        variant: "destructive",
+        title: "Session Expired",
+        description: "Your session has expired. Redirecting to login page.",
+      });
+
+      router.push("/login");
+    }
+  }, [error, customInfoError, router, toast]);
+
+
+
+  useEffect(() => {
+    if (customerGroup) {
+      const customerGroupDataCopy = { ...customerGroup.data };
+
+      // Clear customerGroupCode if it's a clone page
+      if (slug === "clone") {
+        customerGroupDataCopy.customerGroupCode = "";
+      }
+
+      setCustomerGroupData(customerGroupDataCopy);
+      setIsSaving(false);
+    }
+  }, [customerGroup, slug]);
+
+
+  useEffect(() => {
+    if (customInformationData) {
+      if (slug === "clone") {
+        setTempRowCustomInfo(customInformationData.rows)
+      }
+
+    }
+  }, [customInformationData]);
+
+  useEffect(() => {
+    const currentCompanyID = getCurrentCompanyUUID();
+    const currentCompanyName = getCurrentCompany();
+
+    if (!form.getValues("company")) {
+      form.setValue("company", currentCompanyID);
+    }
+
+    if (!form.getValues("companyName")) {
+      form.setValue("companyName", currentCompanyName);
+    }
+    // setCurrentCompanyUUID(currentCompanyID);
+    // setCurrentCompany(currentCompanyName);
+  }, []);
+
+  // Add separate effect for custom information data
+  useEffect(() => {
+    if (customInformationData?.rows) {
+      setTempRowCustomInfo(customInformationData.rows);
+    }
+  }, [customInformationData]);
+
+
+  const revalidateCustomInfoData = () => {
+    mutateCustomInfo();
+  };
+
+  // const revalidateAuthorizedUserData = () => {
+  //   mutateAuthorizedUser();
+  // };
+
+  const handleSubmit = async () => {
+    try {
+      await form.trigger();
+
+      setIsSaving(true);
+      await form.handleSubmit(onSubmit)();
+    } catch (error) {
+      console.error("Form submission error:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const form = useForm<z.infer<typeof customerGroupFormSchema>>({
+    resolver: zodResolver(customerGroupFormSchema),
+    defaultValues: {
+      account: customerGroup?.account ?? currentAccountUUID,
+      accountName: customerGroup?.accountName ?? currentAccountName,
+      company: customerGroup?.company ?? currentCompanyUUID,
+      companyName: customerGroup?.companyName ?? currentCompanyName,
+      customerGroupCode: customerGroup?.customerGroupCode ?? "",
+      customerGroupName: customerGroup?.customerGroupName ?? "",
+      description: customerGroup?.description ?? "",
+      valid: customerGroup?.valid ?? "1",
+    },
+  });
+
+  const onSubmit = async () => {
+    var form_data = new FormData();
+    var formValues = form.getValues();
+    var saveType =
+      slug == "clone"
+        ? `create-data?c_id=1`
+        : id
+          ? `update-customer-group-data?id=${id}`
+          : `create-data`;
+
+    for (var key in formValues) {
+      if (key !== "attachmentLink" && key !== "attachment")
+        form_data.append(`customerGroup[${key}]`, formValues[key] ? formValues[key] : "");
+    }
+
+    // if (saveType === "create-data?c_id=1") {
+    //   // Empty UUID if present
+    //   if (formValues.UUID) {
+    //     form_data.set('customerGroup[UUID]', '');
+    //   }
+    // };
+
+    if (saveType == "create-data" || saveType === "create-data?c_id=1") {
+      tempRowCustomInfo.forEach((row, index) => {
+        const cleanedRow = removeKeys(row, ["_actionUUID", "createdAtFormat", "updatedAtFormat", "CreatedByUsername", "UpdatedByUsername", "_version", "createdAt", "createdBy", "updatedAt", "updatedBy", "customerGroup"]);
+        for (const key in cleanedRow) {
+          if (key !== "attachment") {
+            if (key == "UUID" || key == "customerGroup") {
+              form_data.append(`customerGroupHasCustomInfo[${index}][${key}]`, "");
+            } else {
+              form_data.append(`customerGroupHasCustomInfo[${index}][${key}]`, row[key]);
+            }
+          }
+        }
+      });
+
+      for (let i = 0; i < tempRowCustomInfo.length; i++) {
+        const row = tempRowCustomInfo[i];
+
+        var counter = 0;
+        if (row.attachmentFiles) {
+          for (const file of row.attachmentFiles) {
+            const base64 = await getFileToBase64(file);
+
+            form_data.append(
+              `customerGroupHasCustomInfo[${i}][attachment][${counter}][Name]`,
+              file.name,
+            );
+            form_data.append(
+              `customerGroupHasCustomInfo[${i}][attachment][${counter}][File]`,
+              base64,
+            );
+
+            counter++;
+          }
+        }
+
+      }
+
+      tempRowAuthorizedUser.forEach((row, index) => {
+        for (const key in row) {
+          form_data.append(`customerGroupHasAuthorizedUser[${index}][${key}]`, row[key]);
+        }
+      });
+    }
+
+    try {
+      const response = await fetch(
+        `${ORIGIN}/customer_group/api/customer-group/${saveType}`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        },
+      );
+
+      if (response.status === 401) {
+        console.error("Session expired. Redirecting to login.");
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "Your session has expired. Redirecting to login page.",
+        });
+        router.push("/login");
+        throw new Error("Session expired");
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        setIsSaving(false);
+
+        let errorMessage = errorData.message;
+
+        // Error Handling for "Data too long"
+        if (errorMessage.includes("Data too long")) {
+          errorMessage = errorMessage.split("\n")[0];
+        }
+
+        toast({
+          title: errorData.name,
+          description: errorMessage,
+          variant: "destructive",
+          duration: 2000,
+        });
+
+        throw new Error("Failed to fetch data");
+      }
+
+      const responseData = await response.json();
+
+      if (responseData && responseData.item) {
+        const url = `/sales/customer-group/edit?item=${responseData.item}&id=${responseData.data}`;
+
+        router.push(url);
+
+        if (params.slug == "edit") {
+          mutateCustomerGroup();
+          // mutateAuthorizedUser();
+          mutateCustomInfo();
+        }
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      } else if (slug === "clone" && id) {
+        router.push(`/sales/customer-group/clone?id=${id}`);
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      console.error("Error creating new customer group data:", error);
+    }
+  };
+
+  return (
+    <>
+      <div className="sticky top-0 z-20">
+        <TopActionBar
+          customerGroup={customerGroupData}
+          form={form}
+          action={slug}
+          handleSubmit={handleSubmit}
+          customerGroupFormSchema={customerGroupFormSchema}
+          params={params}
+        />
+      </div>
+      <div className="grid h-full grid-rows-[auto_1fr]">
+        <div className="grid h-full grid-cols-[1fr_auto] gap-x-2">
+          <ScrollArea className="h-full">
+            <div id="mainDetails" className="mt-2" ref={mainDetailsRef}>
+              <CustomerGroupForm
+                key={formResetKey}
+                customInformationData={customInformationData}
+                tempRowCustomInfo={tempRowCustomInfo}
+                form={form}
+                slug={slug}
+              />
+            </div>
+
+            <div id="moreDetails" className="mt-2" ref={moreDetailsRef}>
+              <OtherDetailForm
+                key={formResetKey}
+                form={form}
+                slug={slug}
+              />
+
+              <div className="mt-2">
+                <CustomInformationDataTable
+                  columns={customInformationColumns}
+                  data={
+                    id && slug == "edit" ? (customInformationData ? customInformationData.rows : []) : tempRowCustomInfo
+                  }
+                  tempRowCustomInfo={tempRowCustomInfo}
+                  setTempRowCustomInfo={setTempRowCustomInfo}
+                  revalidateCustomInfoData={revalidateCustomInfoData}
+                />
+              </div>
+            </div>
+
+            {/* <div id="authorizedLocation" className="mt-2" ref={authorizedLocationRef}>
+              <AuthorizedLocationForm
+                key={formResetKey}
+                customInformationData={customInformationData}
+                tempRowCustomInfo={tempRowCustomInfo}
+                form={form}
+                slug={slug}
+              />
+            </div> */}
+          </ScrollArea>
+
+          <TabsNavigator tabs={tabs} initialActiveTabId="mainDetails" stickyTop="top-14" />
+        </div>
+
+        {isLoading && <LoadingUI />}
+        {(isFetching || isSaving) && <LoadingUI />}
+      </div>
+    </>
+  );
+}

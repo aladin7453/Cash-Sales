@@ -1,0 +1,42 @@
+import type { TransferFromConfig } from "@/components/features/transfer/transferFrom";
+import { salesInvoiceDocumentColumns } from "./documentColumns";
+import { salesInvoiceItemColumns } from "./itemColumns";
+
+export const salesInvoiceTransferFromConfig: TransferFromConfig = {
+  module:"sales_invoice",
+  model: "sales-invoice",
+  apiNamespace: "sales",
+  sources: [
+    {
+      key: "quotation",
+      label: "Quotation",
+      apiDocType: "quotation",
+      transferDocType: "quotation",
+    },
+    {
+      key: "salesOrder",
+      label: "Sales Order",
+      apiDocType: "salesOrder",
+      transferDocType: "sales_order",
+    },
+    {
+      key: "deliveryOrder",
+      label: "Sales Delivery Order",
+      apiDocType: "deliveryOrder",
+      transferDocType: "deliveryOrder",
+    },
+    {
+      key: "jobOrder",
+      label: "Job Order",
+      apiDocType: "jobOrder",
+      transferDocType: "jobOrder",
+    },
+  ],
+  documentColumns: salesInvoiceDocumentColumns,
+  itemColumns: salesInvoiceItemColumns,
+  transferEndpointSuffix: "transfer-from-selected-item",
+  buttonText: "T-From",
+  dialogTitle: "Transfer from",
+  documentPopoverTitle: "Select Document",
+  detailsPopoverTitle: "Transfer Details",
+};

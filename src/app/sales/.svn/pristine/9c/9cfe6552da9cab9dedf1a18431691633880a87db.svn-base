@@ -1,0 +1,414 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+import { NumberFormatter } from "@/components/ui/number-formatter";
+
+export type CustomerAnalysisByDocument = {
+  bFAmt?: string;
+  bFLocalAmt?: string;
+  invoice?: string;
+  invoiceLocal?: string;
+  cN?: string;
+  cNLocal?: string;
+  dN?: string;
+  dNLocal?: string;
+  payment?: string;
+  paymentLocal?: string;
+  contra?: string;
+  bouncedPayment?: string;
+  bouncedPaymentLocal?: string;
+  refund?: string;
+  refundLocal?: string;
+  gainLoss?: string;
+  cFAmt?: string;
+  cFLocalAmt?: string;
+};
+
+export const CustomerAnalysisByDocumentColumns: ColumnDef<CustomerAnalysisByDocument>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "code",
+    id: "code",
+    header: "Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "companyName",
+    id: "companyName",
+    header: "Description",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "currencyCode",
+    id: "currencyCode",
+    header: "Currency",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "bFAmt",
+    id: "bFAmt",
+    header: "B/F",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.bFAmt} /></div>
+    ),
+  },
+  {
+    accessorKey: "bFLocalAmt",
+    id: "bFLocalAmt",
+    header: "B/F Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.bFLocalAmt} /></div>
+    ),
+  },
+  {
+    accessorKey: "invoice",
+    id: "invoice",
+    header: "Invoice",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.invoice} /></div>
+    ),
+  },
+  {
+    accessorKey: "invoiceLocal",
+    id: "invoiceLocal",
+    header: "Invoice Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.invoiceLocal} /></div>
+    ),
+  },
+  {
+    accessorKey: "cN",
+    id: "cN",
+    header: "Credit Note",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.cN} /></div>
+    ),
+  },
+  {
+    accessorKey: "cNLocal",
+    id: "cNLocal",
+    header: "Credit Note Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.cNLocal} /></div>
+    ),
+  },
+  {
+    accessorKey: "dN",
+    id: "dN",
+    header: "Debit Note",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.dN} /></div>
+    ),
+  },
+  {
+    accessorKey: "dNLocal",
+    id: "dNLocal",
+    header: "Debit Note Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.dNLocal} /></div>
+    ),
+  },
+  {
+    accessorKey: "payment",
+    id: "payment",
+    header: "Payment",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.payment} /></div>
+    ),
+  },
+  {
+    accessorKey: "paymentLocal",
+    id: "paymentLocal",
+    header: "Payment Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.paymentLocal} /></div>
+    ),
+  },
+  {
+    accessorKey: "contra",
+    id: "contra",
+    header: "Contra",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.contra} /></div>
+    ),
+  },
+  {
+    accessorKey: "bouncedPayment",
+    id: "bouncedPayment",
+    header: " Bounced Payment",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.bouncedPayment} /></div>
+    ),
+  },
+  {
+    accessorKey: "bouncedPaymentLocal",
+    id: "bouncedPaymentLocal",
+    header: "Bounced Payment Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.bouncedPaymentLocal} /></div>
+    ),
+  },
+  {
+    accessorKey: "refund",
+    id: "refund",
+    header: "Refund",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.refund} /></div>
+    ),
+  },
+  {
+    accessorKey: "refundLocal",
+    id: "refundLocal",
+    header: "Refund Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.refundLocal} /></div>
+    ),
+  },
+  {
+    accessorKey: "gainLoss",
+    id: "gainLoss",
+    header: "Gain Loss",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.gainLoss} /></div>
+    ),
+  },
+  {
+    accessorKey: "cFAmt",
+    id: "cFAmt",
+    header: "C/F",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.cFAmt} /></div>
+    ),
+  },
+  {
+    accessorKey: "cFLocalAmt",
+    id: "cFLocalAmt",
+    header: "C/F Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.cFLocalAmt} /></div>
+    ),
+  },
+];
+
+export const CustomerAnalysisByDocumentReportColumns: ColumnDef<CustomerAnalysisByDocument>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "code",
+    id: "code",
+    header: "Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "companyName",
+    id: "companyName",
+    header: "Description",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "bFLocalAmt",
+    id: "bFLocalAmt",
+    header: "B/F Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.bFLocalAmt} /></div>
+    ),
+  },
+  {
+    accessorKey: "invoiceLocal",
+    id: "invoiceLocal",
+    header: "Invoice Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.invoiceLocal} /></div>
+    ),
+  },
+  {
+    accessorKey: "cNLocal",
+    id: "cNLocal",
+    header: "Credit Note Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.cNLocal} /></div>
+    ),
+  },
+  {
+    accessorKey: "dNLocal",
+    id: "dNLocal",
+    header: "Debit Note Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.dNLocal} /></div>
+    ),
+  },
+  {
+    accessorKey: "paymentLocal",
+    id: "paymentLocal",
+    header: "Payment Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.paymentLocal} /></div>
+    ),
+  },
+  {
+    accessorKey: "contra",
+    id: "contra",
+    header: "Contra",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.contra} /></div>
+    ),
+  },
+  {
+    accessorKey: "refundLocal",
+    id: "refundLocal",
+    header: "Refund Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.refundLocal} /></div>
+    ),
+  },
+  {
+    accessorKey: "cFLocalAmt",
+    id: "cFLocalAmt",
+    header: "C/F Local",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.cFLocalAmt} /></div>
+    ),
+  },
+];

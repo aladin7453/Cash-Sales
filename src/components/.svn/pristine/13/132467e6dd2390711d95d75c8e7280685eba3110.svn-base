@@ -1,0 +1,37 @@
+//Imports
+import { useState } from "react";
+import clsx from "clsx";
+
+//Icon
+import { FaCaretRight } from "react-icons/fa6";
+
+function SlideInAnimation({ children }: { children: React.ReactNode; }) {
+  //State
+  const [isSlide, setisSlide] = useState(false);
+
+  return (
+    <div className="w-full flex md:w-auto">
+      {/* Children */}
+      <div className={clsx(
+        "transition-all duration-300 ease-in-out overflow-visible", "w-full md:w-auto", "md:max-w-0 md:opacity-0",
+        isSlide
+          ? "md:max-w-[480px] md:opacity-100 overflow-visible"
+          : "md:max-w-0 md:opacity-0 overflow-hidden pointer-events-none"
+      )}>
+        {children}
+      </div>
+
+      {/* Expand Button */}
+      <div className="hidden md:flex justify-center items-center bg-white relative z-10">
+        <button onClick={() => setisSlide(!isSlide)}>
+          <FaCaretRight className={clsx(
+            "size-4.5 text-erp-blue-14 hover:text-erp-blue-14/70 transition-all duration-300 ease-in-out",
+            isSlide && "rotate-180"
+          )} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export default SlideInAnimation

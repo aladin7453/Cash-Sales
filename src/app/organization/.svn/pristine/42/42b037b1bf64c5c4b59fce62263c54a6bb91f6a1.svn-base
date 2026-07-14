@@ -1,0 +1,17 @@
+"use client";
+
+import { createContext } from "react";
+
+import type { Dispatch, SetStateAction } from "react";
+import type { NodeId } from "react-accessible-treeview";
+
+export type AccessControlState = {
+  selectedIds: NodeId[];
+  setSelectedIds: Dispatch<SetStateAction<NodeId[]>>;
+  unselectedIds: NodeId[];
+  setUnselectedIds: Dispatch<SetStateAction<NodeId[]>>;
+  handleGrantAll?: () => void;
+  handleDenyAll?: () => void;
+};
+
+export const AccessControlContext = createContext<AccessControlState | undefined>(undefined);

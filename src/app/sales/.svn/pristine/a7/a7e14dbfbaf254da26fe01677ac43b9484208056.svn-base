@@ -1,0 +1,929 @@
+"use client";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+import type { ColumnDef } from "@tanstack/react-table";
+import { NumberFormatter } from "@/components/ui/number-formatter";
+
+export type OutstandingSalesDocumentListingReport = {
+  price?: string;
+  originalQuantity?: string;
+  osAmount?: string;
+  transferableQuantity?: string;
+  transferQuantity?: string;
+  osQuantity?: string;
+};
+
+export const columnDefinitionsByDocType: Record<string, ColumnDef<OutstandingSalesDocumentListingReport>[]> = {
+  quotation: [
+  { 
+    accessorKey: "rowNumber",
+    id : "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docNo",
+    id : "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id:"docDateFormat",
+    header:"Date",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "customerName",
+    id : "customerName",
+    header: "Customer",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "salesAgentName",
+    id : "salesAgentName",
+    header: "Sales Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "servicingAgentName",
+    id : "servicingAgentName",
+    header: "Servicing Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "collectionAgentName",
+    id : "collectionAgentName",
+    header: "Collection Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "itemCode",
+    id: "itemCode",
+    header: "Item Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },  
+  {
+    accessorKey: "itemName",
+    id: "itemName",
+    header: "Item Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },   
+  {
+    accessorKey: "currencyCode",
+    id: "currencyCode",
+    header: "Currency Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },  
+  {
+    accessorKey: "price",
+    id: "price",
+    header: "Price",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.price} /></div>
+    ),
+  },
+  {
+    accessorKey: "deliveryDateFormat",
+    id: "deliveryDateFormat",
+    header: "Delivery Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "originalQuantity",
+    id: "originalQuantity",
+    header: "Orig. Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.originalQuantity} /></div>
+    ),
+  },
+  {
+    accessorKey: "osAmount",
+    id: "osAmount",
+    header: "O/S Amt",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.osAmount} /></div>
+    ),
+  },
+  ],
+
+  quotationListing: [
+    {
+			accessorKey: "rowNumber",
+			id : "rowNumber",
+			header: "No",
+			cell: ({ table, row }) => {
+				const { pageIndex, pageSize } = table.getState().pagination;
+				return pageIndex * pageSize + row.index + 1;
+			},
+			enableSorting: false,
+			enableColumnFilter: false,
+		},
+    {
+      accessorKey: "itemCode",
+      header: "Code",
+    },
+    {
+      accessorKey:"description",
+      header:"Description",
+    },
+    {
+      accessorKey: "price",
+      header:"U/Price",
+    },
+    {
+      accessorKey: "deliveryDateFormat",
+      header:"Delivery Date",
+    },
+    {
+      accessorKey: "originalQuantity",
+      header:"Orig. Qty",
+    },
+    {
+      accessorKey: "docDateFormat",
+      header:"Date",
+    },
+    {
+      accessorKey: "docNo",
+      header: "Doc No",
+    },
+    {
+      accessorKey: "transferQuantity",
+      header: "Transfer Quantity",
+    },
+  ],
+
+  salesOrder: [
+  { 
+    accessorKey: "rowNumber",
+    id : "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docNo",
+    id : "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id:"docDateFormat",
+    header:"Date",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "customerName",
+    id : "customerName",
+    header: "Customer",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "salesAgentName",
+    id : "salesAgentName",
+    header: "Sales Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "servicingAgentName",
+    id : "servicingAgentName",
+    header: "Servicing Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "collectionAgentName",
+    id : "collectionAgentName",
+    header: "Collection Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "itemCode",
+    id: "itemCode",
+    header: "Item Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },  
+  {
+    accessorKey: "itemName",
+    id: "itemName",
+    header: "Item Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },   
+  {
+    accessorKey: "currencyCode",
+    id: "currencyCode",
+    header: "Currency Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },  
+  {
+    accessorKey: "price",
+    id: "price",
+    header: "Price",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.price} /></div>
+    ),
+  },
+  {
+    accessorKey: "deliveryDateFormat",
+    id: "deliveryDateFormat",
+    header: "Delivery Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "originalQuantity",
+    id: "originalQuantity",
+    header: "Orig. Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.originalQuantity} /></div>
+    ),
+  },
+  {
+    accessorKey: "osAmount",
+    id: "osAmount",
+    header: "O/S Amt",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.osAmount} /></div>
+    ),
+  },
+  ],
+
+  salesOrderListing: [
+    {
+			accessorKey: "rowNumber",
+			id : "rowNumber",
+			header: "No",
+			cell: ({ table, row }) => {
+				const { pageIndex, pageSize } = table.getState().pagination;
+				return pageIndex * pageSize + row.index + 1;
+			},
+			enableSorting: false,
+			enableColumnFilter: false,
+		},
+    {
+      accessorKey: "itemCode",
+      header: "Code",
+    },
+    {
+      accessorKey:"description",
+      header:"Description",
+    },
+    {
+      accessorKey: "price",
+      header:"U/Price",
+    },
+    {
+      accessorKey: "deliveryDateFormat",
+      header:"Delivery Date",
+    },
+    {
+      accessorKey: "originalQuantity",
+      header:"Orig. Qty",
+    },
+    {
+      accessorKey: "docDateFormat",
+      header:"Date",
+    },
+    {
+      accessorKey: "docNo",
+      header: "Doc No",
+    },
+    {
+      accessorKey: "transferQuantity",
+      header: "Transfer Quantity",
+    },
+  ],
+  deliveryOrder: [
+  { 
+    accessorKey: "rowNumber",
+    id : "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docNo",
+    id : "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id:"docDateFormat",
+    header:"Date",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "customerName",
+    id : "customerName",
+    header: "Customer",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "salesAgentName",
+    id : "salesAgentName",
+    header: "Sales Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "servicingAgentName",
+    id : "servicingAgentName",
+    header: "Servicing Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "collectionAgentName",
+    id : "collectionAgentName",
+    header: "Collection Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "itemCode",
+    id: "itemCode",
+    header: "Item Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },  
+  {
+    accessorKey: "itemName",
+    id: "itemName",
+    header: "Item Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },   
+  {
+    accessorKey: "currencyCode",
+    id: "currencyCode",
+    header: "Currency Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },  
+  {
+    accessorKey: "price",
+    id: "price",
+    header: "Price",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.price} /></div>
+    ),
+  },
+  {
+    accessorKey: "deliveryDateFormat",
+    id: "deliveryDateFormat",
+    header: "Delivery Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "originalQuantity",
+    id: "originalQuantity",
+    header: "Orig. Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.originalQuantity} /></div>
+    ),
+  },
+  {
+    accessorKey: "osAmount",
+    id: "osAmount",
+    header: "O/S Amt",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.osAmount} /></div>
+    ),
+    },
+    {
+      accessorKey: "deliveryTerm",
+      id: "deliveryTerm",
+      header: "Delivery Term",
+      filterFn: "includesString",
+      enableColumnFilter: false,
+    },
+  ],
+
+  deliveryOrderListing: [
+    {
+      accessorKey: "rowNumber",
+      id : "rowNumber",
+      header: "No",
+      cell: ({ table, row }) => {
+        const { pageIndex, pageSize } = table.getState().pagination;
+        return pageIndex * pageSize + row.index + 1;
+      },
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: "itemCode",
+      header: "Code",
+    },
+    {
+      accessorKey:"description",
+      header:"Description",
+    },
+    {
+      accessorKey: "price",
+      header:"U/Price",
+    },
+    {
+      accessorKey: "deliveryDateFormat",
+      header:"Delivery Date",
+    },
+    {
+      accessorKey: "originalQuantity",
+      header:"Orig. Qty",
+    },
+    {
+      accessorKey: "docDateFormat",
+      header:"Date",
+    },
+    {
+      accessorKey: "docNo",
+      header: "Doc No",
+    },
+    {
+      accessorKey: "transferQuantity",
+      header: "Transfer Quantity",
+    },
+  ],
+
+  salesInvoice: [
+  { 
+    accessorKey: "rowNumber",
+    id : "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docNo",
+    id : "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id:"docDateFormat",
+    header:"Date",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "customerName",
+    id : "customerName",
+    header: "Customer",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "salesAgentName",
+    id : "salesAgentName",
+    header: "Sales Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "servicingAgentName",
+    id : "servicingAgentName",
+    header: "Servicing Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "collectionAgentName",
+    id : "collectionAgentName",
+    header: "Collection Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "itemCode",
+    id: "itemCode",
+    header: "Item Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },  
+  {
+    accessorKey: "itemName",
+    id: "itemName",
+    header: "Item Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },   
+  {
+    accessorKey: "currencyCode",
+    id: "currencyCode",
+    header: "Currency Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },  
+  {
+    accessorKey: "price",
+    id: "price",
+    header: "Price",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.price} /></div>
+    ),
+  },
+  {
+    accessorKey: "deliveryDateFormat",
+    id: "deliveryDateFormat",
+    header: "Delivery Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "originalQuantity",
+    id: "originalQuantity",
+    header: "Orig. Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.originalQuantity} /></div>
+    ),
+  },
+  {
+    accessorKey: "osAmount",
+    id: "osAmount",
+    header: "O/S Amt",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.osAmount} /></div>
+    ),
+  },
+  ],
+
+  salesInvoiceListing:[
+    {
+			accessorKey: "rowNumber",
+			id : "rowNumber",
+			header: "No",
+			cell: ({ table, row }) => {
+				const { pageIndex, pageSize } = table.getState().pagination;
+				return pageIndex * pageSize + row.index + 1;
+			},
+			enableSorting: false,
+			enableColumnFilter: false,
+		},
+    {
+      accessorKey: "itemCode",
+      header: "Code",
+    },
+    {
+      accessorKey:"description",
+      header:"Description",
+    },
+    {
+      accessorKey: "price",
+      header:"U/Price",
+    },
+    {
+      accessorKey: "deliveryDateFormat",
+      header:"Delivery Date",
+    },
+    {
+      accessorKey: "originalQuantity",
+      header:"Orig. Qty",
+    },
+    {
+      accessorKey: "docDateFormat",
+      header:"Date",
+    },
+    {
+      accessorKey: "docNo",
+      header: "Doc No",
+    },
+    {
+      accessorKey: "transferQuantity",
+      header: "Transfer Quantity",
+    },
+  ],
+
+  cashSales: [
+  { 
+    accessorKey: "rowNumber",
+    id : "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docNo",
+    id : "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id:"docDateFormat",
+    header:"Date",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "customerName",
+    id : "customerName",
+    header: "Customer",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "salesAgentName",
+    id : "salesAgentName",
+    header: "Sales Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "servicingAgentName",
+    id : "servicingAgentName",
+    header: "Servicing Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "collectionAgentName",
+    id : "collectionAgentName",
+    header: "Collection Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "itemCode",
+    id: "itemCode",
+    header: "Item Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },  
+  {
+    accessorKey: "itemName",
+    id: "itemName",
+    header: "Item Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },   
+  {
+    accessorKey: "currencyCode",
+    id: "currencyCode",
+    header: "Currency Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },  
+  {
+    accessorKey: "price",
+    id: "price",
+    header: "Price",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.price} /></div>
+    ),
+  },
+  {
+    accessorKey: "deliveryDateFormat",
+    id: "deliveryDateFormat",
+    header: "Delivery Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "originalQuantity",
+    id: "originalQuantity",
+    header: "Orig. Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.originalQuantity} /></div>
+    ),
+  },
+  {
+    accessorKey: "osAmount",
+    id: "osAmount",
+    header: "O/S Amt",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.osAmount} /></div>
+    ),
+  },
+],
+
+cashSalesListing:[
+  {
+    accessorKey: "rowNumber",
+    id : "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "itemCode",
+    header: "Code",
+  },
+  {
+    accessorKey:"description",
+    header:"Description",
+  },
+  {
+    accessorKey: "price",
+    header:"U/Price",
+  },
+  {
+    accessorKey: "deliveryDateFormat",
+    header:"Delivery Date",
+  },
+  {
+    accessorKey: "originalQuantity",
+    header:"Orig. Qty",
+  },
+  {
+    accessorKey: "docDateFormat",
+    header:"Date",
+  },
+  {
+    accessorKey: "docNo",
+    header: "Doc No",
+  },
+  {
+    accessorKey: "transferQuantity",
+    header: "Transfer Quantity",
+  },
+],
+  salesDebitNote: [
+  { 
+    accessorKey: "rowNumber",
+    id : "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docNo",
+    id : "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id:"docDateFormat",
+    header:"Date",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "customerName",
+    id : "customerName",
+    header: "Customer",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "salesAgentName",
+    id : "salesAgentName",
+    header: "Sales Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "servicingAgentName",
+    id : "servicingAgentName",
+    header: "Servicing Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "collectionAgentName",
+    id : "collectionAgentName",
+    header: "Collection Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "itemCode",
+    id: "itemCode",
+    header: "Item Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },  
+  {
+    accessorKey: "itemName",
+    id: "itemName",
+    header: "Item Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },   
+  {
+    accessorKey: "currencyCode",
+    id: "currencyCode",
+    header: "Currency Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },  
+  {
+    accessorKey: "price",
+    id: "price",
+    header: "Price",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.price} /></div>
+    ),
+  },
+  {
+    accessorKey: "deliveryDateFormat",
+    id: "deliveryDateFormat",
+    header: "Delivery Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "originalQuantity",
+    id: "originalQuantity",
+    header: "Orig. Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.originalQuantity} /></div>
+    ),
+  },
+  {
+    accessorKey: "osAmount",
+    id: "osAmount",
+    header: "O/S Amt",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.osAmount} /></div>
+    ),
+  },
+  ],
+};

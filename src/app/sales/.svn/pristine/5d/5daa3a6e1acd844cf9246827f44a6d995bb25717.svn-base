@@ -1,0 +1,563 @@
+"use client";
+
+import React, { useEffect, useState, memo } from "react";
+import { FaSort, FaSortDown, FaSortUp } from "react-icons/fa6";
+import type { ColumnDef, Row, SortingState } from "@tanstack/react-table";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+
+import { useSearchParams } from "next/navigation";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+import { DEFAULT_DATA_TABLE_PAGE_SIZE, getAuthHeaders, DATA_TABLE_DEFAULT_COLUMN_SIZING } from "@/lib/constants";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { cn } from "@/lib/utils/cn";
+
+import ItemPopoverToolbar from "./ItemPopoverToolbar";
+import type { ItemList } from "./itemColumns";
+
+// Mobile View (Imports)
+import MobilePopoverDataTable from "@/components/form/MobilePopoverDataTable";
+
+// Column Drag and Drop and Resize (Imports)
+import type { MouseEvent } from "react";
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import getExcludedColumns from "@/lib/utils/data-table/getExcludedColumns";
+import handleDndDragEnd from "@/lib/utils/data-table/handleDndDragEnd";
+import type {
+  ColumnOrderState,
+  ColumnSizingState,
+  Table as TableType,
+  VisibilityState,
+} from "@tanstack/react-table";
+
+type Props = {
+  open: boolean;
+  setOpen: (state: boolean) => void;
+  columns: ColumnDef<ItemList>[];
+  setTempRowSalesCreditNoteDetailsListData: (data: any, overwrite: boolean) => void;
+  tempRowSalesCreditNoteDetailsList: any;
+  revalidateSalesCreditNoteDetails: () => void;
+  itemTable: any;
+  fetchItemData: (itemType: string) => void;
+  itemType: string;
+  form: any;
+  updateItem: (prop: any) => void;
+  itemData?: any[];
+  slug: string;
+  preferenceData: any
+};
+
+const now = new Date();
+
+// Start = now (seconds)
+const startDayTs = Math.floor(now.getTime() / 1000);
+
+// End = end of last day of current month (seconds)
+const lastDayTs = Math.floor(
+  new Date(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    0,
+    23, 59, 59, 999
+  ).getTime() / 1000
+);
+
+
+// Column Drag and Drop and Resize (Local Storage Keys)
+const SERVICE_COLUMN_ORDERING_KEY = "sales-credit-note.service.bs.table.ordering";
+const SERVICE_COLUMN_SIZING_KEY = "sales-credit-note.service.bs.table.sizing";
+const STOCK_COLUMN_ORDERING_KEY = "sales-credit-note.stock.bs.table.ordering";
+const STOCK_COLUMN_SIZING_KEY = "sales-credit-note.stock.bs.table.sizing";
+const COLUMN_VISIBILITY_KEY = "sales-credit-note.item.bs.table.columns";
+
+// HTML Utility Function
+function stripHtml(html) {
+  if (!html) return "";
+  // Replace <br> and <br/> with newlines
+  let text = html.replace(/<br\s*\/?>/gi, '\n');
+  // Replace <p> with nothing, </p> with newline
+  text = text.replace(/<p[^>]*>/gi, '').replace(/<\/p>/gi, '\n');
+  // Remove all other HTML tags
+  text = text.replace(/<[^>]+>/g, '');
+  // Replace HTML entities
+  text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+
+  return text;
+};
+
+export default function ItemPopover({
+  open,
+  setOpen,
+  columns,
+  setTempRowSalesCreditNoteDetailsListData,
+  tempRowSalesCreditNoteDetailsList,
+  itemTable,
+  revalidateSalesCreditNoteDetails,
+  fetchItemData,
+  itemType,
+  form,
+  updateItem,
+  itemData = [],
+  slug,
+  preferenceData
+}: Props) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const headers = getAuthHeaders();
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [selectedRow, setSelectedRow] = useState<Row | null>(null);
+  const [saveDisabled, setSaveDisabled] = useState(false);
+
+  // Selection Order (State)
+  const [selectionOrder, setSelectionOrder] = useState<string[]>([]);
+
+  // Column Drag and Drop and Resize (State)
+  const initialColumnOrder = columns?.filter(column => column?.id).map((column) => column.id!) || [];
+
+  const [serviceColumnOrder, setServiceColumnOrder] = useLocalStorage<ColumnOrderState>(
+    SERVICE_COLUMN_ORDERING_KEY,
+    initialColumnOrder
+  );
+  const [serviceColumnSizing, setServiceColumnSizing] = useLocalStorage<ColumnSizingState>(
+    SERVICE_COLUMN_SIZING_KEY,
+    {}
+  );
+  const [stockColumnOrder, setStockColumnOrder] = useLocalStorage<ColumnOrderState>(
+    STOCK_COLUMN_ORDERING_KEY,
+    initialColumnOrder
+  );
+  const [stockColumnSizing, setStockColumnSizing] = useLocalStorage<ColumnSizingState>(
+    STOCK_COLUMN_SIZING_KEY,
+    {}
+  );
+
+  const serviceDefaultColumns: Array<keyof ItemList> = [
+    "serviceCode",
+    "serviceName",
+    "description",
+  ];
+  const stockDefaultColumns: Array<keyof ItemList> = [
+    "stockCode",
+    "stock",
+    "description",
+  ];
+
+  const serviceDefaultColumnVisibility: VisibilityState = getExcludedColumns(
+    columns || [],
+    serviceDefaultColumns
+  );
+  const stockDefaultColumnVisibility: VisibilityState = getExcludedColumns(
+    columns || [],
+    stockDefaultColumns
+  );
+
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
+    if (typeof window !== "undefined") {
+      return JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}");
+    }
+    return itemType === "service" ? serviceDefaultColumnVisibility : stockDefaultColumnVisibility;
+  });
+
+  const currentColumnOrder = itemType === "service" ? serviceColumnOrder : stockColumnOrder;
+  const currentColumnSizing = itemType === "service" ? serviceColumnSizing : stockColumnSizing;
+  const setCurrentColumnOrder = itemType === "service" ? setServiceColumnOrder : setStockColumnOrder;
+  const setCurrentColumnSizing = itemType === "service" ? setServiceColumnSizing : setStockColumnSizing;
+
+  const table = useReactTable({
+    columns,
+    data: itemData || itemTable.getRowModel().rows.map((row) => row.original) || [],
+    state: {
+      sorting,
+      columnVisibility,
+      columnOrder: currentColumnOrder,
+      columnSizing: currentColumnSizing,
+    },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnOrderChange: setCurrentColumnOrder,
+    onColumnSizingChange: setCurrentColumnSizing,
+    autoResetPageIndex: false,
+    columnResizeMode: "onChange",
+    defaultColumn: DATA_TABLE_DEFAULT_COLUMN_SIZING,
+    enableColumnResizing: true,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      },
+      columnVisibility: JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}"),
+    },
+  });
+
+  // Column Drag and Drop and Resize (Hooks)
+  const sensors = useDndSensors();
+  const columnSizeVars = useColumnSizeVars(table);
+
+  useEffect(() => {
+    localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
+
+  usePreventShiftTextSelect();
+
+  const onSave = async (prop) => {
+    // if (id && slug !== "clone") {
+    //   // Selection Order (Pass Selection Order)
+    //   await updateItem({
+    //     ...prop,
+    //     selectionOrder: selectionOrder, // Pass selection order to updateItem
+    //   });
+
+    //   revalidateSalesCreditNoteDetails();
+    // } else {
+    let selectedRows = Array(0);
+
+    // Selection Order (Logic)
+    if (prop.table) {
+      const selectedRowsMap = new Map(
+        prop.table.getSelectedRowModel().rows.map(row => [row.id, row])
+      );
+
+      selectedRows = selectionOrder
+        .filter(rowId => selectedRowsMap.has(rowId))
+        .map(rowId => selectedRowsMap.get(rowId));
+    } else {
+      selectedRows.push(prop.row);
+    }
+
+    // Selection Order (Add Index and Sequence)
+    selectedRows.forEach((row, index) => {
+      // Get the maximum existing sequence number
+      const existingData = tempRowSalesCreditNoteDetailsList || [];
+      const maxSeq = existingData.length > 0
+        ? Math.max(...existingData.map(item => parseInt(item.seq) || 0))
+        : 0;
+
+      let item = {};
+
+      if (itemType === "service") {
+        item = {
+          UUID: "",
+          seq: (maxSeq + index + 1).toString(),
+          item: row.original["UUID"],
+          itemCode: row.original["serviceCode"],
+          itemName: row.original["serviceName"],
+          type: "Service",
+          description: stripHtml(row.original["description"]),
+          "2ndDescription": stripHtml(row.original["2ndDescription"]),
+          moreDescription: stripHtml(row.original["moreDescription"]),
+          itemGroup: row.original["serviceGroupCode"],
+          itemGroupCode: row.original["serviceGroupCodeCode"],
+          itemCategory: row.original["serviceCategoryCode"],
+          itemCategoryCode: row.original["serviceCategoryCodeCode"],
+          tariff: null,
+          classification: row.original["classification"],
+          classificationCode: row.original["classificationCodeCode"],
+          permitNo: null,
+          project: form.getValues("project"),
+          quantity: row.original.UOMDropdown && row.original.UOMDropdown.length > 0 && row.original.UOMDropdown[0].UOM ? 1 : "",
+          quantity2: row.original.UOMDropdown2 && row.original.UOMDropdown2.length > 0 && row.original.UOMDropdown2[0].UOM2 ? 1 : "",
+          quantity3: row.original.UOMDropdown3 && row.original.UOMDropdown3.length > 0 && row.original.UOMDropdown3[0].UOM3 ? 1 : "",
+          UOM: row.original["defaultUOMSales"],
+          UOM2: null,
+          UOM3: null,
+          UOMDropdown: row.original.UOMDropdown || [],
+          UOMDropdown2: row.original.UOMDropdown2 || [],
+          UOMDropdown3: row.original.UOMDropdown3 || [],
+          itemRate: row.original["rate"],
+          price: row.original["promotionPrice"] || 0,
+          discountRate: 0,
+          discountAmount: 0,
+          tax: null,
+          deliveryDate: row.original["deliveryDate"],
+          billingFrequency: row.original["billingFrequency"],
+          billingInterval: row.original["billingInterval"],
+          startAt: preferenceData?.data?.salesCreditNoteDefaultDate == "1" ? startDayTs : "",
+          endAt: preferenceData?.data?.salesCreditNoteDefaultDate == "1" ? lastDayTs : "",
+          remark1: "",
+          remark2: "",
+          valid: "1",
+        };
+      } else {
+        item = {
+          UUID: "",
+          seq: (maxSeq + index + 1).toString(),
+          item: row.original["UUID"],
+          itemCode: row.original["stockCode"],
+          itemName: row.original["stock"],
+          type: "Stock",
+          description: stripHtml(row.original["description"]),
+          "2ndDescription": stripHtml(row.original["2ndDescription"]),
+          moreDescription: stripHtml(row.original["moreDescription"]),
+          itemGroup: row.original["stockGroupCode"],
+          itemGroupCode: row.original["stockGroupCodeCode"],
+          itemCategory: row.original["stockCategoryCode"],
+          itemCategoryCode: row.original["stockCategoryCodeCode"],
+          tariff: null,
+          classification: row.original["classification"],
+          classificationCode: row.original["classificationCodeCode"],
+          permitNo: null,
+          project: form.getValues("project"),
+          quantity: 1,
+          UOM: row.original["defaultUOMSales"],
+          UOM2: null,
+          UOM3: null,
+          UOMDropdown: row.original.UOMDropdown || [],
+          itemRate: row.original["rate"],
+          price: row.original["promotionPrice"] || 0,
+          discountRate: 0,
+          discountAmount: 0,
+          itemSerialNo: row.original["serialNo"],
+          tax: null,
+          deliveryDate: "",
+          billingFrequency: null,
+          billingInterval: null,
+          startAt: preferenceData?.data?.salesCreditNoteDefaultDate == "1" ? startDayTs : "",
+          endAt: preferenceData?.data?.salesCreditNoteDefaultDate == "1" ? lastDayTs : "",
+          remark1: "",
+          remark2: "",
+          valid: "1",
+        };
+      }
+      setTempRowSalesCreditNoteDetailsListData(item, false);
+    });
+    // }
+
+    if (prop.table) {
+      prop.table.resetRowSelection();
+
+      // Selection Order (Reset)
+      setSelectionOrder([]);
+    }
+
+    setOpen(false);
+  };
+
+  const onDoubleClick = (row: Row<ItemList>) => {
+    onSave({ row: row, itemType: itemType });
+  };
+
+  // Selection Order (Handler)
+  const onItemRowSelection = (row: Row<ItemList>) => (event: React.MouseEvent) => {
+    const isSelected = row.getIsSelected();
+
+    if (event.detail === 2) {
+      // Double click
+      onDoubleClick(row);
+      return;
+    }
+
+    // Handle selection order
+    if (isSelected) {
+      // Deselecting - remove from order
+      setSelectionOrder(prev => prev.filter(id => id !== row.id));
+    } else {
+      // Selecting - add to end of order
+      setSelectionOrder(prev => [...prev, row.id]);
+    }
+
+    row.toggleSelected();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen} className="mx-2">
+      <DialogContent className="min-h-[75vh] min-w-[75vw] max-w-3xl bg-erp-blue-3 p-2">
+        <div className="flex flex-row">
+          <div className="h-[73cqh] w-full p-4">
+            <div className="flex h-[70cqh] flex-col bg-erp-blue-3 @container-[size]">
+              <h2 className="text-sm font-bold">Select Item</h2>
+              <ItemPopoverToolbar
+                table={table}
+                setOpen={setOpen}
+                handleSave={onSave}
+                revalidateSalesCreditNoteDetails={revalidateSalesCreditNoteDetails}
+                fetchItemData={fetchItemData}
+                itemType={itemType}
+                setSelectedRow={setSelectedRow}
+                saveDisabled={saveDisabled}
+                setSaveDisabled={setSaveDisabled}
+              />
+              <Separator className="bg-erp-blue-11" />
+              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                {/* Mobile View (Data Table) */}
+                <MobilePopoverDataTable
+                  table={table}
+                  headerFields={[
+                    itemType === "service" ? "serviceCode" : "stockCode",
+                    itemType === "service" ? "serviceName" : "stock",
+                  ]}
+                  initialVisibleFields={4}
+                  excludeFromGrid={["serviceCode", "stockCode"]}
+                  showSelection={true}
+                  selectionLabel="Select"
+                />
+
+                {/* Web View (Data Table) */}
+                <div className="hidden md:block">
+                  {/* Column Drag and Drop and Resize (DND Context) */}
+                  <DndContext
+                    collisionDetection={closestCenter}
+                    modifiers={[restrictToHorizontalAxis]}
+                    onDragEnd={(event) => handleDndDragEnd(event, setCurrentColumnOrder)}
+                    sensors={sensors}
+                  >
+                    {/* Column Drag and Drop and Resize (Table) */}
+                    <Table
+                      className="table-fixed border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1"
+                      style={{ ...columnSizeVars, width: table.getTotalSize() }}
+                    >
+                      <TableHeader className="sticky top-0 z-10">
+                        {table.getHeaderGroups().map((headerGroup) => (
+                          <TableRow key={headerGroup.id}>
+                            {/* Column Drag and Drop and Resize (Sortable Context) */}
+                            <SortableContext
+                              items={currentColumnOrder}
+                              strategy={horizontalListSortingStrategy}
+                            >
+                              {headerGroup.headers.map((header) => (
+                                // Column Drag and Drop and Resize (Dragable Table Head)
+                                <DragableTableHead
+                                  key={header.id}
+                                  header={header}
+                                  className="bg-erp-blue-11 font-normal"
+                                  style={{
+                                    width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                                  }}
+                                >
+                                  {header.column.id === "valid" ? (
+                                    <TableHeadValidityFilter table={table} />
+                                  ) : (
+                                    <TableHeadColumnTextFilter column={header.column} table={table} />
+                                  )}
+                                  <ColumnResizer header={header} />
+                                </DragableTableHead>
+                              ))}
+                            </SortableContext>
+                          </TableRow>
+                        ))}
+                      </TableHeader>
+                      {/* Column Drag and Drop and Resize (Table Body) */}
+                      {table.getState().columnSizingInfo.isResizingColumn ? (
+                        <MemoizedTableBody
+                          table={table}
+                          onItemRowSelection={onItemRowSelection}
+                          columns={columns}
+                        />
+                      ) : (
+                        <NonMemoizedTableBody
+                          table={table}
+                          onItemRowSelection={onItemRowSelection}
+                          columns={columns}
+                        />
+                      )}
+                    </Table>
+                  </DndContext>
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Column Drag and Drop and Resize (Table Body)
+type TableBodyProps = {
+  table: TableType<ItemList>;
+  onItemRowSelection: (row: Row<ItemList>) => (event: MouseEvent<HTMLTableRowElement>) => void;
+  columns: ColumnDef<ItemList>[];
+};
+
+function NonMemoizedTableBody({ table, onItemRowSelection, columns }: TableBodyProps) {
+  return (
+    <TableBody>
+      {table.getRowModel().rows?.length ? (
+        table.getRowModel().rows.map((row) => (
+          <TableRow
+            className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+            data-state={row.getIsSelected() && "selected"}
+            onClick={onItemRowSelection(row)}
+            key={row.id}
+          >
+            {row.getVisibleCells().map((cell) => {
+              if (
+                cell.column.id === "description" ||
+                cell.column.id === "2ndDescription" ||
+                cell.column.id === "moreDescription"
+              ) {
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className="truncate"
+                    title={stripHtml((cell.getValue() ?? "").toString())}
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                    }}
+                  >
+                    {stripHtml((cell.getValue() ?? "").toString())}
+                  </TableCell>
+                );
+              } else {
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className="truncate"
+                    title={(cell.getValue() ?? "").toString()}
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                    }}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                );
+              }
+            })}
+          </TableRow>
+        ))
+      ) : (
+        <NoResultsTableRow columns={columns} />
+      )}
+    </TableBody>
+  );
+}
+
+const MemoizedTableBody = memo(
+  NonMemoizedTableBody,
+  (prev, next) => prev.table.options.data === next.table.options.data
+) as typeof NonMemoizedTableBody;

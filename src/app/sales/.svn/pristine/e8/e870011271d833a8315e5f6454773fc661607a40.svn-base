@@ -1,0 +1,321 @@
+"use client";
+
+import { Table } from "@tanstack/react-table";
+import React, { useEffect, useState } from "react";
+
+import CancelEInvoiceButton from "@/components/data-table/ActionButton/CancelEInvoice";
+import CloneButton from "@/components/data-table/ActionButton/Clone";
+import DeleteButton from "@/components/data-table/ActionButton/Delete";
+import EditButton from "@/components/data-table/ActionButton/Edit";
+import GetEInvoiceButton from "@/components/data-table/ActionButton/GetEinvoice";
+import NewButton from "@/components/data-table/ActionButton/New";
+import PreviewButton from "@/components/data-table/ActionButton/Preview";
+import RestoreButton from "@/components/data-table/ActionButton/Restore";
+import SubmitEInvoiceButton from "@/components/data-table/ActionButton/SubmitEInvoice";
+import TrashButton from "@/components/data-table/ActionButton/Trash";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import MobileActionGroupEnd from "@/components/data-table/MobileActionGroupEnd";
+import MobileActionGroupStart from "@/components/data-table/MobileActionGroupStart";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import Validity from "@/components/data-table/Validity";
+// Transfer From (Imports)
+import { TransferFromButton } from "@/components/features/transfer/transferFrom";
+// Transfer To (Imports)
+import { TransferToButton } from "@/components/features/transfer/transferTo";
+// Mobile View (Imports)
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+
+import { SalesInvoice } from "./columns";
+import { salesInvoiceTransferFromConfig } from "./transfer/transferFrom/config";
+import { salesInvoiceTransferToConfig } from "./transfer/transferTo/config";
+
+import type { VisibilityState } from "@tanstack/react-table";
+
+// Server-Side Filtering (Add totalNumOfRows)
+type Props = {
+  table: Table<SalesInvoice>;
+  refreshTable: any;
+  totalNumOfRows?: number;
+  defaultColumns?: VisibilityState;
+  dataStatusBadgeDisplay?: React.ReactNode;
+  onResetColumnOrdering?: () => void;
+  isSelectionMode?: boolean;
+  onExitSelectionMode?: () => void;
+  // viewEInvoiceDetails?: (row: any) => void;
+};
+
+export default function DataTableToolbar({
+  table,
+  refreshTable,
+  totalNumOfRows,
+  defaultColumns,
+  dataStatusBadgeDisplay,
+  onResetColumnOrdering,
+  isSelectionMode = false,
+  onExitSelectionMode,
+  // viewEInvoiceDetails,
+}: Props) {
+  return (
+    <div className="flex h-[90px] items-center justify-between bg-erp-blue-5 md:h-auto md:p-1.5">
+      <ActionGroupStart table={table} refreshTable={refreshTable} />
+
+      {/* Mobile View (Hide Pagination) */}
+      <div className="hidden md:block">
+        {/* Server-Side Filtering (Pass totalNumOfRows) */}
+        <Pagination table={table} totalNumOfRows={totalNumOfRows} />
+      </div>
+
+      <ActionGroupEnd
+        table={table}
+        refreshTable={refreshTable}
+        defaultColumns={defaultColumns}
+        dataStatusBadgeDisplay={dataStatusBadgeDisplay}
+        onResetColumnOrdering={onResetColumnOrdering}
+        isSelectionMode={isSelectionMode}
+        onExitSelectionMode={onExitSelectionMode}
+      />
+    </div>
+  );
+}
+
+function ActionGroupStart({ table, refreshTable }: Props) {
+  const [selectedRow, setSelectedRow] = useState<any>(null);
+
+  const selectedRowModel = table.getSelectedRowModel();
+
+  useEffect(() => {
+    if (selectedRowModel.rows.length === 1) {
+      setSelectedRow(selectedRowModel.rows[0]);
+    } else {
+      setSelectedRow(null);
+    }
+  }, [selectedRowModel]);
+
+  // Mobile View (States)
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  return (
+    <div className="flex hidden flex-wrap items-center justify-start gap-x-2 p-1 md:block">
+      {/* Mobile View (Start Menu) */}
+      <MobileActionGroupStart
+        table={table}
+        refreshTable={refreshTable}
+        config={{
+          newDestination: "/sales/sales-invoice/new",
+          editDestination: (row) => `/sales/sales-invoice/edit?item=${row.docNo}&id=${row.UUID}`,
+          cloneDestination: (row) => `/sales/sales-invoice/clone?id=${row.UUID}`,
+          module: "sales_invoice",
+          model: "sales-invoice",
+        }}
+      >
+        {/* Additional Actions (Other than New, Edit, Clone, Trash, Restore, Delete) */}
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div onClick={() => setDropdownOpen(false)}>
+            <PreviewButton
+              table={table}
+              previewType={"SALES INVOICE"}
+              module={"sales_invoice"}
+              model={"sales-invoice"}
+              doc_id={selectedRow ? selectedRow.original.UUID : ""}
+              refreshTable={refreshTable}
+            />
+          </div>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div onClick={() => setDropdownOpen(false)}>
+            <SubmitEInvoiceButton
+              table={table}
+              module={"sales_invoice"}
+              model={"sales-invoice"}
+              refreshTable={refreshTable}
+            />
+          </div>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div onClick={() => setDropdownOpen(false)}>
+            <GetEInvoiceButton
+              table={table}
+              module={"sales_invoice"}
+              model={"sales-invoice"}
+              refreshTable={refreshTable}
+            />
+          </div>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div onClick={() => setDropdownOpen(false)}>
+            <CancelEInvoiceButton
+              table={table}
+              module={"sales_invoice"}
+              model={"sales-invoice"}
+              refreshTable={refreshTable}
+              selectedRow={selectedRow}
+            />
+          </div>
+        </DropdownMenuItem>
+        {/* Transfer From (Mobile View Button) */}
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div onClick={() => setDropdownOpen(false)}>
+            <TransferFromButton
+              table={table}
+              id={selectedRow ? selectedRow.original.UUID : ""}
+              config={salesInvoiceTransferFromConfig}
+              onTransferComplete={refreshTable}
+              refreshTable={refreshTable}
+            />
+          </div>
+        </DropdownMenuItem>
+        {/* Transfer To (Mobile View Button) */}
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div onClick={() => setDropdownOpen(false)}>
+            <TransferToButton
+              table={table}
+              id={selectedRow ? selectedRow.original.UUID : ""}
+              config={salesInvoiceTransferToConfig}
+            />
+          </div>
+        </DropdownMenuItem>
+      </MobileActionGroupStart>
+
+      {/* Web View (Menu) */}
+      <div className="hidden flex-wrap items-center justify-start gap-x-2 md:flex">
+        <NewButton destination="/sales/sales-invoice/new" />
+        <EditButton
+          table={table}
+          destination={`/sales/sales-invoice/edit?item=${selectedRow ? selectedRow.original.docNo : ""
+            }&id=${selectedRow ? selectedRow.original.UUID : ""}`}
+        />
+        <CloneButton
+          table={table}
+          destination={`/sales/sales-invoice/clone?id=${selectedRow ? selectedRow.original.UUID : ""
+            }`}
+        />
+        <TrashButton
+          table={table}
+          module={"sales_invoice"}
+          model={"sales-invoice"}
+          refreshTable={refreshTable}
+        />
+        <RestoreButton
+          table={table}
+          module={"sales_invoice"}
+          model={"sales-invoice"}
+          refreshTable={refreshTable}
+        />
+        <DeleteButton
+          table={table}
+          module={"sales_invoice"}
+          model={"sales-invoice"}
+          refreshTable={refreshTable}
+        />
+        <PreviewButton
+          table={table}
+          previewType={"SALES INVOICE"}
+          module={"sales_invoice"}
+          model={"sales-invoice"}
+          doc_id={selectedRow ? selectedRow.original.UUID : ""}
+          refreshTable={refreshTable}
+        />
+        <SubmitEInvoiceButton
+          table={table}
+          module={"sales_invoice"}
+          model={"sales-invoice"}
+          refreshTable={refreshTable}
+        />
+        <GetEInvoiceButton
+          table={table}
+          module={"sales_invoice"}
+          model={"sales-invoice"}
+          refreshTable={refreshTable}
+        />
+        <CancelEInvoiceButton
+          table={table}
+          module={"sales_invoice"}
+          model={"sales-invoice"}
+          refreshTable={refreshTable}
+          selectedRow={selectedRow}
+        />
+        {/* Transfer From (Web View Button) */}
+        <TransferFromButton
+          table={table}
+          id={selectedRow ? selectedRow.original.UUID : ""}
+          config={salesInvoiceTransferFromConfig}
+          onTransferComplete={refreshTable}
+          refreshTable={refreshTable}
+        />
+        {/* Transfer To (Web View Button) */}
+        <TransferToButton
+          table={table}
+          id={selectedRow ? selectedRow.original.UUID : ""}
+          config={salesInvoiceTransferToConfig}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ActionGroupEnd({
+  table,
+  refreshTable,
+  defaultColumns,
+  dataStatusBadgeDisplay,
+  onResetColumnOrdering,
+  onExitSelectionMode,
+  isSelectionMode = false,
+}: Props) {
+  return (
+    <div className="relative flex items-center gap-x-1 text-erp-blue-14">
+      {/* Web View (End Menu) */}
+      <span className="absolute-left-32 hidden md:flex">{dataStatusBadgeDisplay}</span>
+      <div className="hidden items-center gap-x-1 md:flex">
+        <Export table={table} module={"salesInvoice"} mainModule={"sales"} />
+        <Refresh refreshTable={refreshTable} resetRowSelection={() => table.resetRowSelection()} />
+        <Validity table={table} />
+        <ColumnVisibilityToggle
+          table={table}
+          defaultColumns={defaultColumns}
+          onResetColumnOrdering={onResetColumnOrdering}
+        />
+      </div>
+
+      {/* Mobile View (三合一咖啡，一键调用) */}
+      <div className="w-full px-2 sm:mr-auto md:hidden">
+        <MobileActionGroupEnd
+          table={table}
+          config={{
+            //Search 
+            searchColumn: "docNo",
+            searchPlaceholder: "Search Doc No.",
+            sortColumn: "docNo",
+
+            //Module
+            module: "sales_invoice",
+            model: "sales-invoice",
+            previewType: "SALES INVOICE",
+            refreshTable: refreshTable,
+
+            //Path
+            newDestination: "/sales/sales-invoice/new",
+
+            //Transfer From
+            transferFromConfig: salesInvoiceTransferFromConfig,
+            getTransferFromId: (row) => row?.UUID ?? "",
+            transferFromOnComplete: refreshTable,
+
+            //Export (Add module prop for API endpoint) 
+            exportModule: "salesInvoice",
+            exportMainModule: "sales",
+
+            //Customise Condition (Show Or Hidden)
+            showSubmitEInvoice: true,
+            showGetEInvoice: true,
+            showTransferFrom: true,
+          }}
+          isSelectionMode={isSelectionMode}
+          onExitSelectionMode={onExitSelectionMode}
+        />
+      </div>
+    </div>
+  );
+}

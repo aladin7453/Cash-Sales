@@ -1,0 +1,1329 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { format, fromUnixTime } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import moment from "moment";
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { FaCircleXmark, FaFileCirclePlus, FaMagnifyingGlass } from "react-icons/fa6";
+import { z } from "zod";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { DATE_FORMAT, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+
+import ResetButton from "./Reset";
+import SaveButton from "./Save";
+
+import type { Dispatch, SetStateAction } from "react";
+
+type Props = {
+  open: boolean;
+  setOpen: Dispatch<SetStateAction<boolean>>;
+  rowId?: string;
+  setTempRowCompanyAssignmentData: () => void;
+};
+
+const companyAssignmentFormSchema = z.object({
+  UUID: z.union([z.string(), z.literal("")]),
+  user: z.string().nullable().optional(),
+  Username: z.string().nullable().optional(),
+  company: z.string().nullable().optional(),
+  companyName: z.string().nullable().optional(),
+  department: z.string().nullable().optional(),
+  departmentName: z.string().nullable().optional(),
+  jobTitle: z.string().nullable().optional(),
+  jobTitleName: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  locationName: z.string().nullable().optional(),
+  employeeID: z.string().nullable().optional(),
+  employmentType: z.string().nullable().optional(),
+  supervisor: z.string().nullable().optional(),
+  supervisorName: z.string().nullable().optional(),
+  mentor: z.string().nullable().optional(),
+  mentorName: z.string().nullable().optional(),
+  startDate: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
+  exitReason: z.string().nullable().optional(),
+  remark: z.string().nullable().optional(),
+  attachment: z.custom((value) => {
+    if (!value || !value[0]) {
+      return "Attachment is required.";
+    }
+    return true;
+  }),
+  valid: z.union([z.string(), z.literal("")]),
+});
+
+export default function CompanyFormPopover({
+  slug,
+  open,
+  setOpen,
+  row,
+  tempRowCompanyAssignment,
+  setTempRowCompanyAssignmentData,
+  revalidateCompanyAssignmentData,
+  accountId,
+  setIsCompanyAssignmentData,
+  companyAssignmentFiles,
+  setCompanyAssignmentFiles,
+}: Props) {
+  const headers = getAuthHeaders();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const data = row;
+  const { toast } = useToast();
+
+  const [showTableCompany, setShowTableCompany] = useState(false); // State to control visibility of the table
+  const [showTableDepartment, setshowTableDepartment] = useState(false); // State to control visibility of the table
+  const [showTableJobTitle, setShowTableJobTitle] = useState(false); // State to control visibility of the table
+  const [showTableLocationCode, setShowTableLocationCode] = useState(false);
+  const [showTableMentor, setShowTableMentor] = useState(false);
+  const [showTableSupervisor, setShowTableSupervisor] = useState(false);
+
+  const [baseCompanyDropdownTableData, setBaseCompanyDropdownTableData] = useState([]);
+  const [baseDepartmentDropdownTableData, setBaseDepartmentDropdownTableData] = useState([]);
+  const [jobTitleDropdownTableData, setJobTitleDropdownTableData] = useState([]);
+  const [locationCodeDropdownData, setLocationCodeDropdownData] = useState([]);
+  const [mentorDropdownTableData, setMentorDropdownTableData] = useState([]);
+  const [supervisorDropdownTableData, setSupervisorDropdownTableData] = useState([]);
+  const [dropdownEnumData, setDropdownEnumData] = useState<DropdownData | null>(null);
+
+  const [isDropdownEnumDataLoaded, setIsDropdownEnumDataLoaded] = useState(false);
+
+  const [companyFilter, setCompanyFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [jobTitleFilter, setJobTitleFilter] = useState("");
+  const [locationCodeFilter, setLocationCodeFilter] = useState("");
+  const [supervisorFilter, setSupervisorFilter] = useState("");
+  const [mentorFilter, setMentorFilter] = useState("");
+
+  const dropdownCompanyColumns = [
+    { accessorKey: "company", header: "Company" },
+    { accessorKey: "description", header: "Description" },
+  ];
+  const dropdownDepartmentColumns = [
+    { accessorKey: "departmentID", header: "ID" },
+    { accessorKey: "department", header: "Department" },
+    { accessorKey: "description", header: "Description" },
+  ];
+  const dropdownJobTitleColumns = [
+    { accessorKey: "jobTitleID", header: "ID" },
+    { accessorKey: "jobTitle", header: "Job Title" },
+    { accessorKey: "description", header: "Description" },
+  ];
+  const dropdownLocationCodeColumns = [
+    { accessorKey: "locationCode", header: "Location Code" },
+    { accessorKey: "locationName", header: "Location" },
+    { accessorKey: "locationType", header: "Location Type" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+  const dropdownMentorSupervisorColumns = [
+    { accessorKey: "fullName", header: "Full Name" },
+    { accessorKey: "userGroupuserGroup", header: "User Group" },
+    { accessorKey: "baseJobTitlebaseJobTitle", header: "Job Title" },
+  ];
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const [fileError, setFileError] = useState<string | null>(null);
+  const fileInputRef = useRef(null);
+
+  const handleChooseFileClick = () => {
+    fileInputRef.current.click(); // Trigger click event on file input
+  };
+
+  const handleReset = () => {
+    form.reset({
+      UUID: "",
+      company: "",
+      companyName: "",
+      department: "",
+      departmentName: "",
+      jobTitle: "",
+      jobTitleName: "",
+      location: "",
+      locationName: "",
+      employeeID: "",
+      employmentType: "",
+      supervisor: "",
+      mentor: "",
+      startDate: "",
+      endDate: "",
+      exitReason: "",
+      remark: "",
+      attachment: null,
+      valid: "1",
+    });
+  };
+
+  useEffect(() => {
+    if (open) {
+      !data && handleReset();
+      !data && setCompanyAssignmentFiles([]);
+    }
+  }, [open]);
+
+  const fetchDropdownEnumData = async () => {
+    try {
+      const response = await fetch(
+        `${ORIGIN}/user/api/user/get-all-enum-dropdown-data`,
+        {
+          headers,
+        },
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch dropdown data");
+      }
+      const data = await response.json();
+      const mappedData = {
+        exitReason: data.user.exitReason.map((item) => {
+          return { label: item, value: item };
+        }),
+        employmentType: data.user.employmentType.map((item) => {
+          return { label: item, value: item };
+        }),
+      };
+      return mappedData;
+    } catch (error) {
+      throw new Error("Failed to fetch dropdown data");
+    }
+  };
+
+  useEffect(() => {
+    fetchDropdownEnumData()
+      .then((data) => {
+        setDropdownEnumData(data);
+        setIsDropdownEnumDataLoaded(true);
+      })
+      .catch((error) => {
+        console.error("Error fetching dropdown data:", error);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (data && data.attachmentLink) {
+      setCompanyAssignmentFiles(data.attachmentLink);
+    }
+    if (data && data.attachmentFiles) {
+      setCompanyAssignmentFiles(data.attachmentFiles);
+    }
+
+    return () => {};
+  }, [data]);
+
+  function handleDeleteFile(index) {
+    var newCompanyFiles = [...companyAssignmentFiles];
+    newCompanyFiles.splice(index, 1);
+    setCompanyAssignmentFiles(newCompanyFiles);
+  }
+
+  const validateFileType = (file: File): boolean => {
+    const allowedTypes = [".pdf", ".png", ".jpg", ".jpeg"];
+    const fileExtension = "." + file.name.split(".").pop()?.toLowerCase();
+    return allowedTypes.includes(fileExtension);
+  };
+
+  const handleFileChange = (event) => {
+    const fileList = Array.from(event.target.files);
+
+    // Validate file types
+    for (const file of fileList) {
+      if (!validateFileType(file)) {
+        setFileError("Only (.pdf, .png, .jpg, .jpeg) files are allowed.");
+        return;
+      }
+    }
+
+    setFileError(null);
+    const mergeArray: any = [...companyAssignmentFiles, ...fileList];
+    setCompanyAssignmentFiles(mergeArray);
+  };
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableCompany(false);
+      setshowTableDepartment(false);
+      setShowTableJobTitle(false);
+      setShowTableLocationCode(false);
+      setShowTableSupervisor(false);
+      setShowTableMentor(false);
+    }
+  };
+
+  // Attach click event listener to the document body
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    // Cleanup: remove event listener when component unmounts
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  const handleCompanySearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCompanyFilter(value);
+    form.setValue("companyName", value);
+
+    if (!showTableCompany) setShowTableCompany(true);
+  };
+
+  const handleDepartmentSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setDepartmentFilter(value);
+    form.setValue("departmentName", value);
+
+    if (!showTableDepartment) setshowTableDepartment(true);
+  };
+
+  const handleJobTitleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setJobTitleFilter(value);
+    form.setValue("jobTitleName", value);
+
+    if (!showTableJobTitle) setShowTableJobTitle(true);
+  };
+
+  const handleLocationCodeSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLocationCodeFilter(value);
+    form.setValue("locationName", value);
+
+    if (!showTableLocationCode) setShowTableLocationCode(true);
+  };
+
+  const handleSupervisorSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSupervisorFilter(value);
+    form.setValue("supervisorName", value);
+
+    if (!showTableSupervisor) setShowTableSupervisor(true);
+  };
+
+  const handleMentorSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setMentorFilter(value);
+    form.setValue("mentorName", value);
+
+    if (!showTableMentor) setShowTableMentor(true);
+  };
+
+  const toggleTableDepartment = async () => {
+    if (!company) {
+      toast({
+        variant: "destructive",
+        title: "No Company Selected",
+        description: "Please select a company first before selecting department.",
+      });
+
+      return;
+    }
+
+    const formData = new FormData();
+    const department = "department";
+    formData.append("table[]", department);
+    formData.append("company", company);
+
+    if (!showTableDepartment) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch user list drop-down data");
+        }
+        const departmentData = await response.json();
+        setBaseDepartmentDropdownTableData(departmentData.rows);
+        setshowTableDepartment(true);
+      } catch (error) {
+        console.error("Error fetching user list drop-down data:", error);
+        // Handle error
+      }
+    } else {
+      setshowTableDepartment(false);
+    }
+  };
+
+  const toggleTableCompany = async () => {
+    const formData = new FormData();
+    const company = "company";
+    formData.append("table[]", company);
+
+    if (!showTableCompany) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch company drop-down data");
+        }
+
+        const companyData = await response.json();
+
+        setBaseCompanyDropdownTableData(companyData.rows);
+        setShowTableCompany(true);
+      } catch (error) {
+        console.error("Error fetching company drop-down data:", error);
+      }
+    } else {
+      setShowTableCompany(false);
+    }
+  };
+
+  const toggleTableJobTitle = async () => {
+    if (!company) {
+      toast({
+        variant: "destructive",
+        title: "No Company Selected",
+        description: "Please select a company first before selecting job title.",
+      });
+
+      return;
+    }
+
+    const formData = new FormData();
+    const jobTitle = "jobTitle";
+    formData.append("table[]", jobTitle);
+    formData.append("company", company);
+
+    if (!showTableJobTitle) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch user list drop-down data");
+        }
+        const jobTitleData = await response.json();
+        setJobTitleDropdownTableData(jobTitleData.rows);
+        setShowTableJobTitle(true);
+      } catch (error) {
+        console.error("Error fetching user list drop-down data:", error);
+        // Handle error
+      }
+    } else {
+      setShowTableJobTitle(false);
+    }
+  };
+
+  const toggleTableLocation = async () => {
+    if (!company) {
+      toast({
+        variant: "destructive",
+        title: "No Company Selected",
+        description: "Please select a company first before selecting location.",
+      });
+
+      return;
+    }
+
+    const formData = new FormData();
+    const location = "location";
+    formData.append("table[]", location);
+    formData.append("company", company);
+
+    if (!showTableLocationCode) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch asset location drop-down data");
+        }
+        const locationData = await response.json();
+        setLocationCodeDropdownData(locationData.rows);
+        setShowTableLocationCode(true);
+      } catch (error) {
+        console.error("Error fetching asset location drop-down data:", error);
+      }
+    } else {
+      setShowTableLocationCode(false);
+    }
+  };
+
+  const toggleTableSupervisor = async () => {
+    var companyId = form.getValues("company");
+
+    if (!showTableSupervisor) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/user/api/user/get-mentor-or-supervisor-by-company?id=${companyId}`,
+          {
+            headers,
+          },
+        );
+        if (!response.ok) {
+          throw new Error("Failed to fetch user list drop-down data");
+        }
+        const supervisorData = await response.json();
+        setSupervisorDropdownTableData(supervisorData.rows);
+        setShowTableSupervisor(true);
+      } catch (error) {
+        console.error("Error fetching user list drop-down data:", error);
+      }
+    } else {
+      setShowTableSupervisor(false);
+    }
+  };
+
+  const toggleTableMentor = async () => {
+    var companyId = form.getValues("company");
+
+    if (!showTableMentor) {
+      setShowTableCompany(false);
+      setshowTableDepartment(false);
+      setShowTableJobTitle(false);
+      setShowTableLocationCode(false);
+      setShowTableSupervisor(false);
+      try {
+        const response = await fetch(
+          `${ORIGIN}/user/api/user/get-mentor-or-supervisor-by-company?id=${companyId}`,
+          {
+            headers,
+          },
+        );
+        if (!response.ok) {
+          throw new Error("Failed to fetch user list drop-down data");
+        }
+        const mentorData = await response.json();
+        setMentorDropdownTableData(mentorData.rows);
+        setShowTableMentor(true);
+      } catch (error) {
+        console.error("Error fetching user list drop-down data:", error);
+        // Handle error
+      }
+    } else {
+      setShowTableMentor(false);
+    }
+  };
+
+  const onClickRowCompany = (row) => {
+    form.setValue("company", row.UUID);
+    form.setValue("companyName", row.company);
+    setShowTableCompany(false);
+  };
+
+  const onClickRowDepartment = (row) => {
+    form.setValue("department", row.UUID);
+    form.setValue("departmentName", row.department);
+    setshowTableDepartment(false);
+  };
+
+  const onClickRowJobTitle = (row) => {
+    form.setValue("jobTitle", row.UUID);
+    form.setValue("jobTitleName", row.jobTitle);
+    setShowTableJobTitle(false);
+  };
+
+  const onClickRowLocationCode = (row) => {
+    form.setValue("location", row.UUID);
+    form.setValue("locationName", row.locationName);
+    setShowTableLocationCode(false);
+  };
+
+  const onClickRowMentor = (row) => {
+    form.setValue("mentor", row.UUID);
+    form.setValue("mentorName", row.fullName);
+    setShowTableMentor(false);
+  };
+
+  const onClickRowSupervisor = (row) => {
+    form.setValue("supervisor", row.UUID);
+    form.setValue("supervisorName", row.fullName);
+    setShowTableSupervisor(false);
+  };
+
+  const form = useForm<z.infer<typeof companyAssignmentFormSchema>>({
+    resolver: zodResolver(companyAssignmentFormSchema),
+    defaultValues: {
+      UUID: data?.UUID !== undefined ? data.UUID : "",
+      user: data?.user !== undefined ? data.user : "",
+      Username: data?.Username !== undefined ? data.Username : "",
+      company: data?.company !== undefined ? data.company : "",
+      companyName: data?.companyName !== undefined ? data.companyName : "",
+      department: data?.department !== undefined ? data.department : "",
+      departmentName: data?.departmentName !== undefined ? data.departmentName : "",
+      jobTitle: data?.jobTitle !== undefined ? data.jobTitle : "",
+      jobTitleName: data?.jobTitleName !== undefined ? data.jobTitleName : "",
+      location: data?.location !== undefined ? data.location : "",
+      locationName: data?.locationName !== undefined ? data.locationName : "",
+      employeeID: data?.employeeID !== undefined ? data.employeeID : "",
+      employmentType: data?.employmentType !== undefined ? data.employmentType : "",
+      supervisor: data?.supervisor !== undefined ? data.supervisor : "",
+      supervisorName: data?.supervisorName !== undefined ? data.supervisorName : "",
+      mentor: data?.mentor !== undefined ? data.mentor : "",
+      mentorName: data?.mentorName !== undefined ? data.mentorName : "",
+      startDate: data?.startDateFormat
+        ? moment(data.startDateFormat, "YYYY-MM-DD HH:mm:ss").unix()
+        : undefined,
+      endDate: data?.endDateFormat
+        ? moment(data.endDateFormat, "YYYY-MM-DD HH:mm:ss").unix()
+        : undefined,
+      exitReason: data?.exitReason !== undefined ? data.exitReason : "",
+      remark: data?.remark !== undefined ? data.remark : "",
+      attachment: data?.attachment ? [new File([], data.attachment)] : null,
+      valid: data?.valid ?? "1",
+    },
+  });
+
+  const company = form.watch("company");
+
+  const updateCompanyAssignmentData = async (data) => {
+    var counter = 0;
+    try {
+      const formData = new FormData();
+      for (var key in data) {
+        if (key !== "attachment") {
+          //exclude attachment first for testing,will add back later
+          formData.append(`userHasCompany[${key}]`, data[key]);
+        }
+      }
+      for (const fileData of companyAssignmentFiles) {
+        if (fileData.link) {
+          formData.append(`userHasCompany[attachment][${counter}][Name]`, fileData.name);
+          formData.append(`userHasCompany[attachment][${counter}][File]`, "");
+        } else {
+          const base64 = await getFileToBase64(fileData);
+          formData.append(`userHasCompany[attachment][${counter}][Name]`, fileData.name);
+          formData.append(`userHasCompany[attachment][${counter}][File]`, base64);
+        }
+        counter++;
+      }
+      const response = await fetch(
+        `${ORIGIN}/user/api/user/update-user-has-company-data?id=${id}`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        },
+      );
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 403) {
+          toast({
+            title: errorData.message,
+            duration: 2000,
+          });
+        }
+        throw new Error("Failed to fetch data");
+      }
+      const responseData = await response.json();
+      if (responseData) {
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      }
+      // Optionally, handle success or display a message to the user
+    } catch (error) {
+      console.error("Error updating custom information data:", error);
+    }
+  };
+
+  const onSubmit = async (values) => {
+    if (!values) return; // If values are empty or null, return without processing
+
+    const formValues = form.getValues();
+
+    if (!formValues.companyName) {
+      form.setError("companyName", {
+        message: "Required",
+      });
+
+      return;
+    }
+
+    // Assuming userListData is an array where you store your user data
+    const newData = { ...values }; // Copy form values
+    // Call the function to update custom information data if newData is valid
+    if (id && slug !== "clone") {
+      await updateCompanyAssignmentData(newData);
+      revalidateCompanyAssignmentData();
+    } else if (slug === "clone") {
+      newData.attachmentFiles = companyAssignmentFiles;
+
+      setTempRowCompanyAssignmentData(newData, false);
+    } else {
+      newData.attachmentFiles = companyAssignmentFiles;
+
+      setTempRowCompanyAssignmentData(newData);
+    }
+    handleReset();
+    setOpen(false); // Close the dialog after submission
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen} className="m-2">
+      <DialogContent className="max-w-6xl bg-erp-blue-3 p-2">
+        <Form {...form}>
+          <form className="space-y-2" onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="flex items-center justify-between pr-4">
+              <div className="grid auto-cols-fr grid-flow-col gap-x-1.5">
+                <SaveButton />
+                <ResetButton onClick={handleReset} />
+                <DialogClose asChild>
+                  <CancelButton />
+                </DialogClose>
+              </div>
+              <FormField
+                control={form.control}
+                name="valid"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-x-1.5 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value === "1"}
+                        onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                      />
+                    </FormControl>
+                    <FormLabel>Valid</FormLabel>
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="space-y-2.5 bg-white p-3 pt-2">
+              <h2 className="text-sm font-bold">Company Assignment</h2>
+              <div className="grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-4">
+                <FormField
+                  control={form.control}
+                  name="UUID"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid hidden h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="companyName"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel
+                        className={form.formState.errors.companyName ? "text-red-500" : ""}
+                      >
+                        Company: <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl className="relative">
+                        <div className="relative">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                            onClick={() => toggleTableCompany()}
+                            onChange={handleCompanySearchChange}
+                            ref={inputRef}
+                            autoComplete="off"
+                          />
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="text-gray-400" />{" "}
+                            {/* Using the search icon */}
+                          </div>
+                          {showTableCompany && (
+                            <div
+                              ref={dropdownRef}
+                              className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownCompanyColumns}
+                                  data={baseCompanyDropdownTableData}
+                                  onClickRow={onClickRowCompany}
+                                  filterValue={companyFilter}
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      {form.formState.errors.companyName && (
+                        <FormMessage className="mt-1 w-60 text-sm text-red-500">
+                          {form.formState.errors.companyName.message}
+                        </FormMessage>
+                      )}
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="company"
+                  render={({ field }) => (
+                    <FormItem className="flex hidden flex-col space-y-1">
+                      <FormControl className="relative">
+                        <Input className="h-7.5 pr-8" {...field} readOnly={true} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="departmentName"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Department:</FormLabel>
+                      <FormControl className="relative">
+                        <div className="relative">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                            onClick={() => toggleTableDepartment()}
+                            onChange={handleDepartmentSearchChange}
+                            ref={inputRef}
+                            autoComplete="off"
+                          />
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="text-gray-400" />{" "}
+                            {/* Using the search icon */}
+                          </div>
+                          {showTableDepartment && (
+                            <div
+                              ref={dropdownRef}
+                              className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownDepartmentColumns}
+                                  data={baseDepartmentDropdownTableData}
+                                  onClickRow={onClickRowDepartment}
+                                  filterValue={departmentFilter}
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="department"
+                  render={({ field }) => (
+                    <FormItem className="flex hidden flex-col space-y-1">
+                      <FormControl className="relative">
+                        <Input className="h-7.5 pr-8" {...field} readOnly={true} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="jobTitleName"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1 ">
+                      <FormLabel>Job Title:</FormLabel>
+                      <FormControl className="relative">
+                        <div className="relative">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                            onClick={() => toggleTableJobTitle()}
+                            onChange={handleJobTitleSearchChange}
+                            ref={inputRef}
+                            autoComplete="off"
+                          />
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="text-gray-400" />{" "}
+                            {/* Using the search icon */}
+                          </div>
+                          {showTableJobTitle && (
+                            <div
+                              ref={dropdownRef}
+                              className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownJobTitleColumns}
+                                  data={jobTitleDropdownTableData}
+                                  onClickRow={onClickRowJobTitle}
+                                  filterValue={jobTitleFilter}
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="jobTitle"
+                  render={({ field }) => (
+                    <FormItem className="flex hidden flex-col  space-y-1">
+                      <FormControl className="relative">
+                        <Input className="h-7.5 pr-8" {...field} readOnly={true} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="locationName"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1 ">
+                      <FormLabel>Location:</FormLabel>
+                      <FormControl className="relative">
+                        <div className="relative">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                            onClick={() => toggleTableLocation()}
+                            onChange={handleLocationCodeSearchChange}
+                            ref={inputRef}
+                            autoComplete="off"
+                          />
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="text-gray-400" />{" "}
+                            {/* Using the search icon */}
+                          </div>
+                          {showTableLocationCode && (
+                            <div
+                              ref={dropdownRef}
+                              className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownLocationCodeColumns}
+                                  data={locationCodeDropdownData}
+                                  onClickRow={onClickRowLocationCode}
+                                  filterValue={locationCodeFilter}
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="location"
+                  render={({ field }) => (
+                    <FormItem className="flex hidden flex-col  space-y-1">
+                      <FormControl className="relative">
+                        <Input className="h-7.5 pr-8" {...field} readOnly={true} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-4">
+                <FormField
+                  control={form.control}
+                  name="employeeID"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Employee ID:</FormLabel>
+                      <FormControl className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          moduleName="user"
+                          fieldName="employeeID"
+                          columnName="Employee ID"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {isDropdownEnumDataLoaded && (
+                  <FormField
+                    control={form.control}
+                    name="employmentType"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Employement Type:</FormLabel>
+                        <Select defaultValue={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger className="h-7.5 w-full">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {dropdownEnumData &&
+                              dropdownEnumData.employmentType.map((item) => (
+                                <SelectItem key={item.value} value={item.value}>
+                                  {item.label}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                <FormField
+                  control={form.control}
+                  name="supervisorName"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Supervisor:</FormLabel>
+                      <FormControl className="relative">
+                        <div className="relative">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                            onClick={() => toggleTableSupervisor()}
+                            onChange={handleSupervisorSearchChange}
+                            ref={inputRef}
+                            autoComplete="off"
+                          />
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="text-gray-400" />{" "}
+                            {/* Using the search icon */}
+                          </div>
+                          {showTableSupervisor && (
+                            <div
+                              ref={dropdownRef}
+                              className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownMentorSupervisorColumns}
+                                  data={supervisorDropdownTableData}
+                                  onClickRow={onClickRowSupervisor}
+                                  filterValue={supervisorFilter}
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="supervisor"
+                  render={({ field }) => (
+                    <FormItem className="flex hidden flex-col space-y-1">
+                      <FormControl className="relative">
+                        <Input className="h-7.5 pr-8" {...field} readOnly />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="mentorName"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Mentor:</FormLabel>
+                      <FormControl className="relative">
+                        <div className="relative">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                            onClick={() => toggleTableMentor()}
+                            onChange={handleMentorSearchChange}
+                            ref={inputRef}
+                            autoComplete="off"
+                          />
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="text-gray-400" />{" "}
+                            {/* Using the search icon */}
+                          </div>
+                          {showTableMentor && (
+                            <div
+                              ref={dropdownRef}
+                              className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownMentorSupervisorColumns}
+                                  data={mentorDropdownTableData}
+                                  onClickRow={onClickRowMentor}
+                                  filterValue={mentorFilter}
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="mentor"
+                  render={({ field }) => (
+                    <FormItem className="flex hidden flex-col space-y-1">
+                      <FormControl className="relative">
+                        <Input className="h-7.5 pr-8" {...field} readOnly />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-4">
+                <FormField
+                  control={form.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Start Date:</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              className={cn(
+                                "flex h-7.5 w-full",
+                                !field.value && "text-muted-foreground",
+                              )}
+                              variant="outline"
+                              size="sm"
+                            >
+                              {field.value
+                                ? moment.unix(field.value).format(DATE_FORMAT)
+                                : "Pick a date"}
+                              <CalendarIcon className="ml-auto h-4 w-4" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value ? moment.unix(field.value).toDate() : undefined}
+                            onSelect={(date) => {
+                              const unixTimestamp = date ? Math.floor(date.getTime() / 1000) : "";
+                              field.onChange(unixTimestamp.toString());
+                            }}
+                            initialFocus
+                            defaultMonth={new Date()}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>End Date:</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              className={cn(
+                                "flex h-7.5 w-full",
+                                !field.value && "text-muted-foreground",
+                              )}
+                              variant="outline"
+                              size="sm"
+                            >
+                              {field.value
+                                ? moment.unix(field.value).format(DATE_FORMAT)
+                                : "Pick a date"}
+                              <CalendarIcon className="ml-auto h-4 w-4" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value ? moment.unix(field.value).toDate() : undefined}
+                            onSelect={(date) => {
+                              const unixTimestamp = date ? Math.floor(date.getTime() / 1000) : "";
+                              field.onChange(unixTimestamp.toString());
+                            }}
+                            initialFocus
+                            defaultMonth={new Date()}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {isDropdownEnumDataLoaded && (
+                  <FormField
+                    control={form.control}
+                    name="exitReason"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Quit Reason:</FormLabel>
+                        <Select defaultValue={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger className="h-7.5 w-full">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {dropdownEnumData &&
+                              dropdownEnumData.exitReason.map((item) => (
+                                <SelectItem key={item.value} value={item.value}>
+                                  {item.label}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+
+              <div className="grid grid-flow-col-dense  grid-cols-1 items-start gap-x-8 gap-y-2.5 md:grid-cols-3 ">
+                <FormField
+                  control={form.control}
+                  name="remark"
+                  render={({ field }) => (
+                    <FormItem className="col-span-3 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Description:</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          moduleName="userHasCompany"
+                          fieldName="remark"
+                          columnName="Description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div>
+                <FormField
+                  control={form.control}
+                  name="attachment"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          Attachment:{" "}
+                          <button type="button" onClick={handleChooseFileClick}>
+                            <FaFileCirclePlus
+                              style={{ marginLeft: "5px" }}
+                              className="text-erp-blue-14"
+                            />
+                          </button>
+                        </div>
+                      </FormLabel>
+
+                      <FormControl>
+                        <Input
+                          id="attachments"
+                          type="file"
+                          multiple
+                          onChange={handleFileChange}
+                          ref={fileInputRef}
+                          className="hidden"
+                        />
+                      </FormControl>
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* You can render the files here */}
+                {companyAssignmentFiles &&
+                  companyAssignmentFiles.map((file, index) => (
+                    <div className="flex items-center gap-x-0.5" key={index}>
+                      <a
+                        href={file.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "blue" }}
+                      >
+                        {file.name}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteFile(index)}
+                        style={{ color: "red" }}
+                      >
+                        <FaCircleXmark
+                          style={{
+                            verticalAlign: "bottom",
+                            marginLeft: "2px",
+                            marginTop: "2px",
+                          }}
+                          title={"Remove"}
+                        />
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

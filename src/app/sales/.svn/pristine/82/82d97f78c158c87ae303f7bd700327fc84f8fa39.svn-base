@@ -1,0 +1,830 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { PDFViewer } from "@react-pdf/renderer";
+import axios from "axios";
+import { useRouter, useSearchParams } from "next/navigation";
+import React, { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+import useSWRImmutable from "swr/immutable";
+import { z } from "zod";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import LoadingUI from "@/components/LoadingUI";
+import SimplifiedPDF from "@/components/simplifiedTemplate";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input, NumberInputField } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, getCurrentCompanyUUID, getCurrentUserID, ORIGIN } from "@/lib/constants";
+import authorizedFetcher from "@/lib/utils/authorizedFetcher";
+import { cn } from "@/lib/utils/cn";
+
+import type { Dispatch, SetStateAction } from "react";
+
+type Props = {
+  open: boolean;
+  setOpen: Dispatch<SetStateAction<boolean>>;
+  cashSalesData: any;
+  tempRowCashSalesDetailsList: any[];
+  form: any;
+  slug: string;
+  setIsPaidAmountManuallyUpdated: (updated: boolean) => void;
+  setIsTenderPaymentSaved: (updated: boolean) => void;
+  isTenderPaymentSaved: boolean;
+  setIsTenderPaymentSavedInNew: (updated: boolean) => void;
+  handleSubmit: () => Promise<void>;
+};
+
+const tenderPaymentFormSchema = z.object({
+  totalPayable: z.string().default("0.00"),
+  paymentMethod: z.string().optional(),
+  paymentMethodCode: z.string().optional(),
+  paidAmount: z.string().default("0.00"),
+  additionalDiscount: z.string().default("0.00"),
+  remark1: z.string().optional(),
+  remark2: z.string().optional(),
+});
+
+export default function TenderPaymentFormPopover({
+  open,
+  setOpen,
+  cashSalesData,
+  tempRowCashSalesDetailsList,
+  form: parentForm,
+  slug,
+  setIsPaidAmountManuallyUpdated,
+  setIsTenderPaymentSaved,
+  isTenderPaymentSaved,
+  setIsTenderPaymentSavedInNew,
+  handleSubmit,
+}: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const headers = getAuthHeaders();
+  const id = searchParams.get("id");
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [showTablePaymentMethod, setShowTablePaymentMethod] = useState(false);
+  const [paymentMethodDropdownTableData, setPaymentMethodDropdownTableData] = useState([]);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showSimplifiedPDFDialog, setShowSimplifiedPDFDialog] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
+  const [itemsData, setItemsData] = useState(null);
+  const [currentCompanyData, setCurrentCompanyData] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [PDFPreviewType, setPDFPreviewType] = useState(null);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [previewTemplatePDFData, setPreviewTemplatePDFData] = useState(null);
+  const [isPDFLoading, setIsPDFLoading] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const tenderAmountRef = useRef(null);
+
+  let username: string = "";
+  let authToken: string = "";
+  username = JSON.parse(localStorage.getItem("username") || '""');
+  authToken = JSON.parse(localStorage.getItem("authToken") || '""');
+
+  const currentAccount = JSON.parse(localStorage.getItem("currentAccount") || "null");
+  const currentCompany = JSON.parse(localStorage.getItem("currentCompany") || "null");
+
+  // Focus on the tender amount field when the popover opens
+  useEffect(() => {
+    if (open && tenderAmountRef.current) {
+      tenderAmountRef.current.focus();
+       tenderAmountRef.current.select();
+    }
+  }, [open]);
+
+  const dropdownPaymentMethodColumns = [
+    { accessorKey: "paymentMethodCode", header: "Payment Method Code" },
+    { accessorKey: "eInvoicePaymentMethodCode", header: "E-Invoice Payment Method Code" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const currentUserUUID = getCurrentUserID();
+  const currentCompanyUUID = getCurrentCompanyUUID();
+
+  let userHasRuleData = { userHasRule: [] };
+
+  if (typeof window !== "undefined") {
+    const stored = localStorage.getItem("userRule");
+
+    if (stored) {
+      userHasRuleData = JSON.parse(stored);
+    }
+  }
+
+  const calculateNetTotal = () => {
+    let totalAmount = 0;
+    let totalDiscount = 0;
+    let totalTax = 0;
+
+    tempRowCashSalesDetailsList.forEach((row) => {
+      const quantity1 = Number(row.quantity) || 0;
+      const quantity2 = Number(row.quantity2) || 1;
+      const quantity3 = Number(row.quantity3) || 1;
+      const price = Number(row.price) || 0;
+      const discountAmount = Number(row.discountAmount) || 0;
+      const taxRate = Number(row.taxRate) || 0;
+
+      const totalRowAmount = quantity1 * quantity2 * quantity3 * price;
+
+      if (row.taxInclusive === "1") {
+        const subtotalTax = totalRowAmount - discountAmount;
+        const subtotal = subtotalTax / (1 + taxRate / 100);
+        const taxAmount = subtotalTax - subtotal;
+
+        totalAmount += subtotalTax;
+        totalTax += taxAmount;
+      } else {
+        const subtotal = totalRowAmount - discountAmount;
+        const taxAmount = subtotal * (taxRate / 100);
+        const subtotalTax = subtotal + taxAmount;
+
+        totalAmount += subtotalTax;
+        totalTax += taxAmount;
+      }
+
+      totalDiscount += discountAmount;
+    });
+
+    // Get additional discount from parent form instead of local form
+    const additionalDiscount = Number(parentForm.getValues("additionalDiscount")) || 0;
+    const netTotal = totalAmount - additionalDiscount;
+
+    // Round to the nearest 5 cents
+    const roundedNetTotal = Math.round(netTotal * 20) / 20;
+
+    return roundedNetTotal.toFixed(2);
+  };
+
+  useEffect(() => {
+    if (cashSalesData) {
+      if (cashSalesData.totalPayable !== undefined) {
+        form.setValue("totalPayable", cashSalesData.totalPayable);
+      }
+      if (cashSalesData.paymentMethod !== undefined) {
+        form.setValue("paymentMethod", cashSalesData.paymentMethod);
+      }
+      if (cashSalesData.paidAmount !== undefined) {
+        form.setValue("paidAmount", cashSalesData.paidAmount);
+      }
+      if (cashSalesData.additionalDiscount !== undefined) {
+        form.setValue("additionalDiscount", cashSalesData.additionalDiscount);
+      }
+      if (cashSalesData.remark1 !== undefined) {
+        form.setValue("remark1", cashSalesData.remark1);
+      }
+      if (cashSalesData.remark2 !== undefined) {
+        form.setValue("remark2", cashSalesData.remark2);
+      }
+    }
+
+    // Also get paidAmount from parent form if not available in cashSalesData
+    const parentPaidAmount = parentForm.getValues("paidAmount");
+    if (
+      parentPaidAmount &&
+      (!cashSalesData?.paidAmount ||
+        cashSalesData.paidAmount === "0" ||
+        cashSalesData.paidAmount === "0.00")
+    ) {
+      form.setValue("paidAmount", parentPaidAmount);
+    }
+  }, [cashSalesData, parentForm]);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTablePaymentMethod(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  const toggleTablePaymentMethod = async () => {
+    if (paymentMethodDropdownTableData.length > 0) {
+      setShowTablePaymentMethod((prev) => !prev);
+
+      return;
+    }
+
+    const formData = new FormData();
+
+    formData.append("table[]", "paymentMethod");
+
+    if (!showTablePaymentMethod) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch payment methods");
+
+        const data = await response.json();
+
+        setPaymentMethodDropdownTableData(data.rows);
+        setShowTablePaymentMethod(true);
+      } catch (error) {
+        console.error("Error fetching payment method data:", error);
+      }
+    } else {
+      setShowTablePaymentMethod(false);
+    }
+  };
+
+  const form = useForm<z.infer<typeof tenderPaymentFormSchema>>({
+    resolver: zodResolver(tenderPaymentFormSchema),
+    defaultValues: {
+      totalPayable: "",
+      paymentMethod: parentForm.getValues("paymentMethod") || "",
+      paymentMethodCode: parentForm.getValues("paymentMethodCode") || "",
+      paidAmount: parentForm.getValues("paidAmount") || "",
+      additionalDiscount: parentForm.getValues("additionalDiscount") || "",
+      remark1: "",
+      remark2: "",
+    },
+  });
+
+  const onClickRowPaymentMethod = (row) => {
+    const formattedPaymentMethod = `${row.paymentMethodCode}(${row.description})`;
+
+    form.setValue("paymentMethod", row.UUID);
+    form.setValue("paymentMethodCode", formattedPaymentMethod);
+
+    setShowTablePaymentMethod(false);
+  };
+
+  const handleCancel = () => {
+    setOpen(false);
+    setShowConfirmation(false);
+  };
+
+  const handleOkClick = () => {
+    const values = form.getValues();
+    const netTotal = calculateNetTotal(); // Calculate net total
+
+    let hasError = false;
+
+    if (!values.paymentMethodCode) {
+      form.setError("paymentMethodCode", {
+        message: "Payment method is required.",
+      });
+
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Payment method is required.",
+      });
+
+      hasError = true;
+    }
+
+    if (!values.paidAmount || isNaN(parseFloat(values.paidAmount))) {
+      form.setError("paidAmount", { message: "Tender amount is required." });
+
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Tender amount is required.",
+      });
+
+      hasError = true;
+    } else if (parseFloat(values.paidAmount) < parseFloat(netTotal)) {
+      form.setError("paidAmount", {
+        message: `Tender amount cannot be less than Net Total (${netTotal}).`,
+      });
+
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Tender amount cannot be less than Net Total (${netTotal}).`,
+      });
+
+      hasError = true;
+    }
+
+    if (!hasError) {
+      setShowConfirmation(true);
+    }
+  };
+
+  useEffect(() => {
+    if (showSimplifiedPDFDialog && previewTemplatePDFData) {
+      setIsPDFLoading(true);
+      generatePdf();
+    }
+  }, [showSimplifiedPDFDialog, previewTemplatePDFData]);
+
+  const generatePdf = async () => {
+    const blob = new Blob([previewTemplatePDFData], { type: "application/pdf" });
+    setPdfUrl(window.URL.createObjectURL(blob));
+    setIsPDFLoading(false);
+  };
+
+  const previewTemplatePDF = async (data: any) => {
+    setShowSimplifiedPDFDialog(true);
+    setIsPDFLoading(true);
+
+    var form_data = new FormData();
+
+    form_data.append("previewData", JSON.stringify(data));
+
+    const response = await axios.post(
+      `https://1ofis.infollective.com/application/backend/site/api/site/preview-pdf?module=${"CASH SALES"}&account=${currentAccount.account}&company=${currentCompany.UUID}&fileName=${"Simplified.html"}`,
+      form_data,
+      {
+        method: "GET",
+        responseType: "arraybuffer",
+        auth: {
+          username: username,
+          password: authToken,
+        },
+      },
+    );
+
+    setPreviewTemplatePDFData(response.data);
+  };
+
+  const handleDoneClick = async () => {
+    try {
+      setIsSaving(true);
+
+      const data = form.getValues();
+
+      // For new page (slug=new), just set values in parent form
+      if ((slug === "new" || slug === "clone") && isTenderPaymentSaved === false) {
+        // Check if the value is 0, 0.00, or starts with zero
+        if (data.paidAmount === "") {
+          setIsPaidAmountManuallyUpdated(false);
+        } else {
+          setIsPaidAmountManuallyUpdated(true);
+        }
+
+        parentForm.setValue("totalPayable", data.totalPayable);
+        parentForm.setValue("paidAmount", data.paidAmount);
+        parentForm.setValue("paymentMethodCode", data.paymentMethodCode);
+        parentForm.setValue("paymentMethod", data.paymentMethod);
+        parentForm.setValue("additionalDiscount", data.additionalDiscount);
+        parentForm.setValue("remark1", data.remark1 || "");
+        parentForm.setValue("remark2", data.remark2 || "");
+
+        // Force form to trigger validation and updates
+        parentForm.trigger([
+          "totalPayable",
+          "paidAmount",
+          "paymentMethodCode",
+          "paymentMethod",
+          "additionalDiscount",
+          "remark1",
+          "remark2",
+        ]);
+
+        setIsTenderPaymentSavedInNew(true);
+
+        // Store flag in localStorage before form submission
+        localStorage.setItem("tenderPaymentSavedInNew", "true");
+
+        // toast({
+        //   title: "Success",
+        //   description: "Payment details updated successfully",
+        // });
+
+        setShowConfirmation(false);
+        setOpen(false);
+
+        await handleSubmit(true);
+
+        return;
+      }
+
+      // For existing records, continue with API call
+      const formData = new FormData();
+
+      formData.append("cashSales[totalPayable]", data.totalPayable);
+      formData.append("cashSales[paymentMethod]", data.paymentMethod);
+      formData.append("cashSales[paidAmount]", data.paidAmount);
+      formData.append("cashSales[additionalDiscount]", data.additionalDiscount);
+      formData.append("cashSales[remark1]", data.remark1 || "");
+      formData.append("cashSales[remark2]", data.remark2 || "");
+
+      const apiUrl = `${ORIGIN}/cash_sales/api/cash-sales/update-payment-details?id=${id}`;
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Failed to update data");
+
+      const updateResult = await response.json();
+
+      toast({
+        title: "Success",
+        description: "Payment details updated successfully",
+      });
+
+      setShowConfirmation(false);
+      // setShowSimplifiedPDFDialog(true);
+
+      setPDFPreviewType("Invoice");
+      setPreviewData(updateResult.data);
+      setItemsData(updateResult.itemsData);
+      setCurrentCompanyData(updateResult.currentCompany);
+      setCurrentUser(updateResult.currentUser);
+
+      await previewTemplatePDF(updateResult);
+    } catch (error) {
+      console.error("Error:", error);
+
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Payment Details Updated Error",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Watch for changes in additional discount and update total payable
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === "additionalDiscount") {
+        // Update parent form when local form changes
+        parentForm.setValue("additionalDiscount", value.additionalDiscount || "0.00");
+        // Recalculate and update total payable
+        const newTotalPayable = calculateNetTotal();
+        form.setValue("totalPayable", newTotalPayable);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, parentForm, tempRowCashSalesDetailsList]);
+
+  useEffect(() => {
+    form.setValue("totalPayable", calculateNetTotal());
+  }, [tempRowCashSalesDetailsList, form]);
+
+  const currencySymbol = parentForm.getValues("currencySymbol");
+
+  return (
+    <>
+      <Dialog open={open && !showConfirmation} onOpenChange={setOpen}>
+        <DialogContent className="max-w-l rounded-md bg-white p-6">
+          <Form {...form}>
+            <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+              <h2 className="text-center text-lg font-semibold">Payment Details</h2>
+
+              <FormField
+                control={form.control}
+                name="totalPayable"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-2">
+                    <FormLabel className="w-36 pt-2 text-left">
+                      Total {currencySymbol && `(${currencySymbol})`}:
+                    </FormLabel>
+                    <FormControl className="ml-auto">
+                      <NumberInputField
+                        className="h-8 w-60 text-right"
+                        style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+                        form={form}
+                        fieldName={field.name}
+                        allowDecimal={true}
+                        {...field}
+                        value={calculateNetTotal()} // Use calculateNetTotal for value
+                        readOnly
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="paymentMethodCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-start gap-2">
+                      <FormLabel className="w-36 pt-2 text-left">Payment Method:</FormLabel>
+                      <div className="flex flex-grow flex-col items-end">
+                        <FormControl>
+                          <div className="relative w-60">
+                            <Input
+                              className={`h-8 pr-8 ${
+                                form.formState.errors.paymentMethod ? "border-red-500" : ""
+                              }`}
+                              {...field}
+                              onClick={toggleTablePaymentMethod}
+                              ref={inputRef}
+                              autoComplete="off"
+                            />
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                              <FaMagnifyingGlass className="text-gray-400" />
+                            </div>
+                            {showTablePaymentMethod && (
+                              <div
+                                ref={dropdownRef}
+                                className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                              >
+                                <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                                  <DropdownTable
+                                    columns={dropdownPaymentMethodColumns}
+                                    data={paymentMethodDropdownTableData}
+                                    onClickRow={onClickRowPaymentMethod}
+                                  />
+                                </ScrollArea>
+                              </div>
+                            )}
+                          </div>
+                        </FormControl>
+                        {form.formState.errors.paymentMethodCode && (
+                          <FormMessage className="mt-1 w-60 text-right text-xs text-red-500">
+                            {form.formState.errors.paymentMethodCode.message}
+                          </FormMessage>
+                        )}
+                      </div>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="paymentMethod"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>Payment Method:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} value={field.value || ""} readOnly />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="paidAmount"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-start gap-2">
+                      <FormLabel className="w-36 pt-2 text-left">
+                        Tender Amount {currencySymbol && `(${currencySymbol})`}:
+                      </FormLabel>
+                      <div className="flex flex-grow flex-col items-end">
+                        <FormControl>
+                          <NumberInputField
+                            className={`h-8 w-60 ${
+                              form.formState.errors.paidAmount ? "border-red-500" : "bg-yellow-100"
+                            }`}
+                            form={form}
+                            fieldName="paidAmount"
+                            allowDecimal={true}
+                            value={field.value || ""}
+                            ref={tenderAmountRef}
+                          />
+                        </FormControl>
+                        {form.formState.errors.paidAmount && (
+                          <FormMessage className="mt-1 w-60 text-right text-xs text-red-500">
+                            {form.formState.errors.paidAmount.message}
+                          </FormMessage>
+                        )}
+                      </div>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="additionalDiscount"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-start gap-2">
+                      <FormLabel className="w-45 pt-2 text-left">
+                        Add. Total Discount {currencySymbol && `(${currencySymbol})`}:
+                      </FormLabel>
+                      <div className="flex flex-grow flex-col items-end">
+                        <FormControl>
+                          <NumberInputField
+                            className={"h-8 w-60 text-right"}
+                            form={form}
+                            fieldName="additionalDiscount"
+                            allowDecimal={true}
+                            value={field.value || ""}
+                            disabled={userHasRuleData?.userHasRule.includes(
+                              "disable-cash-sales-additional-discount-update",
+                            )}
+                          />
+                        </FormControl>
+                      </div>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="remark1"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-2">
+                    <FormLabel className="w-36 text-left">Remark 1:</FormLabel>
+                    <FormControl className="ml-auto">
+                      <Input className="h-8 w-60" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="remark2"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-2">
+                    <FormLabel className="w-36 text-left">Remark 2:</FormLabel>
+                    <FormControl className="ml-auto">
+                      <Input className="h-8 w-60" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="mt-[10px] flex justify-center gap-4 p-10">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleCancel}
+                  className="h-10 w-40 bg-erp-blue-14 text-white hover:bg-erp-blue-13 hover:text-white"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleOkClick}
+                  className="h-10 w-40 border border-erp-blue-14 bg-white text-erp-blue-14"
+                >
+                  OK
+                </Button>
+              </div>
+            </form>
+          </Form>
+          {isSaving && <LoadingUI />}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
+        <DialogContent className="max-w-md rounded-md bg-white p-6">
+          <h2 className="mb-4 text-center text-lg font-semibold">Payment Details</h2>
+
+          <div className="space-y-3">
+            <div className="mr-5 flex justify-between">
+              <span>Total {currencySymbol && `(${currencySymbol})`}:</span>
+              <span>{parseFloat(form.getValues("totalPayable") || "0").toFixed(2)}</span>
+            </div>
+            <div className="mr-5 flex justify-between">
+              <span>Tender Amount {currencySymbol && `(${currencySymbol})`}:</span>
+              <span>{parseFloat(form.getValues("paidAmount")).toFixed(2)}</span>
+            </div>
+            <div className="mr-5 flex justify-between">
+              <span>Add. Total Discount {currencySymbol && `(${currencySymbol})`}:</span>
+              <span>{parseFloat(form.getValues("additionalDiscount") || "0").toFixed(2)}</span>
+            </div>
+            <div className="mr-5 flex justify-between font-semibold">
+              <span>Change {currencySymbol && `(${currencySymbol})`}:</span>
+              <span>
+                {(
+                  parseFloat(form.getValues("paidAmount") || 0) -
+                  parseFloat(form.getValues("totalPayable") || 0)
+                ).toFixed(2)}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-[10px] flex justify-center gap-4 p-10">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleCancel}
+              className="h-10 w-40 bg-erp-blue-14 text-white hover:bg-erp-blue-13 hover:text-white"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleDoneClick}
+              className="h-10 w-40 border border-erp-blue-14 bg-white text-erp-blue-14"
+            >
+              Done
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSimplifiedPDFDialog} onOpenChange={setShowSimplifiedPDFDialog}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Simplified Receipt - Tender Payment</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isSaving && <LoadingUI />}
+            {!isPDFLoading && pdfUrl ? (
+              <iframe src={pdfUrl} className="h-full w-full" title="pdf" />
+            ) : (
+              !isPDFLoading && <LoadingUI />
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <DialogClose
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "mt-2 sm:mt-0",
+                isRedirecting && "pointer-events-none opacity-50",
+              )}
+              onClick={async () => {
+                setIsRedirecting(true);
+                setShowSimplifiedPDFDialog(false);
+                setOpen(false);
+                await router.push("/sales/cash-sales/new");
+              }}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+          {isRedirecting && <LoadingUI />}
+        </DialogContent>
+      </Dialog>
+
+      {/* <Dialog open={showSimplifiedPDFDialog} onOpenChange={setShowSimplifiedPDFDialog}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Simplified Receipt - Tender Payment</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            <PDFViewer width="100%" height="100%" className="absolute inset-0">
+              <SimplifiedPDF
+                previewData={previewData}
+                itemsData={itemsData}
+                currentCompanyData={currentCompanyData}
+                currentUser={currentUser}
+              />
+            </PDFViewer>
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <DialogClose
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "mt-2 sm:mt-0",
+                isRedirecting && "pointer-events-none opacity-50",
+              )}
+              onClick={async () => {
+                setIsRedirecting(true);
+                setShowSimplifiedPDFDialog(false);
+                setOpen(false);
+                await router.push("/sales/cash-sales/new");
+              }}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+          {isRedirecting && <LoadingUI />}
+        </DialogContent>
+      </Dialog> */}
+    </>
+  );
+}

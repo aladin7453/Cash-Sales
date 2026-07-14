@@ -1,0 +1,127 @@
+import React from 'react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+
+type SuccessItem = {
+  SubmissionUid: string;
+  UUID: string;
+  LongID: string;
+  OverallStatus: string;
+  ReceivedAt: string;
+  Status: string;
+  RejectedReason?: string;
+  [key: string]: any;
+};
+
+type SubmissionData = {
+  docNo?: string;
+  Success?: SuccessItem[];
+  message?: string;
+};
+
+type Props = {
+  open: boolean;
+  setOpen: (val: boolean) => void;
+  submissionData?: SubmissionData[];
+};
+
+const SubmitCompletionDialog = ({ open, setOpen, submissionData = [] }: Props) => {
+  const handleClose = () => {
+    setOpen(false);
+  };
+
+  // Only get successful submissions with full details
+  const successfulSubmissions = submissionData
+    .filter(group => group.Success && group.Success.length > 0)
+    .flatMap(group => 
+      group.Success?.filter(item => 
+        item.Status === 'Valid' || 
+        item.OverallStatus === 'Valid' || 
+        (!item.RejectedReason && item.Status !== 'Invalid')
+      ).map(item => ({ ...item, docNo: group.docNo })) || []
+    );
+
+    const invalidSubmissions = submissionData
+    .filter(group => group.Success && group.Success.length > 0)
+    .flatMap(group => 
+      group.Success?.filter(item => 
+        item.Status === 'Invalid' || 
+        // item.OverallStatus === 'Invalid' || 
+        (!item.RejectedReason && item.Status == 'Invalid')
+      ).map(item => ({ ...item, docNo: group.docNo })) || []
+    );
+
+   
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="w-[600px] max-h-[80vh]">
+        <ScrollArea className="w-full h-full">
+          <div className="p-4">
+            <h2 className="text-lg font-bold mb-4 text-center">E-Invoice Submission Details</h2>
+
+            {successfulSubmissions.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-green-600 font-semibold mb-2">Success</h3>
+                <div className="space-y-3">
+                  {successfulSubmissions.map((item, index) => (
+                    <div key={index} className="border-l-4 border-green-500 pl-4 text-sm">
+                      {item.docNo && <p><strong>Document No:</strong> {item.docNo}</p>}
+                      <p><strong>UUID:</strong> {item.UUID}</p>
+                      <p><strong>SubmissionUid:</strong> {item.SubmissionUid}</p>
+                      <p><strong>Status:</strong> {item.Status}</p>
+                      <p><strong>Overall Status:</strong> {item.OverallStatus}</p>
+                      <p><strong>Received At:</strong> {item.ReceivedAt}</p>
+                      {item.RejectedReason && (
+                          <p className="text-red-500">
+                            <strong>Rejected Reason:</strong> {item.RejectedReason}
+                          </p>
+                        )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+             {invalidSubmissions.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-green-600 font-semibold mb-2">Success</h3>
+                <div className="space-y-3">
+                  {invalidSubmissions.map((item, index) => (
+                    <div key={index} className="border-l-4 border-green-500 pl-4 text-sm">
+                      {item.docNo && <p><strong>Document No:</strong> {item.docNo}</p>}
+                      <p><strong>UUID:</strong> {item.UUID}</p>
+                      <p><strong>SubmissionUid:</strong> {item.SubmissionUid}</p>
+                      <p><strong>Status:</strong> {item.Status}</p>
+                      <p><strong>Overall Status:</strong> {item.OverallStatus}</p>
+                      <p><strong>Received At:</strong> {item.ReceivedAt}</p>
+                      {item.RejectedReason && (
+                          <p className="text-red-500">
+                            <strong>Rejected Reason:</strong> {item.RejectedReason}
+                          </p>
+                        )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {successfulSubmissions.length === 0 &&  invalidSubmissions.length === 0 && (
+              <p className="text-center">No submission details available.</p>
+            )}
+
+            <div className="flex justify-center mt-4">
+              <Button onClick={handleClose} variant="outline" className="hover:bg-erp-blue-10">
+                OK
+              </Button>
+            </div>
+          </div>
+          <ScrollBar orientation="vertical" />
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default SubmitCompletionDialog;

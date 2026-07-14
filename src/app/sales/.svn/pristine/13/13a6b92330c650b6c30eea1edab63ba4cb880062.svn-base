@@ -1,0 +1,12 @@
+"use client";
+
+import React from "react";
+import CustomerTagDataTable from "./DataTable";
+
+export default function PortPage() {
+  return (
+    <div className="h-full">
+      <CustomerTagDataTable />
+    </div>
+  );
+}

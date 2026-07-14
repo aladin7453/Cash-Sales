@@ -1,0 +1,346 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import axios from "axios";
+import { CalendarIcon } from "lucide-react";
+import moment from "moment";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { FaReceipt } from "react-icons/fa6";
+import { FiAlertTriangle } from "react-icons/fi";
+import { z } from "zod";
+
+import LoadingUI from "@/components/LoadingUI";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useToast } from "@/components/ui/use-toast";
+import { DATE_FORMAT, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+import { showLoadingToast } from "@/lib/utils/showLoadingToast";
+
+import type { Row, Table } from "@tanstack/react-table";
+
+type Props = {
+  model: string;
+  module: string;
+  account?: string;
+  refreshTable: () => Promise<void>;
+  isMobile?: boolean;
+  isSelectionMode?: boolean;
+  disabled?: boolean;
+};
+
+const dailySummaryFormSchema = z.object({
+  docDate: z.string().nullable().optional(),
+});
+
+export default function DailySummaryButton({
+  module,
+  model,
+  account,
+  refreshTable,
+  isMobile,
+  isSelectionMode,
+  disabled,
+}: Props) {
+  const { toast } = useToast();
+  const headers = getAuthHeaders();
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [previewTemplatePDFData, setPreviewTemplatePDFData] = useState(null);
+  const [isPDFLoading, setIsPDFLoading] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [showSimplifiedPDFDialog, setShowSimplifiedPDFDialog] = useState(false);
+
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+
+  useEffect(() => {
+    const ua = navigator.userAgent || "";
+
+    const hasTouch = navigator.maxTouchPoints > 0 || "ontouchstart" in window;
+
+    const smallScreen = window.screen.width <= 1280;
+
+    const isDesktopUA = /Windows NT|Macintosh|X11|Linux x86_64/i.test(ua);
+
+    // Treat touch devices with small screens as mobile/POS
+    const isMobileOrPOS = hasTouch && smallScreen;
+
+    setIsMobileDevice(isMobileOrPOS);
+
+    console.log({
+      ua,
+      hasTouch,
+      smallScreen,
+      isDesktopUA,
+      isMobileOrPOS,
+      width: window.screen.width,
+      height: window.screen.height,
+      maxTouchPoints: navigator.maxTouchPoints,
+    });
+  }, []);
+
+  let username: string = "";
+  let authToken: string = "";
+  username = JSON.parse(localStorage.getItem("username") || '""');
+  authToken = JSON.parse(localStorage.getItem("authToken") || '""');
+
+  const currentAccount = JSON.parse(localStorage.getItem("currentAccount") || "null");
+  const currentCompany = JSON.parse(localStorage.getItem("currentCompany") || "null");
+
+  const form = useForm<z.infer<typeof dailySummaryFormSchema>>({
+    resolver: zodResolver(dailySummaryFormSchema),
+    defaultValues: {
+      docDate: Math.floor(Date.now() / 1000).toString(),
+    },
+  });
+
+  const openSummary = async () => {
+    const form_data = new FormData();
+    const formValues = form.getValues();
+
+    form_data.append("docDate", formValues?.docDate || "");
+
+    try {
+      const response = await fetch(`${ORIGIN}/${module}/api/${model}/cash-sales-summary`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        toast({
+          title: errorData.message,
+          duration: 2000,
+        });
+
+        throw new Error("Failed to fetch data");
+      } else {
+        const data = await response.json();
+
+        await previewTemplatePDF(data);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (showSimplifiedPDFDialog && previewTemplatePDFData) {
+      setIsPDFLoading(true);
+      generatePdf();
+    }
+  }, [showSimplifiedPDFDialog, previewTemplatePDFData]);
+
+  const generatePdf = async () => {
+    const blob = new Blob([previewTemplatePDFData], { type: "application/pdf" });
+    setPdfUrl(window.URL.createObjectURL(blob));
+    setIsPDFLoading(false);
+  };
+
+  const previewTemplatePDF = async (data: any) => {
+    setShowSimplifiedPDFDialog(true);
+    setIsPDFLoading(true);
+
+    var form_data = new FormData();
+    const docDate = form.getValues("docDate");
+
+    const previewData = {
+      ...data,
+      docDate: docDate,
+    };
+
+    form_data.append("previewData", JSON.stringify(previewData));
+
+    const response = await axios.post(
+      `https://1ofis.infollective.com/application/backend/site/api/site/preview-pdf?module=${"DAILY SUMMARY"}&account=${currentAccount.account}&company=${currentCompany.UUID}&fileName=${"Daily_Summary.html"}`,
+      form_data,
+      {
+        method: "GET",
+        responseType: "arraybuffer",
+        auth: {
+          username: username,
+          password: authToken,
+        },
+      },
+    );
+
+    if (isMobileDevice) {
+      const blob = new Blob([response.data], {
+        type: "application/pdf",
+      });
+
+      const url = URL.createObjectURL(blob);
+
+      setPdfUrl(url);
+      setIsPDFLoading(false);
+    } else {
+      setPreviewTemplatePDFData(response.data);
+    }
+  };
+
+  return (
+    <>
+      <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <AlertDialogTrigger asChild>
+          <button
+            className={
+              isMobile
+                ? isSelectionMode
+                  ? "flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-transparent bg-white text-erp-blue-14 shadow-md transition-all duration-300 ease-in-out"
+                  : "flex w-full items-center justify-start gap-2"
+                : "group flex flex-col items-center gap-y-1 disabled:cursor-not-allowed"
+            }
+            type="button"
+            disabled={disabled}
+            id="daily-summary-btn"
+          >
+            <FaReceipt
+              className={
+                isMobile
+                  ? "size-4.5 text-erp-blue-11"
+                  : "size-5.5 text-erp-blue-11 group-disabled:text-erp-gray-5"
+              }
+            />
+            <span
+              className={
+                isMobile
+                  ? isSelectionMode
+                    ? "hidden"
+                    : "text-[10px]/none font-normal"
+                  : "text-[11px]/none font-medium group-disabled:text-erp-gray-5"
+              }
+            >
+              D.Sum
+            </span>
+          </button>
+        </AlertDialogTrigger>
+
+        <AlertDialogContent
+          className={isMobile ? "max-w-xs gap-y-4.5 rounded-md bg-white !p-5" : "max-w-sm"}
+        >
+          <AlertDialogHeader>
+            <div className="flex flex-col items-center gap-2">
+              <h1 className="text-xl font-bold text-black">Select a date for daily summary.</h1>
+            </div>
+          </AlertDialogHeader>
+          <Form {...form}>
+            <FormField
+              control={form.control}
+              name="docDate"
+              render={({ field }) => (
+                <FormItem className="col-span-1 space-y-1">
+                  <FormLabel>Date:</FormLabel>
+                  <Popover open={open} onOpenChange={setOpen}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          className={cn(
+                            "flex h-7.5 w-full",
+                            !field.value && "text-muted-foreground",
+                          )}
+                          variant="outline"
+                          size="sm"
+                        >
+                          {field.value
+                            ? moment.unix(field.value).format(DATE_FORMAT)
+                            : "Pick a date"}
+                          <CalendarIcon className="ml-auto h-4 w-4" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="absolute bottom-[10px] w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={
+                          field.value ? moment.unix(field.value).format(DATE_FORMAT) : undefined
+                        }
+                        onSelect={(date) => {
+                          if (date) {
+                            field.onChange(Math.floor(date.getTime() / 1000).toString());
+                            setOpen(false);
+                          }
+                        }}
+                        initialFocus
+                        defaultMonth={
+                          field.value ? moment.unix(field.value).format(DATE_FORMAT) : undefined
+                        }
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </Form>
+          <AlertDialogFooter className="mt-2 flex items-center !justify-center justify-center gap-3 [&>*]:m-0">
+            <AlertDialogAction className="h-9 w-24" autoFocus>
+              Cancel
+            </AlertDialogAction>
+            <AlertDialogCancel className="h-9 w-24" onClick={() => openSummary()}>
+              OK
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={showSimplifiedPDFDialog} onOpenChange={setShowSimplifiedPDFDialog}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Daily Summary</DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {isSaving && <LoadingUI />}
+            {!isPDFLoading && !isMobileDevice && pdfUrl && (
+              <iframe src={pdfUrl} className="h-full w-full" title="pdf" />
+            )}
+
+            {!isPDFLoading && isMobileDevice && pdfUrl && (
+              <div className="flex h-full items-center justify-center">
+                <Button onClick={() => window.open(pdfUrl, "_blank")}>Open PDF Preview</Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <DialogClose
+              className="mt-2 opacity-50 sm:mt-0"
+              onClick={async () => {
+                setShowSimplifiedPDFDialog(false);
+              }}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

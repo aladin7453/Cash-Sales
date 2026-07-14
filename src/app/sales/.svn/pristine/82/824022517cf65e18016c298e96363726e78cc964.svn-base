@@ -1,0 +1,24 @@
+import type { TransferFromConfig } from "@/components/features/transfer/transferFrom";
+import { salesOrderDocumentColumns } from "./documentColumns";
+import { salesOrderItemColumns } from "./itemColumns";
+
+export const salesOrderTransferFromConfig: TransferFromConfig = {
+  module: "sales_order",
+  model: "sales-order",
+  apiNamespace: "sales",
+  sources: [
+    {
+      key: "quotation",
+      label: "Quotation",
+      apiDocType: "quotation",
+      transferDocType: "quotation",
+    },
+  ],
+  documentColumns: salesOrderDocumentColumns,
+  itemColumns: salesOrderItemColumns,
+  transferEndpointSuffix: "transfer-from-quotation",
+  buttonText: "T-From",
+  dialogTitle: "Transfer from",
+  documentPopoverTitle: "Select Document",
+  detailsPopoverTitle: "Transfer Details",
+};

@@ -1,0 +1,73 @@
+"use client";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type AuthorizedUser = {
+  fullname: string;
+  title: string;
+  phoneNo: string;
+  email: string;
+  department: string;
+  jobTitle: string;
+  remark: string;
+  createdBy: string;
+  valid: "0" | "1";
+};
+
+export const authorizedUserColumns: ColumnDef<AuthorizedUser>[] = [
+  {
+    accessorKey: "fullName",
+    header: "Full Name",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "title",
+    header: "Title",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "phoneNo",
+    header: "Phone No.",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "email",
+    header: "Email",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "jobTitle",
+    header: "Job Title",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "department",
+    header: "Department",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "remark",
+    header: "Remark",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} columnName="remark" />,
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "createdBy",
+    header: "Created by",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as AuthorizedUser["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    // Custom filter function that first convert the row's numeric boolean
+    // value to string, then check if the string contains the filterValue
+    filterFn: filterWithStringConversion,
+  },
+];

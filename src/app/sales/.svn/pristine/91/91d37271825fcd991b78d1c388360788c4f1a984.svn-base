@@ -1,0 +1,122 @@
+"use client";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import {autoWordSize} from "@/lib/constants";
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type CustomerGroup = {
+  id: string;
+  UUID: string;
+  account: string;
+  company: string;
+  customerGroupCode: string;
+  customerGroupName: string;
+  description: string;
+  createdAt: string;
+  createdAtFormat: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  valid: "0" | "1";
+  preferenceData?: any;
+};
+
+// Preference (Format Number Function)
+const formatNumber = (value: string | number, decimalPlaces: number = 2): string => {
+  if (value === null || value === undefined || value === '') {
+    return (0).toFixed(decimalPlaces);
+  }
+  
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  
+  if (isNaN(numValue)) {
+    return (0).toFixed(decimalPlaces);
+  }
+  
+  return numValue.toFixed(decimalPlaces);
+};
+
+export const rawColumns: ColumnDef<CustomerGroup>[] = [
+  // {
+  //   id: "accountName",
+  //   accessorKey: "accountName",
+  //   header: "Sys Acc",
+  //   filterFn: "includesString"
+  // },
+  // {
+  //   id: "companyName",
+  //   accessorKey: "companyName",
+  //   header: "Ownership",
+  //   filterFn: "includesString"
+  // },
+  {
+    id: "customerGroupCode",
+    accessorKey: "customerGroupCode",
+    header: "Customer Group Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerGroupName",
+    accessorKey: "customerGroupName",
+    header: "Customer Group",
+    filterFn: "includesString",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    filterFn: "includesString",
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+    filterFn: "includesString",
+  },
+  {
+    id: "CreatedByUsername",
+    accessorKey: "CreatedByUsername",
+    header: "Created by",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+    filterFn: "includesString",
+  },
+  {
+    id: "UpdatedByUsername",
+    accessorKey: "UpdatedByUsername",
+    header: "Updated by",
+    filterFn: "includesString",
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as CustomerGroup["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    filterFn: "includesString",
+  },
+];
+
+export const columns: ColumnDef<CustomerGroup>[] = rawColumns.map(
+  (col) => {
+    if (typeof col.header === "string") {
+      const sizes = autoWordSize(col.header);
+
+      return {
+        ...col,
+        sizes,
+        size: sizes, // 👈 applied automatically
+        minSize:50
+      };
+    }
+
+    return col;
+  }
+);

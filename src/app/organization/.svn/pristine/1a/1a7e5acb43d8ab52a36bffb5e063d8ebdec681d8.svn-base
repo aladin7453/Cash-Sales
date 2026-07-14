@@ -1,0 +1,499 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { FaCircleXmark, FaFileCirclePlus } from "react-icons/fa6";
+import { z } from "zod";
+
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders,ORIGIN } from "@/lib/constants";
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+
+import { contactDetails } from "../contact-details/data";
+import ResetButton from "./Reset";
+import SaveButton from "./Save";
+
+import type { Dispatch, SetStateAction } from "react";
+
+import type { ContactDetails } from "../contact-details/columns";
+
+type Props = {
+  open: boolean;
+  setOpen: Dispatch<SetStateAction<boolean>>;
+  rowId?: string;
+  setTempRowData: () => void;
+  setUserData: Dispatch<SetStateAction<ContactDetails[]>>;
+};
+
+const contactDetailsFormSchema = z.object({
+  UUID: z.union([z.string(), z.literal("")]),
+  user: z.string().nullable().optional(),
+  contact: z.string().nullable().optional(),
+  relationship: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
+  phoneNo: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  attachment: z.custom((value) => {
+    if (!value || !value[0]) {
+      return "Attachment is required.";
+    }
+    return true;
+  }),
+  valid: z.union([z.string(), z.literal("")]),
+});
+
+export default function ContactDetailsFormPopover({
+  slug,
+  open,
+  setOpen,
+  row,
+  setTempRowContactDetailsData,
+  revalidateContactDetailsData,
+}: Props) {
+  const headers = getAuthHeaders();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const data = row;
+  const { toast } = useToast();
+  const [contactDetailsFiles, setContactDetailsFiles] = useState([]);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const fileInputRef = useRef(null);
+
+  const handleChooseFileClick = () => {
+    fileInputRef.current.click(); // Trigger click event on file input
+  };
+
+  const handleReset = () => {
+    form.reset({
+      UUID: "",
+      contact: "",
+      relationship: "",
+      title: "",
+      phoneNo: "",
+      email: "",
+      address: "",
+      description: "",
+      attachment: null,
+      valid: "1",
+    });
+  };
+
+  useEffect(() => {
+    if (open) {
+      !data && handleReset();
+      !data && setContactDetailsFiles([]);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (data && data.attachmentLink) {
+      setContactDetailsFiles(data.attachmentLink);
+    }
+    if (data && data.attachmentFiles) {
+      setContactDetailsFiles(data.attachmentFiles);
+    }
+
+    return () => {};
+  }, [data]);
+
+  function handleDeleteFile(index) {
+    var newContactDetailsFiles = [...contactDetailsFiles];
+    newContactDetailsFiles.splice(index, 1);
+    setContactDetailsFiles(newContactDetailsFiles);
+  }
+
+  const validateFileType = (file: File): boolean => {
+    const allowedTypes = [".pdf", ".png", ".jpg", ".jpeg"];
+    const fileExtension = "." + file.name.split(".").pop()?.toLowerCase();
+    return allowedTypes.includes(fileExtension);
+  };
+
+  const handleFileChange = (event) => {
+    const fileList = Array.from(event.target.files);
+
+    // Validate file types
+    for (const file of fileList) {
+      if (!validateFileType(file)) {
+        setFileError("Only (.pdf, .png, .jpg, .jpeg) files are allowed.");
+        return;
+      }
+    }
+
+    setFileError(null);
+    const mergeArray: any = [...contactDetailsFiles, ...fileList];
+    setContactDetailsFiles(mergeArray);
+  };
+
+  const form = useForm<z.infer<typeof contactDetailsFormSchema>>({
+    resolver: zodResolver(contactDetailsFormSchema),
+    defaultValues: {
+      UUID: data?.UUID !== undefined ? data.UUID : "",
+      user: data?.user !== undefined ? data.user : "",
+      contact: data?.contact !== undefined ? data.contact : "",
+      relationship: data?.relationship !== undefined ? data.relationship : "",
+      title: data?.title !== undefined ? data.title : "",
+      phoneNo: data?.phoneNo !== undefined ? data.phoneNo : "",
+      email: data?.email !== undefined ? data.email : "",
+      address: data?.address !== undefined ? data.address : "",
+      description: data?.description !== undefined ? data.description : "",
+      attachment: data?.attachment ? [new File([], data.attachment)] : null,
+      valid: data?.valid ?? "1",
+    },
+  });
+
+  useEffect(() => {
+    if (!data) return;
+
+    form.reset({
+      ...data,
+      UUID: slug === "clone" ? "" : data.UUID,
+      user: slug === "clone" ? "" : data.user,
+    });
+  }, [data, slug, form]);
+
+  const updateContactDetailsData = async (data) => {
+    var counter = 0;
+    try {
+      const formData = new FormData();
+      for (var key in data) {
+        if (key !== "attachment") {
+          //exclude attachment first for testing,will add back later
+          formData.append(`userHasContact[${key}]`, data[key]);
+        }
+      }
+      for (const fileData of contactDetailsFiles) {
+        if (fileData.link) {
+          formData.append(`userHasContact[attachment][${counter}][Name]`, fileData.name);
+          formData.append(`userHasContact[attachment][${counter}][File]`, "");
+        } else {
+          var base64 = await getFileToBase64(fileData);
+          formData.append(`userHasContact[attachment][${counter}][Name]`, fileData.name);
+          formData.append(`userHasContact[attachment][${counter}][File]`, base64);
+        }
+        counter++;
+      }
+
+      const response = await fetch(
+        `${ORIGIN}/user/api/user/update-user-has-contact-data?id=${id}`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        },
+      );
+
+      const responseData = await response.json();
+      if (responseData) {
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 403) {
+          toast({
+            title: errorData.message,
+            duration: 2000,
+          });
+        }
+        throw new Error("Failed to fetch data");
+      }
+      // Optionally, handle success or display a message to the user
+    } catch (error) {
+      console.error("Error updating custom information data:", error);
+    }
+  };
+
+  const onSubmit = async (values) => {
+    if (!values) return; // If values are empty or null, return without processing
+
+    // Assuming userListData is an array where you store your user data
+    const newData = { ...values }; // Copy form values
+    // Call the function to update custom information data if newData is valid
+    if (id && slug !== "clone") {
+      await updateContactDetailsData(newData);
+      revalidateContactDetailsData();
+    } else if (slug === "clone") {
+      newData.attachmentFiles = contactDetailsFiles;
+
+      setTempRowContactDetailsData(newData, false);
+    } else {
+      newData.attachmentFiles = contactDetailsFiles;
+
+      setTempRowContactDetailsData(newData);
+    }
+    handleReset();
+    setOpen(false); // Close the dialog after submission
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen} className="m-2">
+      <DialogContent className="max-w-6xl bg-erp-blue-3 p-2">
+        <Form {...form}>
+          <form className="space-y-2" onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="flex items-center justify-between pr-4">
+              <div className="grid auto-cols-fr grid-flow-col gap-x-1.5">
+                <SaveButton />
+                <ResetButton onClick={handleReset} />
+                <DialogClose asChild>
+                  <CancelButton />
+                </DialogClose>
+              </div>
+              <FormField
+                control={form.control}
+                name="valid"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-x-1.5 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value === "1"}
+                        onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                      />
+                    </FormControl>
+                    <FormLabel>Valid</FormLabel>
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="space-y-2.5 bg-white p-3 pt-2">
+              <h2 className="text-sm font-bold">Contact Details</h2>
+              <div className="grid grid-cols-12 gap-x-6 gap-y-2.5">
+                <FormField
+                  control={form.control}
+                  name="UUID"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid hidden h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="contact"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 flex flex-col space-y-1">
+                      <FormLabel>Contact:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          moduleName="userHasContact"
+                          fieldName="contact"
+                          columnName="Contact"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="relationship"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2 flex flex-col space-y-1">
+                      <FormLabel>Relationship:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7"
+                          {...field}
+                          moduleName="userHasContact"
+                          fieldName="relationship"
+                          columnName="Relationship"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2 flex flex-col space-y-1">
+                      <FormLabel>Title:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7"
+                          {...field}
+                          moduleName="userHasContact"
+                          fieldName="title"
+                          columnName="Title"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phoneNo"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2 flex flex-col space-y-1">
+                      <FormLabel>Phone No:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7"
+                          {...field}
+                          moduleName="userHasContact"
+                          fieldName="phoneNo"
+                          columnName="Phone No"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2 flex flex-col space-y-1">
+                      <FormLabel>Email:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7"
+                          {...field}
+                          moduleName="userHasContact"
+                          fieldName="email"
+                          columnName="Email"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-flow-col-dense  grid-cols-1 items-start gap-x-8 gap-y-2.5 md:grid-cols-3 ">
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem className="col-span-3 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Address:</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          moduleName="userHasContact"
+                          fieldName="address"
+                          columnName="Address"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-flow-col-dense  grid-cols-1 items-start gap-x-8 gap-y-2.5 md:grid-cols-3 ">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem className="col-span-3 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Remark:</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          moduleName="userHasContact"
+                          fieldName="description"
+                          columnName="Description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div>
+                <FormField
+                  control={form.control}
+                  name="attachment"
+                  render={({ field }) => (
+                    <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          Attachment:{" "}
+                          <button type="button" onClick={handleChooseFileClick}>
+                            <FaFileCirclePlus
+                              style={{ marginLeft: "5px" }}
+                              className="text-erp-blue-14"
+                            />
+                          </button>
+                        </div>
+                      </FormLabel>
+
+                      <FormControl>
+                        <Input
+                          id="attachments"
+                          type="file"
+                          multiple
+                          onChange={handleFileChange}
+                          ref={fileInputRef}
+                          className="hidden"
+                        />
+                      </FormControl>
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* You can render the files here */}
+                {contactDetailsFiles &&
+                  contactDetailsFiles.map((file, index) => (
+                    <div className="flex items-center gap-x-0.5" key={index}>
+                      <a
+                        href={file.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "blue" }}
+                      >
+                        {file.name}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteFile(index)}
+                        style={{ color: "red" }}
+                      >
+                        <FaCircleXmark
+                          style={{
+                            verticalAlign: "bottom",
+                            marginLeft: "2px",
+                            marginTop: "2px",
+                          }}
+                          title={"Remove"}
+                        />
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

@@ -1,0 +1,9 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Auto Billing Config",
+};
+
+export default function CustomerPageLayout({ children }: { children: React.ReactNode }) {
+  return children;
+}

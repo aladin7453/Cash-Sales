@@ -1,0 +1,13 @@
+"use client";
+
+import React from "react";
+
+import SalesPurchaseContraDataTable from "./DataTable";
+
+export default function SalesPurchaseContraPage() {
+  return (
+    <div className="h-full">
+      <SalesPurchaseContraDataTable/>
+    </div>
+  );
+}

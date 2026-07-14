@@ -1,0 +1,624 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { CalendarIcon } from "lucide-react";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import moment from 'moment';
+
+import { DATE_FORMAT, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+import { useVerify } from "@/lib/hooks/useVerify";
+
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import {
+  Card,
+  CardContent,
+  CardTitle,
+  CardHeader
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+type Params = {
+  form: any;
+  slug?: string;
+  preferenceData?: any;
+};
+
+type DropdownConfig = {
+  tableName: string;
+  columns: { accessorKey: string; header: string }[];
+  valueField: string;
+  displayField: string;
+  formValueField: string;
+  formDisplayField: string;
+  additionalMappings?: { sourceField: string; targetFormField: string }[];
+};
+
+export function DocumentDetailsFormOld({ form, slug, preferenceData }: Params) {
+  const { verifyField } = useVerify(form, "/quotation/api/quotation/verify", "quotation", form.watch("UUID"));
+
+  const headers = getAuthHeaders();
+
+  const [dropdownState, setDropdownState] = useState({
+    currentDropdown: null as string | null,
+    data: [] as any[],
+    originalData: [] as any[],
+    showTable: false,
+  });
+
+  const dropdownInputRef = useRef(null);
+  const dropdownTableRef = useRef(null);
+
+  const dropdownConfigs: Record<string, DropdownConfig> = {
+    creditTerm: {
+      tableName: "creditTerm",
+      columns: [
+        { accessorKey: "creditTermCode", header: "Credit Term Code" },
+        { accessorKey: "creditTermType", header: "Credit Term Type" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "creditTermCode",
+      formValueField: "creditTerm",
+      formDisplayField: "creditTermCode",
+    },
+    salesAgent: {
+      tableName: "agent",
+      columns: [
+        { accessorKey: "agentName", header: "Agent Name" },
+        { accessorKey: "agentTypeName", header: "Agent Type" },
+        { accessorKey: "description", header: "Description" }
+      ],
+      valueField: "UUID",
+      displayField: "agentName",
+      formValueField: "salesAgent",
+      formDisplayField: "salesAgentName"
+    },
+    servicingAgent: {
+      tableName: "agent",
+      columns: [
+        { accessorKey: "agentName", header: "Agent Name" },
+        { accessorKey: "agentTypeName", header: "Agent Type" },
+        { accessorKey: "description", header: "Description" }
+      ],
+      valueField: "UUID",
+      displayField: "agentName",
+      formValueField: "servicingAgent",
+      formDisplayField: "servicingAgentName"
+    },
+    collectionAgent: {
+      tableName: "agent",
+      columns: [
+        { accessorKey: "agentName", header: "Agent Name" },
+        { accessorKey: "agentTypeName", header: "Agent Type" },
+        { accessorKey: "description", header: "Description" }
+      ],
+      valueField: "UUID",
+      displayField: "agentName",
+      formValueField: "collectionAgent",
+      formDisplayField: "collectionAgentName"
+    },
+  };
+
+  const fetchDropdownData = async (dropdownKey: string) => {
+    try {
+      const config = dropdownConfigs[dropdownKey];
+
+      if (!config) return;
+
+      var form_data = new FormData();
+
+      form_data.append(`table[0]`, config.tableName);
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${dropdownKey} data`);
+      }
+
+      const data = await response.json();
+
+      setDropdownState({
+        currentDropdown: dropdownKey,
+        data: data.rows,
+        originalData: data.rows,
+        showTable: true,
+      });
+    } catch (error) {
+      console.error(`Error fetching ${dropdownKey} data:`, error);
+
+      throw new Error(`Failed to fetch ${dropdownKey} data`);
+    }
+  };
+
+  const onClickRow = (row: any) => {
+    const config = dropdownConfigs[dropdownState.currentDropdown!];
+
+    if (config) {
+      form.setValue(config.formValueField, row[config.valueField]);
+      form.setValue(config.formDisplayField, row[config.displayField]);
+
+      if (config.additionalMappings) {
+        config.additionalMappings.forEach((mapping) => {
+          if (row[mapping.sourceField]) {
+            form.setValue(mapping.targetFormField, row[mapping.sourceField]);
+          }
+        });
+      }
+    }
+
+    setDropdownState((prev) => ({ ...prev, showTable: false }));
+  };
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownTableRef.current &&
+      !dropdownTableRef.current.contains(event.target) &&
+      dropdownInputRef.current !== event.target
+    ) {
+      setDropdownState((prev) => ({ ...prev, showTable: false }));
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener('click', handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  const onClickRowCreditTerm = (row) => {
+    form.setValue("creditTerm", row.UUID);
+    form.setValue("creditTermCode", row.creditTermCode);
+
+    setShowCreditTermTable(false);
+  };
+
+  // Clear value in clone page
+  useEffect(() => {
+    if (slug === "clone") {
+      form.setValue("docNo", "");
+    }
+  }, [slug, form]);
+
+  const handleDropdownSearchChange = (dropdownKey: string, searchTerm: string) => {
+    const config = dropdownConfigs[dropdownKey];
+    if (!config) return;
+
+    form.setValue(config.formDisplayField, searchTerm);
+
+    // --- If user clears input ---
+    if (searchTerm.trim() === "") {
+      // Clear the value field too
+      form.setValue(config.formValueField, "");
+
+      // Reopen dropdown with full data
+      if (dropdownState.originalData && dropdownState.currentDropdown === dropdownKey) {
+        setDropdownState((prev) => ({
+          ...prev,
+          data: prev.originalData,
+          showTable: true,
+          currentDropdown: dropdownKey,
+        }));
+      } else {
+        // Use .then() instead of await
+        fetchDropdownData(dropdownKey).then(() => {
+          setDropdownState((prev) => ({
+            ...prev,
+            showTable: true,
+            currentDropdown: dropdownKey,
+          }));
+        });
+      }
+
+      return;
+    }
+
+    if (!dropdownState.originalData || dropdownState.currentDropdown !== dropdownKey) {
+      fetchDropdownData(dropdownKey);
+      return;
+    }
+
+    const filtered = dropdownState.originalData.filter((row: any) =>
+      row[config.displayField]
+        ?.toString()
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
+    );
+
+    setDropdownState((prev) => ({
+      ...prev,
+      data: filtered,
+      showTable: true,
+      currentDropdown: dropdownKey,
+    }));
+  };
+
+  // Default Credit Term Function
+  const setDefaultCreditTerm = async () => {
+    if (preferenceData?.data?.creditTerm) {
+      form.setValue("creditTerm", preferenceData?.data?.creditTerm);
+      form.setValue("creditTermCode", preferenceData?.data?.creditTermCode);
+    }
+
+  };
+
+
+  useEffect(() => {
+    if (preferenceData?.data?.creditTerm && slug === "new") {
+      setDefaultCreditTerm();
+    }
+  }, [preferenceData, slug]);
+
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Document Details</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form>
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6">
+              <FormField
+                control={form.control}
+                name="docNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Doc. No.:</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <TooltipProvider>
+                          <Tooltip delayDuration={0}>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className={`h-7.5 pr-7 ${slug === "edit" && "bg-erp-gray-1 text-gray-500"}`}
+                                {...field}
+                                moduleName="quotation"
+                                fieldName="docNo"
+                                columnName="Doc. No."
+                                onBlur={() => {
+                                  if (field.value && field.value.trim()) {
+                                    verifyField("docNo", field.value);
+                                  }
+                                }}
+                                readOnly={slug === "edit" ? true : false}
+                              />
+                            </TooltipTrigger>
+                            {slug === "edit" && (
+                              <TooltipContent>
+                                <p>This field is disabled in edit page.</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="docDate"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Doc. Date:</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            className={cn(
+                              "flex h-7.5 w-full",
+                              !field.value && "text-muted-foreground",
+                            )}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {field.value
+                              ? moment.unix(field.value).format(DATE_FORMAT)
+                              : moment().format(DATE_FORMAT)}
+                            <CalendarIcon className="ml-auto h-4 w-4 text-gray-400" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={
+                            field.value ? moment.unix(field.value).toDate() : new Date()
+                          }
+                          onSelect={(date) => {
+                            const unixTimestamp = date
+                              ? Math.floor(date.getTime() / 1000)
+                              : Math.floor(Date.now() / 1000);
+                            field.onChange(unixTimestamp.toString());
+                          }}
+                          initialFocus
+                          defaultMonth={new Date()}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="creditTerm"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>Credit Term UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="creditTermCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Terms:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          // readOnly
+                          onChange={(e) => handleDropdownSearchChange("creditTerm", e.target.value)}
+                          onClick={() => fetchDropdownData("creditTerm")}
+                          ref={dropdownState.currentDropdown === "creditTerm" ? dropdownInputRef : null}
+                          autoComplete="off"
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable && dropdownState.currentDropdown === "creditTerm" && (
+                          <div
+                            ref={dropdownTableRef}
+                            className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px]"
+                          >
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownConfigs.creditTerm.columns}
+                                data={dropdownState.data}
+                                onClickRow={onClickRow}
+                              />
+                              <ScrollBar orientation="vertical" />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Sales Agent UUID (hidden) */}
+              <FormField
+                control={form.control}
+                name="salesAgent"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>Sales Agent UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Sales Agent Name */}
+              <FormField
+                control={form.control}
+                name="salesAgentName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Sales Agent:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          // readOnly
+                          onChange={(e) => handleDropdownSearchChange("salesAgent", e.target.value)}
+                          onClick={() => fetchDropdownData("salesAgent")}
+                          ref={dropdownState.currentDropdown === "salesAgent" ? dropdownInputRef : null}
+                          autoComplete="off"
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable && dropdownState.currentDropdown === "salesAgent" && (
+                          <div
+                            ref={dropdownTableRef}
+                            className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px]"
+                          >
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownConfigs.salesAgent.columns}
+                                data={dropdownState.data}
+                                onClickRow={onClickRow}
+                              />
+                              <ScrollBar orientation="vertical" />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Servicing Agent UUID (hidden) */}
+              <FormField
+                control={form.control}
+                name="servicingAgent"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>Servicing Agent UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Servicing Agent Name */}
+              <FormField
+                control={form.control}
+                name="servicingAgentName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Servicing Agent:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          // readOnly
+                          onChange={(e) => handleDropdownSearchChange("servicingAgent", e.target.value)}
+                          onClick={() => fetchDropdownData("servicingAgent")}
+                          ref={dropdownState.currentDropdown === "servicingAgent" ? dropdownInputRef : null}
+                          autoComplete="off"
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable && dropdownState.currentDropdown === "servicingAgent" && (
+                          <div
+                            ref={dropdownTableRef}
+                            className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px]"
+                          >
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownConfigs.servicingAgent.columns}
+                                data={dropdownState.data}
+                                onClickRow={onClickRow}
+                              />
+                              <ScrollBar orientation="vertical" />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Collection Agent UUID (hidden) */}
+              <FormField
+                control={form.control}
+                name="collectionAgent"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>Collection Agent UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Collection Agent Name */}
+              <FormField
+                control={form.control}
+                name="collectionAgentName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Collection Agent:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          // readOnly
+                          onChange={(e) => handleDropdownSearchChange("collectionAgent", e.target.value)}
+                          onClick={() => fetchDropdownData("collectionAgent")}
+                          ref={dropdownState.currentDropdown === "collectionAgent" ? dropdownInputRef : null}
+                          autoComplete="off"
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable && dropdownState.currentDropdown === "collectionAgent" && (
+                          <div
+                            ref={dropdownTableRef}
+                            className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px] right-0"
+                          >
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownConfigs.collectionAgent.columns}
+                                data={dropdownState.data}
+                                onClickRow={onClickRow}
+                              />
+                              <ScrollBar orientation="vertical" />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5 mt-4">
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem className="col-span-5 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Description:</FormLabel>
+                    <FormControl>
+                      <Textarea className="h-20 resize-none" {...field}
+                        moduleName="quotation"
+                        fieldName="description"
+                        columnName="Description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

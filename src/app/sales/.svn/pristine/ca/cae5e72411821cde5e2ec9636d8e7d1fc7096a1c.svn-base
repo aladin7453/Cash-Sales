@@ -1,0 +1,303 @@
+"use client";
+
+import { Table, VisibilityState } from "@tanstack/react-table";
+import React, { useEffect, useState } from "react";
+
+import CancelEInvoiceButton from "@/components/data-table/ActionButton/CancelEInvoice";
+import CloneButton from "@/components/data-table/ActionButton/Clone";
+import DailySummaryButton from "@/components/data-table/ActionButton/DailySummary";
+import DeleteButton from "@/components/data-table/ActionButton/Delete";
+import EditButton from "@/components/data-table/ActionButton/Edit";
+import GetEInvoiceButton from "@/components/data-table/ActionButton/GetEinvoice";
+import NewButton from "@/components/data-table/ActionButton/New";
+import PreviewButton from "@/components/data-table/ActionButton/Preview";
+import RestoreButton from "@/components/data-table/ActionButton/Restore";
+import SubmitEInvoiceButton from "@/components/data-table/ActionButton/SubmitEInvoice";
+import TrashButton from "@/components/data-table/ActionButton/Trash";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import MobileActionGroupEnd from "@/components/data-table/MobileActionGroupEnd";
+import MobileActionGroupStart from "@/components/data-table/MobileActionGroupStart";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import Validity from "@/components/data-table/Validity";
+import TransferButton from "@/components/features/transfer/TransferButton";
+// Transfer From (Imports)
+import { TransferFromButton } from "@/components/features/transfer/transferFrom";
+// Transfer To (Imports)./transfer/transferFrom/config
+import { TransferToButton } from "@/components/features/transfer/transferTo";
+// Mobile View (Imports)
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+
+import { cashSalesTransferFromConfig } from "./transfer/transferFrom/config";
+import { cashSalesTransferToConfig } from "./transfer/transferTo/config";
+
+import type { CashSales } from "./columns";
+
+// Server-Side Filtering (Add totalNumOfRows)
+type Props = {
+  table: Table<CashSales>;
+  refreshTable: any;
+  totalNumOfRows?: number;
+  defaultColumns?: VisibilityState;
+  dataStatusBadgeDisplay?: React.ReactNode;
+  onResetColumnOrdering?: () => void;
+  // viewEInvoiceDetails?: (row: any) => void;
+  viewDailySummary?: boolean;
+};
+
+export default function CashSalesDataTableToolbar({
+  table,
+  refreshTable,
+  totalNumOfRows,
+  defaultColumns,
+  dataStatusBadgeDisplay,
+  onResetColumnOrdering,
+  // viewEInvoiceDetails,
+  viewDailySummary,
+}: Props) {
+  return (
+    <div className="flex items-center justify-between p-1.5">
+      <ActionGroupStart
+        table={table}
+        refreshTable={refreshTable}
+        viewDailySummary={viewDailySummary}
+      />
+
+      {/* Mobile View (Hide Pagination) */}
+      <div className="hidden md:block">
+        {/* Server-Side Filtering (Pass totalNumOfRows) */}
+        <Pagination table={table} totalNumOfRows={totalNumOfRows} />
+      </div>
+
+      <ActionGroupEnd
+        table={table}
+        refreshTable={refreshTable}
+        defaultColumns={defaultColumns}
+        dataStatusBadgeDisplay={dataStatusBadgeDisplay}
+        onResetColumnOrdering={onResetColumnOrdering}
+      />
+    </div>
+  );
+}
+
+function ActionGroupStart({
+  table,
+  refreshTable,
+  // viewEInvoiceDetails,
+  viewDailySummary,
+}: Omit<Props, "defaultColumns" | "dataStatusBadgeDisplay">) {
+  const [selectedRow, setSelectedRow] = useState("");
+  const userRule = JSON.parse(localStorage.getItem("userRule") || "null");
+  const existsDelete = userRule.userHasRule?.includes("delete-cash-sales");
+
+  const selectedRowModel = table.getSelectedRowModel();
+
+  useEffect(() => {
+    if (selectedRowModel.rows.length === 1) {
+      setSelectedRow(selectedRowModel.rows[0]);
+    }
+  }, [selectedRowModel]);
+
+  // Mobile View (States)
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  return (
+    <div className="flex flex-wrap items-center justify-start gap-x-2 p-1">
+      {/* Mobile View (Start Menu) */}
+      <MobileActionGroupStart
+        table={table}
+        refreshTable={refreshTable}
+        config={{
+          newDestination: "/sales/cash-sales/new",
+          editDestination: (row) => `/sales/cash-sales/edit?item=${row.docNo}&id=${row.UUID}`,
+          cloneDestination: (row) => `/sales/cash-sales/clone?id=${row.UUID}`,
+          module: "cash_sales",
+          model: "cash-sales",
+        }}
+      >
+        {/* Additional Actions (Other than New, Edit, Clone, Trash, Restore, Delete) */}
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div onClick={() => setDropdownOpen(false)}>
+            <PreviewButton
+              table={table}
+              previewType="CASH SALES"
+              module="cash_sales"
+              model="cash-sales"
+              doc_id={selectedRow ? selectedRow.original.UUID : ""}
+              refreshTable={refreshTable}
+            />
+          </div>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div onClick={() => setDropdownOpen(false)}>
+            <SubmitEInvoiceButton
+              table={table}
+              module={"cash_sales"}
+              model={"cash-sales"}
+              refreshTable={refreshTable}
+            />
+          </div>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div onClick={() => setDropdownOpen(false)}>
+            <GetEInvoiceButton
+              table={table}
+              module={"cash_sales"}
+              model={"cash-sales"}
+              refreshTable={refreshTable}
+            />
+          </div>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div onClick={() => setDropdownOpen(false)}>
+            <CancelEInvoiceButton
+              table={table}
+              module={"cash_sales"}
+              model={"cash-sales"}
+              refreshTable={refreshTable}
+              selectedRow={selectedRow}
+            />
+          </div>
+        </DropdownMenuItem>
+
+        {/* Transfer (Mobile View Button) */}
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div onClick={() => setDropdownOpen(false)}>
+            <TransferButton
+              transferFromProps={{
+                table: table,
+                id: selectedRow ? selectedRow.original.UUID : "",
+                config: cashSalesTransferFromConfig,
+                onTransferComplete: refreshTable,
+                refreshTable: refreshTable,
+              }}
+              transferToProps={{
+                table: table,
+                id: selectedRow ? selectedRow.original.UUID : "",
+                config: cashSalesTransferToConfig,
+              }}
+            />
+          </div>
+        </DropdownMenuItem>
+      </MobileActionGroupStart>
+
+      {/* Web View (Start Menu) */}
+      <div className="hidden flex-wrap items-center justify-start gap-x-2 md:flex">
+        <NewButton destination="/sales/cash-sales/new" />
+        <EditButton
+          table={table}
+          destination={`/sales/cash-sales/edit?item=${
+            selectedRow ? selectedRow.original.docNo : ""
+          }&id=${selectedRow ? selectedRow.original.UUID : ""}`}
+        />
+        <CloneButton
+          table={table}
+          destination={`/sales/cash-sales/clone?id=${selectedRow ? selectedRow.original.UUID : ""}`}
+        />
+        <TrashButton
+          table={table}
+          module={"cash_sales"}
+          model={"cash-sales"}
+          refreshTable={refreshTable}
+        />
+        <RestoreButton
+          table={table}
+          module={"cash_sales"}
+          model={"cash-sales"}
+          refreshTable={refreshTable}
+        />
+        <DeleteButton
+          table={table}
+          module={"cash_sales"}
+          model={"cash-sales"}
+          refreshTable={refreshTable}
+          disabled={existsDelete?false:true}
+        />
+        <PreviewButton
+          table={table}
+          previewType={"CASH SALES"}
+          module={"cash_sales"}
+          model={"cash-sales"}
+          doc_id={selectedRow ? selectedRow.original.UUID : ""}
+          refreshTable={refreshTable}
+        />
+        <SubmitEInvoiceButton
+          table={table}
+          module={"cash_sales"}
+          model={"cash-sales"}
+          refreshTable={refreshTable}
+        />
+        <GetEInvoiceButton
+          table={table}
+          module={"cash_sales"}
+          model={"cash-sales"}
+          refreshTable={refreshTable}
+        />
+        <CancelEInvoiceButton
+          table={table}
+          module={"cash_sales"}
+          model={"cash-sales"}
+          refreshTable={refreshTable}
+          selectedRow={selectedRow}
+        />
+        {/* Transfer From (Web View Button) */}
+        <TransferButton
+          transferFromProps={{
+            table: table,
+            id: selectedRow ? selectedRow.original.UUID : "",
+            config: cashSalesTransferFromConfig,
+            onTransferComplete: refreshTable,
+            refreshTable: refreshTable,
+          }}
+          transferToProps={{
+            table: table,
+            id: selectedRow ? selectedRow.original.UUID : "",
+            config: cashSalesTransferToConfig,
+          }}
+        />
+        <DailySummaryButton
+          module={"cash_sales"}
+          model={"cash-sales"}
+          disabled={viewDailySummary ? false : true}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ActionGroupEnd({
+  table,
+  refreshTable,
+  defaultColumns,
+  dataStatusBadgeDisplay,
+  onResetColumnOrdering,
+}: Props) {
+  return (
+    <div className="relative flex items-center gap-x-1 pr-1.5 text-erp-blue-14">
+      {/* Web View (End Menu) */}
+      <span className="absolute-left-32 hidden md:flex">{dataStatusBadgeDisplay}</span>
+      <div className="hidden items-center gap-x-1 md:flex">
+        <Export table={table} module={"cashSales"} mainModule={"sales"} />
+        <Refresh refreshTable={refreshTable} resetRowSelection={() => table.resetRowSelection()} />
+        <Validity table={table} />
+        <ColumnVisibilityToggle
+          table={table}
+          defaultColumns={defaultColumns}
+          onResetColumnOrdering={onResetColumnOrdering}
+        />
+      </div>
+
+      {/* Mobile View (Search and Sort) */}
+      <MobileActionGroupEnd
+        table={table}
+        config={{
+          searchColumn: "docNo",
+          searchPlaceholder: "Search Doc No.",
+          sortColumn: "docNo",
+        }}
+      />
+    </div>
+  );
+}

@@ -1,0 +1,13 @@
+"use client";
+
+import React from "react";
+
+import CompanyDataTable from "./DataTable";
+
+export default function CompanyPage() {
+  return (
+    <div className="h-full">
+      <CompanyDataTable />
+    </div>
+  );
+}

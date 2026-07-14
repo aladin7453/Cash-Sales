@@ -1,0 +1,279 @@
+"use client";
+
+import { Table } from "@tanstack/react-table";
+import React, { useEffect, useState } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import CloneButton from "@/components/data-table/ActionButton/Clone";
+import DeleteButton from "@/components/data-table/ActionButton/Delete";
+import EditButton from "@/components/data-table/ActionButton/Edit";
+import NewButton from "@/components/data-table/ActionButton/New";
+import PreviewButton from "@/components/data-table/ActionButton/Preview";
+import RestoreButton from "@/components/data-table/ActionButton/Restore";
+import TrashButton from "@/components/data-table/ActionButton/Trash";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import MobileActionGroupEnd from "@/components/data-table/MobileActionGroupEnd";
+import MobileActionGroupStart from "@/components/data-table/MobileActionGroupStart";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import Validity from "@/components/data-table/Validity";
+import TransferButton from "@/components/features/transfer/TransferButton";
+// Transfer From (Imports)
+import { TransferFromButton } from "@/components/features/transfer/transferFrom";
+// Transfer To (Imports)
+import { TransferToButton } from "@/components/features/transfer/transferTo";
+// Mobile View (Imports)
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+
+import { SalesOrder } from "./columns";
+import { salesOrderTransferFromConfig } from "./transfer/transferFrom/config";
+import { salesOrderTransferToConfig } from "./transfer/transferTo/config";
+
+import type { VisibilityState } from "@tanstack/react-table";
+
+// Server-Side Filtering (Add totalNumOfRows)
+type Props = {
+  table: Table<SalesOrder>;
+  refreshTable: any;
+  totalNumOfRows?: number;
+  defaultColumns?: VisibilityState;
+  dataStatusBadgeDisplay?: React.ReactNode;
+  onResetColumnOrdering?: () => void;
+  isSelectionMode?: boolean;
+  onExitSelectionMode?: () => void;
+};
+
+// Server-Side Filtering (Add totalNumOfRows)
+export default function DataTableToolbar({
+  table,
+  refreshTable,
+  totalNumOfRows,
+  defaultColumns,
+  dataStatusBadgeDisplay,
+  onResetColumnOrdering,
+  isSelectionMode,
+  onExitSelectionMode,
+}: Props) {
+  return (
+    <div className="flex h-[110px] items-center justify-between bg-erp-blue-3 md:h-auto md:p-1.5">
+      <ActionGroupStart table={table} refreshTable={refreshTable} />
+
+      {/* Mobile View (Hide Pagination) */}
+      <div className="hidden md:block">
+        {/* Server-Side Filtering (Pass totalNumOfRows) */}
+        <Pagination table={table} totalNumOfRows={totalNumOfRows} />
+      </div>
+
+      <ActionGroupEnd
+        table={table}
+        refreshTable={refreshTable}
+        defaultColumns={defaultColumns}
+        dataStatusBadgeDisplay={dataStatusBadgeDisplay}
+        onResetColumnOrdering={onResetColumnOrdering}
+        isSelectionMode={isSelectionMode}
+        onExitSelectionMode={onExitSelectionMode}
+      />
+    </div>
+  );
+}
+
+function ActionGroupStart({ table, refreshTable }: Props) {
+  const [selectedRow, setSelectedRow] = useState<any>(null);
+  const userRule = JSON.parse(localStorage.getItem("userRule") || "null");
+  const canDelete = userRule.userHasRule?.includes("delete-sales-order");
+
+  const selectedRowModel = table.getSelectedRowModel();
+
+  useEffect(() => {
+    if (selectedRowModel.rows.length === 1) {
+      setSelectedRow(selectedRowModel.rows[0]);
+    } else {
+      setSelectedRow(null);
+    }
+  }, [selectedRowModel]);
+
+  // Mobile View (States)
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  return (
+    <div className="hidden md:block flex flex-wrap items-center justify-start gap-x-2 p-1">
+      {/* Mobile View (Start Menu) */}
+      <MobileActionGroupStart
+        table={table}
+        refreshTable={refreshTable}
+        config={{
+          newDestination: "/sales/sales-order/new",
+          editDestination: (row) => `/sales/sales-order/edit?item=${row.docNo}&id=${row.UUID}`,
+          cloneDestination: (row) => `/sales/sales-order/clone?id=${row.UUID}`,
+          module: "sales_order",
+          model: "sales-order",
+        }}
+      >
+        {/* Additional Actions (Other than New, Edit, Clone, Trash, Restore, Delete) */}
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div onClick={() => setDropdownOpen(false)}>
+            <PreviewButton
+              table={table}
+              previewType={"SALES ORDER"}
+              module="sales_order"
+              model="sales-order"
+              doc_id={selectedRow ? selectedRow.original.UUID : ""}
+            />
+          </div>
+        </DropdownMenuItem>
+        {/* Transfer  (Mobile View Button) */}
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div onClick={() => setDropdownOpen(false)}>
+            <TransferButton
+              transferFromProps={{
+                table: table,
+                id: selectedRow ? selectedRow.original.UUID : "",
+                config: salesOrderTransferFromConfig,
+                onTransferComplete: refreshTable,
+                refreshTable: refreshTable,
+              }}
+              transferToProps={{
+                table: table,
+                id: selectedRow ? selectedRow.original.UUID : "",
+                config: salesOrderTransferToConfig,
+              }}
+            />
+          </div>
+        </DropdownMenuItem>
+      </MobileActionGroupStart>
+
+      {/* Web View (Menu) */}
+      <div className="hidden flex-wrap items-center justify-start gap-x-2 md:flex">
+        <NewButton destination="/sales/sales-order/new" />
+        <EditButton
+          table={table}
+          destination={`/sales/sales-order/edit?item=${selectedRow ? selectedRow.original.docNo : ""
+            }&id=${selectedRow ? selectedRow.original.UUID : ""}`}
+        />
+        <CloneButton
+          table={table}
+          destination={`/sales/sales-order/clone?id=${selectedRow ? selectedRow.original.UUID : ""}`}
+        />
+        <TrashButton
+          table={table}
+          module="sales_order"
+          model="sales-order"
+          refreshTable={refreshTable}
+        />
+        <RestoreButton
+          table={table}
+          module="sales_order"
+          model="sales-order"
+          refreshTable={refreshTable}
+        />
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <DeleteButton
+                  table={table}
+                  module="sales_order"
+                  model="sales-order"
+                  refreshTable={refreshTable}
+                  disabled={!canDelete}
+                />
+              </span>
+            </TooltipTrigger>
+
+            {!canDelete && (
+              <TooltipContent>
+                You are not allowed to perform this action
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
+        <PreviewButton
+          table={table}
+          previewType={"SALES ORDER"}
+          module="sales_order"
+          model="sales-order"
+          doc_id={selectedRow ? selectedRow.original.UUID : ""}
+        />
+        <TransferButton
+          transferFromProps={{
+            table: table,
+            id: selectedRow ? selectedRow.original.UUID : "",
+            config: salesOrderTransferFromConfig,
+            onTransferComplete: refreshTable,
+            refreshTable: refreshTable,
+          }}
+          transferToProps={{
+            table: table,
+            id: selectedRow ? selectedRow.original.UUID : "",
+            config: salesOrderTransferToConfig,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ActionGroupEnd({
+  table,
+  refreshTable,
+  defaultColumns,
+  dataStatusBadgeDisplay,
+  onResetColumnOrdering,
+  onExitSelectionMode,
+  isSelectionMode = false,
+}: Props) {
+  return (
+    <div className="relative flex items-center gap-x-1 pr-1.5 text-erp-blue-14">
+      {/* Web View (End Menu) */}
+      <span className="absolute-left-32 hidden md:flex">{dataStatusBadgeDisplay}</span>
+      <div className="hidden items-center gap-x-1 md:flex">
+        <Export table={table} module={"salesOrder"} mainModule={"sales"} />
+        <Refresh refreshTable={refreshTable} resetRowSelection={() => table.resetRowSelection()} />
+        <Validity table={table} />
+        <ColumnVisibilityToggle
+          table={table}
+          defaultColumns={defaultColumns}
+          onResetColumnOrdering={onResetColumnOrdering}
+        />
+      </div>
+
+      {/* Mobile View (Search and Sort) */}
+      <div className="w-full px-3 sm:mr-auto sm:w-[60%] md:hidden">
+        <MobileActionGroupEnd
+          table={table}
+          config={{
+            //Search 
+            searchColumn: "docNo",
+            searchPlaceholder: "Search Doc No.",
+            sortColumn: "docNo",
+
+            //Module
+            module: "sales_order",
+            model: "sales-order",
+            previewType: "SALES ORDER",
+            refreshTable: refreshTable,
+
+            //Path
+            newDestination: "/sales/sales-order/new",
+
+            //Transfer From
+            transferFromConfig: salesOrderTransferFromConfig,
+            getTransferFromId: (row) => row?.UUID ?? "",
+            transferFromOnComplete: refreshTable,
+
+            //Export (Add module prop for API endpoint) 
+            exportModule: "salesOrder",
+            exportMainModule: "sales",
+
+            //Customise Condition (Show Or Hidden)
+            showSubmitEInvoice: false,
+            showGetEInvoice: false,
+            showTransferFrom: true,
+          }}
+          isSelectionMode={isSelectionMode}
+          onExitSelectionMode={onExitSelectionMode}
+        />
+      </div>
+    </div>
+  );
+}

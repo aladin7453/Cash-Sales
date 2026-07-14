@@ -1,0 +1,514 @@
+"use client";
+
+import React, { useState, useEffect, useRef } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea";
+import { ORIGIN } from "@/lib/constants";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+import { getAuthHeaders,getCurrentCompanyUUID } from "@/lib/constants";
+
+type Params = {
+  form: any;
+  defaultCurrentCompany: any;
+};
+
+type DropdownConfig = {
+  tableName: string;
+  columns: { accessorKey: string; header: string }[];
+  valueField: string;
+  displayField: string;
+  formValueField: string;
+  formDisplayField: string;
+  additionalMappings?: { sourceField: string; targetFormField: string }[];
+};
+
+export function SupplierDetailsForm({ form, defaultCurrentCompany }: Params) {
+  const headers = getAuthHeaders();
+
+  const [dropdownState, setDropdownState] = useState({
+    currentDropdown: null as string | null,
+    data: [] as any[],
+    originalData: [] as any[],
+    showTable: false,
+  });
+
+  const dropdownInputRef = useRef(null);
+  const dropdownTableRef = useRef(null);
+
+  const dropdownConfigs: Record<string, DropdownConfig> = {
+    MISCCode: {
+      tableName: "MISCCode",
+      columns: [
+        { accessorKey: "code", header: "MSIC" },
+        { accessorKey: "description", header: "Description" }
+      ],
+      valueField: "UUID",
+      displayField: "code",
+      formValueField: "supplierMSICCode",
+      formDisplayField: "MISCCodeCode",
+      additionalMappings: [{ sourceField: "description", targetFormField: "supplierBusinessNature" }],
+    },
+  };
+
+  const fetchDropdownData = async (dropdownKey: string) => {
+    try {
+      const config = dropdownConfigs[dropdownKey];
+
+      if (!config) return;
+
+      var form_data = new FormData();
+
+      form_data.append(`table[0]`, config.tableName);
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${dropdownKey} data`);
+      }
+
+      const data = await response.json();
+
+      setDropdownState({
+        currentDropdown: dropdownKey,
+        data: data.rows,
+        originalData: data.rows,
+        showTable: true,
+      });
+    } catch (error) {
+      console.error(`Error fetching ${dropdownKey} data:`, error);
+
+      throw new Error(`Failed to fetch ${dropdownKey} data`);
+    }
+  };
+
+  const onClickRow = (row: any) => {
+    const config = dropdownConfigs[dropdownState.currentDropdown!];
+
+    if (config) {
+      form.setValue(config.formValueField, row[config.valueField]);
+      form.setValue(config.formDisplayField, row[config.displayField]);
+
+      if (config.additionalMappings) {
+        config.additionalMappings.forEach((mapping) => {
+          if (row[mapping.sourceField]) {
+            form.setValue(mapping.targetFormField, row[mapping.sourceField]);
+          }
+        });
+      }
+    }
+
+    setDropdownState((prev) => ({ ...prev, showTable: false }));
+  };
+
+  const [showTableMSICCode, setShowTableMSICCode] = useState(false);
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownTableRef.current &&
+      !dropdownTableRef.current.contains(event.target) &&
+      dropdownInputRef.current !== event.target
+    ) {
+      setDropdownState((prev) => ({ ...prev, showTable: false }));
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener('click', handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  const currentCompanyUUID = getCurrentCompanyUUID();
+
+  const fetcher = async (url) => {
+    const headers = getAuthHeaders();
+
+    return fetch(url, { headers }).then((res) => {
+      if (!res.ok) {
+        throw new Error('Failed to fetch data');
+      }
+      return res.json();
+    });
+  };
+
+  useEffect(() => {
+    const savedState = localStorage.getItem("sales-credit-note.currentSupplierChecked");
+    if (savedState === "true") {
+      form.setValue("currentSupplier", "1");
+    } else {
+      form.setValue("currentSupplier", "0");
+    }
+  }, [form]);
+
+  const handleCurrentCompanyChange = async (event: { target: { checked: CheckedState } }) => {
+    const isChecked = event.target.checked;
+
+    localStorage.setItem("sales-credit-note.currentSupplierChecked", isChecked.toString());
+
+    if (isChecked) {
+      try {
+        const apiUrl = `${ORIGIN}/universal/get-current-company?id=${currentCompanyUUID}`;
+        const data = await fetcher(apiUrl);
+
+        const companyData = data.data;
+        form.setValue("supplierName", companyData.company);
+        form.setValue("supplierTIN", companyData.TIN);
+        form.setValue("supplierBRN", companyData.BRN);
+        form.setValue("supplierSSTNo", companyData.SSTNo);
+        form.setValue("supplierTTXNo", companyData.TTxNo);
+        form.setValue("supplierMSICCode", companyData.MSIC);
+        form.setValue("MISCCodeCode", companyData.MSICCode);
+        form.setValue("supplierBusinessNature", companyData.businessNature);
+        form.setValue("supplierEmail", companyData.email);
+        form.setValue("supplierPhoneNo", companyData.phoneNo);
+        form.setValue("supplierAddress", companyData.address);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    } else {
+      form.setValue("supplierName", "");
+      form.setValue("supplierTIN", "");
+      form.setValue("supplierBRN", "");
+      form.setValue("supplierSSTNo", "");
+      form.setValue("supplierTTXNo", "");
+      form.setValue("supplierMSICCode", "");
+      form.setValue("MISCCodeCode", "");
+      form.setValue("supplierBusinessNature", "");
+      form.setValue("supplierEmail", "");
+      form.setValue("supplierPhoneNo", "");
+      form.setValue("supplierAddress", "");
+    }
+  };
+
+
+  useEffect(() => {
+    if (defaultCurrentCompany) {
+      form.setValue("currentCompany", "1");
+      const companyData = defaultCurrentCompany.data;
+
+      form.setValue("supplierName", companyData.company);
+      form.setValue("supplierTIN", companyData.TIN);
+      form.setValue("supplierBRN", companyData.BRN);
+      form.setValue("supplierSSTNo", companyData.SSTNo);
+      form.setValue("supplierTTXNo", companyData.TTxNo);
+      form.setValue("supplierMSICCode", companyData.MSIC);
+      form.setValue("MISCCodeCode", companyData.MSICCode);
+      form.setValue("supplierBusinessNature", companyData.businessNature);
+      form.setValue("supplierEmail", companyData.email);
+      form.setValue("supplierPhoneNo", companyData.phoneNo);
+      form.setValue("supplierAddress", companyData.address);
+
+    }
+    return () => {
+
+    }
+  }, [defaultCurrentCompany])
+  
+  const handleDropdownSearchChange = (dropdownKey: string, searchTerm: string) => {
+    const config = dropdownConfigs[dropdownKey];
+    if (!config) return;
+
+    // Update the field the user is actually typing in
+    form.setValue(config.formDisplayField, searchTerm);
+
+    // If input is cleared, also clear related fields
+    if (searchTerm.trim() === "") {
+      // Clear UUID and Business Nature
+      form.setValue(config.formValueField, "");
+      form.setValue("supplierBusinessNature", "");
+
+      setDropdownState((prev) => ({
+        ...prev,
+        data: prev.originalData,
+        showTable: true,
+        currentDropdown: dropdownKey,
+      }));
+      return;
+    }
+
+    // Fetch if no data or different dropdown
+    if (!dropdownState.originalData.length || dropdownState.currentDropdown !== dropdownKey) {
+      fetchDropdownData(dropdownKey);
+      return;
+    }
+
+    // Filter by code or description
+    const filtered = dropdownState.originalData.filter((row: any) =>
+      [row[config.valueField], row[config.displayField]]
+        .some((field) =>
+          field?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+        )
+    );
+
+    setDropdownState((prev) => ({
+      ...prev,
+      data: filtered,
+      showTable: true,
+      currentDropdown: dropdownKey,
+    }));
+  };
+
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Own Company Information</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form>
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6">
+              <FormField
+                control={form.control}
+                name="supplierName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Supplier Name:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7.5"
+                        {...field}
+                        moduleName="salesCreditNote"
+                        fieldName="supplierName"
+                        columnName="Supplier Name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="currentCompany"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <div className="flex items-center">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value === "1"}
+                          onCheckedChange={(state) => {
+                            field.onChange(state ? "1" : "0");
+                            handleCurrentCompanyChange({ target: { checked: state } });
+                          }}
+                        />
+                      </FormControl>
+                      <FormLabel className="ml-2">Current Company</FormLabel>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierTIN"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Supplier TIN:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierBRN"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Supplier BRN/NRIC/Passport:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierSSTNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Supplier SST No.:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierTTXNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>TTx No.:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6 mt-4">
+              <FormField
+                control={form.control}
+                name="supplierMSICCode"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="MISCCodeCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>MSIC:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          // readOnly
+                          onChange={(e) => handleDropdownSearchChange("MISCCode", e.target.value)}
+                          onClick={() => fetchDropdownData('MISCCode')}
+                          ref={dropdownState.currentDropdown === 'MISCCode' ? dropdownInputRef : null}
+                          autoComplete="off"
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable && dropdownState.currentDropdown === 'MISCCode' && (
+                          <div ref={dropdownTableRef} className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px]">
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownConfigs.MISCCode.columns}
+                                data={dropdownState.data}
+                                onClickRow={onClickRow}
+                              />
+                              <ScrollBar orientation="vertical" />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierBusinessNature"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Business Nature:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierEmail"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Supplier Email:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierPhoneNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Supplier Phone No.:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6 mt-4">
+              <FormField
+                control={form.control}
+                name="supplierAddress"
+                render={({ field }) => (
+                  <FormItem className="col-span-6 row-span-3 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Supplier Address:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-20 resize-none"
+                        {...field}
+                        moduleName="salesCreditNote"
+                        fieldName="supplierAddress"
+                        columnName="Supplier Address"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

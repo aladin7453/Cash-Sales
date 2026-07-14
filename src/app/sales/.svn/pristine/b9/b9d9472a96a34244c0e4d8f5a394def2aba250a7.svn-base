@@ -1,0 +1,316 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { FaArrowRotateLeft } from "react-icons/fa6";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { Button } from "@/components/ui/button";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardTitle,
+  CardHeader
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { QuotationColumns } from "../quotation-details/columns";
+import QuotationDataTableOld from "../quotation-details/DataTableOld";
+import { getAuthHeaders, getCurrentAcc, getCurrentAccount, ORIGIN } from "@/lib/constants";
+
+import type { AutoBillingConfig } from "../../../columns";
+
+type Params = {
+  autoBillingConfig?: AutoBillingConfig | null;
+  customInformationData: any;
+  tempRowCustomInfo: any;
+  form: any;
+  tempRowQuotationDetailsList: any
+  setTempRowQuotationDetailsList: any;
+};
+
+export function AutoBillingConfigFormOld({
+  autoBillingConfig,
+  customInformationData,
+  tempRowCustomInfo,
+  form,
+  tempRowQuotationDetailsList,
+  setTempRowQuotationDetailsList
+}: Params) {
+  const headers = getAuthHeaders();
+  const currentAcc = getCurrentAcc();
+  const currentAccountUUID = getCurrentAccount();
+
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const router = useRouter();
+
+
+  ;
+
+  const dropdownCompanyColumns = [
+    { accessorKey: "companyID", header: "Company Code" },
+    { accessorKey: "company", header: "Company" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const inputRef = useRef(null);
+  const { toast } = useToast();
+  const dropdownRef = useRef(null);
+
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+
+  const [customerDropdownData, setCustomerDropdownData] = useState<[]>([]);
+  const [showCustomerTable, setShowCustomerTable] = useState(false);
+  const [customerFilter, setCustomerFilter] = useState("");
+
+
+  const handleClickOutside = (event) => {
+    if (customerDropdownRef.current && !customerDropdownRef.current.contains(event.target) && customerCodeInputRef.current !== event.target) {
+      setShowCustomerTable(false);
+    }
+
+  };
+
+  const customerCodeInputRef = useRef(null);
+  const customerDropdownRef = useRef(null);
+
+  const dropdownCustomerColumns = [
+    { accessorKey: "customerCode", header: "Customer Code", },
+    { accessorKey: "customerGroupCode", header: "Customer Group", },
+    { accessorKey: "customerName", header: "Customer Name", },
+  ];
+
+  const fetchCustomerDropdownData = async () => {
+    try {
+      var form_data = new FormData();
+
+      form_data.append(`table[0]`, "customer");
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch dropdown data');
+      }
+
+      const data = await response.json();
+
+      setCustomerDropdownData(data.rows);
+      setShowCustomerTable(true);
+    } catch (error) {
+      console.error('Error fetching dropdown data:', error);
+
+      throw new Error('Failed to fetch dropdown data');
+    }
+  };
+
+
+  const onClickRowCustomer = (row) => {
+    form.setValue("customer", row.UUID);
+    form.setValue("customerCode", row.customerCode);
+    form.setValue("customerName", row.customerName);
+    setShowCustomerTable(false);
+    setCustomerFilter("");
+  };
+
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">General Details</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form>
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5">
+              <FormField
+                control={form.control}
+                name="ID"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>
+                      ID: <span className="text-red-500"></span>
+                    </FormLabel>
+                    <FormControl>
+                      <div className="relative h-7.5">
+                        <Input
+                          className="h-7.5 pr-7"
+                          {...field}
+                          readOnly={true}
+                          moduleName="AutoBillingConfig"
+                          fieldName="ID"
+                          columnName="ID"
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="customer"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>Customer UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="customerCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>
+                      Customer Code: <span className="text-red-500"></span>
+                    </FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onClick={fetchCustomerDropdownData}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setCustomerFilter(e.target.value);
+                          }}
+                          ref={customerCodeInputRef}
+                          autoComplete="off"
+                          moduleName="quotation"
+                          fieldName="customerCode"
+                          columnName="Customer Code"
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {showCustomerTable && (
+                          <div ref={customerDropdownRef} className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px]">
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownCustomerColumns}
+                                data={customerDropdownData}
+                                onClickRow={onClickRowCustomer}
+                                filterValue={customerFilter}
+                                filterColumn="customerName"
+                              />
+                              <ScrollBar orientation="vertical" />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="customerName"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>
+                      Customer Name: <span className="text-red-500"></span>
+                    </FormLabel>
+                    <FormControl>
+                      <div className="relative h-7.5">
+                        <Input
+                          className="h-7.5 pr-7"
+                          {...field}
+                          readOnly={true}
+                          moduleName="AutoBillingConfig"
+                          fieldName="customerName"
+                          columnName="customerName"
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5 mt-4">
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem className="col-span-5 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Description:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7"
+                        {...field}
+                        moduleName="autoBillingConfig"
+                        fieldName="description"
+                        columnName="Description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+          </form>
+          <QuotationDataTableOld
+            columns={QuotationColumns}
+            // data={
+            //   id
+            //     ? quotationDetails
+            //       ? quotationDetails.rows
+            //       : []
+            //     : tempRowQuotationDetailsList
+            // }
+            data={tempRowQuotationDetailsList}
+            tempRowQuotationDetailsList={tempRowQuotationDetailsList}
+            setTempRowQuotationDetailsList={setTempRowQuotationDetailsList}
+
+            form={form}
+          // quotationData={quotationData}
+          // UOMDetails={UOMDetails}
+          // preferenceData={preferenceData}
+          // slug={slug}
+          />
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function onReset() {
+  throw new Error("Function not implemented.");
+}

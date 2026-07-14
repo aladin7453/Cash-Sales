@@ -1,0 +1,154 @@
+import { FaCheck, FaEye, FaEyeSlash, FaMagnifyingGlass, FaMinus } from "react-icons/fa6";
+import { React } from "react";
+import Delta from "@/components/icons/svg-repo/Delta";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import ModuleTreeView from "./ModuleTreeView";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+type Props = {
+  disabled?: boolean;
+};
+
+export default function AccessControlDataTable({ disabled }: Props) {
+  return (
+    <div className="max-w-7xl p-4">
+      <div className="flex w-full flex-col gap-y-2">
+        <div className="grid grid-cols-4 gap-x-3">
+          <Input className="col-span-3" placeholder="Search all modules and features here..." />
+          <div className="col-span-1 flex h-10 justify-between rounded-md border border-input bg-background px-3 py-2 text-sm">
+            <span className="font-medium">Total:</span>
+            <div className="flex items-center gap-x-1">
+              <span className="font-medium">3000.00</span>
+              <span className="text-red-600">(-100.00)</span>
+            </div>
+          </div>
+        </div>
+        <div className="w-full overflow-hidden rounded-md">
+          <div className="flex items-center bg-erp-blue-11 py-1.5 pl-4 pr-8">
+            <div className="flex basis-3/4 items-center gap-x-1">
+              <span className="mr-4 font-semibold text-white">Module and Feature</span>
+              <div className="relative">
+                <Input className="h-7 w-fit" placeholder="Load billing plan" />
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                  <FaMagnifyingGlass className="text-gray-400" />
+                </div>
+              </div>
+              <GrantAllButton />
+              <DenyAllButton />
+              <HistoryButton hidden={false} />
+              <PriceChangeButton />
+            </div>
+            <div className="flex basis-1/4 items-center">
+              <Input
+                value="Adjusted Price"
+                className="h-fit border-0 bg-transparent text-right font-semibold text-white disabled:opacity-100"
+                disabled
+              />
+              <Input
+                value="Current Price"
+                className="h-fit border-0 bg-transparent text-right font-semibold text-white disabled:opacity-100"
+                disabled
+              />
+            </div>
+          </div>
+          <ScrollArea className="h-[400px] overflow-auto bg-erp-gray-1">
+            <ModuleTreeView />
+          </ScrollArea>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GrantAllButton() {
+  const handleGrantAll = () => {
+    alert("All access granted!");
+  };
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <button className="flex h-7 items-center gap-x-2 rounded bg-erp-blue-13 px-2 text-white">
+          <span className="text-sm">Grant All</span>
+          <FaCheck className="size-4" />
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent className="max-w-sm">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Grant All Access</AlertDialogTitle>
+        </AlertDialogHeader>
+        <div className="flex justify-center py-6">
+          <p className="text-erp-blue-14">Are you sure you want to grant all access?</p>
+        </div>
+        <AlertDialogFooter className="flex !justify-center gap-x-2">
+          <AlertDialogAction className="h-9 w-24" onClick={handleGrantAll}>
+            Yes
+          </AlertDialogAction>
+          <AlertDialogCancel className="h-9 w-24">No</AlertDialogCancel>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function DenyAllButton() {
+  const handleDenyAll = () => {
+    alert("All access denied!");
+  };
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <button className="flex h-7 items-center gap-x-2 rounded bg-erp-blue-13 px-2 text-white">
+          <span className="text-sm">Deny All</span>
+          <FaMinus className="size-4" />
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent className="max-w-sm">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Deny All Access</AlertDialogTitle>
+        </AlertDialogHeader>
+        <div className="flex justify-center py-6">
+          <p className="text-erp-blue-14">Are you sure you want to deny all access?</p>
+        </div>
+        <AlertDialogFooter className="flex !justify-center gap-x-2">
+          <AlertDialogAction className="h-9 w-24" onClick={handleDenyAll}>
+            Yes
+          </AlertDialogAction>
+          <AlertDialogCancel className="h-9 w-24">No</AlertDialogCancel>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function HistoryButton({ hidden }) {
+  return (
+    <button
+      className="flex h-7 items-center gap-x-2 rounded bg-erp-blue-13 px-2 text-white disabled:text-erp-blue-14"
+      disabled={hidden}
+    >
+      <span className="text-sm">History</span>
+      {hidden ? <FaEyeSlash className="size-4" /> : <FaEye className="size-4" />}
+    </button>
+  );
+}
+
+function PriceChangeButton() {
+  return (
+    <button className="flex h-7 items-center gap-x-2 rounded bg-erp-blue-13 px-2 text-white">
+      <span className="text-sm">Price Change</span>
+      <Delta className="size-4" />
+    </button>
+  );
+}

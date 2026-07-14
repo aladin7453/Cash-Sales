@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* All the color variables defined here are in HSL format without using the color space function */
+  :root {
+    /* Custom colours for the app */
+    --erp-blue-1: 186 54% 99.5%; /* #f9fefe – very faint cyan */
+    --erp-blue-2: 186 56% 99%; /* #f1fcfd */
+    --erp-blue-3: 186 58% 98%; /* #e8fafd */
+    --erp-blue-4: 186 60% 97%; /* #def7fb */
+    --erp-blue-5: 186 62% 96%; /* #d5f5fa */
+    --erp-blue-6: 186 64% 94%; /* #c4f1f7 */
+    --erp-blue-7: 186 66% 91%; /* #b0ecf4 */
+    --erp-blue-8: 186 68% 88%; /* #9ce7f0 */
+    --erp-blue-9: 186 68% 84%; /* #82e0eb */
+    --erp-blue-10: 186 68% 78%; /* #5fd8e6 */
+    --erp-blue-11: 186 68% 72%; /* #40d0e0 */
+    --erp-blue-12: 186 68% 66%; /* #29c7da */
+    --erp-blue-13: 186 68% 58%; /* #1cbdd0 */
+    --erp-blue-14: 186 68% 50%; /* #15afc2 */
+    --erp-blue-15: 186 68% 42%; /* #1093a7 */
+    --erp-blue-16: 186 85% 94%; /* #c2f9fc – lively highlight */
+    --erp-blue-17: 186 75% 88%; /* #9df3f8 – more presence */
+    --erp-blue-18: 186 26% 98.5%; /* #f3fcfd – slightly deeper background tint */
+
+    --erp-gray-1: 0 0% 95%; /* #f2f2f2 */
+    --erp-gray-2: 0 0% 93%; /* #ededed */
+    --erp-gray-3: 0 2% 90%; /* #e7e6e6 */
+    --erp-gray-4: 0 2% 81%; /* #d0cece */
+    --erp-gray-5: 0 0% 50%; /* #7f7f7f */
+    --erp-gray-6: 0 2% 45%; /* #767171 */
+    --erp-gray-7: 0 2% 68%; /* #afabab */
+    --erp-gray-8: 0 0% 85%; /* #d9d9d9 */
+    --erp-gray-9: 0 0% 15%; /* #262626 */
+
+    --erp-green-1: 89 58% 56%; /* #92d050 */
+    --erp-green-2: 147 100% 35%; /* #00b050 */
+
+    --erp-yellow-1: 60 100% 50%; /* #ffff00 */
+    --erp-yellow-2: 45 100% 50%; /* #ffc000 */
+    --erp-yellow-3: 60 100% 70%; /* #ffff66 */
+
+    --erp-orange-1: 24 100% 50%; /* #ff6600 */
+
+    --erp-red-1: 0 100% 50%; /* #ff0000 */
+
+    --white: 0 0% 100%; /* #ffffff */
+
+    /* Default background color of <body />...etc */
+    --background: var(--erp-blue-5);
+    --foreground: 222.2 84% 4.9%;
+
+    /* Background color for <Card /> */
+    --card: var(--white);
+    --card-foreground: 222.2 84% 4.9%;
+
+    /* Background color for popovers such as <DropdownMenu />, <HoverCard />, <Popover /> */
+    --popover: var(--erp-blue-2);
+    --popover-foreground: 222.2 84% 4.9%;
+
+    /* Primary colors for <Button /> */
+    --primary: var(--erp-blue-15);
+    --primary-foreground: var(--white);
+
+    /* Secondary colors for <Button /> */
+    --secondary: var(--erp-blue-8);
+    --secondary-foreground: 30 30% 15%;
+
+    /* Muted backgrounds such as <TabsList />, <Skeleton /> and <Switch /> */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    /* Used for accents such as hover effects on <DropdownMenuItem>, <SelectItem>...etc */
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    /* Used for destructive actions such as <Button variant="destructive"> */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    /* Default border color */
+    --border: 214.3 31.8% 91.4%;
+
+    /* Border color for inputs such as <Input />, <Select />, <Textarea /> */
+    --input: var(--erp-blue-17);
+
+    /* Used for focus ring */
+    --ring: var(--erp-blue-12);
+
+    /* Border radius for card, input and buttons */
+    --radius: 0.5rem; /* 8px */
+
+    /* Default scrollbar color */
+    --scrollbar: var(--erp-blue-11);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border; /* set the border color globally */
+  }
+  /* body {
+    @apply bg-background text-foreground;
+  } */
+  * {
+    scrollbar-color: hsl(var(--erp-blue-11)) hsl(var(--erp-blue-3));
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-button {
+    display: none;
+    height: 0;
+    width: 0;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--erp-blue-11));
+    border-radius: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background-color: hsl(var(--erp-blue-3));
+  }
+}
+
+@layer utilities {
+  .react-tabs__tab-panel--selected {
+    display: block;
+  }
+}

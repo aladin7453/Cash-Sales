@@ -1,0 +1,105 @@
+"use client";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import {autoWordSize} from "@/lib/constants";
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type AutoBillingConfig = {
+  id: string;
+  UUID: string;
+  ID: string;
+  customer:string;
+  customerName:string;
+  customerCode:string;
+  account: string;
+  company: string;
+  autoBillingConfigCode: string;
+  autoBillingConfigName: string;
+  description: string;
+  createdAt: string;
+  createdAtFormat: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  valid: "0" | "1";
+  preferenceData?: any;
+};
+
+export const rawColumns: ColumnDef<AutoBillingConfig>[] = [
+  {
+    id: "ID",
+    accessorKey: "ID",
+    header: "ID",
+    filterFn: "includesString",
+  },
+    {
+    id: "customerCode",
+    accessorKey: "customerCode",
+    header: "Customer Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerName",
+    accessorKey: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    filterFn: "includesString",
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+    filterFn: "includesString",
+  },
+  {
+    id: "CreatedByUsername",
+    accessorKey: "CreatedByUsername",
+    header: "Created by",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+    filterFn: "includesString",
+  },
+  {
+    id: "UpdatedByUsername",
+    accessorKey: "UpdatedByUsername",
+    header: "Updated by",
+    filterFn: "includesString",
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as AutoBillingConfig["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    filterFn: "includesString",
+  },
+];
+
+export const columns: ColumnDef<AutoBillingConfig>[] = rawColumns.map(
+  (col) => {
+    if (typeof col.header === "string") {
+      const sizes = autoWordSize(col.header);
+
+      return {
+        ...col,
+        sizes,
+        size: sizes, // 👈 applied automatically
+        minSize:50
+      };
+    }
+
+    return col;
+  }
+);

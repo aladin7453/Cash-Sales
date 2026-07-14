@@ -1,0 +1,104 @@
+"use client";
+
+import { ColumnDef } from "@tanstack/react-table";
+import { useSearchParams } from "next/navigation";
+import { ORIGIN } from "@/lib/constants";
+import ChangelogDataTable from "@/components/features/changelog/DataTable";
+import { ChangelogConfig } from "@/components/features/changelog/types";
+import { cursorTo } from "readline";
+import { Currency } from "lucide-react";
+
+// Define the sales purchase contra changelog config
+const SalesPurchaseContraChangelogConfig: ChangelogConfig = {
+  // Default endpoints (fallback)
+  getHistoryUrl: (id: string) => `${ORIGIN}/sales_purchase_contra/api/sales-purchase-contra/get-sales-purchase-contra-log?id=${id}`,
+  getDetailsUrl: (id: string, action: string) => 
+    `${ORIGIN}/sales_purchase_contra/api/sales-purchase-contra/get-sales-purchase-contra-log-details?id=${id}&action=${action}`,
+  
+  fieldNameMapping: {
+    // Main Details
+    docNo: "Doc No.",
+    customerCodeCode: "Customer Code",
+    customerName: "Customer Name",
+    SSTNo: "SST No.",
+    currencyCode: "Currency",
+    currencyRate: "Currency Rate",
+    createdByUsername: "Created By",
+  },
+  
+  fieldsToFilter: [
+    "UUID",
+    "account",
+    "historyUUID",
+    "createdAt",
+    "createdBy",
+    "_actionUUID",
+    "_version",
+    "action",
+    "date_created",
+    "user_id",
+    "updatedBy",
+    "valid",
+
+    // Main Details
+    "customerCode",
+    "currency",
+    "taxExNo",
+    "company",
+    "reference",
+
+    // Customer Contra Details
+    "salesPurchaseContra",
+    "salesInvoice",
+  ],
+  
+  entityName: "salesPurchaseContra",
+  
+  defaultSortField: "createdAt",
+  
+  tabs: [
+    { 
+      value: "salesPurchaseContra", 
+      label: "Customer Contra",
+      referenceField: "docNo",
+      getHistoryUrl: (id: string) => `${ORIGIN}/sales_purchase_contra/api/sales-purchase-contra/get-sales-purchase-contra-log?id=${id}`,
+      getDetailsUrl: (id: string, action: string) => 
+        `${ORIGIN}/sales_purchase_contra/api/sales-purchase-contra/get-sales-purchase-contra-log-details?id=${id}&action=${action}`,
+    },
+    { 
+      value: "salesPurchaseContraHasDetails", 
+      label: "Customer Contra Details",
+      referenceField: "reference",
+      getHistoryUrl: (id: string) => `${ORIGIN}/sales_purchase_contra/api/sales-purchase-contra/get-sales-purchase-contra-log?id=${id}&table=salesPurchaseContraHasDetails`,
+      getDetailsUrl: (id: string, action: string) => 
+        `${ORIGIN}/sales_purchase_contra/api/sales-purchase-contra/get-sales-purchase-contra-log-details?id=${id}&action=${action}&table=salesPurchaseContraHasDetails`,
+    },
+  ],
+};
+
+export default function SalesPurchaseContraChangelogDataTable<TData, TValue>({
+  columns,
+  initialData,
+  onTableParamsChange,
+}: {
+  columns: ColumnDef<TData, TValue>[];
+  initialData?: any | null;
+  onTableParamsChange?: any;
+}) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return <div>Missing entity ID</div>;
+  }
+
+  return (
+    <ChangelogDataTable
+      columns={columns}
+      initialData={initialData}
+      config={SalesPurchaseContraChangelogConfig}
+      entityId={id}
+      onTableParamsChange={onTableParamsChange}
+    />
+  );
+}

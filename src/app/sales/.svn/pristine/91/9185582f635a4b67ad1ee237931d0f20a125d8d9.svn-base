@@ -1,0 +1,1238 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { useForm } from "react-hook-form";
+import {
+  FaClipboard,
+  FaCubes,
+  FaLayerGroup,
+  FaObjectUngroup,
+  FaListCheck,
+} from "react-icons/fa6";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+
+import useSWR from "swr";
+import { useApi } from "@/lib/hooks/useAPI"
+import { Dialog, DialogClose, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import { SVGCustomerService } from "@/components/icons/svg-repo/SVGCustomerService";
+import LoadingUI from "@/components/LoadingUI";
+import { Form } from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { TabsNavigator } from "@/components/ui/TabsNavigator";
+import { useToast } from "@/components/ui/use-toast";
+
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+import {
+  DEFAULT_DATA_TABLE_PAGE_SIZE,
+  getAuthHeaders,
+  getCurrentAcc,
+  getCurrentAccount,
+  getCurrentCompany,
+  getCurrentCompanyUUID,
+  ORIGIN,
+  removeKeys
+} from "@/lib/constants";
+
+import SelectDialog from "./E-Invoice Type/SelectDialog";
+import { AuthorizedLocationForm } from "./authorized-location/AuthorizedLocationForm";
+import { billingContactDetailsColumns } from "./billing-details/billing-contact-details/columns";
+import BillingContactDetailsDataTable from "./billing-details/billing-contact-details/DataTable";
+import { BillingDetailsForm } from "./billing-details/billing-details/BillingDetailsForm";
+import { AddressDetailsColumns } from "./main-details/address-details/columns";
+import AddressDetailsDataTable from "./main-details/address-details/DataTable";
+import { EInvoiceUsageForm } from "./main-details/e-invoice-usage/EInvoiceUsageForm";
+import { CustomerForm } from "./main-details/general-details/CustomerForm";
+import { customInformationColumns } from "./more-details/custom-information/columns";
+import CustomInformationDataTable from "./more-details/custom-information/DataTable";
+import TopActionBar from "./TopActionBar";
+import { OtherDetailForm } from "./more-details/custom-information/OtherDetailForm";
+import { AgentColumns } from "./agent/columns";
+import AgentDataTable from "./agent/DataTable";
+import {
+  SalesInvoiceColumns,
+  CashSalesColumns,
+  SalesCreditNoteColumns,
+  SalesDebitNoteColumns
+} from "./E-Invoice Type/columns";
+import { activityLogColumns } from "./activity-log/columns";
+import ActivityLogDataTable from "./activity-log/DataTable";
+
+type PageParams = {
+  params: { slug: string };
+};
+
+const validRoutes = ["new", "edit", "clone"] as const;
+
+type ValidRoute = (typeof validRoutes)[number];
+
+const customerFormSchema = z.object({
+  customerName: z.string().min(2, {
+    message: "This field is required.",
+  }),
+});
+
+function isValidRoute(route: string): route is ValidRoute {
+  return validRoutes.includes(route as ValidRoute);
+}
+
+const tabs = [
+  {
+    id: "mainDetails",
+    name: "Main Details",
+    icon: FaClipboard,
+    shortName: "Main",
+  },
+  {
+    id: "moreDetails",
+    name: "More Details",
+    icon: FaLayerGroup,
+    shortName: "More",
+  },
+  {
+    id: "billingDetails",
+    name: "Billing Details",
+    icon: FaCubes,
+    shortName: "Bill",
+  },
+  // {
+  //   id: "authorizedLocation",
+  //   name: "Authorized Location",
+  //   icon: FaObjectUngroup,
+  //   shortName: "Auth",
+  // },
+  // {
+  //   id: "agent",
+  //   name: "Agent",
+  //   icon: SVGCustomerService,
+  //   shortName: "Agent",
+  // },
+  {
+    id: "activityLog",
+    name: "Activity Log",
+    icon: FaListCheck,
+    shortName: "Activity",
+  },
+];
+
+const DIALOG_CONFIGS = {
+  salesInvoice: {
+    docType: "salesInvoice",
+    title: "Select Sales Invoice",
+    nextDialog: "cashSales",
+    columns: SalesInvoiceColumns,
+  },
+  cashSales: {
+    docType: "cashSales",
+    title: "Select Cash Sales",
+    nextDialog: "salesCreditNote",
+    columns: CashSalesColumns,
+  },
+  salesCreditNote: {
+    docType: "salesCreditNote",
+    title: "Select Sales Credit Note",
+    nextDialog: "salesDebitNote",
+    columns: SalesCreditNoteColumns,
+  },
+  salesDebitNote: {
+    docType: "salesDebitNote",
+    title: "Select Sales Debit Note",
+    nextDialog: null,
+    columns: SalesDebitNoteColumns,
+  },
+};
+
+export default function CustomerDetailsPage({ params }: PageParams) {
+  const headers = getAuthHeaders();
+  const router = useRouter();
+
+  const slug = params.slug;
+
+  const { toast } = useToast();
+
+  const currentAccountUUID = getCurrentAccount();
+  const currentAccountName = getCurrentAcc();
+  const currentCompanyUUID = getCurrentCompanyUUID();
+  const currentCompanyName = getCurrentCompany();
+
+  const [formResetKey, setFormResetKey] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [approvalStatus, setApprovalStatus] = useState({});
+  const [hasAssociations, setHasAssociations] = useState(false);
+
+  const [customerData, setCustomerData] = useState({});
+  const [tempRowAddressDetails, setTempRowAddressDetails] = useState([]);
+  const [tempRowCustomInfo, setTempRowCustomInfo] = useState([]);
+  const [tempRowBillingContactDetail, setTempRowBillingContactDetail] = useState([]);
+  const [tempRowAgentList, setTempRowAgentList] = useState([]);
+  const [tempRowActivityLog, setTempRowActivityLog] = useState([]);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [duplicateBRNLog, setDuplicateBRNLog] = useState<any>(null);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null)
+
+  // Create refs for each section
+  const mainDetailsRef = useRef(null);
+  const moreDetailsRef = useRef(null);
+  const billingDetailsRef = useRef(null);
+  const authorizedLocationRef = useRef(null);
+  const agentRef = useRef(null);
+  const activityLogRef = useRef(null);
+
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  if (!isValidRoute(slug)) {
+    notFound();
+  }
+
+  const {
+    data: customer,
+    error,
+    isLoading,
+    isValidating,
+    mutate: mutateCustomer,
+  } = useApi(
+    id
+      ? `${ORIGIN}/customer/api/customer/get-update-customer-data?id=${id}`
+      : null,
+    { refreshInterval: 0, revalidateOnFocus: false }
+  );
+
+  const {
+    data: addressDetailsData,
+    error: addressDetailsError,
+    mutate: mutateAddressDetails,
+  } = useApi(
+    id
+      ? `${ORIGIN}/customer/api/customer/get-update-customer-has-delivery-location-data?id=${id}`
+      : null,
+    { refreshInterval: 0, revalidateOnFocus: false }
+  );
+
+  const {
+    data: customInformationData,
+    error: customInfoError,
+    mutate: mutateCustomInfo,
+  } = useApi(
+    id
+      ? `${ORIGIN}/customer/api/customer/get-update-customer-has-custom-info-data?id=${id}`
+      : null,
+    { refreshInterval: 0, revalidateOnFocus: false }
+  );
+
+  const {
+    data: billingContactDetailsData,
+    error: billingContactDetailsError,
+    mutate: mutateBillingContactDetails,
+  } = useApi(
+    id
+      ? `${ORIGIN}/customer/api/customer/get-update-customer-has-billing-contact-data?id=${id}`
+      : null,
+    { refreshInterval: 0, revalidateOnFocus: false }
+  );
+
+  const {
+    data: agentData,
+    error: agentError,
+    mutate: mutateAgentDetails,
+  } = useApi(
+    id
+      ? `${ORIGIN}/customer/api/customer/get-customer-has-agent?id=${id}`
+      : null,
+    { refreshInterval: 0, revalidateOnFocus: false }
+  );
+
+  const {
+    data: activityLogData,
+    error: activityLogError,
+    mutate: mutateActivityLog,
+  } = useApi(
+    id
+      ? `${ORIGIN}/customer/api/customer/get-update-customer-has-activity-log-data?id=${id}`
+      : null,
+    { refreshInterval: 0, revalidateOnFocus: false }
+  );
+
+  const isFetching = isLoading || isValidating;
+
+
+
+  // Preference (State)
+  const [preferenceData, setPreferenceData] = useState<any>(null);
+
+  // Preference (Fetch Function)
+  const fetchPreferenceData = async () => {
+    try {
+      const headers = getAuthHeaders();
+
+      const response = await fetch(
+        `${ORIGIN}/universal/get-preference?module=sales`,
+        {
+          method: "GET",
+          headers,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch preference data");
+      }
+
+      const data = await response.json();
+      setPreferenceData(data);
+    } catch (error) {
+      console.error("Error fetching preference data:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchPreferenceData();
+  }, []);
+
+
+  //   useEffect(() => {
+  //   if (
+  //     error ||
+  //     addressDetailsError ||
+  //     customInfoError ||
+  //     billingContactDetailsError ||
+  //     activityLogError
+  //   ) {
+  //     toast({
+  //       variant: "destructive",
+  //       title: "Session Expired",
+  //       description: "Your session has expired. Redirecting to login page.",
+  //     });
+  //     router.push("/login");
+  //   }
+  // }, [
+  //   addressDetailsError,
+  //   billingContactDetailsError,
+  //   customInfoError,
+  //   activityLogError,
+  //   error,
+  //   router,
+  //   toast,
+  // ]);
+  
+
+  useEffect(() => {
+    if (customer) {
+      const customerDataCopy = { ...customer.data };
+
+      // Clear customerCode if it's a clone page
+      if (slug === "clone") {
+        customerDataCopy.customerCode = "";
+        customerDataCopy.outstandingAmount = "";
+      }
+
+      setCustomerData(customerDataCopy);
+      setApprovalStatus(customer.approval);
+      setOriginalInvoiceType(customer.data?.invoiceType || "None");
+
+      setIsSaving(false);
+    }
+  }, [customer, slug]);
+
+  const [dialogStates, setDialogStates] = useState(() => {
+    const initialStates = {};
+
+    Object.keys(DIALOG_CONFIGS).forEach((dialogType) => {
+      initialStates[dialogType] = {
+        open: false,
+        data: [],
+        isLoading: false,
+        totalCount: 0,
+        pagination: { pageIndex: 0, pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE },
+        sorting: [],
+        columnFilters: []
+      };
+    });
+    return initialStates;
+  });
+
+  const [invoiceTypeChanged, setInvoiceTypeChanged] = useState(false);
+  const [originalInvoiceType, setOriginalInvoiceType] = useState("");
+
+  const revalidateAddressDetails = () => {
+    mutateAddressDetails();
+  };
+
+  // Add separate effect for custom information data
+  useEffect(() => {
+    if (customInformationData?.rows) {
+      setTempRowCustomInfo(customInformationData.rows);
+    }
+  }, [customInformationData]);
+
+  useEffect(() => {
+    if (billingContactDetailsData) {
+      if (slug === "clone" || slug === "edit") {
+        setTempRowBillingContactDetail(billingContactDetailsData.rows)
+      }
+
+    }
+  }, [billingContactDetailsData]);
+
+  useEffect(() => {
+    if (addressDetailsData) {
+      if (slug === "clone") {
+        setTempRowAddressDetails(addressDetailsData.rows)
+      }
+
+    }
+  }, [addressDetailsData]);
+
+  const revalidateCustomInfoData = () => {
+    mutateCustomInfo();
+  };
+
+  const revalidateBillingContactDetail = () => {
+    mutateBillingContactDetails();
+  };
+
+  const revalidateActivityLogData = () => {
+    mutateActivityLog();
+  };
+
+  const handleSubmit = async () => {
+    try {
+      await form.trigger();
+      await form.handleSubmit(onSubmit)();
+    } catch (error) {
+      console.error("Form submission error:", error);
+    }
+  };
+
+  const form = useForm<z.infer<typeof customerFormSchema>>({
+    resolver: zodResolver(customerFormSchema),
+    defaultValues: {
+      account: customer?.account ?? currentAccountUUID,
+      accountName: customer?.accountName ?? currentAccountName,
+      company: customer?.company ?? currentCompanyUUID,
+      companyName: customer?.companyName ?? currentCompanyName,
+      customerGroupName: customer?.customerGroupName ?? "",
+      customerCategoryName: customer?.customerCategoryName ?? "",
+      GLCode: customer?.GLCode ?? "",
+      locationName: customer?.locationName ?? "",
+      salesAgent: customer?.salesAgent ?? "",
+      address: customer?.address ?? "",
+      postcode: customer?.postcode ?? "",
+      city: customer?.city ?? "",
+      state: customer?.state ?? "",
+      stateCode: customer?.stateCode ?? "",
+      country: customer?.country ?? "",
+      countryOfOriginCode: customer?.countryOfOriginCode ?? "",
+      customerName: customer?.customerName ?? "",
+      customerCode: customer?.customerCode ?? "",
+      BRN: customer?.BRN ?? "",
+      TIN: customer?.TIN ?? "",
+      SSTNo: customer?.SSTNo ?? "",
+      description: customer?.description ?? "",
+      valid: customer?.valid ?? "1",
+      currency: customer?.currency ?? "",
+      currencyCode: customer?.currencyCode ?? "",
+      currencyRate: customer?.currencyRate ?? "",
+    },
+  });
+
+  useEffect(() => {
+    const currentCompanyID = getCurrentCompanyUUID();
+    const currentCompanyName = getCurrentCompany();
+
+    if (!form.getValues("company")) {
+      form.setValue("company", currentCompanyID);
+    }
+
+    if (!form.getValues("companyName")) {
+      form.setValue("companyName", currentCompanyName);
+    }
+  }, []);
+
+  const onSubmit = async () => {
+    setIsSaving(true);
+
+    var form_data = new FormData();
+    var formValues = form.getValues();
+    var saveType =
+      slug == "clone"
+        ? `create-data?c_id=1`
+        : id
+          ? `update-customer-data?id=${id}`
+          : `create-data`;
+
+    for (var key in formValues) {
+      form_data.append(
+        `customer[${key}]`,
+        formValues[key] ? formValues[key] : ""
+      );
+    }
+
+    if (saveType == "create-data" || saveType === "create-data?c_id=1") {
+
+      // tempRowAddressDetails.forEach((row, index) => {
+      //   for (const key in row) {
+      //     if (key !== "attachment") {
+      //       form_data.append(`customerHasDeliveryLocation[${index}][${key}]`, row[key]);
+      //     }
+      //   }
+      // });
+
+      tempRowAddressDetails.forEach((row, index) => {
+        const cleanedRow = removeKeys(row, ["_actionUUID", "createdAtFormat", "updatedAtFormat", "CreatedByUsername", "UpdatedByUsername", "_version", "createdAt", "createdBy", "updatedAt", "updatedBy", "customer"]);
+        for (const key in cleanedRow) {
+          if (key !== "attachment") {
+            if (key == "UUID" || key == "customer") {
+              form_data.append(`customerHasDeliveryLocation[${index}][${key}]`, "");
+            } else {
+              form_data.append(`customerHasDeliveryLocation[${index}][${key}]`, row[key]);
+            }
+          }
+        }
+      });
+
+      for (let i = 0; i < tempRowAddressDetails.length; i++) {
+        const row = tempRowAddressDetails[i];
+
+        var counter = 0;
+        if (row.attachmentFiles) {
+          for (const file of row.attachmentFiles) {
+            const base64 = await getFileToBase64(file);
+
+            form_data.append(
+              `customerHasDeliveryLocation[${i}][attachment][${counter}][Name]`,
+              file.name
+            );
+            form_data.append(
+              `customerHasDeliveryLocation[${i}][attachment][${counter}][File]`,
+              base64
+            );
+
+            counter++;
+          }
+        }
+
+      }
+
+      tempRowCustomInfo.forEach((row, index) => {
+        const cleanedRow = removeKeys(row, ["_actionUUID", "createdAtFormat", "updatedAtFormat", "CreatedByUsername", "UpdatedByUsername", "_version", "createdAt", "createdBy", "updatedAt", "updatedBy", "customer"]);
+        for (const key in cleanedRow) {
+          if (key !== "attachment") {
+            if (key == "UUID" || key == "customer") {
+              form_data.append(`customerHasCustomInfo[${index}][${key}]`, "");
+            } else {
+              form_data.append(`customerHasCustomInfo[${index}][${key}]`, row[key]);
+            }
+          }
+        }
+      });
+
+      // tempRowCustomInfo.forEach((row, index) => {
+      //   for (const key in row) {
+      //     if (key !== "attachment") {
+      //       form_data.append(
+      //         `customerHasCustomInfo[${index}][${key}]`,
+      //         row[key]
+      //       );
+      //     }
+      //   }
+      // });
+
+      for (let i = 0; i < tempRowCustomInfo.length; i++) {
+        const row = tempRowCustomInfo[i];
+
+        var counter = 0;
+        if (row.attachmentFiles) {
+          for (const file of row.attachmentFiles) {
+            const base64 = await getFileToBase64(file);
+
+            form_data.append(
+              `customerHasCustomInfo[${i}][attachment][${counter}][Name]`,
+              file.name
+            );
+            form_data.append(
+              `customerHasCustomInfo[${i}][attachment][${counter}][File]`,
+              base64
+            );
+
+            counter++;
+          }
+        }
+
+      }
+
+      tempRowBillingContactDetail.forEach((row, index) => {
+        const cleanedRow = removeKeys(row, ["_actionUUID", "createdAtFormat", "updatedAtFormat", "CreatedByUsername", "UpdatedByUsername", "_version", "createdAt", "createdBy", "updatedAt", "updatedBy", "customer"]);
+        for (const key in cleanedRow) {
+          if (key !== "attachment") {
+            if (key == "UUID" || key == "customer") {
+              form_data.append(`customerHasBillingContact[${index}][${key}]`, "");
+            } else {
+              form_data.append(`customerHasBillingContact[${index}][${key}]`, row[key]);
+            }
+          }
+        }
+      });
+
+
+
+      // tempRowBillingContactDetail.forEach((row, index) => {
+      //   for (const key in row) {
+      //     if (key !== "attachment") {
+      //       form_data.append(
+      //         `customerHasBillingContact[${index}][${key}]`,
+      //         row[key]
+      //       );
+      //     }
+      //   }
+      // });
+
+      for (let i = 0; i < tempRowBillingContactDetail.length; i++) {
+        const row = tempRowBillingContactDetail[i];
+
+        var counter = 0;
+        if (row.attachmentFiles) {
+          for (const file of row.attachmentFiles) {
+            const base64 = await getFileToBase64(file);
+
+            form_data.append(
+              `customerHasBillingContact[${i}][attachment][${counter}][Name]`,
+              file.name
+            );
+            form_data.append(
+              `customerHasBillingContact[${i}][attachment][${counter}][File]`,
+              base64
+            );
+
+            counter++;
+          }
+        }
+
+      }
+
+      // Add agent tab data
+      const allowedAgentKeys = [
+        "UUID",
+        "agentCode",
+        "agentName",
+        "agentType",
+        "agentDescription",
+        "description",
+        "agentTypeType",
+        "createdByUsername",
+        "createdAt",
+        "updatedAt"
+      ];
+
+      tempRowAgentList.forEach((row, index) => {
+        allowedAgentKeys.forEach((key) => {
+          if (key === "UUID") {
+            if (row.UUID) {
+              form_data.append(`customerHasAgent[${index}][UUID]`, row.UUID);
+            }
+          } else {
+            form_data.append(`customerHasAgent[${index}][${key}]`, row[key] ?? "");
+          }
+        });
+      });
+
+      // Add activity log data
+      tempRowActivityLog.forEach((row, index) => {
+        for (const key in row) {
+          if (key !== "attachment") {
+            form_data.append(
+              `customerHasActivityLog[${index}][${key}]`,
+              row[key]
+            );
+          }
+        }
+      });
+
+      for (let i = 0; i < tempRowActivityLog.length; i++) {
+        const row = tempRowActivityLog[i];
+
+        var counter = 0;
+
+        for (const file of row.attachmentFiles) {
+          const base64 = await getFileToBase64(file);
+
+          form_data.append(
+            `customerHasActivityLog[${i}][attachment][${counter}][Name]`,
+            file.name
+          );
+          form_data.append(
+            `customerHasActivityLog[${i}][attachment][${counter}][File]`,
+            base64
+          );
+
+          counter++;
+        }
+      }
+    } else if (saveType.startsWith("update-customer-data")) {
+      // Billing contact details
+      tempRowBillingContactDetail.forEach((row, index) => {
+        const cleanedRow = removeKeys(row, [
+          "_actionUUID", "createdAtFormat", "updatedAtFormat",
+          "CreatedByUsername", "UpdatedByUsername", "_version",
+          "createdAt", "createdBy", "updatedAt", "updatedBy", "customer"
+        ]);
+        for (const key in cleanedRow) {
+          if (key !== "attachment") {
+            form_data.append(`customerHasBillingContact[${index}][${key}]`, row[key] ?? "");
+          }
+        }
+      });
+
+      // Billing contact attachments
+      for (let i = 0; i < tempRowBillingContactDetail.length; i++) {
+        const row = tempRowBillingContactDetail[i];
+        if (row.attachmentFiles) {
+          for (let j = 0; j < row.attachmentFiles.length; j++) {
+            const file = row.attachmentFiles[j];
+            const base64 = await getFileToBase64(file);
+            form_data.append(`customerHasBillingContact[${i}][attachment][${j}][Name]`, file.name);
+            form_data.append(`customerHasBillingContact[${i}][attachment][${j}][File]`, base64);
+          }
+        }
+      }
+    }
+
+    try {
+      const response = await fetch(
+        `${ORIGIN}/customer/api/customer/${saveType}`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        setIsSaving(false);
+
+        let errorMessage = errorData.message;
+
+        // Error Handling for "Data too long"
+        if (errorMessage.includes("Data too long")) {
+          errorMessage = errorMessage.split("\n")[0];
+        }
+
+        toast({
+          title: errorData.name,
+          description: errorMessage,
+          variant: "destructive",
+          duration: 2000,
+        });
+
+        throw new Error("Failed to fetch data");
+      }
+
+      const responseData = await response.json();
+
+      if (responseData && responseData.item) {
+        const url = `/sales/customer/edit?item=${responseData.item}&id=${responseData.data}`;
+
+        // router.push(url);
+
+          if (responseData.validation.customer && responseData.validation.customer.length > 0) {
+          setDialogOpen(true);
+          setDuplicateBRNLog(responseData.validation.customer);
+          setPendingUrl(url);
+          if (params.slug == "edit") {
+          // Manually revalidate the data since router.push() won't trigger it if same path
+          mutateCustomer();
+          mutateAddressDetails();
+          mutateCustomInfo();
+          mutateBillingContactDetails();
+          mutateActivityLog();
+        }
+        } else {
+          router.push(url);
+          if (params.slug == "edit") {
+          // Manually revalidate the data since router.push() won't trigger it if same path
+          mutateCustomer();
+          mutateAddressDetails();
+          mutateCustomInfo();
+          mutateBillingContactDetails();
+          mutateActivityLog();
+        }
+        }
+
+
+        
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      } else if (responseData.message) {
+        setIsSaving(false);
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      } else if (slug === "clone" && id) {
+        router.push(`/sales/customer/clone?id=${id}`);
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      console.error("Error creating new customer data:", error);
+
+      setIsSaving(false);
+
+      toast({
+        title: `${error.message}`,
+        duration: 2000,
+      });
+    }
+  };
+
+  // Generic fetch function for all dialog types
+  const fetchDialogData = async (dialogType, tableState = null) => {
+    const config = DIALOG_CONFIGS[dialogType];
+    if (!config) return;
+
+    setDialogStates((prev) => ({
+      ...prev,
+      [dialogType]: { ...prev[dialogType], isLoading: true },
+    }));
+
+    try {
+      // Get current state or use defaults
+      const currentState = dialogStates[dialogType];
+      const columnFilters = tableState?.getState?.()?.columnFilters || currentState.columnFilters || [];
+      const sorting = tableState?.getState?.()?.sorting || currentState.sorting || [];
+      const pagination = tableState?.getState?.()?.pagination || currentState.pagination || {
+        pageIndex: 0,
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      };
+
+      const columnFiltersWithoutValid = columnFilters.filter(
+        (filter) => filter.id !== "valid"
+      );
+
+      const params = new FormData();
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append(
+        "param[offset]",
+        `${pagination.pageIndex * pagination.pageSize}`
+      );
+      params.append(
+        "param[filter]",
+        columnFiltersWithoutValid.length > 0
+          ? JSON.stringify(
+            columnFiltersWithoutValid.reduce((acc, curr) => {
+              acc[curr.id] = curr.value;
+              return acc;
+            }, {})
+          )
+          : "{}"
+      );
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc"
+      );
+      params.append(
+        "param[valid]",
+        columnFilters.length > 0
+          ? `${columnFilters.find((row) => row.id === "valid")?.value || ""}`
+          : ""
+      );
+      params.append(
+        "param[sort]",
+        sorting.length > 0 ? sorting[0].id : "createdAt"
+      );
+
+      const response = await fetch(
+        `${ORIGIN}/organization_preference/api/organization-preference/get-document-details?docType=${config.docType}&id=${id}`,
+        {
+          method: "POST",
+          headers,
+          body: params,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${dialogType} data`);
+      }
+
+      const result = await response.json();
+
+      // Handle total count properly - convert string to number if needed
+      const totalCount = result.total
+        ? (typeof result.total === 'string' ? parseInt(result.total, 10) : result.total)
+        : (result.totalCount || result.rows?.length || 0);
+
+      setDialogStates((prev) => ({
+        ...prev,
+        [dialogType]: {
+          ...prev[dialogType],
+          data: result.rows || [],
+          totalCount: totalCount,
+          isLoading: false,
+          pagination,
+          sorting,
+          columnFilters,
+        },
+      }));
+    } catch (error) {
+      console.error(`Error fetching ${dialogType} data:`, error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to fetch ${dialogType} data.`,
+      });
+      setDialogStates((prev) => ({
+        ...prev,
+        [dialogType]: {
+          ...prev[dialogType],
+          data: [],
+          totalCount: 0,
+          isLoading: false
+        },
+      }));
+    }
+  };
+
+  // Generic update function for all dialog types
+  const updateDialogData = async (dialogType, selectedRows) => {
+    const config = DIALOG_CONFIGS[dialogType];
+
+    if (!config) return;
+
+    try {
+      const params = new FormData();
+
+      const currentInvoiceType = form.getValues("invoiceType");
+      params.append("invoiceType", currentInvoiceType);
+
+      selectedRows.forEach((row, index) => {
+        params.append(`UUIDs[${index}]`, row.UUID);
+      });
+
+      const response = await fetch(
+        `${ORIGIN}/organization_preference/api/organization-preference/update-document-details?docType=${config.docType}&id=${id}`,
+        {
+          method: "POST",
+          headers,
+          body: params,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to update ${dialogType} data`);
+      }
+
+      const result = await response.json();
+
+      toast({
+        variant: "default",
+        title: "Success",
+        description: `${config.title.replace("Select ", "")} updated successfully.`,
+      });
+
+      return result;
+    } catch (error) {
+      console.error(`Error updating ${dialogType} data:`, error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to update ${dialogType} data.`,
+      });
+      throw error;
+    }
+  };
+
+  const handleSaveAndOpenDialog = async () => {
+    await handleSubmit();
+
+    const currentInvoiceType = form.getValues("invoiceType");
+
+    if (
+      invoiceTypeChanged &&
+      currentInvoiceType !== "None"
+    ) {
+      await fetchDialogData("salesInvoice");
+
+      setDialogStates((prev) => ({
+        ...prev,
+        salesInvoice: { ...prev.salesInvoice, open: true },
+      }));
+
+      setInvoiceTypeChanged(false);
+    }
+  };
+
+  const onInvoiceTypeChange = (oldValue: string, newValue: string) => {
+    if (oldValue !== newValue) {
+      setInvoiceTypeChanged(true);
+    }
+  };
+
+  // Generic selection handler
+  const onSelectDocument = (dialogType) => (document) => {
+    let description = `Selected ${dialogType}: ${document.docNo}`;
+  };
+
+  // Generic dialog opening handler
+  const onOpenNextDialog = (currentDialogType) => async () => {
+    const config = DIALOG_CONFIGS[currentDialogType];
+    const nextDialogType = config?.nextDialog;
+
+    setDialogStates((prev) => ({
+      ...prev,
+      [currentDialogType]: { ...prev[currentDialogType], open: false },
+    }));
+
+    if (nextDialogType) {
+      await fetchDialogData(nextDialogType);
+      setDialogStates((prev) => ({
+        ...prev,
+        [nextDialogType]: { ...prev[nextDialogType], open: true },
+      }));
+    }
+  };
+
+  return (
+    <>
+      <div className="sticky top-0 z-20">
+        <TopActionBar
+          customer={customerData}
+          approvalStatus={approvalStatus}
+          form={form}
+          handleSubmit={handleSubmit}
+          handleSaveAndOpenDialog={handleSaveAndOpenDialog}
+          customerFormSchema={customerFormSchema}
+          params={params}
+          isSaving={isSaving}
+          setIsSaving={setIsSaving}
+        />
+      </div>
+      <div className="grid h-full grid-rows-[auto_1fr]">
+        <Form {...form}>
+          <div className="grid h-full grid-cols-[1fr_auto] gap-x-2">
+            <ScrollArea className="h-full">
+              <div id="mainDetails" className="mt-2" ref={mainDetailsRef}>
+                <CustomerForm
+                  key={formResetKey}
+                  form={form}
+                  hasAssociations={hasAssociations}
+                />
+              </div>
+
+              <div className="mt-2">
+                <EInvoiceUsageForm
+                  key={formResetKey}
+                  form={form}
+                  slug={slug}
+                  onInvoiceTypeChange={onInvoiceTypeChange}
+                />
+              </div>
+
+              <div className="mt-2">
+                <AddressDetailsDataTable
+                  columns={AddressDetailsColumns}
+                  data={
+                    id && slug == "edit"
+                      ? addressDetailsData
+                        ? addressDetailsData.rows
+                        : []
+                      : tempRowAddressDetails
+                  }
+                  tempRowAddressDetails={tempRowAddressDetails}
+                  setTempRowAddressDetails={setTempRowAddressDetails}
+                  revalidateAddressDetails={revalidateAddressDetails}
+                  tempRowBillingContactDetail={tempRowBillingContactDetail}
+                />
+              </div>
+
+              <div id="moreDetails" className="mt-2" ref={moreDetailsRef}>
+                <OtherDetailForm
+                  key={formResetKey}
+                  hasAssociations={hasAssociations}
+                  form={form}
+                  slug={slug}
+                />
+              </div>
+
+              <div className="mt-2">
+                <CustomInformationDataTable
+                  columns={customInformationColumns}
+                  data={
+                    id && slug == "edit"
+                      ? customInformationData
+                        ? customInformationData.rows
+                        : []
+                      : tempRowCustomInfo
+                  }
+                  tempRowCustomInfo={tempRowCustomInfo}
+                  setTempRowCustomInfo={setTempRowCustomInfo}
+                  revalidateCustomInfoData={revalidateCustomInfoData}
+                />
+              </div>
+
+              <div id="billingDetails" className="mt-2" ref={billingDetailsRef}>
+                <BillingDetailsForm
+                  key={formResetKey}
+                  form={form}
+                  preferenceData={preferenceData}
+                  slug={slug}
+                />
+              </div>
+
+              <div className="mt-2">
+                <BillingContactDetailsDataTable
+                  columns={billingContactDetailsColumns}
+                  data={
+                    id && slug == "edit"
+                      ? billingContactDetailsData
+                        ? billingContactDetailsData.rows
+                        : []
+                      : tempRowBillingContactDetail
+                  }
+                  tempRowBillingContactDetail={tempRowBillingContactDetail}
+                  setTempRowBillingContactDetail={setTempRowBillingContactDetail}
+                  revalidateBillingContactDetail={revalidateBillingContactDetail}
+                />
+              </div>
+
+              {/* <div id="authorizedLocation" className="mt-2" ref={authorizedLocationRef}>
+                <AuthorizedLocationForm
+                  key={formResetKey}
+                  customInformationData={customInformationData}
+                  tempRowCustomInfo={tempRowCustomInfo}
+                  form={form}
+                  slug={slug}
+                />
+              </div> */}
+              {/* <div id="agent" className="mt-2" ref={agentRef}>
+                <AgentDataTable
+                  columns={AgentColumns}
+                  data={
+                    id
+                      ? agentData
+                        ? agentData.rows
+                        : []
+                      : tempRowAgentList
+                  }
+                  tempRowAgentList={tempRowAgentList}
+                  setTempRowAgentList={setTempRowAgentList}
+                  revalidateAgentDetails={mutateAgentDetails}
+                />
+              </div> */}
+              <div id="activityLog" className="mt-2" ref={activityLogRef}>
+                <ActivityLogDataTable
+                  columns={activityLogColumns}
+                  data={
+                    id
+                      ? activityLogData
+                        ? activityLogData.rows
+                        : []
+                      : tempRowActivityLog
+                  }
+                  tempRowActivityLog={tempRowActivityLog}
+                  setTempRowActivityLog={setTempRowActivityLog}
+                  revalidateActivityLogData={revalidateActivityLogData}
+                />
+              </div>
+            </ScrollArea>
+
+            <TabsNavigator tabs={tabs} initialActiveTabId="mainDetails" stickyTop="top-14" />
+          </div>
+        </Form>
+
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open && pendingUrl) {
+            router.push(pendingUrl);
+            setPendingUrl(null);
+          }
+        }} className="m-2">
+          <DialogContent className="max-w-6xl bg-erp-blue-3 p-2">
+
+
+            <p className="">Warning: Same BRN/TIN</p>
+            {duplicateBRNLog?.length > 0 ? (
+              <div className="max-h-[400px] overflow-y-auto border border-white-300">
+                <table className="w-full bg-white">
+                  <thead className="sticky top-0 bg-erp-blue-11 font-normal z-10">
+                    <tr>
+                      <th className="border px-3 py-2 text-left text-white">Name</th>
+                      <th className="border px-3 py-2 text-left text-white">BRN (new)</th>
+                      <th className="border px-3 py-2 text-left text-white">BRN (Old)</th>
+                      <th className="border px-3 py-2 text-left text-white">TIN</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {duplicateBRNLog.map((item: any, index: number) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="border px-3 py-2">{item.customerName}</td>
+                        <td className="border px-3 py-2">{item.BRN}</td>
+                        <td className="border px-3 py-2">{item.BRNOld}</td>
+                        <td className="border px-3 py-2">{item.TIN}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center text-gray-500 py-6">
+                No duplicate BRN found
+              </div>
+            )}
+
+            {/* Footer */}
+            <DialogFooter className="mt-4 flex justify-end">
+              <DialogClose asChild>
+                <button
+                  className="rounded-md bg-primary px-4 py-2 text-sm text-white"
+                >
+                  OK
+                </button>
+              </DialogClose>
+            </DialogFooter>
+
+          </DialogContent>
+        </Dialog>
+
+        {isLoading && <LoadingUI />}
+        {(isFetching || isSaving) && <LoadingUI />}
+      </div>
+
+      {/* Dialog Components */}
+      {Object.entries(DIALOG_CONFIGS).map(([dialogType, config]) => (
+        <SelectDialog
+          key={dialogType}
+          open={dialogStates[dialogType].open}
+          setOpen={(open) =>
+            setDialogStates((prev) => ({
+              ...prev,
+              [dialogType]: { ...prev[dialogType], open },
+            }))
+          }
+          columns={config.columns}
+          data={dialogStates[dialogType].data}
+          totalCount={dialogStates[dialogType].totalCount}
+          isLoading={dialogStates[dialogType].isLoading}
+          onSelectDocument={onSelectDocument(dialogType)}
+          onOpenSecondDialog={config.nextDialog ? onOpenNextDialog(dialogType) : undefined}
+          onUpdate={(selectedRows) => updateDialogData(dialogType, selectedRows)}
+          revalidateData={(tableState) => fetchDialogData(dialogType, tableState)}
+          dialogTitle={config.title}
+        />
+      ))}
+    </>
+  );
+}

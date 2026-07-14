@@ -1,0 +1,371 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+
+import AddressDetailsFormPopover from "./AddressDetailsForm";
+import AddressDetailsDataTableToolbar from "./DataTableToolbar";
+import type { AddressDetails } from "./columns";
+
+// Mobile View (Imports)
+import MobileFormDataTable from "@/components/form/MobileFormDataTable";
+
+// Column Drag and Drop and Resize (Imports)
+import { memo } from "react";
+import type { MouseEvent } from "react";
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import { DATA_TABLE_DEFAULT_COLUMN_SIZING, DEFAULT_DATA_TABLE_PAGE_SIZE } from "@/lib/constants";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import getExcludedColumns from "@/lib/utils/data-table/getExcludedColumns";
+import handleDndDragEnd from "@/lib/utils/data-table/handleDndDragEnd";
+import type {
+  ColumnDef,
+  ColumnOrderState,
+  ColumnSizingState,
+  Row,
+  SortingState,
+  Table as TableType,
+  VisibilityState,
+} from "@tanstack/react-table";
+
+type AddressDetailsDataTableProps = {
+  columns: ColumnDef<AddressDetails>[];
+  tempRowAddressDetails: AddressDetails[];
+  data: AddressDetails[];
+  setTempRowAddressDetails: (data: any) => void;
+  revalidateAddressDetails: () => void;
+  tempRowBillingContactDetail:any;
+};
+
+// Column Drag and Drop and Resize (Local Storage Keys)
+const COLUMN_ORDERING_KEY = "customer.address-details.bs.table.ordering";
+const COLUMN_SIZING_KEY = "customer.address-details.bs.table.sizing";
+
+const COLUMN_VISIBILITY_KEY = "customer.address-details.bs.table.columns";
+
+export default function AddressDetailsDataTable({
+  columns,
+  data,
+  tempRowAddressDetails,
+  setTempRowAddressDetails,
+  revalidateAddressDetails,
+  tempRowBillingContactDetail
+}: AddressDetailsDataTableProps) {
+  function setTempRowAddressDetailsData(data: any, overwrite: boolean) {
+    if (overwrite) {
+      setTempRowAddressDetails([...data]);
+    } else {
+      setTempRowAddressDetails((tempRowAddressDetails) => {
+        // Check if this is an update (item has UUID and exists in temp data)
+        if (data.UUID) {
+          const existingIndex = tempRowAddressDetails.findIndex(item => item.UUID === data.UUID);
+
+          if (existingIndex !== -1) {
+            // Update existing item
+            const updatedData = [...tempRowAddressDetails];
+
+            updatedData[existingIndex] = data;
+
+            return updatedData;
+          }
+        }
+
+        // Add new item
+        return [...tempRowAddressDetails, data];
+      });
+    }
+  }
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+
+  // Column Drag and Drop and Resize (Constants)
+  const initialColumnOrder = columns?.filter(column => column?.id).map((column) => column.id!) || [];
+  const [columnOrder, setColumnOrder] = useLocalStorage<ColumnOrderState>(
+    COLUMN_ORDERING_KEY,
+    initialColumnOrder
+  );
+  const [columnSizing, setColumnSizing] = useLocalStorage<ColumnSizingState>(
+    COLUMN_SIZING_KEY,
+    {}
+  );
+  const defaultColumns: Array<keyof AddressDetails> = [
+    "deliveryLocation",
+    "deliveryAddress",
+  ];
+  const defaultColumnVisibility: VisibilityState = getExcludedColumns(
+    columns || [],
+    defaultColumns
+  );
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    COLUMN_VISIBILITY_KEY,
+    defaultColumnVisibility
+  );
+
+  // Column Drag and Drop and Resize (Data Table)
+  const table = useReactTable({
+    columns,
+    data,
+    state: { 
+      sorting, 
+      columnOrder,
+      columnSizing,
+      columnVisibility 
+    },
+    onSortingChange: setSorting,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+    onColumnVisibilityChange: setColumnVisibility,
+    autoResetPageIndex: false,
+    columnResizeMode: "onChange",
+    defaultColumn: DATA_TABLE_DEFAULT_COLUMN_SIZING,
+    enableColumnResizing: true,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      },
+    },
+  });
+
+  const sensors = useDndSensors();
+  const columnSizeVars = useColumnSizeVars(table);
+
+  useEffect(() => {
+    localStorage.setItem(
+      COLUMN_VISIBILITY_KEY,
+      JSON.stringify(columnVisibility)
+    );
+  }, [columnVisibility]);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<string>("");
+
+  // Prevent text selection when performing multiple row selection with "shift" + click
+  usePreventShiftTextSelect();
+
+  const openDialog = (row) => {
+    setSelectedRow(row.original);
+    setDialogOpen(true);
+  };
+
+  const onDoubleClick = (row: Row<AddressDetails>) => {
+    setDialogOpen(false);
+    setSelectedRow("");
+    openDialog(row);
+  };
+
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  useEffect(() => {
+    if (dialogOpen === false) {
+      setSelectedRow("");
+    }
+  }, [dialogOpen]);
+
+  return (
+    <Card
+      collapsible
+      defaultCollapsed={false}
+      className="h-auto p-0 shadow-md"
+      style={{ marginTop: "10px" }}
+    >
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Address Details</CardTitle>
+      </CardHeader>
+      <CardContent className="px-2 py-0">
+        <div className="h-[98cqh] p-2 md:h-[58cqh]">
+          <div className="flex h-[95cqh] flex-col rounded-md bg-erp-blue-3 @container-[size] md:h-[55cqh]">
+            <AddressDetailsDataTableToolbar
+              table={table}
+              onAdd={() => setDialogOpen(true)}
+              setTempRowAddressDetailsData={setTempRowAddressDetailsData}
+              tempRowAddressDetails={tempRowAddressDetails}
+              revalidateAddressDetails={revalidateAddressDetails}
+            />
+            <Separator className="bg-erp-blue-11" />
+            <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+              {/* Mobile View (Form Data Table) */}
+              <MobileFormDataTable
+                table={table}
+                initialVisibleFields={4}
+                setTempRowDetailsList={setTempRowAddressDetails}
+              />
+
+              {/* Web View (Data Table) */}
+              <div className="hidden md:block">
+                {/* Column Drag and Drop and Resize (DND Context) */}
+                <DndContext
+                  collisionDetection={closestCenter}
+                  modifiers={[restrictToHorizontalAxis]}
+                  onDragEnd={(event) => handleDndDragEnd(event, setColumnOrder)}
+                  sensors={sensors}
+                >
+                  {/* Column Drag and Drop and Resize (Table) */}
+                  <Table 
+                    className="table-fixed border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1"
+                    style={{ ...columnSizeVars, width: table.getTotalSize() }}
+                  >
+                    <TableHeader className="sticky top-0 z-10">
+                      {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id}>
+                          {/* Column Drag and Drop and Resize (Sortable Context) */}
+                          <SortableContext
+                            items={columnOrder}
+                            strategy={horizontalListSortingStrategy}
+                          >
+                            {headerGroup.headers.map((header) => (
+                              // Column Drag and Drop and Resize (Dragable Table Head)
+                              <DragableTableHead
+                                key={header.id}
+                                header={header}
+                                className="bg-erp-blue-11 font-normal"
+                                style={{
+                                  width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                                }}
+                              >
+                                {header.column.id === "valid" ? (
+                                  <TableHeadValidityFilter table={table} />
+                                ) : (
+                                  <TableHeadColumnTextFilter
+                                    column={header.column}
+                                    table={table}
+                                  />
+                                )}
+                                <ColumnResizer header={header} />
+                              </DragableTableHead>
+                            ))}
+                          </SortableContext>
+                        </TableRow>
+                      ))}
+                    </TableHeader>
+                    {/* Column Drag and Drop and Resize (Table Body) */}
+                    {table.getState().columnSizingInfo.isResizingColumn ? (
+                      <MemoizedTableBody
+                        table={table}
+                        onRowSelection={onRowSelection}
+                      />
+                    ) : (
+                      <NonMemoizedTableBody
+                        table={table}
+                        onRowSelection={onRowSelection}
+                      />
+                    )}
+                  </Table>
+                </DndContext>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+
+            {selectedRow && (
+              <AddressDetailsFormPopover
+                open={dialogOpen}
+                setOpen={setDialogOpen}
+                row={selectedRow}
+                 setTempRowAddressDetailsData={setTempRowAddressDetailsData}
+                revalidateAddressDetails={revalidateAddressDetails}
+                tempRowBillingContactDetail={tempRowBillingContactDetail}
+              />
+            )}
+            {!selectedRow && (
+              <AddressDetailsFormPopover
+                open={dialogOpen}
+                setOpen={setDialogOpen}
+                row={undefined}
+                setTempRowAddressDetailsData={setTempRowAddressDetailsData}
+                revalidateAddressDetails={revalidateAddressDetails}
+                tempRowBillingContactDetail={tempRowBillingContactDetail}
+              />
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Column Drag and Drop and Resize (Table Body)
+type TableBodyProps = {
+  table: TableType<AddressDetails>;
+  onRowSelection: (
+    row: Row<AddressDetails>
+  ) => (event: MouseEvent<HTMLTableRowElement>) => void;
+};
+
+function NonMemoizedTableBody({ table, onRowSelection }: TableBodyProps) {
+  return (
+    <TableBody>
+      {table.getRowModel().rows?.length ? (
+        table.getRowModel().rows.map((row, index) => (
+          <TableRow
+            className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+            data-state={row.getIsSelected() && "selected"}
+            onClick={onRowSelection(row)}
+            key={row.id}
+          >
+            {row.getVisibleCells().map((cell) => (
+              <TableCell 
+                key={cell.id}
+                className="truncate"
+                title={(cell.getValue() ?? "").toString()}
+                style={{
+                  width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                  minWidth: cell.column.columnDef.minSize,
+                }}
+              >
+                {flexRender(
+                  cell.column.columnDef.cell,
+                  cell.getContext()
+                )}
+              </TableCell>
+            ))}
+          </TableRow>
+        ))
+      ) : (
+        <NoResultsTableRow columns={table.getVisibleLeafColumns()} />
+      )}
+    </TableBody>
+  );
+}
+
+const MemoizedTableBody = memo(
+  NonMemoizedTableBody,
+  (prev, next) => prev.table.options.data === next.table.options.data
+) as typeof NonMemoizedTableBody;

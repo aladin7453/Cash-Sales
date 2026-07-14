@@ -1,0 +1,256 @@
+"use client";
+
+import { type ColumnDef } from "@tanstack/react-table";
+import { ChevronDown, ChevronUp } from "lucide-react";
+
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils/cn";
+
+export type StandardAction = {
+  access: string;
+  scope: string;
+  accessBasicAction: boolean | null;
+  createBasicAction: boolean | null;
+  editBasicAction: boolean | null;
+  trashBasicAction: boolean | null;
+  restoreBasicAction: boolean | null;
+  deleteBasicAction: boolean | null;
+  previewBasicAction: boolean | null;
+  exportBasicAction: boolean | null;
+  children?: StandardAction[];
+};
+
+export const defaultData: StandardAction[] = [
+  {
+    access: "Organization",
+    scope: "Personal + L",
+    accessBasicAction: true,
+    createBasicAction: true,
+    editBasicAction: true,
+    trashBasicAction: false,
+    restoreBasicAction: false,
+    deleteBasicAction: true,
+    previewBasicAction: true,
+    exportBasicAction: false,
+    children: [
+      {
+        access: "Company",
+        scope: "Personal + L",
+        accessBasicAction: false,
+        createBasicAction: false,
+        editBasicAction: false,
+        trashBasicAction: false,
+        restoreBasicAction: false,
+        deleteBasicAction: false,
+        previewBasicAction: false,
+        exportBasicAction: false,
+        children: [
+          {
+            access: "Main Details",
+            scope: "Personal + L",
+            accessBasicAction: true,
+            createBasicAction: null,
+            editBasicAction: true,
+            trashBasicAction: null,
+            restoreBasicAction: null,
+            deleteBasicAction: null,
+            previewBasicAction: null,
+            exportBasicAction: null,
+          },
+          {
+            access: "More Details",
+            scope: "Personal + L",
+            accessBasicAction: true,
+            createBasicAction: null,
+            editBasicAction: true,
+            trashBasicAction: null,
+            restoreBasicAction: null,
+            deleteBasicAction: null,
+            previewBasicAction: null,
+            exportBasicAction: null,
+          },
+          {
+            access: "User List",
+            scope: "Personal + L",
+            accessBasicAction: true,
+            createBasicAction: null,
+            editBasicAction: true,
+            trashBasicAction: null,
+            restoreBasicAction: null,
+            deleteBasicAction: null,
+            previewBasicAction: null,
+            exportBasicAction: null,
+          },
+        ],
+      },
+    ],
+  },
+];
+
+export const standardActionColumns: ColumnDef<StandardAction>[] = [
+  {
+    accessorKey: "access",
+    header: "Access",
+    cell: ({ row, getValue }) => (
+      // row.depth -> 0: root-level rows, 1: child roes, 2: grandchild rows, ...
+      <div style={{ paddingLeft: `${row.depth * 2.5 + 0.5}rem` }}>
+        <div
+          className={cn(
+            "flex items-center gap-x-3",
+            row.getIsExpanded() && row.depth === 0 && "font-semibold text-erp-blue-13",
+          )}
+        >
+          {row.getCanExpand() && (
+            <div className="flex items-center justify-center">
+              <button
+                onClick={(e) => {
+                  row.toggleExpanded();
+                  e.stopPropagation();
+                }}
+                className="cursor-pointer text-erp-blue-12"
+              >
+                {!row.getIsExpanded() ? (
+                  <ChevronUp size={16} strokeWidth={2.5} />
+                ) : (
+                  <ChevronDown size={16} strokeWidth={2.5} />
+                )}
+              </button>
+            </div>
+          )}
+          {getValue<boolean | null>()}
+        </div>
+      </div>
+    ),
+    meta: {
+      rowSpan: 2,
+    },
+  },
+  {
+    accessorKey: "scope",
+    header: "Scope",
+    cell: (info) => info.getValue(),
+    meta: {
+      rowSpan: 2,
+    },
+  },
+  {
+    header: "Basic Action",
+    columns: [
+      {
+        accessorKey: "accessBasicAction",
+        header: "Access",
+        cell: ({ row }) => {
+          if (row.getValue("accessBasicAction") !== null) {
+            return (
+              <Checkbox
+                className="border-erp-blue-11 data-[state=checked]:bg-erp-blue-11"
+                checked={row.getValue("accessBasicAction") as boolean}
+                onCheckedChange={() =>
+                  (row.original.accessBasicAction = !row.original.accessBasicAction)
+                }
+              />
+            );
+          }
+        },
+      },
+      {
+        accessorKey: "createBasicAction",
+        header: "Create",
+        cell: ({ row }) => {
+          if (row.getValue("createBasicAction") !== null) {
+            return (
+              <Checkbox
+                className="border-erp-blue-11 data-[state=checked]:bg-erp-blue-11"
+                checked={row.getValue("createBasicAction") as boolean}
+              />
+            );
+          }
+        },
+      },
+      {
+        accessorKey: "editBasicAction",
+        header: "Edit",
+        cell: ({ row }) => {
+          if (row.getValue("editBasicAction") !== null) {
+            return (
+              <Checkbox
+                className="border-erp-blue-11 data-[state=checked]:bg-erp-blue-11"
+                checked={row.getValue("editBasicAction") as boolean}
+              />
+            );
+          }
+        },
+      },
+      {
+        accessorKey: "trashBasicAction",
+        header: "Trash",
+        cell: ({ row }) => {
+          if (row.getValue("trashBasicAction") !== null) {
+            return (
+              <Checkbox
+                className="border-erp-blue-11 data-[state=checked]:bg-erp-blue-11"
+                checked={row.getValue("trashBasicAction") as boolean}
+              />
+            );
+          }
+        },
+      },
+      {
+        accessorKey: "restoreBasicAction",
+        header: "Restore",
+        cell: ({ row }) => {
+          if (row.getValue("restoreBasicAction") !== null) {
+            return (
+              <Checkbox
+                className="border-erp-blue-11 data-[state=checked]:bg-erp-blue-11"
+                checked={row.getValue("restoreBasicAction") as boolean}
+              />
+            );
+          }
+        },
+      },
+      {
+        accessorKey: "deleteBasicAction",
+        header: "Delete",
+        cell: ({ row }) => {
+          if (row.getValue("deleteBasicAction") !== null) {
+            return (
+              <Checkbox
+                className="border-erp-blue-11 data-[state=checked]:bg-erp-blue-11"
+                checked={row.getValue("deleteBasicAction") as boolean}
+              />
+            );
+          }
+        },
+      },
+      {
+        accessorKey: "previewBasicAction",
+        header: "Preview",
+        cell: ({ row }) => {
+          if (row.getValue("previewBasicAction") !== null) {
+            return (
+              <Checkbox
+                className="border-erp-blue-11 data-[state=checked]:bg-erp-blue-11"
+                checked={row.getValue("previewBasicAction") as boolean}
+              />
+            );
+          }
+        },
+      },
+      {
+        accessorKey: "exportBasicAction",
+        header: "Export",
+        cell: ({ row }) => {
+          if (row.getValue("exportBasicAction") !== null) {
+            return (
+              <Checkbox
+                className="border-erp-blue-11 data-[state=checked]:bg-erp-blue-11"
+                checked={row.getValue("exportBasicAction") as boolean}
+              />
+            );
+          }
+        },
+      },
+    ],
+  },
+];

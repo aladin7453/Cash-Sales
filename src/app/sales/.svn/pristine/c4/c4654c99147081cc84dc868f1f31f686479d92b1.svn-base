@@ -1,0 +1,752 @@
+"use client";
+
+import { useEffect, useState, memo } from "react";
+import { FaSort, FaSortDown, FaSortUp } from "react-icons/fa6";
+import type { ColumnDef, Row, SortingState } from "@tanstack/react-table";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import useSWR, { mutate } from "swr";
+import { useSearchParams } from "next/navigation";
+import DataLoadingStatusBadge from "@/components/data-table/badge/DataLoadingStatusBadge";
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+import { DEFAULT_DATA_TABLE_PAGE_SIZE, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { cn } from "@/lib/utils/cn";
+import LoadingUI from "@/components/LoadingUI";
+import ItemPopoverToolbar from "./ItemPopoverToolbar";
+import type { ItemList } from "./itemColumns";
+
+// Mobile View (Imports)
+import MobilePopoverDataTable from "@/components/form/MobilePopoverDataTable";
+
+// Column Drag and Drop and Resize (Imports)
+import type { MouseEvent } from "react";
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import { DATA_TABLE_DEFAULT_COLUMN_SIZING } from "@/lib/constants";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import getExcludedColumns from "@/lib/utils/data-table/getExcludedColumns";
+import handleDndDragEnd from "@/lib/utils/data-table/handleDndDragEnd";
+import type {
+  ColumnOrderState,
+  ColumnSizingState,
+  Table as TableType,
+  VisibilityState,
+  PaginationState,
+} from "@tanstack/react-table";
+
+type Props = {
+  open: boolean;
+  setOpen: (state: boolean) => void;
+  columns: ColumnDef<ItemList>[];
+  setTempRowQuotationDetailsListData: (data: any, overwrite: boolean) => void;
+  tempRowQuotationDetailsList: any;
+  revalidateQuotationDetails: () => void;
+  itemType: string;
+  form: any;
+  updateItem: (prop: any) => void;
+  slug: string;
+  preferenceData?: any;
+  setItemType: any;
+};
+
+// Column Drag and Drop and Resize (Local Storage Keys)
+const SERVICE_COLUMN_ORDERING_KEY = "quotation.service.bs.table.ordering";
+const SERVICE_COLUMN_SIZING_KEY = "quotation.service.bs.table.sizing";
+const STOCK_COLUMN_ORDERING_KEY = "quotation.stock.bs.table.ordering";
+const STOCK_COLUMN_SIZING_KEY = "quotation.stock.bs.table.sizing";
+const COLUMN_VISIBILITY_KEY = "quotation.item.bs.table.columns";
+
+const PAGINATION_KEY = "quotation.stock.bs.table.pagination";
+
+// HTML Utility Function
+function stripHtml(html) {
+  if (!html) return "";
+  // Replace <br> and <br/> with newlines
+  let text = html.replace(/<br\s*\/?>/gi, '\n');
+  // Replace <p> with nothing, </p> with newline
+  text = text.replace(/<p[^>]*>/gi, '').replace(/<\/p>/gi, '\n');
+  // Remove all other HTML tags
+  text = text.replace(/<[^>]+>/g, '');
+  // Replace HTML entities
+  text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+
+  return text;
+};
+
+const now = new Date();
+
+// Start = now (seconds)
+const startDayTs = Math.floor(now.getTime() / 1000);
+
+// End = end of last day of current month (seconds)
+const lastDayTs = Math.floor(
+  new Date(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    0,
+    23, 59, 59, 999
+  ).getTime() / 1000
+);
+
+
+export default function ItemPopover({
+  open,
+  setOpen,
+  columns,
+  setTempRowQuotationDetailsListData,
+  tempRowQuotationDetailsList,
+  revalidateQuotationDetails,
+  itemType,
+  form,
+  updateItem,
+  slug,
+  preferenceData,
+  setItemType
+}: Props) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const headers = getAuthHeaders();
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [selectedRow, setSelectedRow] = useState<Row | null>(null);
+  const [saveDisabled, setSaveDisabled] = useState(false);
+  const [tableData, setTableData] = useState<Quotation[]>([]);
+  const [totalNumOfRows, setTotalNumOfRows] = useState<number>(0);
+  // Selection Order (State)
+  const [selectionOrder, setSelectionOrder] = useState<string[]>([]);
+
+  // Column Drag and Drop and Resize (State)
+  const initialColumnOrder = columns?.filter(column => column?.id).map((column) => column.id!) || [];
+
+  const [serviceColumnOrder, setServiceColumnOrder] = useLocalStorage<ColumnOrderState>(
+    SERVICE_COLUMN_ORDERING_KEY,
+    initialColumnOrder
+  );
+  const [serviceColumnSizing, setServiceColumnSizing] = useLocalStorage<ColumnSizingState>(
+    SERVICE_COLUMN_SIZING_KEY,
+    {}
+  );
+  const [stockColumnOrder, setStockColumnOrder] = useLocalStorage<ColumnOrderState>(
+    STOCK_COLUMN_ORDERING_KEY,
+    initialColumnOrder
+  );
+  const [stockColumnSizing, setStockColumnSizing] = useLocalStorage<ColumnSizingState>(
+    STOCK_COLUMN_SIZING_KEY,
+    {}
+  );
+
+  const serviceDefaultColumns: Array<keyof ItemList> = [
+    "serviceCode",
+    "serviceName",
+    "description",
+    "price",
+  ];
+  const stockDefaultColumns: Array<keyof ItemList> = [
+    "stockCode",
+    "stock",
+    "description",
+    "refPrice",
+  ];
+
+  const serviceDefaultColumnVisibility: VisibilityState = getExcludedColumns(
+    columns || [],
+    serviceDefaultColumns
+  );
+  const stockDefaultColumnVisibility: VisibilityState = getExcludedColumns(
+    columns || [],
+    stockDefaultColumns
+  );
+
+  const getColumnVisibilityKey = (itemType: string) => {
+    return itemType === "service"
+      ? "quotation.service.bs.table.columns"
+      : "quotation.stock.bs.table.columns";
+  };
+
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    getColumnVisibilityKey(itemType),
+    itemType === "service"
+      ? serviceDefaultColumnVisibility
+      : stockDefaultColumnVisibility
+  );
+  const getPaginationKey = (itemType: string) => {
+    return itemType === "service"
+      ? "quotation.service.bs.table.pagination"
+      : "quotation.stock.bs.table.pagination";
+  };
+
+  const [pagination, setPagination] = useLocalStorage<PaginationState>(
+    getPaginationKey(itemType),
+    {
+      pageIndex: 0,
+      pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+    }
+  );
+  const currentColumnOrder = itemType === "service" ? serviceColumnOrder : stockColumnOrder;
+  const currentColumnSizing = itemType === "service" ? serviceColumnSizing : stockColumnSizing;
+  const setCurrentColumnOrder = itemType === "service" ? setServiceColumnOrder : setStockColumnOrder;
+  const setCurrentColumnSizing = itemType === "service" ? setServiceColumnSizing : setStockColumnSizing;
+  const [columnFilters, setColumnFilters] = useState([]);
+
+
+  useEffect(() => {
+    const key = getColumnVisibilityKey(itemType);
+
+    const saved = localStorage.getItem(key);
+
+    if (saved) {
+      setColumnVisibility(JSON.parse(saved));
+    } else {
+      setColumnVisibility(
+        itemType === "service"
+          ? serviceDefaultColumnVisibility
+          : stockDefaultColumnVisibility
+      );
+    }
+  }, [itemType]);
+
+  const table = useReactTable({
+    columns,
+    data: tableData,
+    state: {
+      sorting,
+      columnFilters, // ✅ must have
+      columnVisibility,
+      columnOrder: currentColumnOrder,
+      columnSizing: currentColumnSizing,
+      pagination,
+      sorting,
+    },
+    columnResizeMode: "onChange",
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    enableColumnResizing: true,
+    manualFiltering: true,
+    onPaginationChange: setPagination,
+    onColumnVisibilityChange: setColumnVisibility, // ✅ MUST HAVE
+    manualPagination: true,
+    manualSorting: true,
+    pageCount: totalNumOfRows
+      ? Math.ceil(totalNumOfRows / pagination.pageSize)
+      : -1,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel()
+  });
+
+  const {
+    data: itemIndexData,
+    error,
+    isLoading,
+    isValidating,
+    mutate: mutateItemData,
+  } = useSWR(
+    [
+      `${ORIGIN}/universal/get-all-item-details2?itemType=${itemType}`,
+      itemType,
+      JSON.stringify(columnFilters),
+      pagination.pageIndex,
+      pagination.pageSize,
+      JSON.stringify(sorting),
+    ],
+    async ([url, itemType]) => {
+      const columnFiltersWithoutValid = columnFilters.filter(
+        (filter) => filter.id !== "valid"
+      );
+      console.log('2222')
+      const params = new FormData();
+
+      // pagination
+      params.append("param[limit]", `${table.getState().pagination.pageSize}`);
+      params.append(
+        "param[offset]",
+        `${table.getState().pagination.pageIndex * table.getState().pagination.pageSize}`
+      );
+
+      // filters
+      params.append(
+        "param[filter]",
+        columnFiltersWithoutValid.length > 0
+          ? JSON.stringify(
+            columnFiltersWithoutValid.reduce<Record<string, unknown>>(
+              (acc, curr) => {
+                acc[curr.id] = curr.value;
+                return acc;
+              },
+              {}
+            )
+          )
+          : "{}"
+      );
+
+      // sorting
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc"
+      );
+
+      params.append(
+        "param[sort]",
+        sorting.length > 0 ? sorting[0].id : "createdAt"
+      );
+
+      // valid filter (same logic as yours)
+      params.append(
+        "param[valid]",
+        "1"
+      );
+
+      // item type (IMPORTANT - your API needs this)
+      params.append("param[itemType]", itemType);
+
+      const headers = getAuthHeaders();
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: params,
+      });
+
+      if (response.status === 401) {
+        throw new Error("Session expired");
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to fetch items");
+      }
+
+      return response.json();
+    },
+    {
+      revalidateOnFocus: false,
+    }
+  );
+
+
+  useEffect(() => {
+    if (itemIndexData) {
+      setTableData(itemIndexData.rows || []);
+      setTotalNumOfRows(+itemIndexData.total);
+    }
+  }, [itemIndexData]);
+
+
+  useEffect(() => {
+    mutateItemData();
+  }, [columnFilters, sorting, pagination.pageIndex, pagination.pageSize]);
+
+
+  // Column Drag and Drop and Resize (Hooks)
+  const sensors = useDndSensors();
+  const columnSizeVars = useColumnSizeVars(table);
+
+  useEffect(() => {
+    localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
+
+  usePreventShiftTextSelect();
+
+
+  const onSave = async (prop) => {
+    // if (id && slug !== "clone") {
+    //   // Selection Order (Pass Selection Order)
+    //   await updateItem({
+    //     ...prop,
+    //     selectionOrder: selectionOrder,
+    //   });
+
+    //   revalidateQuotationDetails();
+    // } else {
+    let selectedRows = Array(0);
+
+    // Selection Order (Logic)
+    if (prop.table) {
+      const selectedRowsMap = new Map(
+        prop.table.getSelectedRowModel().rows.map(row => [row.id, row])
+      );
+
+      selectedRows = selectionOrder
+        .filter(rowId => selectedRowsMap.has(rowId))
+        .map(rowId => selectedRowsMap.get(rowId));
+    } else {
+      selectedRows.push(prop.row);
+    }
+    // Selection Order (Add Index and Sequence)
+    selectedRows.forEach((row, index) => {
+      // Get the maximum existing sequence number
+      const existingData = tempRowQuotationDetailsList || [];
+      const maxSeq = existingData.length > 0
+        ? Math.max(...existingData.map(item => parseInt(item.seq) || 0))
+        : 0;
+
+      let item = {};
+
+      if (itemType === "service") {
+        item = {
+          UUID: "",
+          seq: (maxSeq + index + 1).toString(),
+          item: row.original["UUID"],
+          itemCode: row.original["serviceCode"],
+          itemName: row.original["serviceName"],
+          type: "Service",
+          description: stripHtml(row.original["description"]),
+          "2ndDescription": stripHtml(row.original["2ndDescription"]),
+          moreDescription: stripHtml(row.original["moreDescription"]),
+          itemGroup: row.original["serviceGroupCode"],
+          itemGroupCode: row.original["serviceGroupCodeCode"],
+          itemCategory: row.original["serviceCategoryCode"],
+          itemCategoryCode: row.original["serviceCategoryCodeCode"],
+          tariff: null,
+          classification: row.original["classification"],
+          classificationCode: row.original["classificationCodeCode"],
+          permitNo: null,
+          project: form.getValues("project"),
+          quantity: row.original.UOMDropdown && row.original.UOMDropdown.length > 0 && row.original.UOMDropdown[0].UOM ? 1 : "",
+          quantity2: row.original.UOMDropdown2 && row.original.UOMDropdown2.length > 0 && row.original.UOMDropdown2[0].UOM2 ? 1 : "",
+          quantity3: row.original.UOMDropdown3 && row.original.UOMDropdown3.length > 0 && row.original.UOMDropdown3[0].UOM3 ? 1 : "",
+          UOM: row.original["defaultUOMSales"],
+          UOMDropdown: row.original.UOMDropdown || [],
+          UOMDropdown2: row.original.UOMDropdown2 || [],
+          UOMDropdown3: row.original.UOMDropdown3 || [],
+          itemRate: row.original["rate"],
+          price: row.original["promotionPrice"] || 0,
+          discountRate: 0,
+          discountAmount: 0,
+          tax: null,
+          deliveryDate: row.original["deliveryDate"],
+          billingFrequency: row.original["billingFrequency"],
+          billingInterval: row.original["billingInterval"],
+          startAt: preferenceData?.data?.quotationDefaultDate == "1" ? startDayTs : "",
+          endAt: preferenceData?.data?.quotationDefaultDate == "1" ? lastDayTs : "",
+          remark1: "",
+          remark2: "",
+          valid: "1",
+        };
+      } else {
+        item = {
+          UUID: "",
+          seq: (maxSeq + index + 1).toString(),
+          item: row.original["UUID"],
+          itemCode: row.original["stockCode"],
+          itemName: row.original["stock"],
+          type: "Stock",
+          description: stripHtml(row.original["description"]),
+          "2ndDescription": stripHtml(row.original["2ndDescription"]),
+          moreDescription: stripHtml(row.original["moreDescription"]),
+          itemGroup: row.original["stockGroupCode"],
+          itemGroupCode: row.original["stockGroupCodeCode"],
+          itemCategory: row.original["stockCategoryCode"],
+          itemCategoryCode: row.original["stockCategoryCodeCode"],
+          tariff: null,
+          classification: row.original["classification"],
+          classificationCode: row.original["classificationCodeCode"],
+          permitNo: null,
+          project: form.getValues("project"),
+          quantity: 1,
+          UOM: row.original["defaultUOMSales"],
+          UOMDropdown: row.original.UOMDropdown || [],
+          itemRate: row.original["rate"],
+          price: row.original["promotionPrice"] || 0,
+          discountRate: 0,
+          discountAmount: 0,
+          tax: null,
+          deliveryDate: "",
+          billingFrequency: null,
+          billingInterval: null,
+          startAt: preferenceData?.data?.quotationDefaultDate == "1" ? startDayTs : "",
+          endAt: preferenceData?.data?.quotationDefaultDate == "1" ? lastDayTs : "",
+          remark1: "",
+          remark2: "",
+          valid: "1",
+        };
+      }
+
+      setTempRowQuotationDetailsListData(item, false);
+    });
+    //}
+
+    if (prop.table) {
+      prop.table.resetRowSelection();
+
+      // Selection Order (Reset)
+      setSelectionOrder([]);
+    }
+
+    setOpen(false);
+  };
+
+  const onDoubleClick = (row: Row<ItemList>) => {
+    onSave({ row: row, itemType: itemType });
+  };
+
+  // Selection Order (Handler)
+  const onItemRowSelection = (row: Row<ItemList>) => (event: React.MouseEvent) => {
+    const isSelected = row.getIsSelected();
+
+    if (event.detail === 2) {
+      // Double click
+      onDoubleClick(row);
+      return;
+    }
+
+    // Handle selection order
+    if (isSelected) {
+      // Deselecting - remove from order
+      setSelectionOrder(prev => prev.filter(id => id !== row.id));
+    } else {
+      // Selecting - add to end of order
+      setSelectionOrder(prev => [...prev, row.id]);
+    }
+
+    row.toggleSelected();
+  };
+
+  useEffect(() => {
+    mutateItemData();
+  }, [columnFilters, sorting, pagination.pageIndex, pagination.pageSize]);
+
+
+  const revalidateItemListData = () => {
+    mutateItemData();
+  };
+
+
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
+  const [isLoadedSuccessfully, setIsLoadedSuccessfully] = useState<boolean>(false);
+
+  // Server-Side Filtering (Loading State)
+  useEffect(() => {
+    if (isLoading || !itemIndexData) {
+      setLoadingProgress(90);
+    } else {
+      setIsLoadedSuccessfully(true);
+    }
+  }, [isLoading, itemIndexData]);
+
+  // Server-Side Filtering (Handle Validation State Changes)
+  useEffect(() => {
+    if (isValidating) {
+      setIsLoadedSuccessfully(false);
+      setLoadingProgress(95);
+    } else {
+      setIsLoadedSuccessfully(true);
+    }
+  }, [isValidating]);
+
+
+  // console.log(fetchItemData2())
+
+  // useEffect(() => {
+  //   fetchItemData2(itemType, {
+  //     filters: columnFilters,
+  //     sorting,
+  //     pageIndex: table.getState().pagination.pageIndex,
+  //     pageSize: table.getState().pagination.pageSize,
+  //   });
+  // }, [columnFilters, sorting, table.getState().pagination.pageIndex]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen} className="mx-2">
+      <DialogContent className="min-h-[75vh] min-w-[75vw] max-w-3xl bg-erp-blue-3 p-2">
+        <div className="flex flex-row">
+          <div className="h-[73cqh] w-full p-4">
+            <div className="flex h-[70cqh] flex-col bg-erp-blue-3 @container-[size]">
+              <h2 className="text-sm font-bold">Select Item</h2>
+              <ItemPopoverToolbar
+                table={table}
+                setOpen={setOpen}
+                handleSave={onSave}
+                revalidateQuotationDetails={revalidateQuotationDetails}
+                itemType={itemType}
+                setSelectedRow={setSelectedRow}
+                saveDisabled={saveDisabled}
+                setSaveDisabled={setSaveDisabled}
+                setItemType={setItemType}
+                totalNumOfRows={totalNumOfRows}
+                dataStatusBadgeDisplay={
+                  (isLoadedSuccessfully && (
+                    <DataLoadingStatusBadge variant="success" />
+                  )) ||
+                  (!!error && <DataLoadingStatusBadge variant="error" />)
+                }
+              />
+              <Separator className="bg-erp-blue-11" />
+              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                {/* Mobile View (Data Table) */}
+                <MobilePopoverDataTable
+                  table={table}
+                  headerFields={[
+                    itemType === "service" ? "serviceCode" : "stockCode",
+                    itemType === "service" ? "serviceName" : "stock",
+                  ]}
+                  initialVisibleFields={4}
+                  excludeFromGrid={["serviceCode", "stockCode"]}
+                  showSelection={true}
+                  selectionLabel="Select"
+                />
+
+                {/* Web View (Data Table) */}
+                <div className="hidden md:block">
+                  {/* Column Drag and Drop and Resize (DND Context) */}
+                  <DndContext
+                    collisionDetection={closestCenter}
+                    modifiers={[restrictToHorizontalAxis]}
+                    onDragEnd={(event) => handleDndDragEnd(event, setCurrentColumnOrder)}
+                    sensors={sensors}
+                  >
+                    {/* Column Drag and Drop and Resize (Table) */}
+                    <Table
+                      className="table-fixed border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1"
+                      style={{ ...columnSizeVars, width: table.getTotalSize() }}
+                    >
+                      <TableHeader className="sticky top-0 z-10">
+                        {table.getHeaderGroups().map((headerGroup) => (
+                          <TableRow key={headerGroup.id}>
+                            {/* Column Drag and Drop and Resize (Sortable Context) */}
+                            <SortableContext
+                              items={currentColumnOrder}
+                              strategy={horizontalListSortingStrategy}
+                            >
+                              {headerGroup.headers.map((header) => (
+                                // Column Drag and Drop and Resize (Dragable Table Head)
+                                <DragableTableHead
+                                  key={header.id}
+                                  header={header}
+                                  className="bg-erp-blue-11 font-normal"
+                                  style={{
+                                    width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                                  }}
+                                >
+                                  {header.column.id === "valid" ? (
+                                    <TableHeadValidityFilter table={table} />
+                                  ) : (
+                                    <TableHeadColumnTextFilter column={header.column} table={table} />
+                                  )}
+                                  <ColumnResizer header={header} />
+                                </DragableTableHead>
+                              ))}
+                            </SortableContext>
+                          </TableRow>
+                        ))}
+                      </TableHeader>
+                      {/* Column Drag and Drop and Resize (Table Body) */}
+                      {table.getState().columnSizingInfo.isResizingColumn ? (
+                        <MemoizedTableBody
+                          table={table}
+                          onItemRowSelection={onItemRowSelection}
+                          columns={columns}
+                        />
+                      ) : (
+                        <NonMemoizedTableBody
+                          table={table}
+                          onItemRowSelection={onItemRowSelection}
+                          columns={columns}
+                        />
+                      )}
+                    </Table>
+                  </DndContext>
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+              {!isLoadedSuccessfully && <LoadingUI progressValue={loadingProgress} />}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Column Drag and Drop and Resize (Table Body)
+type TableBodyProps = {
+  table: TableType<ItemList>;
+  onItemRowSelection: (row: Row<ItemList>) => (event: MouseEvent<HTMLTableRowElement>) => void;
+  columns: ColumnDef<ItemList>[];
+};
+
+function NonMemoizedTableBody({ table, onItemRowSelection, columns }: TableBodyProps) {
+  return (
+    <TableBody>
+      {table.getRowModel().rows?.length ? (
+        table.getRowModel().rows.map((row) => (
+          <TableRow
+            className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+            data-state={row.getIsSelected() && "selected"}
+            onClick={onItemRowSelection(row)}
+            key={row.id}
+          >
+            {row.getVisibleCells().map((cell) => {
+              if (
+                cell.column.id === "description" ||
+                cell.column.id === "2ndDescription" ||
+                cell.column.id === "moreDescription"
+              ) {
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className="truncate"
+                    title={stripHtml((cell.getValue() ?? "").toString())}
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                    }}
+                  >
+                    {stripHtml((cell.getValue() ?? "").toString())}
+                  </TableCell>
+                );
+              } else {
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className="truncate"
+                    title={(cell.getValue() ?? "").toString()}
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                    }}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                );
+              }
+            })}
+          </TableRow>
+        ))
+      ) : (
+        <NoResultsTableRow columns={columns} />
+      )}
+    </TableBody>
+  );
+}
+
+const MemoizedTableBody = memo(
+  NonMemoizedTableBody,
+  (prev, next) => prev.table.options.data === next.table.options.data
+) as typeof NonMemoizedTableBody;

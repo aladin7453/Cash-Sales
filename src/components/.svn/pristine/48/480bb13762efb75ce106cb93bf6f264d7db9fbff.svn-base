@@ -1,0 +1,41 @@
+"use client";
+
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+import type { TransferToPopoverToolbarProps } from "./types";
+
+export default function TransferToPopoverToolbar({
+  table,
+  setOpen,
+  fetchItems,
+  setTransferQuantities,
+  onSave,
+}: TransferToPopoverToolbarProps) {
+  return (
+    <>
+      <div className="flex items-center justify-between p-1.5">
+        <div className="grid auto-cols-fr grid-flow-col gap-x-1.5">
+          <SaveButton onClick={() => onSave({ table: table })} />
+          <ResetButton
+            onClick={() => {
+              setTransferQuantities({});
+              fetchItems();
+            }}
+          />
+          <CancelButton onClick={() => setOpen(false)} />
+        </div>
+
+        <Pagination table={table} />
+        
+        <div className="grid grid-cols-2 items-center text-erp-blue-14">
+          <Refresh refreshTable={fetchItems}/>
+          <ColumnVisibilityToggle table={table} />
+        </div>
+      </div>
+    </>
+  );
+}

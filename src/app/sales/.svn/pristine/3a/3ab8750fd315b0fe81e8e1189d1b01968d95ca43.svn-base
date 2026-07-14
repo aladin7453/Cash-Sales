@@ -1,0 +1,331 @@
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import useSWR from "swr";
+import { useDateRestriction } from "@/components/custom/DateRestrictionContext";
+
+//Icon
+import { IoDocumentsSharp } from "react-icons/io5";
+
+//Config
+import { getAuthHeaders, ORIGIN, TOOLTIP_DELAY_DURATION } from "@/lib/constants";
+
+//Buttons
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import CloneButton from "@/components/form/ActionButton/Clone";
+import DeleteButton from "@/components/form/ActionButton/Delete";
+import NewButton from "@/components/form/ActionButton/New";
+import PreviewButton from "@/components/form/ActionButton/Preview";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+import LayoutToggleButton from "@/components/form/ActionButton/LayoutToggleButton";
+
+//Components
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+// Mobile View (Imports)
+import MobileFormActionGroup from "@/components/form/MobileFormActionGroup";
+
+import { ApprovalStatusIcon } from "./ApprovalStatusIcon";
+import { eInvoiceRecords } from "./e-invoice-record/columns";
+import EInvoiceRecordsDataTable from "./e-invoice-record/DataTable";
+import type { ConsolidateEInvoice } from "./main-details/item-details/columns";
+
+type TopActionBarProps = {
+  ConsolidateEInvoice?: ConsolidateEInvoice | null;
+  approvalStatus?: ConsolidateEInvoice | null;
+  tempRowConsolidateEInvoiceDetailsList: () => void;
+  handleSubmit: () => void;
+  resetForm: () => void;
+  onSubmit: (values: any) => void;
+  action: string;
+  table: Table<any> | null;
+  slug: string;
+  revalidateConsolidatedInvoice: () => void;
+  viewEInvoiceDetails?: (row: any) => void;
+  ConsolidatedEInvoiceData?: any;
+  layout: "new" | "old";
+  onLayoutChange: (layout: "new" | "old") => void;
+  isLoading?: boolean;
+};
+
+const fetcher = (url: string) => {
+  const headers = getAuthHeaders();
+  return fetch(url, { headers }).then((res) => res.json());
+};
+
+export default function TopActionBar({
+  ConsolidateEInvoice,
+  approvalStatus,
+  tempRowConsolidateEInvoiceDetailsList,
+  form,
+  handleSubmit,
+  action,
+  slug,
+  revalidateConsolidatedInvoice,
+  viewEInvoiceDetails,
+  ConsolidatedEInvoiceData,
+  layout,
+  onLayoutChange,
+  isLoading
+}: TopActionBarProps) {
+  const headers = getAuthHeaders();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  const [selectedRowUUID, setSelectedRowUUID] = useState<string | null>(null);
+  const [tempRowEInvoiceRecords, setTempRowEInvoiceRecords] = useState([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [tableInstance, setTableInstance] = useState<Table | null>(null);
+
+  const eInvoiceStat = form.getValues("eInvoiceStatus");
+
+  useEffect(() => {
+    form.reset(ConsolidateEInvoice || {});
+  }, [ConsolidateEInvoice, form]);
+
+  const handleReset = () => {
+    form.reset(ConsolidateEInvoice || {});
+  };
+
+  const handleDialogToggle = () => {
+    setDialogOpen(!dialogOpen);
+  };
+
+  const handleRowSelect = (rowUUID: string) => {
+    setSelectedRowUUID(rowUUID);
+  };
+
+  const handleTableInstanceReady = (table: Table<any>) => {
+    if (table) {
+      setTableInstance(table);
+    } else {
+      console.error("Table instance is null or undefined");
+    }
+  };
+
+  const {
+    data: eInvoiceRecordsData,
+    error: eInvoiceRecordError,
+    mutate: mutateEInvoice,
+  } = useSWR(
+    id
+      ? `${ORIGIN}/consolidated_invoice/api/consolidated-invoice/get-update-consolidated-invoice-has-e-invoice-data?id=${id}`
+      : null,
+    fetcher,
+  );
+
+  const revalidateEInvoiceRecordsData = () => {
+    mutateEInvoice();
+  };
+
+  const { allowPastRecord, setAllowPastRecord } = useDateRestriction();
+
+  // Change layout button condition (HardCode)
+  const systemAccount = JSON.parse(localStorage.getItem("system-account") || "{}");
+  const canChangeLayout = ["infollective", "infollectivetesting", "dev", "mymug", "vminimarket", "tridentmed"].includes(systemAccount);
+
+  return (
+    <div className="flex h-full w-full flex-1 items-center justify-between bg-erp-gray-3 py-2">
+      <div className="flex flex-1 space-x-3">
+        {/* Mobile View Action Buttons */}
+        <MobileFormActionGroup
+          config={{
+            onSave: handleSubmit,
+            onReset: handleReset,
+            onCancel: () => router.push(`/sales/consolidated-invoice/`),
+            newDestination: "/sales/consolidated-invoice/new",
+            cloneDestination: `/sales/consolidated-invoice/clone?id=${id}`,
+            deleteConfig:
+              id && action !== "clone"
+                ? {
+                  module: "consolidated_invoice",
+                  model: "consolidated-invoice",
+                  id: `${id}`,
+                  indexPath: `/sales/consolidated-invoice/`,
+                }
+                : undefined,
+            showNew: !!(id && action !== "clone"),
+            showClone: !!(id && action !== "clone"),
+            showDelete: !!(id && action !== "clone"),
+          }}
+        >
+          {/* Additional Actions (Other than Save, New, Clone, Reset, Delete, and Cancel) */}
+          {ConsolidateEInvoice && slug === "edit" && (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <PreviewButton
+                previewType={"CONSOLIDATED INVOICE"}
+                module={"consolidated_invoice"}
+                model={"consolidated_invoice-invoice"}
+                doc_id={ConsolidateEInvoice.UUID}
+                data={ConsolidatedEInvoiceData}
+              />
+            </DropdownMenuItem>
+          )}
+        </MobileFormActionGroup>
+
+        {/* Web View Action Buttons */}
+        <div className="hidden space-x-3 md:flex">
+
+          {/* Save Button */}
+          <SaveButton
+            onSubmit={handleSubmit}
+            disabled={isLoading || eInvoiceStat == "Valid" || eInvoiceStat == "Submitted"}
+          />
+
+          {/* New Button */}
+          {id && action !== "clone" && <NewButton destination="/sales/consolidated-invoice/new" />}
+
+          {/* Clone Button */}
+          {id && action !== "clone" && (
+            <CloneButton destination={`/sales/consolidated-invoice/clone?id=${id}`} />
+          )}
+
+          {/* Reset Button */}
+          <ResetButton onClick={handleReset} />
+          {id && action !== "clone" && (
+            <DeleteButton
+              module={"consolidated_invoice"}
+              model={"consolidated-invoice"}
+              id={`${id}`}
+              indexPath={`/sales/consolidated-invoice/`}
+            />
+          )}
+
+          {/* Preview Button */}
+          {ConsolidateEInvoice && slug === "edit" && (
+            <PreviewButton
+              previewType={"CONSOLIDATED INVOICE"}
+              module={"consolidated_invoice"}
+              model={"consolidated-invoice"}
+              doc_id={ConsolidateEInvoice.UUID}
+              data={ConsolidatedEInvoiceData}
+            />
+          )}
+
+          {/* Cancel Button */}
+          <CancelButton onClick={() => router.push(`/sales/consolidated-invoice/`)} />
+
+          {/* Switch Button */}
+          {canChangeLayout && <LayoutToggleButton layout={layout} onChange={onLayoutChange} />}
+        </div>
+      </div>
+
+      <Form id="topActionBarForm" {...form}>
+        <div className="flex justify-center items-center gap-x-5 space-y-0 px-3">
+
+          {/* Added onSubmit to Form */}
+          {approvalStatus?.approvalStatus &&
+            (approvalStatus.approvalStatus === "Rejected" ? (
+              <TooltipProvider delayDuration={TOOLTIP_DELAY_DURATION}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <ApprovalStatusIcon status={approvalStatus.approvalStatus} />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>{approvalStatus.rejectReason || "No reason provided"}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <ApprovalStatusIcon status={approvalStatus.approvalStatus} />
+            ))}
+
+          {/* E-invoice Record */}
+          <TooltipProvider delayDuration={TOOLTIP_DELAY_DURATION}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  className="hidden size-8 md:flex disabled:hover:bg-transparent"
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleDialogToggle}
+                  disabled={
+                    form.getValues("invoiceType") == "Consolidate" ||
+                    form.getValues("invoiceType") == "None" ||
+                    form.getValues("invoiceType") == ""
+                  }
+                >
+                  <IoDocumentsSharp className="size-5.5 text-primary" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className={form.getValues("invoiceType") == "Consolidate" || form.getValues("invoiceType") == "None" || form.getValues("invoiceType") == "" ? "hidden" : "block"}>
+                E-Invoice Records
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Valid checkbox */}
+          <FormField
+            control={form.control}
+            name="valid"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-x-2.5 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value === "1"}
+                    onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                  />
+                </FormControl>
+                <FormLabel>Valid</FormLabel>
+              </FormItem>
+            )}
+          />
+
+          {/* Past Record checkbox */}
+          <FormField
+            control={form.control}
+            name="allowPastDates"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-x-2.5 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value === "1"}
+                    onCheckedChange={(state) => {
+                      field.onChange(state ? "1" : "0");
+                      setAllowPastRecord(state === true);
+                    }}
+                  />
+                </FormControl>
+                <FormLabel className="cursor-pointer">Past Record</FormLabel>
+              </FormItem>
+            )}
+          />
+        </div>
+      </Form>
+
+      { /* E-Invoice Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-4xl space-y-2.5 bg-white p-3 pt-2">
+          <span className="text-sm/none font-semibold">e-Invoice Records</span>
+          <div className="max-w-4xl overflow-x-auto rounded-sm bg-erp-blue-3 p-1">
+            <EInvoiceRecordsDataTable
+              columns={eInvoiceRecords}
+              data={
+                id && slug == "edit"
+                  ? eInvoiceRecordsData
+                    ? eInvoiceRecordsData.rows
+                    : []
+                  : tempRowEInvoiceRecords
+              }
+              tempRowEInvoiceRecords={tempRowEInvoiceRecords}
+              setTempRowEInvoiceRecords={setTempRowEInvoiceRecords}
+              revalidateEInvoiceRecordsData={revalidateEInvoiceRecordsData}
+              onRowSelect={handleRowSelect}
+              onTableInstanceReady={handleTableInstanceReady}
+              id={id && slug == "edit" ? id : ""}
+              revalidateConsolidatedInvoice={revalidateConsolidatedInvoice}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

@@ -1,0 +1,644 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { CalendarIcon } from "lucide-react";
+import { FaFileCirclePlus, FaCircleXmark, FaMagnifyingGlass } from "react-icons/fa6";
+import type { Dispatch, SetStateAction } from "react";
+
+import moment from 'moment';
+
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Card,
+  CardContent,
+  CardTitle,
+  CardHeader
+} from "@/components/ui/card";
+
+import { cn } from "@/lib/utils/cn";
+import { DATE_FORMAT, ORIGIN, getAuthHeaders } from "@/lib/constants";
+
+import type { CustomerPayment } from "../../columns";
+
+type Params = {
+  tempRowAttachments: any;
+  setTempRowAttachments: ([]) => void;
+  customerPayment?: CustomerPayment| null;
+  setcustomerPayment: Dispatch<SetStateAction<CustomerPayment[]>>;
+  form: any;
+  slug?: string;
+};
+
+// HTML Utility Function
+function stripHtml(html) {
+  if (!html) return "";
+  // Replace <br> and <br/> with newlines
+  let text = html.replace(/<br\s*\/?>/gi, '\n');
+  // Replace <p> with nothing, </p> with newline
+  text = text.replace(/<p[^>]*>/gi, '').replace(/<\/p>/gi, '\n');
+  // Remove all other HTML tags
+  text = text.replace(/<[^>]+>/g, '');
+  // Replace HTML entities
+  text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+  
+  return text;
+}
+
+export function MoreDetailsForm({ 
+  customerPayment,
+  tempRowAttachments, 
+  form, 
+  setTempRowAttachments, 
+  slug
+}: Params ) {
+  const headers = getAuthHeaders();
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target) && inputRef.current !== event.target) {
+      setShowTableProject(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener('click', handleClickOutside);
+        
+    return () => {
+      document.body.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  // Project Dropdown
+  const [showTableProject, setShowTableProject] = useState(false); 
+  const [projectDropdownTableData, setProjectDropdownTableData] = useState([]);
+  const [projectFilter, setProjectFilter] = useState("");
+
+  const dropdownProjectColumns = [ 
+    { accessorKey: "projectCode", header: "Project Code" }, 
+    { accessorKey: "description", header: "Description" }, 
+  ];
+
+  const toggleTableProject = async () => {
+    const formData = new FormData();
+    const project = "project";
+
+    formData.append('table[]', project);
+
+    if (!showTableProject) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/universal/get-all-drop-down-table-data`,
+          {
+            method: "POST",
+            headers,
+            body: formData,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch user list drop-down data");
+        }
+
+        const projectCodeData = await response.json();
+        
+        setProjectDropdownTableData(projectCodeData.rows);
+        setShowTableProject(true);
+      } catch (error) {
+        console.error("Error fetching user list drop-down data:", error);
+      }
+    } else {
+      setShowTableProject(false);
+    }
+  };
+
+  const onClickRowProject = (row) => {
+    form.setValue('project', row.UUID);
+    form.setValue('projectCode', row.projectCode);
+
+    setProjectFilter("");
+    setShowTableProject(false);
+  };
+
+  // File Attachment
+  const fileInputRef = useRef(null);
+
+  const handleChooseFileClick = () => {
+    fileInputRef.current.click(); 
+  };
+
+  const handleFileChange = (event) => {
+    const fileList = Array.from(event.target.files);
+
+    const mergeArray:any=[...tempRowAttachments, ...fileList];
+
+    setTempRowAttachments(mergeArray);
+  };
+
+  function handleDeleteFile(index){
+    var newCustomInfoFiles = [...tempRowAttachments];
+
+    newCustomInfoFiles.splice(index, 1);
+
+    setTempRowAttachments(newCustomInfoFiles)
+  }
+
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Other Details</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form>
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5">  
+              <FormField
+                control={form.control}
+                name="project"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field}  readOnly={true}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="projectCode"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Project:</FormLabel>
+                    <FormControl className="relative">
+                            <div className="relative">
+                              <Input 
+                                className="h-7.5 pr-8" 
+                                {...field} 
+                                onClick={toggleTableProject}
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  setProjectFilter(e.target.value);
+                                }}
+                                ref={inputRef} 
+                                autoComplete="off" 
+                              />
+                              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                <FaMagnifyingGlass className="text-gray-400" /> {/* Using the search icon */}
+                              </div>
+                              {showTableProject && (
+                                <div ref={dropdownRef} className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px]">
+                                  <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                    <DropdownTable
+                                      columns={dropdownProjectColumns}
+                                      data={projectDropdownTableData}
+                                      onClickRow={onClickRowProject}
+                                      filterValue={projectFilter}
+                                      filterColumn="projectCode"
+                                    />
+                                  </ScrollArea>
+                                </div>
+                              )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="remark1"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Remark 1:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7"
+                        {...field}
+                        moduleName="customerPayment"
+                        fieldName="remark1"
+                        columnName="Remark 1"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="remark2"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Remark 2:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7"
+                        {...field}
+                        moduleName="customerPayment"
+                        fieldName="remark2"
+                        columnName="Remark 2"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="remark3"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Remark 3:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} />
+                      </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="remark4"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Remark 4:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} />
+                      </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5 mt-4">
+              {/* <FormField
+                control={form.control}
+                name="taxExNo"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Tax EX:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field}/>
+                      </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              /> */}
+
+              <FormField
+                control={form.control}
+                name="postingDate"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Posting Date:</FormLabel>
+                    <Popover > {/* Pass isOpen and onClose props */}
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            className={cn(
+                              "flex h-7.5 w-full",
+                              !field.value && "text-muted-foreground",
+                            )}
+                            variant="outline"
+                            size="sm"
+                            // disabled={!!field.value}
+                          >
+                            {field.value
+                              ?  moment.unix(field.value).format(DATE_FORMAT)
+                              : "Pick a date"}
+                            <CalendarIcon className="ml-auto h-4 w-4" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? moment.unix(field.value).format(DATE_FORMAT): undefined}
+                          onSelect={(date) => {
+                            const unixTimestamp = date ? Math.floor(date.getTime() / 1000) : null;
+                            field.onChange(unixTimestamp.toString());
+                          }}
+                          // disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                          initialFocus
+                          defaultMonth={field.value ? moment.unix(field.value).format(DATE_FORMAT) : undefined}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="taxDate"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Tax Date:</FormLabel>
+                    <Popover > {/* Pass isOpen and onClose props */}
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            className={cn(
+                              "flex h-7.5 w-full",
+                              !field.value && "text-muted-foreground",
+                            )}
+                            variant="outline"
+                            size="sm"
+                            // disabled={!!field.value}
+                          >
+                            {field.value
+                              ?  moment.unix(field.value).format(DATE_FORMAT)
+                              : "Pick a date"}
+                            <CalendarIcon className="ml-auto h-4 w-4" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? moment.unix(field.value).format(DATE_FORMAT): undefined}
+                          onSelect={(date) => {
+                            const unixTimestamp = date ? Math.floor(date.getTime() / 1000) : null;
+                            field.onChange(unixTimestamp.toString());
+                          }}
+                          // disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                          initialFocus
+                          defaultMonth={field.value ? moment.unix(field.value).format(DATE_FORMAT) : undefined}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="UUID"
+                render={({ field }) => (
+                  <FormItem className={`col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1 ${slug === "clone" ? "hidden" : ""}`}>
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl className="relative">
+                      <Input 
+                        className="h-7.5 pr-8" 
+                        {...field}  
+                        readOnly={true} 
+                        style={{ backgroundColor: '#f2f2f2', color: 'gray' }}
+                        ref={inputRef} 
+                        autoComplete="off" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4 mt-4">
+              <FormField
+                control={form.control}
+                name="note"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="customerPayment"
+                        fieldName="note"
+                        columnName="Note"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4 mt-4">
+              <FormField
+                control={form.control}
+                name="note2"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note 2:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="customerPayment"
+                        fieldName="note2"
+                        columnName="Note2"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4 mt-4">
+              <FormField
+                control={form.control}
+                name="note3"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note 3:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="customerPayment"
+                        fieldName="note3"
+                        columnName="Note3"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4 mt-4">
+              <FormField
+                control={form.control}
+                name="note4"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note 4:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="customerPayment"
+                        fieldName="note4"
+                        columnName="Note4"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4 mt-4">
+              <FormField
+                control={form.control}
+                name="note5"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note 5:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="customerPayment"
+                        fieldName="note5"
+                        columnName="Note5"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4 mt-4">
+              <FormField
+                control={form.control}
+                name="note6"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note 6:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="customerPayment"
+                        fieldName="note6"
+                        columnName="Note6"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4 mt-4">
+              <FormField
+                control={form.control}
+                name="note7"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note 7:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="customerPayment"
+                        fieldName="note7"
+                        columnName="Note7"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4 mt-4">
+              <FormField
+                control={form.control}
+                name="note8"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note 8:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="customerPayment"
+                        fieldName="note8"
+                        columnName="Note8"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <div className="mt-4">
+              <FormField
+                control={form.control}
+                name="attachment"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        Attachment: <button type="button" onClick={handleChooseFileClick} ><FaFileCirclePlus style={{ marginLeft: '5px' }} className="text-erp-blue-14"/></button>
+                      </div></FormLabel>
+            
+                    <FormControl>
+                      <Input id="attachments" type="file" multiple onChange={handleFileChange} ref={fileInputRef} className="hidden" />
+                    </FormControl>
+
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {/* You can render the files here */}
+              {tempRowAttachments && tempRowAttachments.map((file, index) => (
+                  <div key={index}>
+                  <a href={file.link} target="_blank" rel="noopener noreferrer"  style={{ color: 'blue' }}>
+                    {file.name}
+                  </a>
+                  <button type="button" onClick={() => handleDeleteFile(index)} style={{ color: 'red' }}>
+                  <FaCircleXmark  style={{verticalAlign:"bottom",marginLeft:"2px",marginTop:"2px"}} title={"Remove"}/>
+                </button>
+                </div>
+              ))}
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

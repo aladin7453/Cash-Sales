@@ -1,0 +1,193 @@
+"use client";
+
+import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useWatch } from "react-hook-form";
+import SignaturePad from "react-signature-canvas";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, getCurrentAcc, getCurrentAccount, ORIGIN } from "@/lib/constants";
+
+import type { Dispatch, SetStateAction } from "react";
+import type { UseFormReturn } from "react-hook-form";
+
+import type { User } from "../../../columns";
+import type { ProfileImageAttachment } from "../../page";
+
+type Params = {
+  form: UseFormReturn;
+  slug: string;
+};
+
+export function OtherDetailForm({ form, slug }: Params) {
+  const currentAcc = getCurrentAcc();
+
+  const padRef = useRef<SignaturePad | null>(null);
+  const hasLoadedRef = useRef(false);
+
+  const signature = useWatch({
+    control: form.control,
+    name: "signature",
+  });
+
+  const handleEnd = () => {
+    if (!padRef.current) return;
+
+    if (padRef.current.isEmpty()) {
+      form.setValue("signature", "");
+      return;
+    }
+
+    const base64 = padRef.current.toDataURL("image/png");
+
+    form.setValue("signature", base64, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+
+  useEffect(() => {
+    if (!signature) return;
+    if (!padRef.current) return;
+
+    const pad = padRef.current;
+
+    if (!pad.isEmpty()) return;
+
+    const timer = setTimeout(() => {
+      pad.fromDataURL(signature);
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [signature]);
+
+  const handleClearSignature = () => {
+    padRef.current?.clear();
+    form.setValue("signature", "");
+  };
+
+  return (
+    <Card className="h-auto shadow-md">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg font-bold">Other Details</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form>
+            <div className="grid grid-cols-1 items-start gap-x-8 gap-y-3 md:grid-cols-[minmax(0,17rem)_1fr_1fr_1fr_1fr]">
+              <FormField
+                control={form.control}
+                name="account"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="accountName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1.5">
+                    <FormLabel>Sys Acc:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          value={currentAcc}
+                          readOnly={true}
+                          autoComplete="off"
+                          style={{
+                            backgroundColor: "#f2f2f2",
+                            color: "gray",
+                          }}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="UUID"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid hidden h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl className="relative">
+                      <Input
+                        className="h-7.5 pr-8"
+                        {...field}
+                        value={slug === "clone" ? "" : field.value}
+                        readOnly={true}
+                        autoComplete="off"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 items-start gap-x-8 gap-y-3 md:grid-cols-[minmax(0,17rem)_1fr_1fr_1fr_1fr]">
+              <FormField
+                control={form.control}
+                name="signature"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <div className="mt-6 border p-4">
+                <p className="mb-2">Signature</p>
+
+                <div className="flex flex-col gap-2">
+                  <div className="h-32 w-60 border bg-white">
+                    <SignaturePad
+                      ref={padRef}
+                      penColor="black"
+                      canvasProps={{ width: 250, height: 120 }}
+                      onEnd={handleEnd}
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="rounded bg-gray-500 px-3 py-1 text-white"
+                      onClick={handleClearSignature}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

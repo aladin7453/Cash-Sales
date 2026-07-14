@@ -1,0 +1,1185 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { FaMagnifyingGlass, FaRegNoteSticky } from "react-icons/fa6";
+
+import { ORIGIN, getAuthHeaders } from "@/lib/constants";
+
+import { Textarea } from "@/components/ui/textarea";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { DisplayCustomField, CustomFieldHandle, CustomFieldDefinition } from "@/components/DisplayCustomField";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils/cn";
+import TextEditorInline from "@/components/custom/TextEditorInline";
+import { Tab, TabList, TabPanel, Tabs } from "react-tabs";
+import ShipperDetailsForm from "../shipper-details/ShipperDetailsForm";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
+import { useForm, FormProvider } from "react-hook-form";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+
+type Params = {
+  form: any;
+  isMobile?: boolean;
+  isExpand?: boolean;
+  setIsExpand: (v: boolean) => void;
+  customFieldRef?: React.Ref<CustomFieldHandle>;
+  customFieldDefs: CustomFieldDefinition[];
+  customFieldSavedData: Record<string, unknown>;
+  submitAttempted?: boolean;
+  id?: string | null;
+  docNo?: string;
+};
+
+type DropdownConfig = {
+  tableName?: string;
+  endpoint?: string;
+  columns: { accessorKey: string; header: string; cell?: any }[];
+  valueField: string;
+  displayField: string;
+  formValueField: string;
+  formDisplayField: string;
+  additionalMappings?: { sourceField: string; targetFormField: string }[];
+  requiresCustomerUUID?: boolean;
+}
+
+
+interface ContactFormData {
+  contact: string;
+  phoneNo: string;
+  email: string;
+  description: string;
+}
+
+const contactFormSchema = z.object({
+  contact: z.string().min(1, "Contact name is required").trim(),
+  phoneNo: z.string().min(1, "Phone number is required").trim(),
+  email: z.string().optional(),
+  description: z.string().optional(),
+});
+
+
+export function CustomerDetailsForm({
+  form,
+  isMobile,
+  isExpand,
+  setIsExpand,
+  customFieldRef,
+  customFieldDefs,
+  customFieldSavedData,
+  id,
+  docNo,
+  submitAttempted
+}: Params) {
+  const headers = getAuthHeaders();
+
+  const handleClickOutside = (event) => {
+    if (dropdownTableRef.current &&
+      !dropdownTableRef.current.contains(event.target) &&
+      dropdownInputRef.current !== event.target) {
+      setDropdownState(prev => ({ ...prev, showTable: false }));
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener('click', handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  // Customer Filter State
+  const [customerFilter, setCustomerFilter] = useState("");
+
+  // Attention Filter State
+  const [attentionFilter, setAttentionFilter] = useState("");
+
+  // Unified Dropdown State
+  const [dropdownState, setDropdownState] = useState({
+    currentDropdown: null as string | null,
+    data: [] as any[],
+    showTable: false,
+  });
+
+  // Unified Dropdown Refs
+  const dropdownInputRef = useRef(null);
+  const dropdownTableRef = useRef(null);
+
+  // Unified Dropdown Configurations
+  const dropdownConfigs: Record<string, DropdownConfig> = {
+    customerCode: {
+      tableName: "customer",
+      columns: [
+        { accessorKey: "customerCode", header: "Customer Code" },
+        { accessorKey: "customerGroupCode", header: "Customer Group" },
+        { accessorKey: "customerName", header: "Customer Name" },
+        { accessorKey: "description", header: "Description", cell: ({ row }) => <DescriptionCellTooltip row={row} /> }
+      ],
+      valueField: "UUID",
+      displayField: "customerCode",
+      formValueField: "customerCode",
+      formDisplayField: "customerCodeCode",
+      additionalMappings: [
+        { sourceField: "customerName", targetFormField: "customerName" },
+        { sourceField: "BRN", targetFormField: "BRN" },
+        { sourceField: "TIN", targetFormField: "TIN" },
+        { sourceField: "SSTNo", targetFormField: "SSTNo" },
+        { sourceField: "address", targetFormField: "address" },
+        { sourceField: "TaxExNo", targetFormField: "taxExNo" }
+      ]
+    },
+    TIN: {
+      tableName: "customer",
+      columns: [
+        { accessorKey: "TIN", header: "TIN", },
+        { accessorKey: "customerCode", header: "Customer Code", },
+        { accessorKey: "customerName", header: "Customer Name", },
+        { accessorKey: "BRN", header: "BRN", },
+      ],
+      valueField: "UUID",
+      displayField: "customerCode",
+      formValueField: "customerCode",
+      formDisplayField: "customerCodeCode",
+      additionalMappings: [
+        { sourceField: "customerName", targetFormField: "customerName" },
+        { sourceField: "BRN", targetFormField: "BRN" },
+        { sourceField: "TIN", targetFormField: "TIN" },
+        { sourceField: "SSTNo", targetFormField: "SSTNo" },
+        { sourceField: "address", targetFormField: "address" },
+      ],
+    },
+    attention: {
+      endpoint: "/universal/get-attention-by-customer",
+      columns: [
+        { accessorKey: "contact", header: "Contact" },
+        { accessorKey: "phoneNo", header: "Phone No." },
+        { accessorKey: "email", header: "Email" },
+        { accessorKey: "description", header: "Description", cell: ({ row }) => <DescriptionCellTooltip row={row} /> }
+      ],
+      valueField: "UUID",
+      displayField: "contact",
+      formValueField: "attention",
+      formDisplayField: "attentionName",
+      additionalMappings: [
+        { sourceField: "phoneNo", targetFormField: "phoneNo" },
+        { sourceField: "email", targetFormField: "email" }
+      ],
+      requiresCustomerUUID: true
+    }
+  };
+
+  // Unified Fetch Dropdown Data
+  const fetchDropdownData = async (dropdownKey: string) => {
+    try {
+      const config = dropdownConfigs[dropdownKey];
+      if (!config) return;
+
+      let response;
+
+      if (config.requiresCustomerUUID) {
+        const customerUUID = form.getValues('customerCode');
+        if (!customerUUID) {
+          console.warn(`Customer must be selected first for ${dropdownKey}`);
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('table[]', 'user');
+
+        response = await fetch(`${ORIGIN}${config.endpoint}?id=${customerUUID}`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+      } else if (config.tableName) {
+        const formData = new FormData();
+        formData.append('table[]', config.tableName);
+
+        response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+      }
+
+      if (!response || !response.ok) {
+        throw new Error(`Failed to fetch ${dropdownKey} data`);
+      }
+
+      const data = await response.json();
+      setDropdownState({
+        currentDropdown: dropdownKey,
+        data: data.rows,
+        showTable: true,
+      });
+    } catch (error) {
+      console.error(`Error fetching ${dropdownKey} data:`, error);
+    }
+  };
+
+  // Unified Dropdown Row Click Handler
+  const onClickRow = (row: any) => {
+    const config = dropdownConfigs[dropdownState.currentDropdown!];
+
+    if (config) {
+      form.setValue(config.formValueField, row[config.valueField]);
+      form.setValue(config.formDisplayField, row[config.displayField]);
+
+      // Apply any additional field mappings defined in the config
+      if (config.additionalMappings) {
+        config.additionalMappings.forEach(mapping => {
+          if (row[mapping.sourceField]) {
+            form.setValue(mapping.targetFormField, row[mapping.sourceField]);
+          }
+        });
+      }
+
+      // Reset customerFilter if the current dropdown is 'customerCode'
+      if (dropdownState.currentDropdown === 'customerCode') {
+        if (row.customerHasBillingContacts && row.customerHasBillingContacts.length > 0) {
+          var defaultCheck = row.customerHasBillingContacts?.find(row => row.default == "1");
+        }
+
+        defaultCheck ? form.setValue("attention", defaultCheck.UUID) : form.setValue("attention", "")
+        defaultCheck ? form.setValue("attentionName", defaultCheck.contact) : form.setValue("attentionName", "");
+        defaultCheck ? form.setValue("phoneNo", defaultCheck.phoneNo) : form.setValue("phoneNo", "");
+        defaultCheck ? form.setValue("email", defaultCheck.email) : form.setValue("email", "");
+
+        //Shipper
+        form.setValue("shipperName", row.customerName);
+        form.setValue("shipperTIN", row.TIN);
+        form.setValue("shipperBRN", row.BRN);
+        form.setValue("shipperSSTNo", row.SSTNo);
+        form.setValue("shipperAddress", row.address);
+        form.setValue("shipperTTXNo", row.TTXNo);
+
+        setCustomerFilter("");
+      }
+
+      // Reset attentionFilter if the current dropdown is 'attention'
+      if (dropdownState.currentDropdown === 'attention') {
+        setAttentionFilter("");
+      }
+    }
+
+    setDropdownState(prev => ({ ...prev, showTable: false }));
+  };
+
+  // Function for Adding a New Contact
+  const [showAddAttentionDialog, setShowAddAttentionDialog] = useState(false);
+  const [billingContactFiles, setBillingContactFiles] = useState<File[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [tINFilter, setTINFilter] = useState("");
+
+
+  const contactForm = useForm<ContactFormData>({
+    resolver: zodResolver(contactFormSchema),
+    defaultValues: {
+      contact: "",
+      phoneNo: "",
+      email: "",
+      description: "",
+    },
+  });
+
+  const handleAddContact = async () => {
+    const isValid = await contactForm.trigger();
+    if (!isValid) return;
+
+    const data = contactForm.getValues();
+    const customerId = form.getValues("customerCode");
+    const formData = new FormData();
+
+    // Append contact data
+    formData.append("customerHasBillingContact[contact]", data.contact);
+    formData.append("customerHasBillingContact[phoneNo]", data.phoneNo);
+    formData.append("customerHasBillingContact[email]", data.email);
+    formData.append("customerHasBillingContact[description]", data.description || "");
+
+    // Append files
+    for (let i = 0; i < billingContactFiles.length; i++) {
+      const file = billingContactFiles[i];
+
+      if (file.size) {
+        try {
+          const base64 = await getFileToBase64(file);
+
+          formData.append(`customerHasBillingContact[attachment][${i}][Name]`, file.name);
+          formData.append(`customerHasBillingContact[attachment][${i}][File]`, base64);
+        } catch (error) {
+          console.error("Error converting file to base64:", error);
+
+          toast({
+            title: "Error",
+            description: "Failed to process file attachment",
+            variant: "destructive",
+          });
+
+          return;
+        }
+      } else {
+        formData.append(`customerHasBillingContact[attachment][${i}][Name]`, file.name);
+        formData.append(`customerHasBillingContact[attachment][${i}][File]`, "");
+      }
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `${ORIGIN}/customer/api/customer/update-customer-has-billing-contact-data?id=${customerId}`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to add new contact");
+      }
+
+      await fetchDropdownData('attention');
+
+      contactForm.reset();
+
+      setBillingContactFiles([]);
+      setShowAddAttentionDialog(false);
+
+      toast({
+        title: "Success",
+        description: "Contact added successfully",
+      });
+    } catch (error) {
+      console.error("Error adding new contact:", error);
+
+      toast({
+        title: "Error",
+        description: "Failed to add new contact",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  //Active Tab
+  const [activeTabIndex, setActiveTabIndex] = useState(0);
+
+  return (
+    <>
+      <Card className={cn("w-full shadow-sm", isMobile ? "h-auto" : isExpand ? "h-[533px]" : "h-[245px]")}>
+        <CardContent className="px-1.5 py-1">
+          <Form {...form}>
+            <form>
+              <Tabs
+                className="flex w-full flex-col"
+                onSelect={(index) => {
+                  setActiveTabIndex(index);
+                  if (index === 2 || index === 3) {
+                    setIsExpand(true);
+                  } else {
+                    setIsExpand(false);
+                  }
+                }}
+              >
+                <TabList className="flex">
+                  {["Customer", "Shipper", "Note", "More"].map((label) => (
+                    <Tab
+                      key={label}
+                      className="cursor-pointer rounded-tl-md rounded-tr-md border-[1px] border-gray-200 bg-transparent px-2 py-1 text-[12px] text-black outline-none transition-all duration-300 ease-in-out"
+                      selectedClassName="!bg-blue-300 border-blue-300 text-white"
+                    >
+                      {label}
+                    </Tab>
+                  ))}
+                </TabList>
+
+                {/* Tab Customer Details */}
+                <TabPanel
+                  forceRender
+                  className="hidden"
+                  selectedClassName="react-tabs__tab-panel--selected"
+                >
+                  {/* First Row */}
+                  <div className="mt-1.5 grid grid-cols-3 items-center gap-x-2">
+                    <FormField
+                      control={form.control}
+                      name="customerCode"
+                      render={({ field }) => (
+                        <FormItem className="hidden">
+                          <FormLabel>Customer UUID:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Customer Code */}
+                    <FormField
+                      control={form.control}
+                      name="customerCodeCode"
+                      render={({ field }) => (
+                        <FormItem className="col-span-1 flex flex-col space-y-1">
+                          <FormControl className="relative">
+                            <div>
+                              <TooltipProvider delayDuration={1000}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Input
+                                      className={cn(
+                                        "h-7 rounded-md px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out",
+                                        form.formState.errors.customerCodeCode &&
+                                        "border-red-500 placeholder:text-red-500 focus-visible:ring-red-500",
+                                      )}
+                                      {...field}
+                                      onClick={() => fetchDropdownData('customerCode')}
+                                      onChange={(e) => {
+                                        field.onChange(e);
+                                        setCustomerFilter(e.target.value);
+                                      }}
+                                      ref={dropdownState.currentDropdown === 'customerCode' ? dropdownInputRef : null}
+                                      autoComplete="off"
+                                      placeholder={
+                                        form.formState.errors.customerCodeCode
+                                          ? "Required"
+                                          : "Customer Code"
+                                      }
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" align="start">
+                                    Customer Code
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                <FaMagnifyingGlass className="size-3 text-gray-400" />
+                              </div>
+                              {dropdownState.showTable && dropdownState.currentDropdown === 'customerCode' && (
+                                <div ref={dropdownTableRef} className="dropdown-table-class absolute top-full bg-white border border-gray-200 rounded shadow-md z-50">
+                                  <div className="h-[50vh] max-h-[400px]">
+                                    <ScrollArea className="h-full bg-erp-gray-3">
+                                      <DropdownTable
+                                        columns={dropdownConfigs.customerCode.columns}
+                                        data={dropdownState.data}
+                                        onClickRow={onClickRow}
+                                        filterValue={customerFilter}
+                                        filterColumn="customerName"
+                                      />
+                                      <ScrollBar orientation="vertical" />
+                                    </ScrollArea>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Customer Name */}
+                    <FormField
+                      control={form.control}
+                      name="customerName"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2 flex flex-col space-y-1">
+                          <FormControl>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Input
+                                    className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    {...field}
+                                    placeholder="Customer Name"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="start">
+                                  Customer Name
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Second Row */}
+                  <div className="mt-1.5 grid grid-cols-3 items-center gap-x-2">
+                    {/* BRN */}
+                    <FormField
+                      control={form.control}
+                      name="BRN"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormControl>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Input
+                                    className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    {...field}
+                                    placeholder="BRN"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="start">BRN</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* TIN */}
+                    <FormField
+                      control={form.control}
+                      name="TIN"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormControl>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Input
+                                    className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    {...field}
+                                    placeholder="TIN"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="start">TIN</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* TTX No */}
+                    <FormField
+                      control={form.control}
+                      name="TTXNo"
+                      render={({ field }) => (
+                        <FormItem className="hidden">
+                          <FormControl>
+                            <Input className="h-7.5" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* SST No */}
+                    <FormField
+                      control={form.control}
+                      name="SSTNo"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormControl>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Input
+                                    className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    {...field}
+                                    placeholder="SST No"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="start">SST No</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Tab Section */}
+                  <Tabs className="mt-2 flex flex-col">
+                    <TabList className="flex">
+                      {["Billing Details"].map((label) => (
+                        <Tab
+                          key={label}
+                          className="cursor-pointer rounded-tl-md rounded-tr-md border-[1px] border-gray-200 bg-transparent px-2 py-1 text-[12px] text-black text-black outline-none transition-all duration-300 ease-in-out"
+                          selectedClassName="!bg-blue-300 border-blue-300 text-white"
+                        >
+                          {label}
+                        </Tab>
+                      ))}
+                    </TabList>
+
+                    {/* Tab Billing Address */}
+                    <TabPanel
+                      forceRender
+                      className="hidden"
+                      selectedClassName="react-tabs__tab-panel--selected"
+                    >
+                      <div className="flex items-center justify-center gap-x-2.5 pt-1.5">
+                        <div className="flex-1">
+                          <FormField
+                            control={form.control}
+                            name="address"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col">
+                                <FormControl>
+                                  <Textarea
+                                    className="h-[95px] resize-none text-[11px] px-2 outline-none transition-all duration-300 ease-in-out"
+                                    {...field}
+                                    moduleName="salesPurchaseContra"
+                                    fieldName="address"
+                                    columnName="Address"
+                                    placeholder="Billing Address"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="flex flex-1 flex-col gap-y-1.5">
+                          {/* Attention Name */}
+                          <FormField
+                            control={form.control}
+                            name="attentionName"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col space-y-1">
+                                <FormControl className="relative">
+                                  <div>
+                                    <TooltipProvider delayDuration={1000}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Input
+                                            className="h-7 rounded-md px-2 pr-9 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                            {...field}
+                                            onClick={() => fetchDropdownData('attention')}
+                                            onChange={(e) => {
+                                              field.onChange(e);
+                                              setAttentionFilter(e.target.value);
+                                            }}
+                                            ref={dropdownState.currentDropdown === 'attention' ? dropdownInputRef : null}
+                                            autoComplete="off"
+                                            placeholder="Attention"
+                                          />
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" align="start">
+                                          Attention
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                      <FaMagnifyingGlass className="size-3 text-gray-400" />
+                                    </div>
+                                    {dropdownState.showTable && dropdownState.currentDropdown === 'attention' && (
+                                      <div ref={dropdownTableRef} className="dropdown-table-class absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 right-0">
+                                        <div className="h-[50vh] max-h-[400px]">
+                                          <ScrollArea className="h-full bg-erp-gray-3">
+                                            <DropdownTable
+                                              columns={dropdownConfigs.attention.columns}
+                                              data={dropdownState.data}
+                                              onClickRow={onClickRow}
+                                              filterValue={attentionFilter}
+                                              filterColumn="contact"
+                                            />
+                                            <ScrollBar orientation="vertical" />
+                                          </ScrollArea>
+                                          <div className="flex items-center justify-end border-t p-2 bg-white">
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => {
+                                                setDropdownState(prev => ({ ...prev, showTable: false }))
+                                                setShowAddAttentionDialog(true);
+                                              }}
+                                            >
+                                              +
+                                              Add
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Attention UUID */}
+                          <FormField
+                            control={form.control}
+                            name="attention"
+                            render={({ field }) => (
+                              <FormItem className="hidden">
+                                <FormLabel>Attention UUID:</FormLabel>
+                                <FormControl>
+                                  <Input className="h-7.5" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Phone No */}
+                          <FormField
+                            control={form.control}
+                            name="phoneNo"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col space-y-1">
+                                <FormControl>
+                                  <TooltipProvider delayDuration={1000}>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Input
+                                          className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                          {...field}
+                                          placeholder="Phone No"
+                                        />
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" align="start">
+                                        Phone No
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Email */}
+                          <FormField
+                            control={form.control}
+                            name="email"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col space-y-1">
+                                <FormControl>
+                                  <TooltipProvider delayDuration={1000}>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Input
+                                          className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                          {...field}
+                                          moduleName="salesPurchaseContra"
+                                          fieldName="email"
+                                          columnName="Email"
+                                          placeholder="Email"
+                                        />
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" align="start">
+                                        Email
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </TabPanel>
+                  </Tabs>
+                </TabPanel>
+
+                {/* Shipper Details */}
+                <TabPanel
+                  forceRender
+                  className="hidden"
+                  selectedClassName="react-tabs__tab-panel--selected"
+                >
+                  <ShipperDetailsForm form={form} />
+                </TabPanel>
+
+                {/* Notes */}
+                <TabPanel
+                  forceRender
+                  className="hidden"
+                  selectedClassName="react-tabs__tab-panel--selected"
+                >
+                  <Tabs className="h-[500px] pt-1.5 flex">
+                    {/* Left - Editor */}
+                    <div className="min-w-0 flex-1">
+
+                      {/* Note 1 */}
+                      <TabPanel
+                        forceRender
+                        className="hidden"
+                        selectedClassName="react-tabs__tab-panel--selected"
+                      >
+                        <FormField
+                          control={form.control}
+                          name="note"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <TextEditorInline
+                                  value={field.value || ""}
+                                  onChange={(val) => field.onChange(val)}
+                                  className="h-[335px]"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </TabPanel>
+
+                      {/* Note 2 */}
+                      <TabPanel
+                        forceRender
+                        className="hidden"
+                        selectedClassName="react-tabs__tab-panel--selected"
+                      >
+                        <FormField
+                          control={form.control}
+                          name="note2"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <TextEditorInline
+                                  value={field.value || ""}
+                                  onChange={(val) => field.onChange(val)}
+                                  className="h-[335px]"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </TabPanel>
+
+                      {/* Note 3 */}
+                      <TabPanel
+                        forceRender
+                        className="hidden"
+                        selectedClassName="react-tabs__tab-panel--selected"
+                      >
+                        <FormField
+                          control={form.control}
+                          name="note3"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <TextEditorInline
+                                  value={field.value || ""}
+                                  onChange={(val) => field.onChange(val)}
+                                  className="h-[335px]"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </TabPanel>
+
+                      {/* Note 4 */}
+                      <TabPanel
+                        forceRender
+                        className="hidden"
+                        selectedClassName="react-tabs__tab-panel--selected"
+                      >
+                        <FormField
+                          control={form.control}
+                          name="note4"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <TextEditorInline
+                                  value={field.value || ""}
+                                  onChange={(val) => field.onChange(val)}
+                                  className="h-[335px]"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </TabPanel>
+
+                      {/* Note 5 */}
+                      <TabPanel
+                        forceRender
+                        className="hidden"
+                        selectedClassName="react-tabs__tab-panel--selected"
+                      >
+                        <FormField
+                          control={form.control}
+                          name="note5"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <TextEditorInline
+                                  value={field.value || ""}
+                                  onChange={(val) => field.onChange(val)}
+                                  className="h-[335px]"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </TabPanel>
+
+                      {/* Note 6 */}
+                      <TabPanel
+                        forceRender
+                        className="hidden"
+                        selectedClassName="react-tabs__tab-panel--selected"
+                      >
+                        <FormField
+                          control={form.control}
+                          name="note6"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <TextEditorInline
+                                  value={field.value || ""}
+                                  onChange={(val) => field.onChange(val)}
+                                  className="h-[335px]"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </TabPanel>
+
+                      {/* Note 7 */}
+                      <TabPanel
+                        forceRender
+                        className="hidden"
+                        selectedClassName="react-tabs__tab-panel--selected"
+                      >
+                        <FormField
+                          control={form.control}
+                          name="note7"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <TextEditorInline
+                                  value={field.value || ""}
+                                  onChange={(val) => field.onChange(val)}
+                                  className="h-[335px]"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </TabPanel>
+
+                      {/* Note 8 */}
+                      <TabPanel
+                        forceRender
+                        className="hidden"
+                        selectedClassName="react-tabs__tab-panel--selected"
+                      >
+                        <FormField
+                          control={form.control}
+                          name="note8"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <TextEditorInline
+                                  value={field.value || ""}
+                                  onChange={(val) => field.onChange(val)}
+                                  className="h-[335px]"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </TabPanel>
+                    </div>
+
+                    {/* Right - Vertical TabList*/}
+                    <TabList className="ml-1 flex flex-col gap-y-1">
+                      {[
+                        {
+                          label: "Note",
+                          icon: <FaRegNoteSticky className="size-3.5" />,
+                        },
+                        {
+                          label: "Note 2",
+                          icon: <FaRegNoteSticky className="size-3.5" />,
+                        },
+                        {
+                          label: "Note 3",
+                          icon: <FaRegNoteSticky className="size-3.5" />,
+                        },
+                        {
+                          label: "Note 4",
+                          icon: <FaRegNoteSticky className="size-3.5" />,
+                        },
+                        {
+                          label: "Note 5",
+                          icon: <FaRegNoteSticky className="size-3.5" />,
+                        },
+                        {
+                          label: "Note 6",
+                          icon: <FaRegNoteSticky className="size-3.5" />,
+                        },
+                        {
+                          label: "Note 7",
+                          icon: <FaRegNoteSticky className="size-3.5" />,
+                        },
+                        {
+                          label: "Note 8",
+                          icon: <FaRegNoteSticky className="size-3.5" />,
+                        },
+                      ].map((item, index) => (
+                        <Tab
+                          key={index}
+                          className="flex h-11 w-12 cursor-pointer flex-col items-center justify-center gap-y-0.5 rounded-md border border-gray-200 bg-white text-[9px] text-gray-600 outline-none transition-all duration-200 ease-in-out"
+                          selectedClassName="!bg-blue-300 border-blue-300 text-white"
+                        >
+                          {item.icon}
+                          <span>{item.label}</span>
+                        </Tab>
+                      ))}
+                    </TabList>
+                  </Tabs>
+                </TabPanel>
+
+                {/* More Fields */}
+                <TabPanel
+                  forceRender
+                  className="hidden"
+                  selectedClassName="react-tabs__tab-panel--selected"
+                >
+                  <ScrollArea className="h-[495px]">
+                    <DisplayCustomField
+                      ref={customFieldRef}
+                      form={form}
+                      module="sales"
+                      isActive={activeTabIndex === 2}
+                      docUUID={id ?? ""}
+                      docType="salesPurchaseContra"
+                      docNo={docNo ?? ""}
+                      fieldDefs={customFieldDefs}
+                      savedFieldData={customFieldSavedData}
+                      submitAttempted={submitAttempted}
+                    />
+                    <ScrollBar orientation="vertical" />
+                  </ScrollArea>
+                </TabPanel>
+              </Tabs>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <Dialog open={showAddAttentionDialog} onOpenChange={setShowAddAttentionDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Contact</DialogTitle>
+          </DialogHeader>
+          <FormProvider {...contactForm}>
+            <form>
+              <div className="space-y-4">
+                <FormField
+                  control={contactForm.control}
+                  name="contact"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Name:</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Contact Name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={contactForm.control}
+                  name="phoneNo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone No.:</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Phone No." />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={contactForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email:</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={contactForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description:</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Description" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowAddAttentionDialog(false)}
+                    disabled={isLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="button" onClick={handleAddContact} disabled={isLoading}>
+                    {isLoading ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </FormProvider>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

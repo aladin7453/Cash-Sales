@@ -1,0 +1,36 @@
+import type { TransferFromConfig } from "@/components/features/transfer/transferFrom";
+import { salesCreditNoteDocumentColumns } from "./documentColumns";
+import { salesCreditNoteItemColumns } from "./itemColumns";
+
+export const salesCreditNoteTransferFromConfig: TransferFromConfig = {
+  module: "sales_credit_note",
+  model: "sales-credit-note",
+  apiNamespace: "sales",
+  sources: [
+    {
+      key: "salesInvoice",
+      label: "Sales Invoice",
+      apiDocType: "salesInvoice",
+      transferDocType: "salesInvoice",
+    },
+    {
+      key: "cashSales",
+      label: "Cash Sales",
+      apiDocType: "cashSales",
+      transferDocType: "cashSales",
+    },
+    {
+      key: "salesDebitNote",
+      label: "Sales Debit Note",
+      apiDocType: "salesDebitNote",
+      transferDocType: "salesDebitNote",
+    },
+  ],
+  documentColumns: salesCreditNoteDocumentColumns,
+  itemColumns: salesCreditNoteItemColumns,
+  transferEndpointSuffix: "transfer-from",
+  buttonText: "T-From",
+  dialogTitle: "Transfer from",
+  documentPopoverTitle: "Select Document",
+  detailsPopoverTitle: "Transfer Details",
+};

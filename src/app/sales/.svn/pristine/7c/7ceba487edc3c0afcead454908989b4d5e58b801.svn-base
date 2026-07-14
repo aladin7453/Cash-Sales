@@ -1,0 +1,241 @@
+"use client";
+
+//Import
+import { useRouter, useSearchParams } from "next/navigation";
+import React, { useEffect } from "react";
+
+//Action Button
+import TransferButton from "@/components/features/transfer/TransferButton";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import CloneButton from "@/components/form/ActionButton/Clone";
+import DeleteButton from "@/components/form/ActionButton/Delete";
+import LayoutToggleButton from "@/components/form/ActionButton/LayoutToggleButton";
+import NewButton from "@/components/form/ActionButton/New";
+import PreviewButton from "@/components/form/ActionButton/Preview";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+
+// Mobile View (Imports)
+import MobileFormActionGroup from "@/components/form/MobileFormActionGroup";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+import { quotationTransferToConfig } from "../transfer/transferTo/config";
+import { ApprovalStatusIcon } from "./ApprovalStatusIcon";
+import { useDateRestriction } from "@/components/custom/DateRestrictionContext";
+
+import type { Table } from "@tanstack/react-table";
+import type { Quotation } from "../columns";
+
+type TopActionBarProps = {
+  quotation?: Quotation | null;
+  approvalStatus?: Quotation | null;
+  tempRowQuotationDetailsList: () => void;
+  form: Form;
+  handleSubmit: any;
+  revalidateQuotation: () => void;
+  revalidateQuotationDetails: () => void;
+  slug: string;
+  isLoading?: boolean;
+  table: Table<any> | null;
+  action: string;
+  quotationData?: any;
+  layout: "new" | "old";
+  onLayoutChange: (layout: "new" | "old") => void;
+};
+
+export default function TopActionBar({
+  quotation,
+  approvalStatus,
+  form,
+  handleSubmit,
+  revalidateQuotation,
+  revalidateQuotationDetails,
+  slug,
+  action,
+  quotationData,
+  layout,
+  onLayoutChange,
+}: TopActionBarProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  useEffect(() => {
+    form.reset(quotation || {});
+  }, [quotation, form]);
+
+  const handleReset = () => {
+    form.reset(quotation || {});
+  };
+
+  const { allowPastRecord, setAllowPastRecord } = useDateRestriction();
+  // Change layout button condition (HardCode)
+  const systemAccount = JSON.parse(localStorage.getItem("system-account") || "{}");
+  const canChangeLayout = ["infollective", "infollectivetesting", "dev", "mymug", "vminimarket", "tridentmed"].includes(systemAccount);
+
+  return (
+    <div className="flex h-full w-full items-center justify-between bg-erp-gray-3 py-2">
+      <div className="flex flex-1 space-x-3">
+        {/* Mobile View (Action Buttons) */}
+        <MobileFormActionGroup
+          config={{
+            onSave: handleSubmit,
+            onReset: handleReset,
+            onCancel: () => router.push(`/sales/quotation/`),
+            newDestination: "/sales/quotation/new",
+            cloneDestination: `/sales/quotation/clone?id=${id}`,
+            deleteConfig:
+              id && action !== "clone"
+                ? {
+                  module: "quotation",
+                  model: "quotation",
+                  id: `${id}`,
+                  indexPath: `/sales/quotation/`,
+                }
+                : undefined,
+            showNew: !!(id && action !== "clone"),
+            showClone: !!(id && action !== "clone"),
+            showDelete: !!(id && action !== "clone"),
+          }}
+        >
+          {quotation && id && action !== "clone" && (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <PreviewButton
+                previewType={"QUOTATION"}
+                module={"quotation"}
+                model={"quotation"}
+                doc_id={quotation.UUID}
+                data={quotationData}
+              />
+            </DropdownMenuItem>
+          )}
+          {slug === "edit" && id && action !== "clone" ? (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <TransferButton
+                transferToProps={{
+                  id: id,
+                  config: quotationTransferToConfig,
+                }}
+                showTransferFrom={false}
+              />
+            </DropdownMenuItem>
+          ) : (
+            ""
+          )}
+        </MobileFormActionGroup>
+
+        {/* Web View (Action Buttons) */}
+        <div className="hidden space-x-3 md:flex">
+          <SaveButton onClick={handleSubmit} />
+
+          {id && action !== "clone" && <NewButton destination="/sales/quotation/new" />}
+
+          {id && action !== "clone" && (
+            <CloneButton id={id} destination={`/sales/quotation/clone?id=${id}`} />
+          )}
+
+          <ResetButton onClick={handleReset} />
+
+          {id && action !== "clone" && (
+            <DeleteButton
+              id={id}
+              module="quotation"
+              model="quotation"
+              indexPath="/sales/quotation/"
+            />
+          )}
+
+          {quotation && id && action !== "clone" && (
+            <PreviewButton
+              previewType={"QUOTATION"}
+              module={"quotation"}
+              model={"quotation"}
+              doc_id={quotation.UUID}
+              data={quotationData}
+            />
+          )}
+
+          {slug === "edit" && id && action !== "clone" ? (
+            <TransferButton
+              transferToProps={{
+                id: id,
+                config: quotationTransferToConfig,
+              }}
+              showTransferFrom={false}
+            />
+          ) : (
+            ""
+          )}
+
+          <CancelButton onClick={() => router.push(`/sales/quotation`)} />
+
+          {canChangeLayout && <LayoutToggleButton layout={layout} onChange={onLayoutChange} />}
+        </div>
+      </div>
+
+      <Form id="topActionBarForm" {...form}>
+        <div className="flex items-center gap-x-4 px-3">
+
+          {/* Valid checkbox */}
+          <FormField
+            control={form.control}
+            name="valid"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-x-2 space-y-0">
+                {approvalStatus?.approvalStatus &&
+                  (approvalStatus.approvalStatus === "Rejected" ? (
+                    <TooltipProvider delayDuration={0}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <ApprovalStatusIcon status={approvalStatus.approvalStatus} />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p>{approvalStatus.rejectReason || "No reason provided"}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    <ApprovalStatusIcon status={approvalStatus.approvalStatus} />
+                  ))}
+
+                <FormControl>
+                  <Checkbox
+                    checked={field.value === "1"}
+                    onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                  />
+                </FormControl>
+                <FormLabel>Valid</FormLabel>
+              </FormItem>
+            )}
+          />
+
+          {/* Past Record checkbox */}
+          <FormField
+            control={form.control}
+            name="allowPastDates"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-x-2 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value === "1"}
+                    onCheckedChange={(state) => {
+                      field.onChange(state ? "1" : "0");
+                      setAllowPastRecord(state === true);
+                    }}
+                  />
+                </FormControl>
+                <FormLabel className="cursor-pointer">Past Record</FormLabel>
+              </FormItem>
+            )}
+          />
+
+        </div>
+      </Form>
+    </div>
+  );
+}

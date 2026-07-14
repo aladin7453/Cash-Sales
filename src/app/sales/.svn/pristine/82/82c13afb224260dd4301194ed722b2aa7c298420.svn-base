@@ -1,0 +1,323 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+import { CalendarIcon } from "lucide-react";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { notFound, useSearchParams, useRouter } from "next/navigation";
+
+import moment from 'moment';
+
+import { DATE_FORMAT, ORIGIN, getAuthHeaders } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+import { useVerify } from "@/lib/hooks/useVerify";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+type Params = {
+  form: any;
+  slug?: string;
+};
+
+export function DocumentDetailsForm({ form, slug }: Params) {
+  const { verifyField } = useVerify(form, "/consolidated_invoice/api/consolidated-invoice/verify", "consolidatedInvoice", form.watch("UUID"));
+
+  const headers = getAuthHeaders();
+
+  const handleClickOutside = (event) => {  
+    if (agentDropdownRef.current && !agentDropdownRef.current.contains(event.target) && agentInputRef.current !== event.target) {
+      setShowAgentTable(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener('click', handleClickOutside);
+    
+    return () => {
+      document.body.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  const [agentDropdownData, setAgentDropdownData] = useState<[]>([]);
+  const [showAgentTable, setShowAgentTable] = useState(false)
+  
+  const dropdownAgentColumns = [ 
+    { accessorKey: "fullName", header: "Full Name", }, 
+    { accessorKey: "description", header: "Description", }, 
+  ];
+
+  const agentInputRef = useRef(null);
+  const agentDropdownRef = useRef(null);
+  
+  const onClickRowAgent = (row) => {
+    form.setValue("agentName", row.fullName)
+    form.setValue("agent", row.UUID)
+    setShowAgentTable(false)
+  }
+  
+  const fetchDropdownData = async (table:string) => {
+    try {
+      var form_data = new FormData()
+      form_data.append(`table[0]`, table)
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch dropdown data');
+      }
+      const data = await response.json();
+      if (table == "user"){
+        setAgentDropdownData(data.rows)
+        setShowAgentTable(true)
+      } 
+    } catch (error) {
+      console.error('Error fetching dropdown data:', error);
+      throw new Error('Failed to fetch dropdown data');
+    }
+  };
+
+  // Clear value in clone page
+  useEffect(() => {
+    if (slug === "clone") {
+      form.setValue("docNo", "");
+    }
+  }, [slug, form]);
+
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Document Details</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form>
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4">
+              <FormField
+                control={form.control}
+                name="docNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Doc. No.:</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <TooltipProvider>
+                          <Tooltip delayDuration={0}>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className={`h-7.5 pr-7 ${slug === "edit" && "bg-erp-gray-1 text-gray-500"}`}
+                                {...field}
+                                moduleName="consolidatedInvoice"
+                                fieldName="docNo"
+                                columnName="Doc. No."
+                                onBlur={() => {
+                                  if (field.value && field.value.trim()) {
+                                    verifyField("docNo", field.value);
+                                  }
+                                }}
+                                readOnly={slug === "edit" ? true : false}
+                              />
+                            </TooltipTrigger>
+                            {slug === "edit" && (
+                              <TooltipContent>
+                                <p>This field is disabled in edit page.</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="docDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Doc. Date:</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            className={cn(
+                              "flex h-7.5 w-full",
+                              !field.value && "text-muted-foreground",
+                            )}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {field.value
+                              ? moment.unix(field.value).format(DATE_FORMAT)
+                              : moment().format(DATE_FORMAT)}
+                            <CalendarIcon className="ml-auto h-4 w-4" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? moment.unix(field.value).format(DATE_FORMAT) : undefined}
+                          onSelect={(date) => {
+                            const unixTimestamp = date ? Math.floor(date.getTime() / 1000) : null;
+                            field.onChange(unixTimestamp.toString());
+                          }}
+                          initialFocus
+                          defaultMonth={field.value ? moment.unix(field.value).format(DATE_FORMAT) : undefined}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="agent"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 hidden">
+                    <FormLabel>Agent UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="agentName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Agent:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative h-7.5">
+                        <Input 
+                          className="h-7.5 pr-8" 
+                          {...field} 
+                          readOnly 
+                          onClick={() => {fetchDropdownData("user")}} 
+                          ref={agentInputRef} 
+                          autoComplete="off" 
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {showAgentTable && (
+                          <div 
+                            ref={agentDropdownRef} 
+                            className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                          >
+                            <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownAgentColumns}
+                                data={agentDropdownData}
+                                onClickRow={onClickRowAgent}
+                              />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="consolidateDocType"
+                defaultValue={"salesInvoice"}
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Doc Type:</FormLabel>
+                    <FormControl>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}>
+                        <SelectTrigger className="h-7.5 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="salesInvoice">Sales Invoice</SelectItem>
+                          <SelectItem value="salesCreditNote">Sales Credit Note</SelectItem>
+                          <SelectItem value="salesDebitNote">Sales Debit Note</SelectItem>
+                          <SelectItem value="cashSales">Cash Sales</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4 mt-4">
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Description:</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        className="h-7" 
+                        {...field} 
+                        moduleName="consolidatedInvoice" 
+                        fieldName="description" 
+                        columnName="Description" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

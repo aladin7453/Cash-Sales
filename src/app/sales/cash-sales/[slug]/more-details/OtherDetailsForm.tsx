@@ -1,0 +1,784 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+
+//Icons
+import { FaMagnifyingGlass } from "react-icons/fa6";
+import { FaAddressCard, FaBoxes } from "react-icons/fa";
+import { HiOutlineClipboardDocumentList } from "react-icons/hi2";
+import { IoDocumentOutline } from "react-icons/io5";
+import { CalendarIcon } from "lucide-react";
+
+import moment from 'moment';
+import { ImportExportOfGoodsForm } from "../e-invoice-details/import-&-export-of-goods/Import&ExportOfGoodsDetailsForm";
+import { PaymentDetailsForm } from "../e-invoice-details/payment-details/PaymentDetailsForm";
+
+import { cn } from "@/lib/utils/cn";
+import { DATE_FORMAT, ORIGIN, getAuthHeaders } from "@/lib/constants";
+import { Textarea } from "@/components/ui/textarea";
+import { Tab, TabList, TabPanel, Tabs } from "react-tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { Input, NumberInputField } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { DropdownData } from "@/components/data-table/GetAllDropdown";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+import Link from 'next/link'
+
+function stripHtml(html) {
+  if (!html) return "";
+  let text = html.replace(/<br\s*\/?>/gi, '\n');
+  text = text.replace(/<p[^>]*>/gi, '').replace(/<\/p>/gi, '\n');
+  text = text.replace(/<[^>]+>/g, '');
+  text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+  return text;
+}
+
+type Params = {
+  tempRowAttachments: any;
+  setTempRowAttachments: ([]) => void;
+  form: any;
+  slug?: string;
+  isPaid?: boolean;
+  preferenceData?: any;
+  onCurrencyChange?: (currencyUUID: string) => void;
+  setIsPaidAmountManuallyUpdated: (updated: boolean) => void;
+  verifyVoucher: any;
+  isMobile?: boolean;
+  allDropdowns: DropdownData;
+};
+
+export function OtherDetailsForm({
+  form,
+  tempRowAttachments,
+  setTempRowAttachments,
+  slug,
+  isPaid,
+  preferenceData,
+  onCurrencyChange,
+  setIsPaidAmountManuallyUpdated,
+  verifyVoucher,
+  isMobile,
+  allDropdowns
+}: Params) {
+  const headers = getAuthHeaders();
+  const inputRef = useRef(null);
+
+  const decimal = preferenceData?.data?.decimal || 2;
+
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  //  Currency Dropdown 
+  const [currencyDropdownData, setCurrencyDropdownData] = useState<any[]>([]);
+  const [showCurrencyTable, setShowCurrencyTable] = useState(false);
+  const [currencyFilter, setCurrencyFilter] = useState("");
+  const currencyInputRef = useRef(null);
+  const currencyDropdownRef = useRef(null);
+
+  const dropdownCurrencyColumns = [
+    { accessorKey: "currencyCode", header: "Currency Code" },
+    { accessorKey: "description", header: "Description" },
+  ];
+
+  //  Project Dropdown 
+  const [projectDropdownData, setProjectDropdownData] = useState<any[]>([]);
+  const [showProjectTable, setShowProjectTable] = useState(false);
+  const [projectFilter, setProjectFilter] = useState("");
+  const projectInputRef = useRef(null);
+  const projectDropdownRef = useRef(null);
+
+  const dropdownProjectColumns = [
+    { accessorKey: "projectCode", header: "Project Code" },
+    { accessorKey: "description", header: "Description" },
+  ];
+
+  //  Delivery Term Dropdown 
+  const [deliveryTermDropdownData, setDeliveryTermDropdownData] = useState<any[]>([]);
+  const [showDeliveryTermTable, setShowDeliveryTermTable] = useState(false);
+  const deliveryTermInputRef = useRef(null);
+  const deliveryTermDropdownRef = useRef(null);
+
+  const dropdownDeliveryTermColumns = [
+    { accessorKey: "deliveryTermCode", header: "Delivery Term Code" },
+    { accessorKey: "description", header: "Description" },
+  ];
+
+  //  Shipper Dropdown 
+  const [shipperDropdownData, setShipperDropdownData] = useState<any[]>([]);
+  const [showShipperTable, setShowShipperTable] = useState(false);
+  const shipperInputRef = useRef(null);
+  const shipperDropdownRef = useRef(null);
+
+  const dropdownShipperColumns = [
+    { accessorKey: "shipperCode", header: "Shipper Code" },
+    { accessorKey: "description", header: "Description" },
+  ];
+
+  useEffect(() => {
+    setCurrencyDropdownData(allDropdowns.currency ?? []);
+    setProjectDropdownData(allDropdowns.project ?? []);
+    setDeliveryTermDropdownData(allDropdowns.deliveryTerm ?? []);
+    setShipperDropdownData(allDropdowns.shipper ?? []);
+  }, [allDropdowns]);
+
+  const fetchDropdownData = (table: string) => {
+    if (table === "currency") setShowCurrencyTable((prev) => !prev);
+    else if (table === "project") setShowProjectTable((prev) => !prev);
+    else if (table === "shipper") setShowShipperTable((prev) => !prev);
+    else if (table === "deliveryTerm") setShowDeliveryTermTable((prev) => !prev);
+  };
+
+  const onClickRowCurrency = (row) => {
+    form.setValue("currency", row.UUID);
+    form.setValue("currencyCode", row.currencyCode);
+    form.setValue("currencySymbol", row.currencySymbol);
+    form.setValue("currencyRate", row.exchangeRateSales);
+    if (onCurrencyChange) onCurrencyChange(row.UUID);
+    setShowCurrencyTable(false);
+    setCurrencyFilter("");
+  };
+
+  const onClickRowProject = (row) => {
+    form.setValue("project", row.UUID);
+    form.setValue("projectCode", row.projectCode);
+    setProjectFilter("");
+    setShowProjectTable(false);
+  };
+
+  const onClickRowDeliveryTerm = (row) => {
+    form.setValue("deliveryTerm", row.UUID);
+    form.setValue("deliveryTermCode", row.deliveryTermCode);
+    setShowDeliveryTermTable(false);
+  };
+
+  const onClickRowShipper = (row) => {
+    form.setValue("shipper", row.UUID);
+    form.setValue("shipperCode", row.shipperCode);
+    setShowShipperTable(false);
+  };
+
+  const setDefaultCurrency = async () => {
+    if (preferenceData?.data?.currency && !form.getValues("currency")) {
+      try {
+        var formData = new FormData;
+        formData.append("table[]", "currency");
+        formData.append("table[]", "paymentMethod");
+
+        const response = await fetch(`${ORIGIN}/universal/get-multiple-drop-down-table-data`,
+          { method: 'POST', headers, body: formData });
+
+        if (response.ok) {
+          const data = await response.json();
+
+          const defaultCurrencyData = data.find(item => item.table === "currency");
+          const defaultCurrency = defaultCurrencyData.rows?.find(row => row.UUID === preferenceData.data.currency);
+
+          const defaultPaymentMethodData = data.find(item => item.table === "paymentMethod");
+          const defaultPaymentMethod = defaultPaymentMethodData.rows?.find(row => row.UUID === preferenceData.data.customerPaymentMethod);
+
+          if (defaultPaymentMethod) {
+            form.setValue("paymentMethod", defaultPaymentMethod.UUID);
+            form.setValue("paymentMethodCode", defaultPaymentMethod.paymentMethodCode);
+          }
+          if (defaultCurrency) {
+            form.setValue("currency", defaultCurrency.UUID);
+            form.setValue("currencyCode", defaultCurrency.currencyCode);
+            form.setValue("currencySymbol", defaultCurrency.currencySymbol);
+            form.setValue("currencyRate", defaultCurrency.exchangeRateSales);
+          }
+        }
+      } catch (error) {
+        console.error('Error setting default currency:', error);
+      }
+    }
+  };
+
+  //  Delivery Address Dropdown
+  const fetchDropdownDeliveryAddress = async () => {
+    const formData = new FormData();
+    const customerUUID = form.getValues('customerCode');
+
+    if (!showTableDeliveryAddress) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/universal/get-customer-has-delivery-location-by-customer?id=${customerUUID}`,
+          { method: "POST", headers, body: formData },
+        );
+        if (!response.ok) throw new Error("Failed to fetch delivery address data");
+        const deliveryAddressData = await response.json();
+        setDeliveryAddressDropdownTableData(deliveryAddressData.rows);
+        setShowTableDeliveryAddress(true);
+      } catch (error) {
+        console.error("Error fetching delivery address data:", error);
+      }
+    } else {
+      setShowTableDeliveryAddress(false);
+    }
+  };
+
+  const [showTableDeliveryAddress, setShowTableDeliveryAddress] = useState(false);
+  const [deliveryAddressDropdownTableData, setDeliveryAddressDropdownTableData] = useState([]);
+  const deliveryAddressInputRef = useRef(null);
+  const deliveryAddressDropdownRef = useRef(null);
+
+  const dropdownDeliveryAddressColumns = [
+    { accessorKey: "deliveryLocation", header: "Delivery Location" },
+    {
+      accessorKey: "deliveryAddress", header: "Delivery Address",
+      cell: ({ row }) => {
+        const address = row.original.deliveryAddress || "";
+        return <span style={{ whiteSpace: "pre-wrap", wordWrap: "break-word" }}>{address}</span>;
+      },
+    },
+    { accessorKey: "description", header: "Remark", cell: ({ row }) => <DescriptionCellTooltip row={row} /> },
+  ];
+
+  const onClickRowDeliveryAddress = (row) => {
+    form.setValue('deliveryAddress', row.deliveryAddress);
+    setShowTableDeliveryAddress(false);
+  };
+
+  const fileInputRef = useRef(null);
+
+  const handleChooseFileClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleFileChange = (event) => {
+    const fileList = Array.from(event.target.files);
+    const mergeArray = [...tempRowAttachments, ...fileList];
+    setTempRowAttachments(mergeArray);
+  };
+
+  function handleDeleteFile(index) {
+    var newCustomInfoFiles = [...tempRowAttachments];
+    newCustomInfoFiles.splice(index, 1);
+    setTempRowAttachments(newCustomInfoFiles);
+  }
+
+  const handleClickOutside = (event) => {
+    if (currencyDropdownRef.current && !currencyDropdownRef.current.contains(event.target) && currencyInputRef.current !== event.target) {
+      setShowCurrencyTable(false);
+    }
+    if (projectDropdownRef.current && !projectDropdownRef.current.contains(event.target) && projectInputRef.current !== event.target) {
+      setShowProjectTable(false);
+    }
+    if (shipperDropdownRef.current && !shipperDropdownRef.current.contains(event.target) && shipperInputRef.current !== event.target) {
+      setShowShipperTable(false);
+    }
+    if (deliveryAddressDropdownRef.current && !deliveryAddressDropdownRef.current.contains(event.target) && deliveryAddressInputRef.current !== event.target) {
+      setShowTableDeliveryAddress(false);
+    }
+    if (deliveryTermDropdownRef.current && !deliveryTermDropdownRef.current.contains(event.target) && deliveryTermInputRef.current !== event.target) {
+      setShowDeliveryTermTable(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener('click', handleClickOutside);
+    return () => document.body.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  return (
+    <Form {...form}>
+      <form>
+        <Tabs>
+          <div className="flex">
+            {/* Left Container*/}
+            <div className="min-w-0 flex-1">
+              {/* General Details */}
+              <TabPanel forceRender className="hidden" selectedClassName="react-tabs__tab-panel--selected">
+                <div className="flex w-full items-center justify-between px-0.5 pt-1.5">
+                  <div className="text-sm font-bold">General Details</div>
+                </div>
+
+                <div className="flex flex-col gap-y-2.5 pt-1.5">
+                  {/* Currency */}
+                  <div className="grid grid-cols-2 items-center gap-x-2">
+                    <FormField control={form.control} name="currency" render={({ field }) => (
+                      <FormItem className="hidden"><FormLabel>Currency UUID:</FormLabel><FormControl><Input className="h-7.5" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="currencyCode" render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <div className="relative">
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Input
+                                    className="h-7.5 rounded-md px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    {...field}
+                                    onClick={() => fetchDropdownData("currency")}
+                                    onChange={(e) => { field.onChange(e); setCurrencyFilter(e.target.value); }}
+                                    ref={currencyInputRef}
+                                    autoComplete="off"
+                                    disabled={isPaid}
+                                    placeholder="Currency Code"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>Currency Code</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                              <FaMagnifyingGlass className="size-3 text-gray-400" />
+                            </div>
+                            {showCurrencyTable && (
+                              <div ref={currencyDropdownRef} className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md">
+                                <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+                                  <DropdownTable columns={dropdownCurrencyColumns} data={currencyDropdownData} onClickRow={onClickRowCurrency} filterValue={currencyFilter} filterColumn="currencyCode" />
+                                  <ScrollBar orientation="vertical" />
+                                </ScrollArea>
+                              </div>
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="currencyRate" render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <TooltipProvider delayDuration={1000}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <>
+                                  <NumberInputField
+                                    className="h-7.5 rounded-md px-2 text-left text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    form={form} fieldName="currencyRate" value={field.value || ""} decimalPlaces={decimal} constUpdate={true} disabled={isPaid} placeholder="Currency Rate"
+                                  />
+                                </>
+                              </TooltipTrigger>
+                              <TooltipContent>Currency Rate</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+
+                  {/* Project */}
+                  <div className="grid grid-cols-2 items-center gap-x-2">
+                    <FormField control={form.control} name="project" render={({ field }) => (
+                      <FormItem className="hidden"><FormLabel>Project UUID:</FormLabel><FormControl><Input className="h-7.5" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="projectCode" render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <div className="relative">
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Input
+                                    className="h-7.5 rounded-md px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    {...field}
+                                    onClick={() => fetchDropdownData("project")}
+                                    onChange={(e) => { field.onChange(e); setProjectFilter(e.target.value); }}
+                                    ref={projectInputRef}
+                                    autoComplete="off"
+                                    placeholder="Project"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>Project</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                              <FaMagnifyingGlass className="size-3 text-gray-400" />
+                            </div>
+                            {showProjectTable && (
+                              <div ref={projectDropdownRef} className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md">
+                                <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+                                  <DropdownTable columns={dropdownProjectColumns} data={projectDropdownData} onClickRow={onClickRowProject} filterValue={projectFilter} filterColumn="projectCode" />
+                                  <ScrollBar orientation="vertical" />
+                                </ScrollArea>
+                              </div>
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="docValidity" render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <TooltipProvider delayDuration={1000}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Input
+                                  className="h-7.5 rounded-md px-2 text-left text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                  {...field}
+                                  onChange={(e) => form.setValue("docValidity", e.target.value.replace(/[^0-9]/g, ""))}
+                                  moduleName="cashSales" fieldName="docValidity" columnName="Doc Validity Days" placeholder="Doc Validity Days"
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent>Doc Validity Days</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+
+                  {/* Shipper + Delivery Term */}
+                  <div className="grid grid-cols-2 items-center gap-x-2">
+                    <FormField control={form.control} name="shipper" render={({ field }) => (
+                      <FormItem className="hidden"><FormLabel>Shipper UUID:</FormLabel><FormControl><Input className="h-7.5" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="shipperCode" render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <div className="relative">
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Input
+                                    className="h-7.5 rounded-md px-2 pr-8 text-left text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    {...field} readOnly onClick={() => fetchDropdownData("shipper")} ref={shipperInputRef} autoComplete="off" placeholder="Shipper"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>Shipper</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                              <FaMagnifyingGlass className="size-3 text-gray-400" />
+                            </div>
+                            {showShipperTable && (
+                              <div ref={shipperDropdownRef} className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md">
+                                <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+                                  <DropdownTable columns={dropdownShipperColumns} data={shipperDropdownData} onClickRow={onClickRowShipper} />
+                                  <ScrollBar orientation="vertical" />
+                                </ScrollArea>
+                              </div>
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="deliveryTerm" render={({ field }) => (
+                      <FormItem className="hidden"><FormLabel>Delivery Term UUID:</FormLabel><FormControl><Input className="h-7.5" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="deliveryTermCode" render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <div className="relative">
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Input
+                                    className="h-7.5 rounded-md px-2 pr-8 text-left text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    {...field} readOnly onClick={() => fetchDropdownData("deliveryTerm")} ref={deliveryTermInputRef} autoComplete="off" placeholder="DeliveryTerm"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>Delivery Term</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                              <FaMagnifyingGlass className="size-3 text-gray-400" />
+                            </div>
+                            {showDeliveryTermTable && (
+                              <div ref={deliveryTermDropdownRef} className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md">
+                                <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+                                  <DropdownTable columns={dropdownDeliveryTermColumns} data={deliveryTermDropdownData} onClickRow={onClickRowDeliveryTerm} />
+                                  <ScrollBar orientation="vertical" />
+                                </ScrollArea>
+                              </div>
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+
+                  {/* Posting Date + Tax Date */}
+                  <div className="grid grid-cols-2 items-center gap-x-2">
+                    {["postingDate", "taxDate"].map((name) => (
+                      <FormField key={name} control={form.control} name={name} render={({ field }) => (
+                        <FormItem>
+                          <Popover>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        className={cn("h-7.5 w-full rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out hover:bg-background/50", !field.value && "text-muted-foreground")}
+                                        variant="outline" size="lg"
+                                      >
+                                        {field.value ? moment.unix(Number(field.value)).format(DATE_FORMAT) : name === "postingDate" ? "Posting Date" : "Tax Date"}
+                                        <CalendarIcon className="ml-auto size-3.5 text-gray-400" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent>{name === "postingDate" ? "Posting Date" : "Tax Date"}</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={field.value ? moment.unix(Number(field.value)).toDate() : undefined}
+                                onSelect={(date) => {
+                                  if (!date) { field.onChange(null); return; }
+                                  field.onChange(Math.floor(date.getTime() / 1000));
+                                }}
+                                initialFocus
+                                defaultMonth={field.value ? moment.unix(Number(field.value)).toDate() : new Date()}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    ))}
+                  </div>
+
+                  {/* Voucher */}
+                  <div className="grid grid-cols-2 items-center gap-x-2">
+                    <FormField control={form.control} name="location" render={({ field }) => (
+                      <FormItem className="hidden"><FormLabel>Location UUID:</FormLabel><FormControl><Input className="h-7.5" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="voucherCode" render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <TooltipProvider delayDuration={1000}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Input
+                                  className="h-7.5 rounded-md px-2 text-left text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                  placeholder="Voucher"
+                                  {...field}
+                                  disabled={!isOnline}
+                                  onBlur={(e) => {
+                                    if (!isOnline) return;
+                                    verifyVoucher(e.target.value);
+                                  }}
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {isOnline ? "Voucher" : "Voucher redemption requires an internet connection"}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="voucher" render={({ field }) => (
+                      <FormItem className="hidden"><FormLabel>Voucher UUID:</FormLabel><FormControl><Input className="h-7.5" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                  </div>
+                  {!isOnline && (
+                    <p className="text-[10px] text-amber-600 -mt-1">
+                      Voucher is disabled offline. Connect to the internet to apply a voucher.
+                    </p>
+                  )}
+                </div>
+              </TabPanel>
+
+              {/* Mapping Reference */}
+              <TabPanel forceRender className="hidden" selectedClassName="react-tabs__tab-panel--selected">
+                <div className="flex w-full items-center justify-between px-0.5 pt-1.5">
+                  <div className="text-sm font-bold">Mapping Reference</div>
+                </div>
+
+                <div className="flex flex-col gap-y-2.5 pt-1.5">
+                  <div className="grid grid-cols-2 items-center gap-x-2">
+                    {/* QT No */}
+                    <div className="flex flex-col space-y-1 text-nowrap">
+                      <ScrollArea className="flex h-7.5 flex-col rounded-md border border-input bg-erp-blue-4 px-2 pt-[6px] text-[11px] font-normal">
+                        {form.getValues("quotation") && form.getValues("quotationDocNo") ? (
+                          <Link href={`/sales/quotation/edit?item=${form.getValues("quotationDocNo")}&id=${form.getValues("quotation")}`} target="_blank" className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline">
+                            {form.getValues("quotationDocNo")}
+                          </Link>
+                        ) : <span className="text-muted-foreground">QT No</span>}
+                        <ScrollBar orientation="horizontal" className="h-1.5" />
+                      </ScrollArea>
+                    </div>
+                    {/* SO No */}
+                    <div className="flex flex-col space-y-1 text-nowrap">
+                      <ScrollArea className="flex h-7.5 flex-col rounded-md border border-input bg-erp-blue-4 px-2 pt-[6px] text-[11px] font-normal">
+                        {form.getValues("salesOrder") && form.getValues("salesOrderDocNo") ? (
+                          <Link href={`/sales/sales-order/edit?item=${form.getValues("salesOrderDocNo")}&id=${form.getValues("salesOrder")}`} target="_blank" className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline">
+                            {form.getValues("salesOrderDocNo")}
+                          </Link>
+                        ) : <span className="text-muted-foreground">SO No</span>}
+                        <ScrollBar orientation="horizontal" className="h-1.5" />
+                      </ScrollArea>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 items-center gap-x-2">
+                    {/* JO No */}
+                    <div className="flex flex-col space-y-1 text-nowrap">
+                      <ScrollArea className="flex h-7.5 flex-col rounded-md border border-input bg-erp-blue-4 px-2 pt-[6px] text-[11px] font-normal">
+                        {form.getValues("jobOrder") && form.getValues("jobOrderDocNo") ? (
+                          <Link href={`/job-management/job-order/edit?item=${form.getValues("jobOrderDocNo")}&id=${form.getValues("jobOrder")}`} target="_blank" className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline">
+                            {form.getValues("jobOrderDocNo")}
+                          </Link>
+                        ) : <span className="text-muted-foreground">JO No</span>}
+                        <ScrollBar orientation="horizontal" className="h-1.5" />
+                      </ScrollArea>
+                    </div>
+                    {/* DO No */}
+                    <div className="flex flex-col space-y-1 text-nowrap">
+                      <ScrollArea className="flex h-7.5 flex-col rounded-md border border-input bg-erp-blue-4 px-2 pt-[6px] text-[11px] font-normal">
+                        {form.getValues("deliveryOrder") && form.getValues("deliveryOrderDocNo") ? (
+                          <Link href={`/sales/sales-delivery-order/edit?item=${form.getValues("deliveryOrderDocNo")}&id=${form.getValues("deliveryOrder")}`} target="_blank" className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline">
+                            {form.getValues("deliveryOrderDocNo")}
+                          </Link>
+                        ) : <span className="text-muted-foreground">DO No</span>}
+                        <ScrollBar orientation="horizontal" className="h-1.5" />
+                      </ScrollArea>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 items-center gap-x-2">
+                    {/* CN No */}
+                    <FormField control={form.control} name="creditNoteTransferred" render={() => (
+                      <div className="flex flex-col space-y-1 text-nowrap">
+                        <ScrollArea className="flex h-7.5 flex-col rounded-md border border-input bg-erp-blue-4 px-2 pt-[6px] text-[11px] font-normal">
+                          {form.getValues("creditNoteTransferred")?.length > 0 ? (
+                            form.getValues("creditNoteTransferred").map((doc, index) => (
+                              <Link key={index} href={`/sales/sales-credit-note/edit?item=${doc.docNo}&id=${doc.UUID}`} target="_blank" className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline">
+                                {doc.docNo + (index < form.getValues("creditNoteTransferred").length - 1 ? ", " : "")}
+                              </Link>
+                            ))
+                          ) : <span className="text-muted-foreground">CN No</span>}
+                          <ScrollBar orientation="horizontal" className="h-1.5" />
+                        </ScrollArea>
+                      </div>
+                    )} />
+
+                    {/* OR No */}
+                    <FormField control={form.control} name="customerPaymentTransferred" render={({ field }) => (
+                      <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                        <FormControl>
+                          <ScrollArea className="flex h-7.5 flex-col rounded-md border border-input bg-erp-blue-4 px-2 pt-[6px] text-[11px] font-normal">
+                            {field.value?.docNo ? (
+                              <Link href={`/sales/customer-payment/edit?item=${field.value.docNo}&id=${field.value.customerPayment}`} target="_blank" className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline">
+                                {field.value.docNo}
+                              </Link>
+                            ) : <span className="text-muted-foreground">OR No</span>}
+                            <ScrollBar orientation="horizontal" className="h-1.5" />
+                          </ScrollArea>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+
+                  <div className="grid grid-cols-2 items-center gap-x-2">
+                    {/* Consolidated E-Invoice No */}
+                    <div className="flex flex-col space-y-1 text-nowrap">
+                      <ScrollArea className="flex h-7.5 flex-col rounded-md border border-input bg-erp-blue-4 px-2 pt-[6px] text-[11px] font-normal">
+                        {slug !== "clone" && form.getValues("consolidateTo") && form.getValues("consolidatedInvoiceDocNo") ? (
+                          <Link href={`/sales/consolidated-invoice/edit?item=${form.getValues("consolidatedInvoiceDocNo")}&id=${form.getValues("consolidateTo")}`} target="_blank" className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline">
+                            {form.getValues("consolidatedInvoiceDocNo")}
+                          </Link>
+                        ) : <span className="text-muted-foreground">Consolidated E-Invoice No</span>}
+                        <ScrollBar orientation="horizontal" className="h-1.5" />
+                      </ScrollArea>
+                    </div>
+
+                    {/* UUID */}
+                    <FormField control={form.control} name="UUID" render={({ field }) => (
+                      <FormItem className={`flex flex-col ${slug === "clone" ? "hidden" : ""}`}>
+                        <FormControl className="relative">
+                          <Input className="h-7.5 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out" {...field} readOnly={true} ref={inputRef} autoComplete="off" placeholder="UUID" title="UUID" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                </div>
+              </TabPanel>
+
+              {/* Import & Export Goods */}
+              <TabPanel forceRender className="hidden" selectedClassName="react-tabs__tab-panel--selected">
+                <div className="flex w-full items-center justify-between px-0.5 pt-1.5">
+                  <div className="text-sm font-bold">Import & Export Goods</div>
+                </div>
+                <ImportExportOfGoodsForm form={form} isMobile={isMobile} allDropdowns={allDropdowns} />
+              </TabPanel>
+
+              {/* Payment Details */}
+              <TabPanel forceRender className="hidden" selectedClassName="react-tabs__tab-panel--selected">
+                <div className="flex w-full items-center justify-between px-0.5 pt-1.5">
+                  <div className="text-sm font-bold">Payment Details</div>
+                </div>
+                <PaymentDetailsForm form={form} isPaid={isPaid} setIsPaidAmountManuallyUpdated={setIsPaidAmountManuallyUpdated} allDropdowns={allDropdowns} />
+              </TabPanel>
+            </div>
+
+            {/* Right - Vertical TabList */}
+            <TabList className="ml-1 flex flex-col gap-y-1">
+              {[
+                { icon: <IoDocumentOutline className="size-4.5" />, label: "General Details" },
+                { icon: <HiOutlineClipboardDocumentList className="size-4.5" />, label: "Mapping Reference" },
+                { icon: <FaBoxes className="size-4.5" />, label: "Import & Export Goods" },
+                { icon: <FaAddressCard className="size-4.5" />, label: "Payment Details" },
+              ].map((item, index) => (
+                <Tab
+                  key={index}
+                  className="flex h-9 w-9 cursor-pointer flex-col items-center justify-center gap-y-0.5 rounded-md border border-gray-200 bg-white text-[9px] text-gray-600 outline-none transition-all duration-200 ease-in-out"
+                  selectedClassName="!bg-blue-300 border-blue-300 text-white"
+                >
+                  <TooltipProvider delayDuration={1000}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="flex h-full w-full items-center justify-center">{item.icon}</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" align="start">{item.label}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </Tab>
+              ))}
+            </TabList>
+          </div>
+        </Tabs>
+      </form>
+    </Form>
+  );
+}

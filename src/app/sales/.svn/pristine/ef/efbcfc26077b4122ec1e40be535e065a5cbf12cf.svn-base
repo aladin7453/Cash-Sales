@@ -1,0 +1,102 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+import { NumberFormatter } from "@/components/ui/number-formatter";
+
+export type StatementOfAccountReport = {
+  UUID?: string;
+  docNo: string;
+  docDate: string;
+  docType: string;
+  credit: string;
+  debit: string;
+  outstandingAmount: string;
+  docDateFormat?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  balanceAmount?: string;
+  transaction?: string;
+};
+
+export const statementOfAccountColumns: ColumnDef<StatementOfAccountReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "docNo",
+    id: "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id: "docDateFormat",
+    header: "Doc Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "docType",
+    id: "docType",
+    header: "Doc Type",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 180,
+    cell: ({ row }) => {
+      const docType = row.original.docType;
+      const typeMapping = {
+        salesInvoice: "Sales Invoice",
+        salesCreditNote: "Sales Credit Note",
+        salesDebitNote: "Sales Debit Note",
+        customerPayment: "Customer Payment",
+      };
+      return typeMapping[docType] || docType;
+    },
+  },
+  {
+    accessorKey: "credit",
+    id: "credit",
+    header: "Credit",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => <NumberFormatter value={row.original.credit} />,
+  },
+  {
+    accessorKey: "debit",
+    id: "debit",
+    header: "Debit",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => <NumberFormatter value={row.original.debit} />,
+  },
+  {
+    accessorKey: "balanceAmount",
+    id: "balanceAmount",
+    header: "Balance",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => <NumberFormatter value={row.original.balanceAmount} />,
+  },
+];

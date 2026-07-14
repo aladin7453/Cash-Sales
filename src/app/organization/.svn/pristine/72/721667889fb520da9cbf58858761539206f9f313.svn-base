@@ -1,0 +1,16 @@
+import { getAuthHeaders ,ORIGIN} from "@/lib/constants";
+
+export default async function getData(id:string) {
+    try {
+        const response = await fetch(`${ORIGIN}/user/api/user/get-update-data?id=${id}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch data');
+        }
+        const jsonData = await response.json();
+
+       return jsonData.data
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+  }
+   

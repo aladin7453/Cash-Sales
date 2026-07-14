@@ -1,0 +1,277 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter, useSearchParams } from "next/navigation";
+import React, { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+import LoadingUI from "@/components/LoadingUI";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+
+type Props = {
+  open: boolean;
+  setOpen: (state: boolean) => void;
+  row?: any;
+  setTempRowBankAccountDetailsData: (row: any, overwrite: boolean) => void;
+  revalidateBankAccountDetailsData: any;
+  slug: string;
+};
+
+const BankAccountDetailsFormSchema = z.object({
+  UUID: z.union([z.string(), z.literal("")]),
+  name: z.string().min(1, {
+    message: "Bank Name is required.",
+  }),
+  accountName: z.string().min(1, {
+    message: "Bank A/C Name is required.",
+  }),
+  accountNo: z
+    .string()
+    .min(1, { message: "Bank A/C No is required." })
+    .regex(/^[0-9]+$/, {
+      message: "Bank A/C No must contain only digital numbers.",
+    }),
+  valid: z.union([z.string(), z.literal("")]),
+});
+
+export default function BankAccountDetailsFormPopover({
+  row = "",
+  revalidateBankAccountDetailsData,
+  setTempRowBankAccountDetailsData,
+  setOpen,
+  open,
+  slug,
+}: Props) {
+  const router = useRouter();
+  const headers = getAuthHeaders();
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const id = searchParams.get("id");
+  const data: any = row;
+  const [isSaving, setIsSaving] = useState(false);
+
+  const form = useForm<z.infer<typeof BankAccountDetailsFormSchema>>({
+    resolver: zodResolver(BankAccountDetailsFormSchema),
+    defaultValues: {
+      UUID: data.UUID || "",
+      name: data.name || "",
+      accountName: data.accountName || "",
+      accountNo: data.accountNo || "",
+      valid: data?.valid !== undefined ? data.valid : "1",
+    },
+  });
+
+  const updateBankAccountDetailsData = async (data) => {
+    try {
+      setIsSaving(true);
+      const formData = new FormData();
+
+      for (let field of Object.entries(data)) {
+        formData.append(`companyHasBankAccount[${field[0]}]`, `${field[1]}`);
+      }
+
+      const response = await fetch(
+        `${ORIGIN}/company/api/company/update-company-has-bank-account?id=${id}`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 403) {
+          toast({
+            title: errorData.message,
+            variant: "destructive",
+            duration: 2000,
+          });
+        }
+        throw new Error("Failed to fetch data");
+      }
+      const responseData = await response.json();
+      if (responseData.message) {
+        toast({
+          title: responseData.message,
+          description: "Bank account details added successfully",
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      console.error("Error updating user list data:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const onSubmit = async (values) => {
+    if (!values) return;
+
+    try {
+      setIsSaving(true);
+      const newData = { ...values };
+
+      if (id && slug === "edit") {
+        await updateBankAccountDetailsData(newData);
+
+        revalidateBankAccountDetailsData();
+      } else {
+        setTempRowBankAccountDetailsData(newData, false);
+      }
+
+      handleReset();
+      setOpen(false);
+    } catch (error) {
+      console.error("Error submitting form:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReset = () => {
+    form.reset({
+      UUID: "",
+      name: "",
+      accountName: "",
+      accountNo: "",
+      valid: "1",
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen} className="m-2">
+      <DialogContent className="max-w-6xl bg-erp-blue-3 p-2">
+        <Form {...form}>
+          <form className="space-y-2" onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="flex items-center justify-between pr-4">
+              <div className="grid auto-cols-fr grid-flow-col gap-x-1.5">
+                <SaveButton />
+                <ResetButton onClick={handleReset} />
+                <DialogClose asChild>
+                  <CancelButton />
+                </DialogClose>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="valid"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-x-1.5 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value === "1"}
+                        onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                      />
+                    </FormControl>
+                    <FormLabel>Valid</FormLabel>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="space-y-2.5 bg-white p-3 pt-2">
+              <h2 className="text-sm font-bold">Bank Account Details:</h2>
+              <div className="grid grid-flow-col-dense  grid-cols-1 items-start gap-x-8 gap-y-2.5 md:grid-cols-2 ">
+                <FormField
+                  control={form.control}
+                  name="UUID"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2 row-span-1 grid hidden h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2 flex flex-col space-y-1">
+                      <FormLabel>Bank Name:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          moduleName="companyHasBankAccount"
+                          fieldName="name"
+                          columnName="Bank Name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-flow-col-dense  grid-cols-1 items-start gap-x-8 gap-y-2.5 md:grid-cols-2 ">
+                <FormField
+                  control={form.control}
+                  name="accountName"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2 flex flex-col space-y-1">
+                      <FormLabel>Bank A/C Name:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          moduleName="companyHasBankAccount"
+                          fieldName="accountName"
+                          columnName="Bank A/C Name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-flow-col-dense  grid-cols-1 items-start gap-x-8 gap-y-2.5 md:grid-cols-2 ">
+                <FormField
+                  control={form.control}
+                  name="accountNo"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2 flex flex-col space-y-1">
+                      <FormLabel>Bank A/C No:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          moduleName="companyHasBankAccount"
+                          fieldName="accountNo"
+                          columnName="Bank A/C No"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+          </form>
+        </Form>
+        {isSaving && <LoadingUI />}
+      </DialogContent>
+    </Dialog>
+  );
+}

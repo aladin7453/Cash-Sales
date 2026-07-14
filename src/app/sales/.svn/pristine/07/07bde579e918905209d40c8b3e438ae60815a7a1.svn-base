@@ -1,0 +1,173 @@
+import React, { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { notFound, useSearchParams, useRouter } from "next/navigation";
+
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+import NewButton from "@/components/form/ActionButton/New";
+import CloneButton from "@/components/form/ActionButton/Clone";
+import DeleteButton from "@/components/form/ActionButton/Delete";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+} from "@/components/ui/form";
+
+import type { AgentType } from "../columns";
+// Mobile View (Imports)
+import MobileFormActionGroup from "@/components/form/MobileFormActionGroup";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+
+type TopActionBarProps = {
+  agentType?: AgentType | null;
+  handleSubmit: () => void;
+  resetForm: () => void; // Add resetForm prop
+  onSubmit: (values: any) => void;
+  action: string;
+  setTempRowCustomInfo:()=>void;
+  isSaving?: boolean;
+  setIsSaving?: (saving: boolean) => void;
+};
+
+export default function TopActionBar({
+  agentType,
+  form,
+  handleSubmit,
+  action,
+  params,
+  setTempRowCustomInfo
+}: TopActionBarProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    form.reset(agentType || {});
+  }, [agentType, form]);
+
+  const handleReset = () => {
+    const excludedKeys = [
+      "account",
+      "accountName",
+      "_actionUUID",
+      "_version",
+      "UUID",
+      "company",
+      "companyName",
+    ];
+
+    if (params.slug == "new") {
+      //new reset all to empty
+      const defaultValues = Object.keys(form.getValues()).reduce((acc, key) => {
+        const originalValue = form.getValues(key); // Get the original value
+
+        if (!excludedKeys.includes(key)) {
+          acc[key] = ""; // Reset to an empty string
+        } else {
+          acc[key] = originalValue; // Keep the original value
+        }
+        return acc;
+      }, {});
+
+      defaultValues.valid = "1";
+
+      form.reset(defaultValues);
+      setTempRowCustomInfo([])
+    } else {
+      //reset back to previous data
+      form.reset();
+    }
+  };
+
+  const handleSave = async () => {
+    if (isSaving) return; // Prevent multiple clicks
+    setIsSaving(true);
+
+    try {
+      await handleSubmit();
+    } catch (error) {
+      console.error("Error saving:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="-mx-2 -mt-1 flex items-center justify-between bg-erp-gray-3 px-4 py-2">
+      <div className="flex space-x-3">
+        <MobileFormActionGroup
+          config={{
+            onSave: handleSave,
+            onReset: handleReset,
+            onCancel: () => router.push(`/sales/agent-type/`),
+            newDestination: "/sales/agent-type/new",
+            cloneDestination: `/sales/agent-type/clone?id=${id}`,
+            deleteConfig: id && action !== "clone" ? {
+              module: "agent_type",
+              model: "agent-type", 
+              id: `${id}`,
+              indexPath: `/sales/agent-type/`
+            } : undefined,
+            showNew: !!(id && action !== "clone"),
+            showClone: !!(id && action !== "clone"),
+            showDelete: !!(id && action !== "clone"),
+          }}
+        >
+
+        </MobileFormActionGroup>
+        {/* Web View (Action Buttons) */}
+        <div className="hidden md:flex space-x-3">
+        <SaveButton onSubmit={handleSave} disabled={isSaving} />
+        {id && action !== "clone" && (
+          <NewButton destination="/sales/agent-type/new" />
+        )}
+        {id && action !== "clone" && (
+          <CloneButton
+            destination={`/sales/agent-type/clone?id=${id}`}
+          />
+        )}
+        <ResetButton onClick={handleReset} />
+        {id && action !== "clone" && (
+          <DeleteButton
+            module={"agent_type"}
+            model={"agent-type"}
+            id={`${id}`}
+            indexPath={`sales/agent-type/`}
+          />
+        )}
+        <CancelButton
+          onClick={() => router.push("/sales/agent-type/")}
+        />
+      </div>
+      </div>
+      <Form id="topActionBarForm" {...form}>
+        {" "}
+        {/* Added onSubmit to Form */}
+        <FormField
+          control={form.control}
+          name="valid"
+          render={({ field }) => (
+            <FormItem className="flex items-center gap-x-2 space-y-0">
+              <FormControl>
+                <Checkbox
+                  checked={field.value === "1"}
+                  onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                />
+              </FormControl>
+              <FormLabel>Valid</FormLabel>
+            </FormItem>
+          )}
+        />
+      </Form>
+    </div>
+  );
+}

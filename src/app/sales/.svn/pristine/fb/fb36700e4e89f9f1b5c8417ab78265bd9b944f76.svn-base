@@ -1,0 +1,143 @@
+"use client";
+
+import { useState } from "react";
+import { FaMinus, FaPlus } from "react-icons/fa6";
+import type { Table } from "@tanstack/react-table";
+
+import { useSearchParams } from "next/navigation";
+
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import Validity from "@/components/data-table/Validity";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
+
+import { getAuthHeaders,ORIGIN } from "@/lib/constants";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import ConfirmationDialog from "./ConfirmationDialog";
+
+type Props<TData> = {
+  table: Table<TData>;
+  onAdd?: () => void;
+  setTempRowAgentListData: (data, overwrite) => void;
+  tempRowAgentList: [];
+  revalidateAgentDetails: any;
+};
+
+export default function AgentDataTableToolbar<TData>({
+  table,
+  onAdd,
+  setTempRowAgentListData,
+  tempRowAgentList,
+  revalidateAgentDetails,
+}: Props<TData>) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
+
+  const handleDeleteConfirmation = async () => {
+    // Perform deletion logic here
+    var form_data = new FormData();
+
+    const selectedRows = table.getSelectedRowModel().rows;
+
+    selectedRows.forEach((row, index) => {
+      form_data.append(`UUIDs[${index}]`, row.original.UUID);
+    });
+
+    if (id) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/customer/api/customer/remove-customer-has-agent`,
+          {
+            method: "POST",
+            headers,
+            body: form_data,
+          },
+        );
+        if (!response.ok) {
+          const errorData = await response.json();
+          if (response.status === 403) {
+            toast({
+              title: errorData.message,
+              duration: 2000,
+            });
+          }
+          throw new Error("Failed to fetch data");
+        }
+        await response.json();
+      } catch (error) {
+        console.error("Error deleting agent data:", error);
+        // Handle error as needed, display error message to user
+      }
+      revalidateAgentDetails();
+      setShowConfirmationDialog(false);
+    } else {
+      const deletedIndex = selectedRows.map((item) => item.index);
+      const remainRows = tempRowAgentList.filter(
+        (item, index) => !deletedIndex.includes(index),
+      );
+      setTempRowAgentListData(remainRows, true);
+      setShowConfirmationDialog(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between p-2.2">
+        <div className="flex items-center gap-x-1 pl-2">
+          <div className="flex items-center gap-x-1 text-erp-blue-14">
+            <div className="flex flex-col items-center">
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      className="size-8"
+                      variant="ghost"
+                      size="icon"
+                      onClick={onAdd}
+                    >
+                      <FaPlus className="size-5.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Add select agent
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <span className="text-[11px]/none font-medium text-black">Add</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <Button
+                className="size-8"
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowConfirmationDialog(true)}
+              >
+                <FaMinus className="size-5.5" />
+              </Button>
+              <span className="text-[11px]/none font-medium text-black">Remove</span>
+            </div>
+          </div>
+        </div>
+        <Pagination table={table} /> {/* Pagination */}
+        <div className="flex items-center gap-x-3 pr-2 text-erp-blue-14">
+          <Export table={table} />
+          <Refresh refreshTable={revalidateAgentDetails} />
+          <Validity table={table} />
+          <ColumnVisibilityToggle table={table} />
+        </div>
+      </div>
+      <ConfirmationDialog
+        open={showConfirmationDialog}
+        setOpen={setShowConfirmationDialog}
+        onConfirm={handleDeleteConfirmation}
+      />
+    </>
+  );
+}

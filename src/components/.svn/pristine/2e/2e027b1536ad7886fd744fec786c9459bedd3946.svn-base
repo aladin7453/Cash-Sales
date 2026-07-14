@@ -1,0 +1,1624 @@
+import { Document, Font, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { versionPath } from "@/lib/constants";
+import { formatNumberWithCommas } from "@/components/ui/number-formatter";
+
+const isDev = process.env.NODE_ENV === "development";
+
+Font.register({
+  family: "NotoSansSC",
+  src: isDev ? "/fonts/NotoSansSC-Regular.ttf" : `/${versionPath}/fonts/NotoSansSC-Regular.ttf`,
+});
+
+Font.register({
+  family: "NotoSansSC-Bold",
+  src: isDev ? "/fonts/NotoSansSC-Bold.ttf" : `/${versionPath}/fonts/NotoSansSC-Bold.ttf`,
+});
+
+const formatDecimal = (value: any) => {
+  return formatNumberWithCommas(value, 2);
+};
+
+const styles2 = StyleSheet.create({
+  page: { padding: 30 },
+  table: { flexDirection: "row", width: "100%", borderWidth: 1, borderColor: "#000" },
+  leftColumn: { width: "50%", borderRightWidth: 0, borderColor: "#000", justifyContent: "center" },
+  rightColumn: { width: "50%", flexDirection: "column" },
+  row: { flexDirection: "row", flex: 1 },
+  cell: {
+    flex: 1,
+    borderBottomWidth: 0,
+    borderRightWidth: 0,
+    borderColor: "#000",
+    padding: 2,
+    textAlign: "center",
+    justifyContent: "center",
+    fontSize: 7,
+  },
+});
+
+const styles = StyleSheet.create({
+  page: {
+    flexDirection: "column",
+    backgroundColor: "#FFFFFF",
+    padding: 30,
+    fontFamily: "NotoSansSC", // Set the default font for the entire document
+  },
+  topRight: {
+    wdith: 120,
+    position: "absolute",
+    top: 145,
+    fontSize: 14,
+    right: 30,
+    textAlign: "right",
+  },
+  header: {
+    fontSize: 9,
+    marginTop: 5,
+    marginBottom: 5,
+    textAlign: "left",
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start", // keep top aligned (use 'center' if you want vertical center)
+    width: "100%",
+  },
+  headerText: {
+    fontSize: 8,
+    marginRight: 10,
+    marginTop: 5,
+  },
+  headerTextRight: {
+    fontSize: 8,
+    marginRight: 10,
+    marginTop: 50,
+  },
+  mainContainer: {
+    border: "solid",
+    borderColor: "#000000",
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    fontSize: 8,
+    marginTop: 0,
+    flexDirection: "row",
+    width: "100%",
+    justifyContent: "space-between",
+    borderCollapse: "collapse",
+  },
+  leftColumn: {
+    width: "50%",
+    paddingRight: 10,
+  },
+  rightColumn: {
+    width: "50%",
+    textAlign: "left",
+  },
+  botContainer: {
+    flexDirection: "row",
+    justiyfyContent: "space-between",
+  },
+  leftBotColumn: {
+    width: "65%",
+  },
+  rightBotColumn: {
+    width: "35%",
+    marginLeft: 20,
+  },
+  section: {
+    fontSize: 8,
+    marginBottom: 10,
+  },
+  signatureSection: {
+    width: "50%",
+    fontSize: 8,
+    marginBottom: 10,
+    marginLeft: 45,
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+  systemUserSection: {
+    width: "100%",
+    fontSize: 8,
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "bold",
+    textAlign: "right",
+    marginTop: 50,
+    fontFamily: "NotoSansSC-Bold",
+  },
+  sectionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  sectionText: {
+    fontSize: 8,
+    marginRight: 10,
+  },
+  table: {
+    display: "flex",
+    // borderWidth: 1,
+    // borderColor: '#000',
+    flexDirection: "column",
+  },
+  qtyTableContainer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  qtyTable: {
+    borderStyle: "solid",
+    borderColor: "#000000",
+    borderTopWidth: 1,
+    borderCollapse: "collapse",
+  },
+  tableRow: {
+    flexDirection: "row",
+    // borderBottomWidth: 1,
+    // borderLeftWidth: 1,
+    // borderRightWidth: 1,
+    // borderColor: "#000000",
+    borderCollapse: "collapse",
+  },
+
+  tableRowHeader: {
+    flexDirection: "row",
+    // borderBottomWidth: 1,
+    // borderLeftWidth: 1,
+    // borderRightWidth: 1,
+    borderColor: "#000000",
+    borderCollapse: "collapse",
+  },
+
+  tableRowHeaderPayment: {
+    flexDirection: "row",
+    // borderBottomWidth: 1,
+    // borderLeftWidth: 1,
+    // borderRightWidth: 1,
+    borderColor: "#000000",
+    borderCollapse: "collapse",
+  },
+
+  tableCell: {
+    padding: 1,
+    fontSize: 7,
+    textAlign: "center",
+    flexShrink: 1,
+    borderTopWidth: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    borderColor: "#000000",
+  },
+  tableCellHeader: {
+    padding: 1,
+    fontSize: 7,
+    textAlign: "center",
+    flexShrink: 1,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    // borderLeftWidth: 1,
+    borderColor: "#000000",
+    borderCollapse: "collapse",
+  },
+  tableCellHeaderPayment: {
+    padding: 1,
+    fontSize: 7,
+    textAlign: "center",
+    flexShrink: 1,
+    // borderTopWidth: 1,
+    // borderBottomWidth: 1,
+    // borderLeftWidth: 1,
+    // borderColor: "#000000",
+    borderCollapse: "collapse",
+  },
+  qtyTableCell: {
+    padding: 2,
+    fontSize: 8,
+    textAlign: "left",
+    flexShrink: 1,
+    borderRightWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: "#000000",
+  },
+  qtyTableCellNumber: {
+    padding: 2,
+    fontSize: 8,
+    textAlign: "right",
+    flexShrink: 1,
+    borderRightWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: "#000000",
+  },
+  tableCellLeftAlign: {
+    textAlign: "left",
+  },
+  tableCellRightAlign: {
+    textAlign: "right",
+  },
+  noBorderLeft: {
+    borderLeftWidth: 0,
+  },
+  noBorderRight: {
+    borderRightWidth: 0,
+  },
+  lastCell: {
+    borderRightWidth: 0,
+  },
+  lastRow: {
+    borderBottomWidth: 0,
+  },
+  tableHeader: {
+    backgroundColor: "#ffffff",
+    fontFamily: "NotoSansSC-Bold",
+  },
+  tableHeaderPayment: {
+    backgroundColor: "#ffffff",
+    fontFamily: "NotoSansSC-Bold",
+  },
+  firstSeparator: {
+    width: "100%",
+    height: 1,
+    marginTop: 5,
+    marginBottom: 10,
+  },
+  secondSeparator: {
+    width: "100%",
+    height: 1,
+    backgroundColor: "#000000",
+    marginTop: 5,
+    borderCollapse: "collapse",
+  },
+  signatureLine: {
+    width: "100%",
+    height: 1,
+    backgroundColor: "#000000",
+    marginTop: 40,
+    marginBottom: 10,
+  },
+  headerLeft: {
+    flexGrow: 1,
+    flexShrink: 1,
+    textAlign: "center",
+    alignItems: "center",
+    flex: 0.6,
+  },
+  headerRight: {
+    flexGrow: 0,
+    flexShrink: 0,
+    alignItems: "flex-end",
+    textAlign: "right",
+    flex: 0.4,
+  },
+
+  logoContainer: {
+    position: "absolute",
+    top: 30,
+    left: 30,
+    width: 100,
+    height: 100,
+    marginBottom: 10,
+    overflow: "hidden",
+  },
+  logoImage: {
+    width: 100,
+    height: 100,
+    objectFit: "contain",
+  },
+  pageNumber: {
+    position: "absolute",
+    fontSize: 9,
+    bottom: 30,
+    right: 30,
+    textAlign: "right",
+    color: "grey",
+  },
+  childItem: {
+    marginLeft: 13, // Indentation for child items
+  },
+  remark: {
+    marginTop: 5,
+    fontSize: 7,
+  },
+  currency: {
+    fontSize: 8,
+  },
+  boldText: {
+    fontFamily: "NotoSansSC-Bold",
+  },
+  description: {
+    fontSize: 8,
+    width: "100%",
+  },
+  contentContainer: {
+    flex: 1,
+    flexDirection: "column",
+  },
+  bottomSection: {
+    position: "absolute",
+    paddingLeft: 30,
+    paddingRight: 30,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 180,
+  },
+  verticalLine: {
+    width: 1,
+    backgroundColor: "black",
+    marginHorizontal: 5,
+  },
+  verticalLine2: {
+    position: "absolute",
+    height: 442.6,
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: "#000",
+  },
+  verticalLine2Payment: {
+    position: "absolute",
+    height: 12.6,
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: "#000",
+    borderCollapse: "collapse",
+  },
+  rowLine: {
+    borderBottomWidth: 1,
+    borderColor: "#000000",
+    borderCollapse: "collapse",
+  },
+  qrCodeImage: {
+    width: 75,
+    height: 75,
+    textAlign: "right",
+  },
+});
+
+const PreviewPDF = ({
+  previewData,
+  itemsData,
+  currentCompanyData,
+  currentUser,
+  PDFPreviewType,
+  isProformaInvoice = false,
+  descriptionPreferences = { description: true, secondDescription: true, moreDescription: true },
+  agentPreferences = { salesAgent: true, servicingAgent: true, collectionAgent: true },
+  template2Mode = false,
+  QrCode,
+  showService1Itemized,
+  showService1ItemizedRelationship,
+}) => {
+  if (!previewData) {
+    return (
+      <View style={styles.page}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
+
+  {
+    /* Number to words function */
+  }
+  function convertNumberToWords(amount) {
+    // Convert the input to a fixed 2-decimal string
+    const val = parseFloat(amount || 0).toFixed(2);
+    const [intStr, decStr] = val.split("."); // e.g. "10427", "70"
+
+    const integerPart = parseInt(intStr, 10);
+    const decimalPart = parseInt(decStr, 10);
+
+    // Word lists
+    const units = [
+      "Zero",
+      "One",
+      "Two",
+      "Three",
+      "Four",
+      "Five",
+      "Six",
+      "Seven",
+      "Eight",
+      "Nine",
+      "Ten",
+      "Eleven",
+      "Twelve",
+      "Thirteen",
+      "Fourteen",
+      "Fifteen",
+      "Sixteen",
+      "Seventeen",
+      "Eighteen",
+      "Nineteen",
+    ];
+    const tens = [
+      "",
+      "",
+      "Twenty",
+      "Thirty",
+      "Forty",
+      "Fifty",
+      "Sixty",
+      "Seventy",
+      "Eighty",
+      "Ninety",
+    ];
+    const scales = ["", "Thousand", "Million", "Billion"];
+
+    /**
+     * Converts a number < 1000 into words.
+     *
+     * @param {number} num - Up to 3 digits (0–999).
+     * @param {boolean} useAnd - Whether to insert "and" before the last part
+     *                           if there's a remainder after hundreds
+     *                           (British style).
+     */
+    function threeDigitToWords(num, useAnd) {
+      if (num === 0) return "";
+      let word = "";
+
+      const hundred = Math.floor(num / 100);
+      const remainder = num % 100;
+
+      // Handle hundreds
+      if (hundred > 0) {
+        word += units[hundred] + " Hundred";
+        if (remainder > 0 && useAnd) {
+          // If there's something left and we're using "and"
+          word += " and ";
+        } else if (remainder > 0) {
+          // If there's something left but no "and"
+          word += " ";
+        }
+      }
+
+      // Handle remainder (0–99)
+      if (remainder > 0) {
+        if (remainder < 20) {
+          word += units[remainder];
+        } else {
+          const t = Math.floor(remainder / 10);
+          const u = remainder % 10;
+          word += tens[t];
+          if (u > 0) {
+            word += " " + units[u];
+          }
+        }
+      }
+
+      return word.trim();
+    }
+
+    /**
+     * Converts an integer part (e.g., 10427) by splitting into thousands.
+     *
+     * @param {number} n - An integer >= 0.
+     * @param {boolean} useAndForChunks - Whether to use "and" within each
+     *                                    3-digit chunk.
+     */
+    function integerToWords(n, useAndForChunks) {
+      if (n === 0) return "Zero";
+
+      let words = "";
+      let scaleIndex = 0;
+
+      while (n > 0) {
+        const chunk = n % 1000;
+        if (chunk > 0) {
+          const chunkWords = threeDigitToWords(chunk, useAndForChunks);
+          const scaleWord = scales[scaleIndex];
+          const segment = chunkWords + (scaleWord ? " " + scaleWord : "");
+          // Prepend this segment
+          words = segment + (words ? " " + words : "");
+        }
+        n = Math.floor(n / 1000);
+        scaleIndex++;
+      }
+
+      return words;
+    }
+
+    // Decide whether to use “and” in the integer portion
+    // Rule: If there's a decimal portion, skip “and” in integer words
+    const useAnd = decimalPart === 0;
+    const intWords = integerToWords(integerPart, useAnd);
+
+    let finalWords = "";
+    if (decimalPart > 0) {
+      // Convert the decimal part to words (always skip "and" inside cents)
+      const decimalWords = integerToWords(decimalPart, false);
+      finalWords = `${intWords} AND ${decimalWords} CENTS ONLY`;
+    } else {
+      finalWords = `${intWords} ONLY`;
+    }
+
+    return finalWords.toUpperCase();
+  }
+
+  const cleanAddress =
+    currentCompanyData.address
+      ?.replace(/&\s*$/, "") // remove trailing &
+      .replace(/&\s*\r?\n/g, "\n") // & before newline
+      .replace(/\s*&\s*/g, " ") // unexpected &
+      .replace(/\r\n/g, "\n") // normalize CRLF
+      .replace(/\r/g, "\n") // normalize CR
+      .trim() || "";
+
+  const MAX_CHARS_PER_LINE = 50;
+
+  function estimateVisualLines(lines) {
+    return lines.reduce((total, line) => {
+      return total + Math.ceil(line.length / MAX_CHARS_PER_LINE);
+    }, 0);
+  }
+
+  let image64 = currentCompanyData.logoLink && currentCompanyData.logoLink[0]?.base64;
+
+  // Retrieve header value
+  const header1Field = currentCompanyData?.companyHasCustomInfos?.find(
+    (info: { fieldName: string; fieldValue: string }) => info.fieldName === "Header 1",
+  );
+
+  // Retrieve footer value
+  const footer1Field = currentCompanyData?.companyHasCustomInfos?.find(
+    (info: { fieldName: string; fieldValue: string }) => info.fieldName === "Footer 1",
+  );
+
+  const pages = Array.isArray(previewData) ? previewData : [previewData]; //Check for multiple data passed in for preview
+
+  const getTypeDescription = (type) => {
+    switch (type) {
+      case "salesInvoice":
+        return "INVOICE";
+      case "salesCreditNote":
+        return "CREDIT NOTE";
+      case "salesDebitNote":
+        return "DEBIT NOTE";
+      default:
+        return "";
+    }
+  };
+
+  return (
+    <Document title={previewData.docNo || ""}>
+      {pages.map((previewDoc, index) => {
+        // map it in case there are multiple documents data passed in for preview
+        let count = 0;
+
+        const rawAddress = previewDoc.address || previewDoc.customerAddress || "";
+        const itemArray = Array.isArray(previewData)
+          ? previewDoc.itemsData
+          : itemsData
+            ? itemsData
+            : []; // get the item array for each document
+        const Qr = Array.isArray(previewData) ? previewDoc.eInvoiceData?.qrCode : QrCode; // get the QrCode for each document
+
+        const rawLines = rawAddress
+          .replace(/\r\n/g, "\n")
+          .replace(/\r/g, "\n")
+          .replace(/\s+/g, " ")
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean);
+
+        const visualLineCount = estimateVisualLines(rawLines);
+
+        const isNotMoreThanFiveLines = visualLineCount < 4;
+
+        return (
+          <Page size="A4" key={index} style={[styles.page, { paddingBottom: 170 }]}>
+            <>
+              <View style={[styles.topRight, styles.boldText]} fixed>
+                <Text>
+                  {PDFPreviewType == "SALES INVOICE"
+                    ? "INVOICE"
+                    : previewDoc.consolidateDocType
+                      ? getTypeDescription(previewDoc.consolidateDocType)
+                      : PDFPreviewType}
+                </Text>
+              </View>
+              <View style={[styles.headerRow, { height: 120 }]} fixed>
+                {/* Left side */}
+                <View style={[styles.headerLeft]}>
+                  {header1Field?.fieldValue ? (
+                    <Text>
+                      <Text style={[styles.boldText, { fontSize: 12 }]}>
+                        {header1Field.fieldValue}
+                      </Text>
+                    </Text>
+                  ) : null}
+                  <Text>
+                    <Text style={[styles.boldText, { fontSize: 16 }]}>
+                      {currentCompanyData.company || ""}
+                    </Text>
+                  </Text>
+                  <Text style={styles.headerText}>{cleanAddress || ""}</Text>
+                  {/* <Text style={[styles.headerText, styles.boldText]}>Dr. Kho Fui Chung</Text>
+              <Text style={[styles.headerText, { marginTop: 0 }]}>
+                MD (NTU Taiwan)
+              </Text> */}
+                  <Text style={styles.headerText}>
+                    {currentCompanyData.phoneNo ? `Phone No.: ${currentCompanyData.phoneNo}` : ""}
+                  </Text>
+                  <Text style={[styles.headerText, { marginTop: 0 }]}>
+                    {currentCompanyData.email ? `Email: ${currentCompanyData.email}` : ""}
+                  </Text>
+                </View>
+
+                {/* Right side */}
+                <View style={styles.headerRight}>
+                  <View>{Qr && <Image src={Qr} style={styles.qrCodeImage} alt="QR Code" />}</View>
+                  <View>
+                    {Qr && (
+                      <Text style={{ textAlign: "right", fontSize: 8 }}>
+                        E-Invoice No:{previewDoc.eInvoiceCode}
+                      </Text>
+                    )}
+                    {Qr && (
+                      <Text style={{ textAlign: "right", fontSize: 8 }}>
+                        UUID:{previewDoc.oriRefNo}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* <View style={styles.logoContainer}>
+              <Image
+                src={{ uri: image64, method: "GET", headers: { "Cache-Control": "no-cache" }, body: "" }}
+                style={styles.logoImage}
+              />
+            </View> */}
+              </View>
+
+              <View style={styles.firstSeparator} fixed />
+
+              <View
+                style={[
+                  styles.mainContainer,
+                  {
+                    minHeight: 70,
+                    maxHeight: 95,
+                    alignItems: "flex-start",
+                    borderBottomWidth: 1,
+                    borderColor: "#000000",
+                    position: "relative",
+                  },
+                ]}
+                fixed
+              >
+                {/* Left column: rowspan Name */}
+                <View style={styles2.leftColumn}>
+                  <View style={styles.section}>
+                    <Text style={styles.boldText}>
+                      {previewDoc.customerName || previewDoc.supplierName || ""}
+                      {previewData?.TIN ? ` (${previewData?.TIN})` : ""}
+                    </Text>
+                    <Text>{previewDoc.address || previewDoc.customerAddress || ""}</Text>
+                  </View>
+                  <View style={styles.section}>
+                    <Text style={styles.sectionText}>
+                      {previewDoc.phoneNo || previewDoc.customerAttentionTel || ""}
+                    </Text>
+                  </View>
+                </View>
+
+                <View
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    bottom: 0,
+                    left: "50%",
+                    width: 1,
+                    backgroundColor: "#000",
+                  }}
+                />
+
+                {/* Right column: other rows */}
+                <View
+                  style={[
+                    styles2.rightColumn,
+                    {
+                      height: 70,
+                      alignSelf: "flex-start",
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles2.row,
+                      {
+                        borderStyle: "solid",
+                        borderColor: "#000000",
+                        borderLeftWidth: 0,
+                        borderBottomWidth: 1,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles2.cell,
+                        styles.boldText,
+                        {
+                          textAlign: "left",
+                          borderStyle: "solid",
+                          borderColor: "#000000",
+                          borderLeftWidth: 0,
+                          borderRightWidth: 1,
+                        },
+                      ]}
+                    >
+                      <Text>Invoice No:</Text>
+                    </View>
+                    <View
+                      style={[
+                        styles2.cell,
+                        {
+                          borderStyle: "solid",
+                          borderColor: "#000000",
+                          borderLeftWidth: 0,
+                          textAlign: "left",
+                        },
+                      ]}
+                    >
+                      <Text>{previewDoc.docNo}</Text>
+                    </View>
+                  </View>
+
+                  <View
+                    style={[
+                      styles2.row,
+                      {
+                        borderStyle: "solid",
+                        borderColor: "#000000",
+                        borderLeftWidth: 0,
+                        borderBottomWidth: 1,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles2.cell,
+                        styles.boldText,
+                        {
+                          textAlign: "left",
+                          borderStyle: "solid",
+                          borderColor: "#000000",
+                          borderLeftWidth: 0,
+                          borderRightWidth: 1,
+                        },
+                      ]}
+                    >
+                      <Text>Invoice Date:</Text>
+                    </View>
+                    <View
+                      style={[
+                        styles2.cell,
+                        {
+                          borderStyle: "solid",
+                          borderColor: "#000000",
+                          borderLeftWidth: 0,
+                          textAlign: "left",
+                        },
+                      ]}
+                    >
+                      <Text>{previewDoc.docDateFormat}</Text>
+                    </View>
+                  </View>
+
+                  <View
+                    style={[
+                      styles2.row,
+                      {
+                        borderStyle: "solid",
+                        borderColor: "#000000",
+                        borderLeftWidth: 0,
+                        borderBottomWidth: 1,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles2.cell,
+                        styles.boldText,
+                        {
+                          textAlign: "left",
+                          borderStyle: "solid",
+                          borderColor: "#000000",
+                          borderLeftWidth: 0,
+                          borderRightWidth: 1,
+                        },
+                      ]}
+                    >
+                      <Text>For Month of:</Text>
+                    </View>
+                    <View
+                      style={[
+                        styles2.cell,
+                        {
+                          borderStyle: "solid",
+                          borderColor: "#000000",
+                          borderLeftWidth: 0,
+                          textAlign: "left",
+                        },
+                      ]}
+                    >
+                      <Text
+                        wrap
+                        style={{
+                          fontSize: 7,
+                          width: "100%",
+                          textAlign: "left",
+                        }}
+                      >
+                        {previewDoc.description}
+                      </Text>
+                    </View>
+                  </View>
+                  <View
+                    style={[
+                      styles2.row,
+                      {
+                        borderStyle: "solid",
+                        borderColor: "#000000",
+                        borderLeftWidth: 0,
+                        borderBottomWidth: isNotMoreThanFiveLines ? 0 : 1,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles2.cell,
+                        styles.boldText,
+                        {
+                          textAlign: "left",
+                          borderStyle: "solid",
+                          borderColor: "#000000",
+                          borderLeftWidth: 0,
+                          borderRightWidth: 1,
+                        },
+                      ]}
+                    >
+                      <Text>Page No:</Text>
+                    </View>
+                    <View
+                      style={[
+                        styles2.cell,
+                        {
+                          flex: 1,
+                          textAlign: "left",
+                          borderStyle: "solid",
+                          borderColor: "#000000",
+                          borderLeftWidth: 0,
+                        },
+                      ]}
+                    >
+                      <Text
+                        render={({ subPageNumber, subPageTotalPages }) =>
+                          `Page ${subPageNumber} of ${subPageTotalPages}`
+                        }
+                      />
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.contentContainer}>
+                {/* Main Content */}
+                <View style={styles.firstSeparator} fixed />
+                {/* Item Details */}
+                <View style={[styles.table]}>
+                  {/* Header */}
+                  <View style={[styles.tableRowHeader, styles.tableHeader]} fixed>
+                    <View
+                      style={[
+                        styles.verticalLine2,
+                        {
+                          left: "0%",
+                          height: isNotMoreThanFiveLines ? 420 : 400,
+                        },
+                      ]}
+                      fixed
+                    />
+                    {/* after Date */}
+                    <View
+                      style={[
+                        styles.verticalLine2,
+                        {
+                          left: showService1ItemizedRelationship === true ? "10%" : "4.15%",
+                          height: isNotMoreThanFiveLines ? 420 : 400,
+                        },
+                      ]}
+                      fixed
+                    />
+                    {/* after Date */}
+                    <View
+                      style={[
+                        styles.verticalLine2,
+                        {
+                          left: showService1ItemizedRelationship === true ? "25%" : "16.74%",
+                          height: isNotMoreThanFiveLines ? 420 : 400,
+                        },
+                      ]}
+                      fixed
+                    />
+                    {/* after Date */}
+                    <View
+                      style={[
+                        styles.verticalLine2,
+                        {
+                          left: "40.29%",
+                          height: isNotMoreThanFiveLines ? 420 : 400,
+                        },
+                      ]}
+                      fixed
+                    />
+                    {/* after Date */}
+                    <View
+                      style={[
+                        styles.verticalLine2,
+                        {
+                          left: "53%",
+                          height: isNotMoreThanFiveLines ? 420 : 400,
+                        },
+                      ]}
+                      fixed
+                    />
+                    {/* after Date */}
+                    <View
+                      style={[
+                        styles.verticalLine2,
+                        {
+                          left: "74.54%",
+                          height: isNotMoreThanFiveLines ? 420 : 400,
+                        },
+                      ]}
+                      fixed
+                    />
+                    {/* after Date */}
+                    <View
+                      style={[
+                        styles.verticalLine2,
+                        {
+                          left: "87.35%",
+                          height: isNotMoreThanFiveLines ? 420 : 400,
+                        },
+                      ]}
+                      fixed
+                    />
+                    {/* after Date */}
+                    <View
+                      style={[
+                        styles.verticalLine2,
+                        {
+                          left: "100%",
+                          height: isNotMoreThanFiveLines ? 413.9 : 400,
+                        },
+                      ]}
+                      fixed
+                    />
+                    {/* after Date */}
+                    {showService1ItemizedRelationship === true ? (
+                      <View
+                        style={[
+                          styles.tableCellHeader,
+                          {
+                            flex: 0.3,
+                            paddingLeft: showService1ItemizedRelationship === true ? 17 : 0,
+                          },
+                        ]}
+                      >
+                        <Text>Date</Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.tableCellHeader, { flex: 0.3 }]}>
+                        <Text>No</Text>
+                      </View>
+                    )}
+                    {showService1ItemizedRelationship === true ? (
+                      <View
+                        style={[
+                          styles.tableCellHeader,
+                          {
+                            flex: 1,
+                            paddingLeft: showService1ItemizedRelationship === true ? 30 : 0,
+                          },
+                        ]}
+                      >
+                        <Text>Staff's Name</Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.tableCellHeader, { flex: 1 }]}>
+                        <Text>Date</Text>
+                      </View>
+                    )}
+                    {showService1ItemizedRelationship === true ? (
+                      <View
+                        style={[
+                          styles.tableCellHeader,
+                          {
+                            flex: 1,
+                            paddingLeft: showService1ItemizedRelationship === true ? 17 : 0,
+                          },
+                        ]}
+                      >
+                        <Text>Patient's Name</Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.tableCellHeader, { flex: 1.7 }]}>
+                        <Text>Name</Text>
+                      </View>
+                    )}
+                    {showService1ItemizedRelationship === true ? (
+                      <View
+                        style={[
+                          styles.tableCellHeader,
+                          {
+                            flex: 1,
+                            paddingLeft: showService1ItemizedRelationship === true ? 17 : 0,
+                          },
+                        ]}
+                      >
+                        <Text>Relationship</Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.tableCellHeader, { flex: 1, paddingLeft: 30 }]}>
+                        <Text>Ref No/ID</Text>
+                      </View>
+                    )}
+                    {showService1ItemizedRelationship === true ? (
+                      <View style={[styles.tableCellHeader, { flex: 2 }]}>
+                        <Text>Code no/Types of Treatment</Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.tableCellHeader, { flex: 2 }]}>
+                        <Text>Service Code/Description</Text>
+                      </View>
+                    )}
+                    {showService1ItemizedRelationship === true ? (
+                      <View
+                        style={[
+                          styles.tableCellHeader,
+                          {
+                            flex: 1,
+                            paddingRight: showService1ItemizedRelationship === true ? 12 : 0,
+                          },
+                        ]}
+                      >
+                        <Text>Diagnosis</Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.tableCellHeader, { flex: 1 }]}>
+                        <Text>Price</Text>
+                      </View>
+                    )}
+                    {showService1ItemizedRelationship === true ? (
+                      <View style={[styles.tableCellHeader, { flex: 1 }]}>
+                        <Text>Amount(RM)</Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.tableCellHeader, { flex: 1 }]}>
+                        <Text>Amount</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {showService1ItemizedRelationship !== true
+                    ? itemArray?.map((dateGroup, dateIndex) =>
+                        dateGroup.customerGroups?.map((group, groupIndex) => {
+                          const safeItems = group.items || [];
+                          const arrLength = safeItems.length;
+                          count++;
+
+                          return safeItems.map((item, itemIndex) => (
+                            <View
+                              style={styles.tableRow}
+                              key={`${dateIndex}-${groupIndex}-${itemIndex}`}
+                            >
+                              <View style={[styles.tableCell, { flex: 0.3, textAlign: "center" }]}>
+                                <Text>{itemIndex === 0 && count}</Text>
+                              </View>
+
+                              <View style={[styles.tableCell, { flex: 1, textAlign: "center" }]}>
+                                <Text>
+                                  {itemIndex === 0 && stripHtml(dateGroup?.["dateFormat"] || "")}
+                                </Text>
+                              </View>
+
+                              <View
+                                style={[
+                                  styles.tableCell,
+                                  { flex: 1.7, textAlign: "left", paddingLeft: 4 },
+                                ]}
+                              >
+                                <Text>
+                                  {showService1Itemized === true
+                                    ? itemIndex === 0 && stripHtml(group?.["customerName"] || "")
+                                    : itemIndex === 0
+                                      ? stripHtml(item?.["2ndDescription"] || "")
+                                      : null}
+                                </Text>
+                              </View>
+
+                              <View style={[styles.tableCell, { flex: 1, textAlign: "center" }]}>
+                                <Text>
+                                  {showService1Itemized === true
+                                    ? itemIndex === 0 && stripHtml(group?.["customerID"] || "")
+                                    : itemIndex === 0
+                                      ? stripHtml(item?.["moreDescription"] || "")
+                                      : null}
+                                </Text>
+                              </View>
+
+                              <View
+                                style={[
+                                  styles.tableCell,
+                                  {
+                                    flex: showService1ItemizedRelationship === true ? 2.3 : 1.5,
+                                    textAlign:
+                                      showService1ItemizedRelationship === true ||
+                                      showService1Itemized === true
+                                        ? "center"
+                                        : "left",
+                                    paddingRight:
+                                      showService1ItemizedRelationship === true ? 20 : 0,
+                                  },
+                                ]}
+                              >
+                                <Text>{item?.itemName || ""}</Text>
+                              </View>
+
+                              <View
+                                style={[
+                                  styles.tableCell,
+                                  { flex: 1, textAlign: "right", paddingRight: 2 },
+                                ]}
+                              >
+                                <Text>{formatDecimal(item?.subtotalTax)}</Text>
+                              </View>
+
+                              <View
+                                style={[
+                                  styles.tableCell,
+                                  { flex: 1, textAlign: "right", paddingRight: 2 },
+                                ]}
+                              >
+                                <Text>
+                                  {itemIndex === arrLength - 1 &&
+                                    formatDecimal(group?.customerParentPrice)}
+                                </Text>
+                              </View>
+                            </View>
+                          ));
+                        }),
+                      )
+                    : Object.entries(itemArray).map(([key, arr]) => {
+                        const safeArray = showService1ItemizedRelationship
+                          ? Array.isArray(arr)
+                            ? arr
+                            : [arr]
+                          : Array.isArray(arr)
+                            ? arr
+                            : [];
+
+                        if (!showService1ItemizedRelationship && safeArray.length === 0) {
+                          return null;
+                        }
+
+                        count++;
+
+                        return safeArray.map((item, index) => {
+                          const arrLength = safeArray.length;
+
+                          return (
+                            <View style={styles.tableRow} key={`${key}-${index}`}>
+                              {/* Column 1 */}
+                              {showService1ItemizedRelationship === true ? (
+                                <View style={[styles.tableCell, { flex: 1, textAlign: "center" }]}>
+                                  <Text>
+                                    {index === 0 && stripHtml(item?.["dateFormat"] || "")}
+                                  </Text>
+                                </View>
+                              ) : (
+                                <View
+                                  style={[styles.tableCell, { flex: 0.3, textAlign: "center" }]}
+                                >
+                                  <Text>{index === 0 && count}</Text>
+                                </View>
+                              )}
+
+                              {showService1ItemizedRelationship === true ? (
+                                <View
+                                  style={[
+                                    styles.tableCell,
+                                    { flex: 1.6, textAlign: "center", paddingLeft: 15 },
+                                  ]}
+                                >
+                                  <Text>{stripHtml(item?.["customerName"] || "")}</Text>
+                                </View>
+                              ) : (
+                                <View style={[styles.tableCell, { flex: 1, textAlign: "center" }]}>
+                                  <Text>
+                                    {showService1Itemized === true
+                                      ? index === 0 && stripHtml(item?.["dateFormat"] || "")
+                                      : index === 0
+                                        ? key
+                                        : null}
+                                  </Text>
+                                </View>
+                              )}
+
+                              {/* Column 2 */}
+                              {showService1ItemizedRelationship === true ? (
+                                <View
+                                  style={[
+                                    styles.tableCell,
+                                    { flex: 1.7, textAlign: "center", paddingRight: 5 },
+                                  ]}
+                                >
+                                  <Text>{stripHtml(item?.["customerDescription"] || "")}</Text>
+                                </View>
+                              ) : (
+                                <View
+                                  style={[
+                                    styles.tableCell,
+                                    { flex: 1.7, textAlign: "left", paddingLeft: 4 },
+                                  ]}
+                                >
+                                  <Text>
+                                    {index === 0 && showService1Itemized === true
+                                      ? stripHtml(item?.["customerName"] || "")
+                                      : stripHtml(item?.["2ndDescription"] || "")}
+                                  </Text>
+                                </View>
+                              )}
+
+                              {/* Column 3 */}
+                              {showService1ItemizedRelationship === true ? (
+                                <View
+                                  style={[
+                                    styles.tableCell,
+                                    { flex: 1.5, textAlign: "center", paddingRight: 2 },
+                                  ]}
+                                >
+                                  <Text>{stripHtml(item?.["2ndDescription"] || "")}</Text>
+                                </View>
+                              ) : (
+                                <View style={[styles.tableCell, { flex: 1, textAlign: "center" }]}>
+                                  <Text>
+                                    {showService1Itemized === true
+                                      ? stripHtml(item?.["customerID"] || "")
+                                      : index === 0
+                                        ? stripHtml(item?.["moreDescription"] || "")
+                                        : ""}
+                                  </Text>
+                                </View>
+                              )}
+
+                              {/* Column 4 */}
+                              <View
+                                style={[
+                                  styles.tableCell,
+                                  {
+                                    flex: showService1ItemizedRelationship === true ? 2.3 : 1.5,
+                                    textAlign:
+                                      showService1ItemizedRelationship === true ||
+                                      showService1Itemized === true
+                                        ? "center"
+                                        : "left",
+                                    paddingRight:
+                                      showService1ItemizedRelationship === true ? 20 : 0,
+                                  },
+                                ]}
+                              >
+                                <Text>{item?.itemName || ""}</Text>
+                              </View>
+
+                              {/* Column 5 */}
+                              {showService1ItemizedRelationship === true ? (
+                                <View
+                                  style={[
+                                    styles.tableCell,
+                                    { flex: 1.2, textAlign: "center", paddingRight: 25 },
+                                  ]}
+                                >
+                                  <Text>{stripHtml(item?.["moreDescription"] || "")}</Text>
+                                </View>
+                              ) : (
+                                <View
+                                  style={[
+                                    styles.tableCell,
+                                    { flex: 1, textAlign: "right", paddingRight: 2 },
+                                  ]}
+                                >
+                                  <Text>{formatDecimal(item?.subtotalTax)}</Text>
+                                </View>
+                              )}
+
+                              {/* Column 6 */}
+                              {showService1ItemizedRelationship === true ? (
+                                <View
+                                  style={[
+                                    styles.tableCell,
+                                    { flex: 1, textAlign: "right", paddingRight: 2 },
+                                  ]}
+                                >
+                                  <Text>
+                                    {index === arrLength - 1 && formatDecimal(item?.parentPrice)}
+                                  </Text>
+                                </View>
+                              ) : (
+                                <View
+                                  style={[
+                                    styles.tableCell,
+                                    { flex: 1, textAlign: "right", paddingRight: 2 },
+                                  ]}
+                                >
+                                  <Text>
+                                    {index === arrLength - 1 && formatDecimal(item?.parentPrice)}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          );
+                        });
+                      })}
+                </View>
+
+                <View style={{ flex: 1 }} fixed />
+              </View>
+
+              <View style={styles.bottomSection} fixed>
+                <View style={styles.secondSeparator} />
+                <View style={[styles.tableRowHeaderPayment, styles.tableHeaderPayment]}>
+                  {/* <View style={[styles.verticalLine2Payment, { left: "87.29%" }]} fixed />
+              <View style={[styles.verticalLine2Payment, { left: "100%" }]} fixed /> */}
+                  <View style={[styles.tableCellHeaderPayment, { flex: 1 }]}>
+                    <Text></Text>
+                  </View>
+                  <View style={[styles.tableCellHeaderPayment, { flex: 2 }]}>
+                    <Text></Text>
+                  </View>
+                  <View style={[styles.tableCellHeaderPayment, { flex: 1 }]}>
+                    <Text></Text>
+                  </View>
+                  <View style={[styles.tableCellHeaderPayment, { flex: 3, textAlign: "right" }]}>
+                    <Text
+                      render={({ subPageNumber, subPageTotalPages }) =>
+                        subPageNumber === subPageTotalPages
+                          ? `PAYMENT AMOUNT ${previewDoc.currencySymbol}:`
+                          : " "
+                      }
+                    />
+                  </View>
+                  <View
+                    render={({ subPageNumber, subPageTotalPages }) =>
+                      subPageNumber === subPageTotalPages ? (
+                        <View
+                          style={[
+                            {
+                              left: "86%",
+                              position: "absolute",
+                              height: 13.1,
+                              top: 0,
+                              bottom: 0,
+                              width: 1,
+                              backgroundColor: "#000",
+                            },
+                          ]}
+                        />
+                      ) : null
+                    }
+                  />
+
+                  <View
+                    style={[
+                      styles.tableCellHeaderPayment,
+                      {
+                        flex: 1,
+                        textAlign: "right",
+                        position: "relative", // required for absolute child
+                      },
+                    ]}
+                  >
+                    {/* Value – only on last page */}
+                    <Text
+                      render={({ subPageNumber, subPageTotalPages }) =>
+                        subPageNumber === subPageTotalPages ? previewDoc.totalPayable : ""
+                      }
+                      style={{ textAlign: "right", fontSize: 7 }}
+                    />
+
+                    {/* Bottom border – only on last page */}
+                    <View
+                      render={({ subPageNumber, subPageTotalPages }) =>
+                        subPageNumber === subPageTotalPages ? (
+                          <View
+                            style={[
+                              {
+                                left: 0,
+                                position: "absolute",
+                                height: 2,
+                                top: 0,
+                                bottom: 0,
+                                width: 67.1,
+                                backgroundColor: "#000",
+                              },
+                            ]}
+                          />
+                        ) : null
+                      }
+                    />
+                  </View>
+                  <View
+                    render={({ subPageNumber, subPageTotalPages }) =>
+                      subPageNumber === subPageTotalPages ? (
+                        <View
+                          style={[
+                            {
+                              left: "100%",
+                              position: "absolute",
+                              height: 13.1,
+                              top: 0,
+                              bottom: 0,
+                              width: 1,
+                              backgroundColor: "#000",
+                            },
+                          ]}
+                        />
+                      ) : null
+                    }
+                  />
+                </View>
+                <View style={[{ fontSize: 7 }]}>
+                  <View style={[{ textDecoration: "underline" }]}>
+                    <Text>Service Code No:</Text>
+                  </View>
+                  <View style={styles.tableRow}>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>1.Office Visit</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>5.Treatment</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>9. Medicine</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>13.Inoculation</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>17.Inhaler Medicine</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.tableRow}>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>2.Visit & Injection</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>6.Cream</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>10. Home Visit</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>14.Hypertension Medicine</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>18.ECG Test</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.tableRow}>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>3.Examination</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>7.Surgery</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>11. X-ray Exam</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>15.Diabetes Medicine</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text></Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.tableRow}>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>4.Laboratory</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>8.Dressing</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text> 12. Report</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text>16.Cholesterol Medicine</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 0.5, textAlign: "left", padding: 0 }]}>
+                      <Text></Text>
+                    </View>
+                  </View>
+
+                  {/* <View style={styles.remark}>
+                <Text>Sercice Code No:</Text>
+                <Text>1.office visit          5.Treatment    9. Medicine       13.Inoculation              17.Inhaler medicine </Text>
+                <Text>2.Visit & inspection    6.Treatment    10. Home Visit    14.Hypertension Medicine    18.ECG Test</Text>
+                <Text>3.Examination           7.Surgery      11. X-ray Exam    15.Diabetes Medicine </Text>
+                <Text>4.Laboratory            8.Drorwing     12. Report        16.Cholestrol Medicine </Text>
+              </View> */}
+                </View>
+                <View style={styles.botContainer}>
+                  {/* Qty */}
+                  <View style={[styles.leftBotColumn, { fontSize: 8 }]}>
+                    <View style={[styles.remark, styles.boldText]}>
+                      <Text>{stripHtml(previewDoc.note || "")}</Text>
+                    </View>
+                  </View>
+
+                  <View style={[styles.rightBotColumn]}>
+                    <>
+                      {/* Current System User's Full Name */}
+                      <View style={styles.systemUserSection}>
+                        <Text></Text>
+                      </View>
+
+                      {/* Authorised Signature */}
+                      <View>
+                        <View style={styles.signatureLine} />
+                      </View>
+                      {/* <View style={[styles.signatureSection, styles.boldText]}>
+                    <Text>For Dr. Kho Fui Chung</Text>
+                  </View> */}
+                      {footer1Field?.fieldValue ? (
+                        <View style={[styles.signatureSection, styles.boldText]}>
+                          <Text>{footer1Field.fieldValue}</Text>
+                        </View>
+                      ) : null}
+                    </>
+                  </View>
+                </View>
+              </View>
+            </>
+          </Page>
+        );
+      })}
+    </Document>
+  );
+};
+
+export default PreviewPDF;
+
+function stripHtml(html) {
+  if (!html) return "";
+
+  // Replace <br> and <br/> with newlines
+  let text = html.replace(/<br\s*\/?>/gi, "\n");
+
+  // Replace <p> with nothing, </p> with newline
+  text = text.replace(/<p[^>]*>/gi, "").replace(/<\/p>/gi, "\n");
+
+  // Preserve "<" and ">" with spaces inside, replace other HTML tags
+  text = text.replace(/<\s*[^>]*\s*>/g, (match) => {
+    return /\s/.test(match) ? match : "";
+  });
+
+  // Replace HTML entities
+  text = text.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
+
+  // Replace bullet point characters with standard bullet
+  text = text.replace(/⦁/g, "•");
+
+  return text;
+}

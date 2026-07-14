@@ -1,0 +1,302 @@
+"use client";
+
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { horizontalListSortingStrategy, SortableContext, arrayMove } from "@dnd-kit/sortable";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders,ORIGIN } from "@/lib/constants";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+
+import AssignmentLogDataTableToolbar from "./DataTableToolbar";
+
+// import { AssetContext, AssetState } from "../../AssetContext";
+import type { ColumnDef, Row, SortingState } from "@tanstack/react-table";
+
+import type { AssignmentLog } from "./columns";
+
+type AssignmentLogDataTableProps = {
+  columns: ColumnDef<AssignmentLog>[];
+  tempRowAssignmentLog: AssignmentLog[];
+  data: AssignmentLog[];
+  setTempRowAssignmentLog: (data: any) => void;
+  revalidateAssignmentLog: () => void;
+  refreshTable: () => void;
+};
+
+const COLUMN_VISIBILITY_KEY = "asset.assignment-log.bs.table.columns";
+const COLUMN_ORDER_KEY = "asset.assignment-log.bs.table.ordering";
+const COLUMN_SIZING_KEY = "asset.assignment-log.bs.table.sizing";
+
+export default function AssignmentLogDataTable({
+columns,
+  data,
+  tempRowAssignmentLog,
+  setTempRowAssignmentLog,
+  revalidateAssignmentLog,
+  refreshTable,
+}: AssignmentLogDataTableProps) {
+  // DnD and column sizing state
+  const initialColumnOrder = columns?.filter(column => column?.id).map((column) => column.id!) || [];
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      return JSON.parse(localStorage.getItem(COLUMN_ORDER_KEY) || JSON.stringify(initialColumnOrder));
+    }
+    return initialColumnOrder;
+  });
+  const [columnSizing, setColumnSizing] = useState<Record<string, number>>(() => {
+    if (typeof window !== "undefined") {
+      return JSON.parse(localStorage.getItem(COLUMN_SIZING_KEY) || "{}");
+    }
+    return {};
+  });
+  const defaultColumnVisibility: Record<string, boolean> = {
+    condition: false,
+    attachment: false,
+    createdAtFormat: false,
+    createdByUserName: false,
+    updatedAtFormat: false,
+    updatedByUserName: false,
+    valid: false,
+  };
+
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id"); // Fetch the id from search params
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+
+  function setTempRowAssignmentLogData(data: any, overwrite: boolean) {
+    if (overwrite) {
+      setTempRowAssignmentLog(data);
+    } else {
+      setTempRowAssignmentLog((tempRowAssignmentLog) => [
+        ...tempRowAssignmentLog,
+        data,
+      ]);
+    }
+  }
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<
+    Record<string, boolean>
+  >(() => {
+    if (typeof window !== "undefined") {
+      return JSON.parse(
+        localStorage.getItem(COLUMN_VISIBILITY_KEY) ||
+          JSON.stringify(defaultColumnVisibility)
+      );
+    }
+    return {};
+  });
+  const table = useReactTable({
+    columns,
+    data,
+    state: { sorting, columnVisibility, columnOrder, columnSizing },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+    autoResetPageIndex: false,
+    columnResizeMode: "onChange",
+    enableColumnResizing: true,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      columnVisibility: JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || JSON.stringify(defaultColumnVisibility)),
+      columnOrder: JSON.parse(localStorage.getItem(COLUMN_ORDER_KEY) || JSON.stringify(initialColumnOrder)),
+      columnSizing: JSON.parse(localStorage.getItem(COLUMN_SIZING_KEY) || "{}"),
+    },
+  });
+
+  useEffect(() => {
+    localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(columnOrder));
+  }, [columnOrder]);
+  useEffect(() => {
+    localStorage.setItem(COLUMN_SIZING_KEY, JSON.stringify(columnSizing));
+  }, [columnSizing]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      COLUMN_VISIBILITY_KEY,
+      JSON.stringify(columnVisibility)
+    );
+  }, [columnVisibility]);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<string>("");
+
+  usePreventShiftTextSelect();
+
+  const openDialog = (row) => {
+    setSelectedRow(row.original);
+    setDialogOpen(true);
+  };
+
+  const onDoubleClick = (row: Row<AssignmentLog>) => {
+    setDialogOpen(false);
+    setSelectedRow("");
+    openDialog(row);
+  };
+
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  useEffect(() => {
+    if (dialogOpen === false) {
+      setSelectedRow("");
+    }
+  }, [dialogOpen]);
+
+  const updateDetails = async (data) => {
+    try {
+      const formData = new FormData();
+
+      for (var key in data) {
+        formData.append(`assetHADHasUser[${key}]`, data[key]);
+      }
+
+      const response = await fetch(
+        `${ORIGIN}/asset/api/asset/update-asset-data?id=${id}`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        toast({ title: errorData.message || "Error occurred", duration: 2000 });
+        throw new Error("Failed to update asset assignment details");
+      }
+
+      revalidateAssignmentLog();
+    } catch (error) {
+      console.error("Error updating assignment log data:", error);
+      toast({ title: "Error updating assignment log data", duration: 3000 });
+    }
+  };
+
+  // useEffect(() => {
+  //   if (id && data.length > 0) {
+  //     updateDetails({ table });
+  //   }
+  // }, [id, data]);
+
+  // const { setassignedDetails } = useContext(AssetContext) as AssetState;
+
+  return (
+    <div className="h-[58cqh] p-4">
+      <div className="flex h-[55cqh] flex-col bg-erp-blue-3 @container-[size]">
+        <AssignmentLogDataTableToolbar
+          table={table}
+          setTempRowAssignmentLogData={setTempRowAssignmentLogData}
+          tempRowAssignmentLog={tempRowAssignmentLog}
+          revalidateAssignmentLog={revalidateAssignmentLog}
+          refreshTable={refreshTable}
+        />
+        <Separator className="bg-erp-blue-11" />
+        <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+          <DndContext
+            collisionDetection={closestCenter}
+            modifiers={[restrictToHorizontalAxis]}
+            onDragEnd={({ active, over }) => {
+              if (active && over && active.id !== over.id) {
+                setColumnOrder((prev) => {
+                  const oldIndex = prev.indexOf(active.id as string);
+                  const newIndex = prev.indexOf(over.id as string);
+                  return arrayMove(prev, oldIndex, newIndex);
+                });
+              }
+            }}
+            sensors={useDndSensors()}
+          >
+            <Table className="border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1" style={{ ...useColumnSizeVars(table), width: table.getTotalSize() }}>
+              <TableHeader className="sticky top-0">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    <SortableContext
+                      items={columnOrder}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      {headerGroup.headers.map((header) => (
+                        <DragableTableHead
+                          key={header.id}
+                          header={header}
+                          className="bg-erp-blue-11 font-normal"
+                          style={{
+                            width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                          }}
+                        >
+                            {header.column.id === "validity" ? (
+                            <TableHeadValidityFilter table={table} />
+                          ) : (
+                            <TableHeadColumnTextFilter column={header.column} table={table} />
+                          )}
+                          <ColumnResizer header={header} />
+                        </DragableTableHead>
+                      ))}
+                    </SortableContext>
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel().rows?.length ? (
+                  table.getRowModel().rows.map((row) => (
+                    <TableRow
+                      className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+                      data-state={row.getIsSelected() && "selected"}
+                      onClick={onRowSelection(row)}
+                      // onDoubleClick ={()=> setassignedDetails(row.original)}
+                      key={row.id}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (
+                  <NoResultsTableRow columns={columns} />
+                )}
+              </TableBody>
+              <ScrollBar orientation="horizontal" />
+            </Table>
+          </DndContext>
+        </ScrollArea>
+      </div>
+    </div>
+  );
+}

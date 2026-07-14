@@ -1,0 +1,66 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import React, { useState, useEffect, useRef } from "react";
+import { z } from "zod";
+import { notFound, useSearchParams } from "next/navigation";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import ResetButton from "./Reset";
+import SaveButton from "./Save";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
+import { data as stockIssuedDetailsData } from "../stockIssuedDetails/data";
+import { useRouter } from "next/navigation";
+import type { Dispatch, SetStateAction } from "react";
+import { assignmentLogColumns } from "../assignment-log/columns"
+import AsignmentLogDataTable from "../assignment-log/DataTable"
+
+import type { StockUOMDetails } from "../stockUOM-details/columns";
+
+type Props = {
+  open: boolean;
+  setOpen: Dispatch<SetStateAction<boolean>>;
+  row?: any;
+  onOpenChange: Dispatch<SetStateAction<boolean>>
+
+  
+};
+
+
+
+export default function AssetAsignmentLogPopover({ open, setOpen, onOpenChange,row,logTableData }: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const data:any = row;
+
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+     <DialogContent className="min-h-[75vh] min-w-[75vw] max-w-3xl bg-erp-blue-3 p-2">
+            <AsignmentLogDataTable 
+              columns={assignmentLogColumns}
+              data={logTableData ? logTableData : [] }
+            //   tempRowAsignmentLog={tempRowAsignmentLog}
+            //   setTempRowAsignmentLog={setTempRowAsignmentLog}
+            //   revalidateAsignmentLog={revalidateAsignmentLogData}
+            //   refreshTable={() => refreshTable('assignmentLog')}
+            
+            />
+   
+      </DialogContent>
+    </Dialog>
+  );
+}

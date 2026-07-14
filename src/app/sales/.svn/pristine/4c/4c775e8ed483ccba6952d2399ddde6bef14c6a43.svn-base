@@ -1,0 +1,123 @@
+"use client";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type SalesReport = {
+  UUID: string;
+  docNo: string;
+  docDateFormat: string;
+  customerName: string;
+  totalTax: string;
+  totalDiscount: string;
+  netTotal: string;
+  totalPaidAmount: string;
+  outstandingAmount: string;
+  paymentDateFormat: string;
+};
+
+// Helper to format decimals
+const formatDecimal = (value: any) => {
+  if (value === undefined || value === null || value === "") return "0.00";
+
+  const num = parseFloat(value);
+
+  return isNaN(num) ? "0.00" : num.toFixed(2);
+};
+
+export const SalesReportColumns: ColumnDef<SalesReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableHiding: false,
+  },  
+  {
+    accessorKey: "docNo",
+    id: "docNo",
+    header: "Invoice No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id: "docDateFormat",
+    header: "Invoice Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "totalTax",
+    id: "totalTax",
+    header: "Tax",
+    filterFn: "includesString",
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.totalTax)}</div>
+    ),
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "totalDiscount",
+    id: "totalDiscount",
+    header: "Discount",
+    filterFn: "includesString",
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.totalDiscount)}</div>
+    ),
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "netTotal",
+    id: "netTotal",
+    header: "Invoice Amount",
+    filterFn: "includesString",
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.netTotal)}</div>
+    ),
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "totalPaidAmount",
+    id: "totalPaidAmount",
+    header: "Amount Paid",
+    filterFn: "includesString",
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.totalPaidAmount)}</div>
+    ),
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "outstandingAmount",
+    id: "outstandingAmount",
+    header: "Balance",
+    filterFn: "includesString",
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.outstandingAmount)}</div>
+    ),
+    enableColumnFilter: false,
+  },
+  {
+    accessorKey: "paymentDateFormat",
+    id: "paymentDateFormat",
+    header: "Payment Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+  },
+];

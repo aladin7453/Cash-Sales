@@ -1,0 +1,369 @@
+"use client";
+
+//Imports
+import { useState } from "react";
+
+//Config
+import { cn } from "@/lib/utils/cn";
+
+//Components
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tab, TabList, TabPanel, Tabs } from "react-tabs";
+import TextEditorInline from "@/components/custom/TextEditorInline";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { DisplayCustomField, CustomFieldHandle, CustomFieldDefinition } from "@/components/DisplayCustomField";
+
+//Form
+import ShippingRecipientDetailsForm from "@/components/form/ShippingRecipientDetailsForm";
+import { BuyerDetailsForm } from "../../e-invoice-details/buyer-details/BuyerDetailsForm";
+import ShipperDetailsForm from "@/components/form/ShipperDetailsForm";
+
+//Icons
+import { FaRegNoteSticky } from "react-icons/fa6";
+
+
+//Params
+type Params = {
+  form: any;
+  isMobile?: boolean;
+  isExpand?: boolean;
+  setIsExpand: (v: boolean) => void;
+  preferenceData?: any;
+  customFieldRef?: React.Ref<CustomFieldHandle>;
+  customFieldDefs: CustomFieldDefinition[];
+  customFieldSavedData: Record<string, unknown>;
+  submitAttempted?: boolean;
+  id?: string | null;
+  docNo?: string;
+};
+
+function CustomerDetailsForm({
+  form,
+  isMobile,
+  isExpand,
+  setIsExpand,
+  preferenceData,
+  customFieldRef,
+  customFieldDefs,
+  customFieldSavedData,
+  submitAttempted,
+  id,
+  docNo
+}: Params) {
+
+  //State
+  const [activeTabIndex, setActiveTabIndex] = useState(0);
+
+  return (
+    <Card className={cn("w-full shadow-sm", isMobile ? "h-auto" : isExpand ? "h-[533px]" : "h-[245px]")}>
+      <CardContent className="px-1.5 py-1">
+        <Form {...form}>
+          <form>
+            <Tabs
+              className="flex w-full flex-col"
+              onSelect={(index) => {
+                if (index === 3 || index === 4) {
+                  setActiveTabIndex(index);
+                  setIsExpand(true);
+                } else {
+                  setIsExpand(false);
+                }
+              }}
+            >
+              <TabList className="flex">
+                {["Customer", "Shipper", "Recipient", "Note", "More"].map((label) => (
+                  <Tab
+                    key={label}
+                    className="cursor-pointer rounded-tl-md rounded-tr-md border-[1px] border-gray-200 bg-transparent px-2 py-1 text-[12px] text-black outline-none transition-all duration-300 ease-in-out"
+                    selectedClassName="!bg-blue-300 border-blue-300 text-white"
+                  >
+                    {label}
+                  </Tab>
+                ))}
+              </TabList>
+
+              {/* Buyer Details */}
+              <TabPanel
+                forceRender
+                className="hidden"
+                selectedClassName="react-tabs__tab-panel--selected"
+              >
+                <BuyerDetailsForm form={form} />
+              </TabPanel>
+
+              {/* Shipper Details */}
+              <TabPanel
+                forceRender
+                className="hidden"
+                selectedClassName="react-tabs__tab-panel--selected"
+              >
+                <ShipperDetailsForm form={form} />
+              </TabPanel>
+
+              {/* Recipient Details */}
+              <TabPanel
+                forceRender
+                className="hidden"
+                selectedClassName="react-tabs__tab-panel--selected"
+              >
+                <ShippingRecipientDetailsForm form={form} />
+              </TabPanel>
+
+              {/* Note */}
+              <TabPanel
+                forceRender
+                className="hidden"
+                selectedClassName="react-tabs__tab-panel--selected"
+              >
+                <Tabs className="flex h-[500px] pt-1.5">
+                  {/* Left - Editor */}
+                  <div className="min-w-0 flex-1">
+                    {/* Note 1 */}
+                    <TabPanel
+                      forceRender
+                      className="hidden"
+                      selectedClassName="react-tabs__tab-panel--selected"
+                    >
+                      <FormField
+                        control={form.control}
+                        name="note"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <TextEditorInline
+                                value={field.value || preferenceData?.data?.consolidateInvoiceNote || ""}
+                                onChange={(val) => field.onChange(val)}
+                                className="h-[335px]"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </TabPanel>
+
+                    {/* Note 2 */}
+                    <TabPanel
+                      forceRender
+                      className="hidden"
+                      selectedClassName="react-tabs__tab-panel--selected"
+                    >
+                      <FormField
+                        control={form.control}
+                        name="note2"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <TextEditorInline
+                                value={field.value || ""}
+                                onChange={(val) => field.onChange(val)}
+                                className="h-[335px]"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </TabPanel>
+
+                    {/* Note 3 */}
+                    <TabPanel
+                      forceRender
+                      className="hidden"
+                      selectedClassName="react-tabs__tab-panel--selected"
+                    >
+                      <FormField
+                        control={form.control}
+                        name="note3"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <TextEditorInline
+                                value={field.value || ""}
+                                onChange={(val) => field.onChange(val)}
+                                className="h-[335px]"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </TabPanel>
+
+                    {/* Note 4 */}
+                    <TabPanel
+                      forceRender
+                      className="hidden"
+                      selectedClassName="react-tabs__tab-panel--selected"
+                    >
+                      <FormField
+                        control={form.control}
+                        name="note4"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <TextEditorInline
+                                value={field.value || ""}
+                                onChange={(val) => field.onChange(val)}
+                                className="h-[335px]"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </TabPanel>
+
+                    {/* Note 5 */}
+                    <TabPanel
+                      forceRender
+                      className="hidden"
+                      selectedClassName="react-tabs__tab-panel--selected"
+                    >
+                      <FormField
+                        control={form.control}
+                        name="note5"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <TextEditorInline
+                                value={field.value || ""}
+                                onChange={(val) => field.onChange(val)}
+                                className="h-[335px]"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </TabPanel>
+
+                    {/* Note 6 */}
+                    <TabPanel
+                      forceRender
+                      className="hidden"
+                      selectedClassName="react-tabs__tab-panel--selected"
+                    >
+                      <FormField
+                        control={form.control}
+                        name="note6"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <TextEditorInline
+                                value={field.value || ""}
+                                onChange={(val) => field.onChange(val)}
+                                className="h-[335px]"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </TabPanel>
+
+                    {/* Note 7 */}
+                    <TabPanel
+                      forceRender
+                      className="hidden"
+                      selectedClassName="react-tabs__tab-panel--selected"
+                    >
+                      <FormField
+                        control={form.control}
+                        name="note7"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <TextEditorInline
+                                value={field.value || ""}
+                                onChange={(val) => field.onChange(val)}
+                                className="h-[335px]"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </TabPanel>
+
+                    {/* Note 8 */}
+                    <TabPanel
+                      forceRender
+                      className="hidden"
+                      selectedClassName="react-tabs__tab-panel--selected"
+                    >
+                      <FormField
+                        control={form.control}
+                        name="note8"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <TextEditorInline
+                                value={field.value || ""}
+                                onChange={(val) => field.onChange(val)}
+                                className="h-[335px]"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </TabPanel>
+                  </div>
+
+                  {/* Right - Vertical TabList */}
+                  <TabList className="ml-1 flex flex-col gap-y-1">
+                    {[
+                      { label: "Note", icon: <FaRegNoteSticky className="size-3.5" /> },
+                      { label: "Note 2", icon: <FaRegNoteSticky className="size-3.5" /> },
+                      { label: "Note 3", icon: <FaRegNoteSticky className="size-3.5" /> },
+                      { label: "Note 4", icon: <FaRegNoteSticky className="size-3.5" /> },
+                      { label: "Note 5", icon: <FaRegNoteSticky className="size-3.5" /> },
+                      { label: "Note 6", icon: <FaRegNoteSticky className="size-3.5" /> },
+                      { label: "Note 7", icon: <FaRegNoteSticky className="size-3.5" /> },
+                      { label: "Note 8", icon: <FaRegNoteSticky className="size-3.5" /> },
+                    ].map((item, index) => (
+                      <Tab
+                        key={index}
+                        className="flex h-11 w-12 cursor-pointer flex-col items-center justify-center gap-y-0.5 rounded-md border border-gray-200 bg-white text-[9px] text-gray-600 outline-none transition-all duration-200 ease-in-out"
+                        selectedClassName="!bg-blue-300 border-blue-300 text-white"
+                      >
+                        {item.icon}
+                        <span>{item.label}</span>
+                      </Tab>
+                    ))}
+                  </TabList>
+                </Tabs>
+              </TabPanel>
+
+              {/* More Field */}
+              <TabPanel
+                forceRender
+                className="hidden"
+                selectedClassName="react-tabs__tab-panel--selected"
+              >
+                <ScrollArea className="h-[495px]">
+                  <DisplayCustomField
+                    ref={customFieldRef}
+                    form={form}
+                    module="sales"
+                    docUUID={id ?? ""}
+                    docType="consolidatedInvoice"
+                    docNo={docNo ?? ""}
+                    fieldDefs={customFieldDefs}
+                    savedFieldData={customFieldSavedData}
+                    submitAttempted={submitAttempted}
+                  />
+                  <ScrollBar orientation="vertical" />
+                </ScrollArea>
+              </TabPanel>
+            </Tabs>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default CustomerDetailsForm;

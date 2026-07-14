@@ -1,0 +1,256 @@
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+
+import TransferButton from "@/components/features/transfer/TransferButton";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import CloneButton from "@/components/form/ActionButton/Clone";
+import DeleteButton from "@/components/form/ActionButton/Delete";
+import LayoutToggleButton from "@/components/form/ActionButton/LayoutToggleButton";
+import NewButton from "@/components/form/ActionButton/New";
+import PreviewButton from "@/components/form/ActionButton/Preview";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+// Mobile View (Imports)
+import MobileFormActionGroup from "@/components/form/MobileFormActionGroup";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+import { salesOrderTransferFromConfig } from "../transfer/transferFrom/config";
+import { salesOrderTransferToConfig } from "../transfer/transferTo/config";
+import { ApprovalStatusIcon } from "./ApprovalStatusIcon";
+
+import type { SalesOrder } from "../columns";
+
+type TopActionBarProps = {
+  salesOrder?: SalesOrder | null;
+  approvalStatus?: SalesOrder | null;
+  form: Form;
+  handleSubmit: any;
+  revalidateSalesOrderDetails?: () => void;
+  slug?: string;
+  action: string;
+  salesOrderData?: any;
+  layout: "new" | "old";
+  onLayoutChange: (layout: "new" | "old") => void;
+};
+
+export default function TopActionBar({
+  salesOrder,
+  approvalStatus,
+  form,
+  handleSubmit,
+  revalidateSalesOrderDetails,
+  slug,
+  action,
+  salesOrderData,
+  layout,
+  onLayoutChange,
+}: TopActionBarProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  useEffect(() => {
+    form.reset(salesOrder || {});
+  }, [salesOrder, form]);
+
+  const handleReset = () => {
+    form.reset(salesOrder || {});
+    // resetForm();
+  };
+
+  // Dropdown Filter Configuration
+  const getTransferFromFilters = () => {
+    const filters = [];
+
+    // Add customer filter if customer is selected
+    const customerName = form.getValues("customerName");
+
+    if (customerName) {
+      filters.push({
+        column: "customerName",
+        value: customerName,
+      });
+    }
+
+    // You can add more filters here based on other form values
+    // const projectCode = form.getValues("projectCode");
+    // if (projectCode) {
+    //   filters.push({
+    //     column: "projectCode",
+    //     value: projectCode
+    //   });
+    // }
+
+    return filters;
+  };
+
+  // Change layout button condition (HardCode)
+  const systemAccount = JSON.parse(localStorage.getItem("system-account") || "{}");
+
+  const canChangeLayout = ["infollective", "infollectivetesting", "dev"].includes(systemAccount);
+
+  return (
+    <div className="flex h-full w-full items-center justify-between bg-erp-gray-3 py-2">
+      <div className="flex space-x-3">
+        {/* Mobile View (Action Buttons) */}
+        <MobileFormActionGroup
+          config={{
+            onSave: handleSubmit,
+            onReset: handleReset,
+            onCancel: () => router.push(`/sales/sales-order/`),
+            newDestination: "/sales/sales-order/new",
+            cloneDestination: `/sales/sales-order/clone?id=${id}`,
+            deleteConfig:
+              id && slug !== "clone"
+                ? {
+                  module: "sales_order",
+                  model: "sales-order",
+                  id: `${id}`,
+                  indexPath: `/sales/sales-order/`,
+                }
+                : undefined,
+            showNew: !!(id && slug !== "clone"),
+            showClone: !!(id && slug !== "clone"),
+            showDelete: !!(id && slug !== "clone"),
+          }}
+        >
+          {/* Additional Actions (Other than Save, New, Clone, Reset, Delete, and Cancel) */}
+          {salesOrder && slug === "edit" && (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <PreviewButton
+                previewType={"SALES ORDER"}
+                module={"sales_order"}
+                model={"sales-order"}
+                doc_id={salesOrder.UUID}
+              />
+            </DropdownMenuItem>
+          )}
+          {/* Transfer From (Mobile View) */}
+          {slug === "new" ? (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <TransferButton
+                transferFromProps={{
+                  id: id,
+                  slug: slug,
+                  config: salesOrderTransferFromConfig,
+                  filterConfig: getTransferFromFilters(),
+                }}
+                showTransferTo={false}
+              />
+            </DropdownMenuItem>
+          ) : (
+            ""
+          )}
+          {/* Transfer To (Mobile View) */}
+          {slug === "edit" ? (
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <TransferButton
+                transferToProps={{
+                  id: id,
+                  config: salesOrderTransferToConfig,
+                }}
+                showTransferFrom={false}
+              />
+            </DropdownMenuItem>
+          ) : (
+            ""
+          )}
+        </MobileFormActionGroup>
+
+        {/* Web View (Action Buttons) */}
+        <div className="hidden space-x-3 md:flex">
+          <SaveButton onClick={handleSubmit} />
+          <NewButton destination="/sales/sales-order/new" />
+          {id && slug === "edit" && (
+            <CloneButton id={id} destination={`/sales/sales-order/clone?id=${id}`} />
+          )}
+          <ResetButton onClick={handleReset} />
+          {id && slug === "edit" && (
+            <DeleteButton
+              module={"sales_order"}
+              model={"sales-order"}
+              id={`${id}`}
+              indexPath={`/sales/sales-order/`}
+            />
+          )}
+          {salesOrder && slug === "edit" && (
+            <PreviewButton
+              previewType={"SALES ORDER"}
+              module={"sales_order"}
+              model={"sales-order"}
+              doc_id={salesOrder.UUID}
+              data={salesOrderData}
+            />
+          )}
+          {/* Transfer From (Web View) */}
+          {slug === "new" ? (
+            <TransferButton
+              transferFromProps={{
+                id: id,
+                slug: slug,
+                config: salesOrderTransferFromConfig,
+                filterConfig: getTransferFromFilters(),
+              }}
+              showTransferTo={false}
+            />
+          ) : (
+            ""
+          )}
+          {/* Transfer To (Web View) */}
+          {slug === "edit" ?
+            <TransferButton
+              transferToProps={{
+                id: id,
+                config: salesOrderTransferToConfig,
+              }}
+              showTransferFrom={false}
+            />
+            : ""}
+          <CancelButton onClick={() => router.push(`/sales/sales-order`)} />
+
+          {/* Change Layout button */}
+          {canChangeLayout && <LayoutToggleButton layout={layout} onChange={onLayoutChange} />}
+        </div>
+      </div>
+
+      <Form id="topActionBarForm" {...form}>
+        {/* Added onSubmit to Form */}
+        <FormField
+          control={form.control}
+          name="valid"
+          render={({ field }) => (
+            <FormItem className="flex items-center gap-x-2 space-y-0 px-3">
+              {approvalStatus?.approvalStatus &&
+                (approvalStatus.approvalStatus === "Rejected" ? (
+                  <TooltipProvider delayDuration={0}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <ApprovalStatusIcon status={approvalStatus.approvalStatus} />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <p>{approvalStatus.rejectReason || "No reason provided"}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : (
+                  <ApprovalStatusIcon status={approvalStatus.approvalStatus} />
+                ))}
+              <FormControl>
+                <Checkbox
+                  checked={field.value === "1"}
+                  onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                />
+              </FormControl>
+              <FormLabel>Valid</FormLabel>
+            </FormItem>
+          )}
+        />
+      </Form>
+    </div>
+  );
+}

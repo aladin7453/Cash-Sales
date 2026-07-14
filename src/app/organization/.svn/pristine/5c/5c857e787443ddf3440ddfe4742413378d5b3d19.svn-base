@@ -1,0 +1,161 @@
+"use client";
+
+import { ColumnDef } from "@tanstack/react-table";
+import { useSearchParams } from "next/navigation";
+
+import ChangelogDataTable from "@/components/features/changelog/DataTable";
+import { ChangelogConfig } from "@/components/features/changelog/types";
+import { ORIGIN } from "@/lib/constants";
+
+// Define the company changelog config
+const CompanyChangelogConfig: ChangelogConfig = {
+  // Default endpoints (fallback)
+  getHistoryUrl: (id: string) => `${ORIGIN}/company/api/company/get-company-log?id=${id}`,
+  getDetailsUrl: (id: string, action: string) =>
+    `${ORIGIN}/company/api/company/get-company-log-details?id=${id}&action=${action}`,
+
+  fieldNameMapping: {
+    // Main Details
+    attentionName: "Attention",
+    MISCCodeCode: "MISC Code",
+    countryOfOriginCode: "Country",
+    companyID: "Company ID",
+    company: "Company Name",
+    address: "Address",
+    city: "City",
+    postcode: "Postcode",
+    phoneNo: "Phone Number",
+    faxNo: "Fax Number",
+    email: "Email",
+    website: "Website",
+    description: "Description",
+    BRN: "Business Registration Number",
+    SSTNo: "SST Number",
+    TIN: "Tax Identification Number",
+    TTxNo: "TTx Number",
+    ClientID: "Client ID",
+    ClientSecret1: "Client Secret 1",
+    ClientSecret2: "Client Secret 2",
+    IRBToken: "IRB Token",
+    businessNature: "Business Nature",
+    bankACNo: "Bank Account Number",
+    coordinate: "Coordinates",
+    logo: "Logo",
+    parentCompanyName: "Parent Company",
+    production: "Production",
+    testing: "Testing",
+
+    // Bank Accounts
+    name: "Bank Name",
+    accountName: "Account Name",
+    accountNo: "Account Number",
+    default: "Default",
+
+    // Custom Information
+    fieldName: "Field Name",
+    fieldValue: "Field Value",
+    attachment: "Attachment",
+  },
+
+  fieldsToFilter: [
+    "UUID",
+    "account",
+    "historyUUID",
+    "createdAt",
+    "createdBy",
+    "updatedAt",
+    "createdAtFormat",
+    "createdByUsername",
+    "IRBTokenExpiredAt",
+    "_actionUUID",
+    "_version",
+    "action",
+    "date_created",
+    "user_id",
+    "updatedBy",
+    "productionClientID",
+    "productionClientSecret1",
+    "productionClientSecret2",
+    "valid",
+
+    // Bank Accounts
+    "reference",
+
+    // Main Details
+    "attention",
+    "MISCCode",
+    "state",
+    "country",
+    "parentCompany",
+  ],
+
+  entityName: "company",
+
+  defaultSortField: "createdAt",
+
+  tabs: [
+    {
+      value: "company",
+      label: "Company",
+      referenceField: "company",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/company/api/company/get-company-log?id=${id}&tableName=company`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/company/api/company/get-company-log-details?id=${id}&action=${action}&tableName=company`,
+    },
+    {
+      value: "companyHasCustomInfo",
+      label: "Custom Information",
+      referenceField: "fieldName",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/company/api/company/get-company-log?id=${id}&tableName=companyHasCustomInfo`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/company/api/company/get-company-log-details?id=${id}&action=${action}&tableName=companyHasCustomInfo`,
+    },
+    {
+      value: "companyHasBankAccount",
+      label: "Bank Accounts",
+      referenceField: "accountName",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/company/api/company/get-company-log?id=${id}&tableName=companyHasBankAccount`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/company/api/company/get-company-log-details?id=${id}&action=${action}&tableName=companyHasBankAccount`,
+    },
+    {
+      value: "companyHasUser",
+      label: "Users List",
+      referenceField: "reference",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/company/api/company/get-company-log?id=${id}&tableName=userHasCompany`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/company/api/company/get-company-log-details?id=${id}&action=${action}&tableName=userHasCompany`,
+    },
+  ],
+};
+
+export default function CompanyChangelogDataTable<TData, TValue>({
+  columns,
+  initialData,
+  onTableParamsChange,
+}: {
+  columns: ColumnDef<TData, TValue>[];
+  initialData?: any | null;
+  onTableParamsChange?: any;
+}) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return <div>Missing entity ID</div>;
+  }
+
+  return (
+    <ChangelogDataTable
+      columns={columns}
+      initialData={initialData}
+      config={CompanyChangelogConfig}
+      entityId={id}
+      onTableParamsChange={onTableParamsChange}
+    />
+  );
+}

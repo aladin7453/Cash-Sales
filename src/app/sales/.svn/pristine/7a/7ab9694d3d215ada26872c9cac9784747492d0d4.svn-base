@@ -1,0 +1,8 @@
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+
+  title: "Statement Of Account",
+};
+export default function StatementOfAccountPageLayout({ children }: { children: React.ReactNode }) {
+  return children;
+}

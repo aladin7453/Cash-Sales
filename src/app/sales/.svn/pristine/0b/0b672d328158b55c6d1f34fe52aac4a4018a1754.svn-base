@@ -1,0 +1,748 @@
+"use client";
+
+import { PDFDownloadLink, PDFViewer } from "@react-pdf/renderer";
+import { ColumnDef } from "@tanstack/react-table";
+import { endOfMonth, startOfMonth } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import moment from "moment";
+import React, { useEffect, useState } from "react";
+import { UseFormReturn } from "react-hook-form";
+
+import ReportPreviewButton from "@/components/form/ActionButton/ReportPreview";
+import SalesReport from "@/components/templates/sales/salesReportTemplate";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { DATE_FORMAT, getAuthHeaders } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+
+import { SalesReportColumns } from "../../customer-monthly-sales-report/Generate/columns";
+import {
+  salesProfitLossReportColumns,
+  salesProfitLossReportColumnsL2,
+} from "../../sales-profit-loss-report/Generate/columns";
+
+interface SalesProfitLossReport {
+  id: string;
+  name: string;
+}
+
+// Base props interface
+interface BaseSalesProfitLossReportFormProps {
+  form: UseFormReturn<any>;
+  onSubmit: (data: any) => void;
+  onPreview?: (data: any, isGenerated?: boolean) => void;
+  previewPDF?: any;
+  salesReportData?: any;
+  generatedReport?: any;
+}
+
+// Component props interface
+interface SalesProfitLossReportFormProps extends BaseSalesProfitLossReportFormProps {
+  salesReportColumns?: ColumnDef<SalesProfitLossReport>[];
+  filterFields?: string[];
+  sorting?: any;
+}
+
+const salesProfitLossReportListingList = [
+  { id: "salesProfitLossReportListing", name: "Sales Profit Loss Report Listing" },
+  { id: "salesProfitLossReportListingLv2", name: "Sales Profit Loss Report Listing - Level 2" },
+];
+
+export default function SalesProfitLossReportForm({
+  form,
+  onSubmit,
+  onPreview,
+  previewPDF,
+  salesReportData,
+  salesReportColumns = [],
+  generatedReport,
+  filterFields,
+  sorting,
+}: SalesProfitLossReportFormProps) {
+  const headers = getAuthHeaders();
+  const systemAccount = JSON.parse(localStorage.getItem("system-account"));
+  const values = form.getValues();
+  const docType = values.docType || "all";
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [activePreviewColumns, setActivePreviewColumns] =
+    useState<ColumnDef<any>[]>(SalesReportColumns);
+  const [selectedReportList, setSelectedReportList] = useState(salesProfitLossReportListingList);
+
+  //Show Option Dialog
+  const [showOptionDialog, setShowOptionDialog] = useState(false);
+
+  // Reset form function
+  const handleReset = () => {
+    form.reset({
+      docType: "",
+      docNo: "",
+      startDate: Math.floor(startOfMonth(new Date()).getTime() / 1000).toString(),
+      endDate: (() => {
+        const end = endOfMonth(new Date());
+
+        end.setHours(23, 59, 59, 999);
+
+        return Math.floor(end.getTime() / 1000).toString();
+      })(),
+
+      docDate: "",
+      itemCode: "",
+      itemCost: "",
+      price: "",
+      itemProfitLoss: "",
+      status: "",
+      profitLossPercentage: "",
+      valid: "1",
+    });
+  };
+
+  // Validate customer selection
+  const handleSubmitWithValidation = (data: any) => {
+    // if (!data.customerCodeCode) {
+    //   toast({
+    //     variant: "destructive",
+    //     title: "Customer Required",
+    //     description: "Please select a customer before generating the",
+    //     duration: 5000,
+    //   });
+    //   return;
+    // }
+    onSubmit(data);
+  };
+
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
+  const [reportType, setReportType] = useState("Sales Profit/Loss Report");
+  const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
+  const [isVariantAvailable, setIsVariantAvailable] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<any>(salesProfitLossReportListingList);
+
+  const handlePreview = () => {
+    if (generatedReport.length == 0) {
+      setIsAlertOpen(true);
+      return false;
+    }
+    // if (!formData.customerCodeCode) {
+    //   toast({
+    //     variant: "destructive",
+    //     title: "Customer Required",
+    //     description: "Please select a customer before generating the",
+    //     duration: 5000,
+    //   });
+    //   return;
+    // }
+    // setShowOptionDialog(true);
+    // return;
+
+    // if (onPreview) {
+    //   const values =  form.getValues();
+    //   onPreview(values, false);
+    // }
+
+    if (onPreview) {
+      // onPreview(values, false);
+      if (salesReportData?.reportTypeName === "salesProfitLossReportListingLv2") {
+        setActivePreviewColumns(salesProfitLossReportColumns);
+      } else {
+        setActivePreviewColumns(salesProfitLossReportColumnsL2);
+      }
+      onPreview(
+        {
+          ...values,
+          reportTypeName: selectedReport,
+        },
+        false,
+      );
+    }
+
+    setReportType("Sales Profit/Loss Report");
+    setShowPreviewDialog(false);
+    setTimeout(() => {
+      setShowPreviewDialog(true);
+    }, 0);
+  };
+
+  // const handleSelectLevel1PL = () =>{
+  //   const values = form.getValues();
+  //   setActivePreviewColumns(salesProfitLossReportColumns);
+  //   if (onPreview) {onPreview(values, false);}
+  //   setReportType("Sales Profit/Loss Report");
+  //   setShowPreviewDialog(false);
+  //   setTimeout(() => { setShowPreviewDialog(true); }, 0);
+  // }
+  // const handleSelectLevel2PL = () =>{
+  //   const values = form.getValues();
+  //   setActivePreviewColumns(salesProfitLossReportColumnsL2);
+  //   setReportType("Sales P&L By Document - Level 2");
+  //   setShowPreviewDialog(false);
+  //   setTimeout(() => { setShowPreviewDialog(true); }, 0);
+  // }
+
+  // Add state to control popover open/close for each date field
+  const [fromDateOpen, setFromDateOpen] = useState(false);
+  const [toDateOpen, setToDateOpen] = useState(false);
+  const [docDateOpen, setDocDateOpen] = useState(false);
+
+  useEffect(() => {
+    setSelectedReportList(salesProfitLossReportListingList);
+  }, []);
+
+  return (
+    <div className="mx-auto">
+      <Card collapsible defaultCollapsed={false} className="shadow-sm">
+        <CardHeader></CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmitWithValidation)}>
+              {/* Main Filters Section */}
+              <div className="mb-4">
+                <h3 className="text-md mb-2 font-semibold">Main Filters:</h3>
+                <div className="grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-5">
+                  {/* Sales Document Type */}
+                  <FormField
+                    control={form.control}
+                    name="docType"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Sales Document Type:</FormLabel>
+                        <FormControl>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger className="h-7.5 w-full">
+                              <SelectValue placeholder="Select Document Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All</SelectItem>
+                              <SelectItem value="deliveryOrder">Sales Delivery Order</SelectItem>
+                              <SelectItem value="salesInvoice">Sales Invoice</SelectItem>
+                              <SelectItem value="cashSales">Cash Sales</SelectItem>
+                              <SelectItem value="salesDebitNote">Sales Debit Note</SelectItem>
+                              <SelectItem value="salesCreditNote">Sales Credit Note</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Doc No */}
+                  <FormField
+                    control={form.control}
+                    name="docNo"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Doc No:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* From Date */}
+                  <FormField
+                    control={form.control}
+                    name="startDate"
+                    render={({ field }) => (
+                      <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                        <FormLabel>From Date:</FormLabel>
+                        <Popover open={fromDateOpen} onOpenChange={setFromDateOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                className={cn(
+                                  "flex h-7.5 w-full",
+                                  !field.value && "text-muted-foreground",
+                                )}
+                                variant="outline"
+                                size="sm"
+                              >
+                                {field.value
+                                  ? moment.unix(field.value).format(DATE_FORMAT)
+                                  : moment().format(DATE_FORMAT)}
+                                <CalendarIcon className="ml-auto h-4 w-4 text-gray-400" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={
+                                field.value ? moment.unix(field.value).toDate() : new Date()
+                              }
+                              onSelect={(date) => {
+                                const unixTimestamp = date
+                                  ? Math.floor(date.getTime() / 1000)
+                                  : Math.floor(Date.now() / 1000);
+                                field.onChange(unixTimestamp.toString());
+                                setFromDateOpen(false);
+                              }}
+                              initialFocus
+                              defaultMonth={
+                                field.value ? moment.unix(field.value).toDate() : new Date()
+                              }
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* To Date */}
+                  <FormField
+                    control={form.control}
+                    name="endDate"
+                    render={({ field }) => (
+                      <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                        <FormLabel>To Date:</FormLabel>
+                        <Popover open={toDateOpen} onOpenChange={setToDateOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                className={cn(
+                                  "flex h-7.5 w-full",
+                                  !field.value && "text-muted-foreground",
+                                )}
+                                variant="outline"
+                                size="sm"
+                              >
+                                {field.value
+                                  ? moment.unix(field.value).format(DATE_FORMAT)
+                                  : moment().format(DATE_FORMAT)}
+                                <CalendarIcon className="ml-auto h-4 w-4 text-gray-400" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={
+                                field.value ? moment.unix(field.value).toDate() : new Date()
+                              }
+                              onSelect={(date) => {
+                                const endOfDay = date ? new Date(date) : new Date();
+                                endOfDay.setHours(23, 59, 59, 999);
+                                const unixTimestamp = Math.floor(endOfDay.getTime() / 1000);
+                                field.onChange(unixTimestamp.toString());
+                                setToDateOpen(false);
+                              }}
+                              initialFocus
+                              defaultMonth={
+                                field.value ? moment.unix(field.value).toDate() : new Date()
+                              }
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Separator Line */}
+              <hr className="my-6 border-gray-300" />
+
+              {/* Column Filters Section */}
+              <div className="mb-4">
+                <h3 className="text-md mb-2 font-semibold">Column Filters:</h3>
+                <div className="grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-5">
+                  {/* Doc Date */}
+                  <FormField
+                    control={form.control}
+                    name="docDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Doc Date:</FormLabel>
+                        <Popover open={docDateOpen} onOpenChange={setDocDateOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                className={cn(
+                                  "flex h-7.5 w-full",
+                                  !field.value && "text-muted-foreground",
+                                )}
+                                variant="outline"
+                                size="sm"
+                              >
+                                {field.value ? moment.unix(field.value).format(DATE_FORMAT) : ""}
+                                <CalendarIcon className="ml-auto h-4 w-4 text-gray-400" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value ? moment.unix(field.value).toDate() : undefined}
+                              onSelect={(date) => {
+                                if (date) {
+                                  const unixTimestamp = Math.floor(date.getTime() / 1000);
+                                  field.onChange(unixTimestamp.toString());
+                                } else {
+                                  field.onChange("");
+                                }
+                                setDocDateOpen(false);
+                              }}
+                              initialFocus
+                              defaultMonth={
+                                field.value ? moment.unix(field.value).toDate() : new Date()
+                              }
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Item Code */}
+                  <FormField
+                    control={form.control}
+                    name="itemCode"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Item Code:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Item Cost */}
+                  <FormField
+                    control={form.control}
+                    name="itemCost"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Item Cost:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Item Price */}
+                  <FormField
+                    control={form.control}
+                    name="price"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Item Price:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Item P/L */}
+                  <FormField
+                    control={form.control}
+                    name="itemProfitLoss"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Item P/L:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 text-right" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="mt-4 grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-5">
+                  {/* Status */}
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Status:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 text-right" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Percentage */}
+                  <FormField
+                    control={form.control}
+                    name="profitLossPercentage"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1">
+                        <FormLabel>Percentage:</FormLabel>
+                        <FormControl>
+                          <Input className="h-7.5 text-right" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="mr-16 mt-6 flex flex-row justify-center space-x-4">
+                <Button
+                  type="button"
+                  className="erp-blue-12 w-28 text-white hover:bg-blue-800"
+                  onClick={form.handleSubmit(handleSubmitWithValidation)}
+                >
+                  Generate
+                </Button>
+                <Button
+                  type="button"
+                  className="erp-blue-12 w-28 text-white hover:bg-blue-800"
+                  // onClick={handlePreview}
+                  onClick={() => {
+                    if (generatedReport.length == 0) {
+                      setIsAlertOpen(true);
+                      return false;
+                    }
+                    setIsVariantAvailable(true);
+                  }}
+                >
+                  Preview
+                </Button>
+                <Button
+                  type="button"
+                  className="erp-blue-12 w-28 text-white hover:bg-blue-800"
+                  onClick={handleReset}
+                >
+                  Reset
+                </Button>
+                {systemAccount === "dev" || systemAccount === "infollectivetesting" ? (
+                  <>
+                    <ReportPreviewButton
+                      form={form}
+                      formData={values}
+                      previewType={"SALES PROFIT LOSS"}
+                      docType={docType}
+                      reportType={"salesProfitLoss"}
+                      modelType={"sales"}
+                      filterFields={filterFields}
+                      sorting={sorting}
+                      generatedReport={generatedReport}
+                      setIsAlertOpen={setIsAlertOpen}
+                      showPreviewDialog={showDialog}
+                      setShowPreviewDialog={setShowDialog}
+                      sortBy={"docDateFormat"}
+                    />
+                  </>
+                ) : null}
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <Dialog open={isVariantAvailable} onOpenChange={setIsVariantAvailable}>
+        <DialogContent className="max-w-l rounded-md bg-white p-6">
+          <Form {...form}>
+            <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+              <h2 className="text-center text-lg font-semibold">Select Report</h2>
+
+              <div className="h-[160px] overflow-auto border border-gray-300 bg-white">
+                {selectedReportList?.map((report) => (
+                  <div
+                    key={report.id}
+                    onClick={() => setSelectedReport(report.id)}
+                    className={`cursor-pointer px-3 py-1 text-sm
+            hover:bg-blue-100
+            ${selectedReport === report.id ? "bg-blue-600 text-white" : ""}`}
+                  >
+                    {report.name}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-[10px] flex justify-center gap-4 p-10">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setIsVariantAvailable(false)}
+                  className="h-10 w-40 bg-erp-blue-14 text-white hover:bg-erp-blue-13 hover:text-white"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handlePreview}
+                  className="h-10 w-40 border border-erp-blue-14 bg-white text-erp-blue-14"
+                >
+                  OK
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dialog */}
+      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+        <DialogContent className="max-w-6xl">
+          <DialogTitle className="flex items-center justify-between">
+            <span>{reportType} - Report Preview</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Orientation:</span>
+              <Button
+                type="button"
+                variant={orientation === "portrait" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setOrientation("portrait")}
+                className="h-8 px-3"
+              >
+                Portrait
+              </Button>
+              <Button
+                type="button"
+                variant={orientation === "landscape" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setOrientation("landscape")}
+                className="h-8 px-3"
+              >
+                Landscape
+              </Button>
+            </div>
+          </DialogTitle>
+          <div className="relative h-[550px] w-full">
+            {previewPDF ? (
+              <PDFViewer width="100%" height="100%" className="absolute inset-0">
+                <SalesReport
+                  type={reportType}
+                  data={previewPDF}
+                  salesReportData={salesReportData}
+                  salesReportColumns={activePreviewColumns}
+                  generatedReport={generatedReport}
+                  orientation={orientation}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <p className="animate-pulse text-lg">
+                  Loading preview
+                  <span className="ml-1 inline-block">
+                    <span>. </span>
+                    <span className="animation-delay-200">. </span>
+                    <span className="animation-delay-400">.</span>
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex !justify-center gap-x-2">
+            <PDFDownloadLink
+              document={
+                <SalesReport
+                  type={reportType}
+                  data={previewPDF}
+                  salesReportData={salesReportData}
+                  salesReportColumns={activePreviewColumns}
+                  generatedReport={generatedReport}
+                  orientation={orientation}
+                />
+              }
+              fileName={`${previewPDF?.currentCompany?.company || ""} - ${reportType} ${orientation}.pdf`}
+              className={cn(buttonVariants({ variant: "default" }), "mt-2 sm:mt-0")}
+            >
+              {({ loading }) => (loading ? "Preparing..." : "Download PDF")}
+            </PDFDownloadLink>
+            <DialogClose
+              className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0")}
+              onClick={() => setShowPreviewDialog(false)}
+            >
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Option Dialog */}
+      {/* <Dialog open={showOptionDialog} onOpenChange={setShowOptionDialog}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Select Report</DialogTitle>
+          
+          <div className="flex flex-col gap-4 py-4">
+            <Button
+              variant="outline"
+              className="w-full justify-start text-left h-auto py-3 px-4 border-erp-blue-10 hover:bg-erp-blue-1 hover:text-erp-blue-10"
+              onClick={handleSelectLevel1PL}>
+              Sales Profit/Loss Report
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start text-left h-auto py-3 px-4 border-erp-blue-10 hover:bg-erp-blue-1 hover:text-erp-blue-10"
+              onClick={handleSelectLevel2PL}>
+              Sales Profit/Loss Report - Level 2
+            </Button>    
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowOptionDialog(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>  
+      </Dialog> */}
+
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent className="max-w-sm">
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-md text-center text-erp-blue-14">kindly generate first.</p>
+          </div>
+          <AlertDialogFooter className="mt-2 flex items-center !justify-center justify-center gap-3 [&>*]:m-0">
+            <AlertDialogAction className="h-9 w-24" autoFocus onClick={() => setShowDialog(false)}>
+              Close
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

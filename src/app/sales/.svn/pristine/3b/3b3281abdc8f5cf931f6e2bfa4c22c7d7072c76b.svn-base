@@ -1,0 +1,1126 @@
+"use client";
+
+import React from "react";
+import { useEffect, useState, useRef } from "react";
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Card,
+  CardContent,
+  CardTitle,
+} from "@/components/ui/card"
+import { FaMagnifyingGlass } from "react-icons/fa6";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import DropdownTable from "@/components/data-table/DropdownTable";
+
+type Params = {
+  form: any;
+  consolidateEInvoiceDetails: [];
+  tempRowConsolidateEInvoiceDetailsList?: any[];
+  preferenceData?: any;
+  consolidateEInvoiceData?: any;
+};
+
+export function EInvoiceDetailsForm({
+  form,
+  consolidateEInvoiceDetails,
+  tempRowConsolidateEInvoiceDetailsList,
+  preferenceData,
+  consolidateEInvoiceData,
+}: Params) {
+  const headers = getAuthHeaders();
+  const [discountRateReadOnly, setDiscountRateReadOnly] = useState(false)
+  const [discountAmountReadOnly, setDiscountAmountReadOnly] = useState(false)
+
+  const handleFieldChange = (e, decimalPoint: 2) => {
+    let newValue = e.target.value
+      .replace(/(?<=\.\d*)\./g, "")  // Allow only one decimal point
+      .replace(/[^\d.]/g, "")        // Remove non-numeric characters except dot
+      .replace(".", "");             // Ensure only one decimal point is kept
+
+    // Ensure the value is correctly formatted with the specified decimal places
+    newValue =
+      (newValue.substr(0, newValue.length - decimalPoint)
+        ? newValue.substr(0, newValue.length - decimalPoint)
+        : "0") +
+      "." +
+      newValue.slice(newValue.length - decimalPoint);
+
+    // Convert to number with fixed decimal places
+    newValue = Number(newValue).toFixed(decimalPoint);
+
+    // Update form value with the formatted number
+    form.setValue(e.target.name, newValue);
+
+    switch (e.target.name) {
+      case "discountRate": {
+        // calculate discountAmount
+      }
+      case "discountAmount": {
+        // calculate discountRate
+      }
+      case "feeRate": {
+        // calculate feeAmount
+      }
+      case "feeAmount": {
+        // calculate feeRate
+      }
+
+    }
+    updateTaxRelatedFields({ totalSubTotalEInvoice, totalDiscountAmount, totalFeeAmount, totalTaxAmount })
+  };
+
+  const [feeRateReadOnly, setFeeRateReadOnly] = useState(false)
+  const [feeAmountReadOnly, setFeeAmountReadOnly] = useState(false)
+  const [totalSubTotalEInvoice, setTotalSubTotalEInvoice] = useState(0);
+  const [totalDiscountAmount, setTotalDiscountAmount] = useState(0)
+  const [totalFeeAmount, setTotalFeeAmount] = useState(0)
+  const [totalTaxAmount, setTotalTaxAmount] = useState(0)
+
+  // Add state to track manual rounding changes
+  const [isRoundingManuallyChanged, setIsRoundingManuallyChanged] = useState(false);
+
+  // Get decimal places from preference data
+  const decimal = preferenceData?.data?.decimal || 2;
+
+  // Use tempRowConsolidateEInvoiceDetailsList if available, otherwise use consolidateEInvoiceDetails
+  const currentConsolidateEInvoiceDetails = tempRowConsolidateEInvoiceDetailsList && tempRowConsolidateEInvoiceDetailsList.length > 0
+    ? tempRowConsolidateEInvoiceDetailsList
+    : consolidateEInvoiceDetails || [];
+
+  const updateTaxRelatedFields = ({ totalSubTotalEInvoice, totalDiscountAmount, totalFeeAmount, totalTaxAmount }) => {
+    const totalExclTax = totalSubTotalEInvoice - totalDiscountAmount + totalFeeAmount;
+    const totalInclTax = totalSubTotalEInvoice - totalDiscountAmount + totalTaxAmount + totalFeeAmount;
+    const prepaymentAmount = form.getValues("prepaymentAmount") ? Number(form.getValues("prepaymentAmount")) : 0;
+
+    // Calculate total payable before rounding
+    let totalPayableBeforeRounding = totalSubTotalEInvoice - totalDiscountAmount + totalTaxAmount - prepaymentAmount + totalFeeAmount;
+
+    // Calculate automatic rounding amount (round to nearest 5 cents)
+    const roundedTotalPayable = Math.round(totalPayableBeforeRounding * 20) / 20;
+
+    // Fix floating-point precision issue by rounding to 2 decimal places
+    const autoRoundingAmount = parseFloat((roundedTotalPayable - totalPayableBeforeRounding).toFixed(decimal));
+
+    // Use manual rounding amount if it was manually changed, otherwise use automatic calculation
+    const currentRoundingAmount = form.getValues("roundingAmount") ? Number(form.getValues("roundingAmount")) : 0;
+    const finalRoundingAmount = isRoundingManuallyChanged ? currentRoundingAmount : autoRoundingAmount;
+
+    // Final total payable with rounding applied
+    const totalPayableAmount = totalPayableBeforeRounding + finalRoundingAmount;
+
+    form.setValue("taxAmount", totalTaxAmount.toFixed(decimal));
+    form.setValue("totalExclTax", totalExclTax.toFixed(decimal));
+    form.setValue("totalNetAmount", totalExclTax.toFixed(decimal));
+    form.setValue("totalInclTax", totalInclTax.toFixed(decimal));
+    form.setValue("totalPayableAmount", totalPayableAmount.toFixed(decimal));
+
+    // Only auto-set rounding amount if it hasn't been manually changed
+    if (!isRoundingManuallyChanged) {
+      form.setValue("roundingAmount", autoRoundingAmount.toFixed(decimal));
+    }
+  };
+
+  useEffect(() => {
+    var totalSubTotalEInvoice = 0;
+    var totalDiscountAmount = 0;
+    var totalFeeAmount = 0;
+    var totalTaxAmount = 0;
+
+    currentConsolidateEInvoiceDetails.forEach((detail: any) => {
+      // Use subTotalEInvoice if available, otherwise calculate from amount
+      totalSubTotalEInvoice += detail.subTotalEInvoice ? Number(detail.subTotalEInvoice) : (detail.amount ? Number(detail.amount) : 0);
+
+      // Sum all three discount tiers
+      const discount1 = detail.discountAmount ? Number(detail.discountAmount) : 0;
+      const discount2 = detail.discountAmount2 ? Number(detail.discountAmount2) : 0;
+      const discount3 = detail.discountAmount3 ? Number(detail.discountAmount3) : 0;
+      totalDiscountAmount += discount1 + discount2 + discount3;
+
+      totalFeeAmount += detail.feeAmount ? Number(detail.feeAmount) : 0;
+      totalTaxAmount += detail.taxAmount ? Number(detail.taxAmount) : 0;
+    });
+
+    // Check if there's an existing rounding amount from form data on initial load
+    const existingRoundingAmount = consolidateEInvoiceData?.roundingAmount;
+
+    let useExistingRounding = Number(existingRoundingAmount) !== 0 && !isRoundingManuallyChanged;
+
+    if (useExistingRounding) {
+      // If there's an existing non-zero rounding amount, mark it as manually changed
+      setIsRoundingManuallyChanged(true);
+    } else {
+      // Nothing
+    }
+
+    updateTaxRelatedFields({ totalSubTotalEInvoice, totalDiscountAmount, totalFeeAmount, totalTaxAmount });
+
+    setTotalSubTotalEInvoice(totalSubTotalEInvoice);
+    setTotalDiscountAmount(totalDiscountAmount);
+    setTotalFeeAmount(totalFeeAmount);
+    setTotalTaxAmount(totalTaxAmount);
+  }, [currentConsolidateEInvoiceDetails, preferenceData, form.watch("prepaymentAmount"), consolidateEInvoiceData]);
+
+  const handleClickOutside = (event) => {
+
+    if (taxDropdownRef.current && !taxDropdownRef.current.contains(event.target) && taxCodeInputRef.current !== event.target) {
+      setShowTaxTable(false);
+    }
+    if (frequencyDropdownRef.current && !frequencyDropdownRef.current.contains(event.target) && frequencyCodeInputRef.current !== event.target) {
+      setShowFrequencyTable(false);
+    }
+  };
+
+  // Attach click event listener to the document body
+  useEffect(() => {
+    document.body.addEventListener('click', handleClickOutside);
+
+    // Cleanup: remove event listener when component unmounts
+    return () => {
+      document.body.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  const [taxDropdownData, setTaxDropdownData] = useState<[]>([]);
+  const [showTaxTable, setShowTaxTable] = useState(false)
+
+  const [frequencyDropdownData, setFrequencyDropdownData] = useState<[]>([]);
+  const [showFrequencyTable, setShowFrequencyTable] = useState(false)
+
+  const dropdownTaxColumns = [
+    { accessorKey: "taxCode", header: "Tax Code", },
+    { accessorKey: "taxTypeCode", header: "Tax Type", },
+    { accessorKey: "taxRate", header: "Tax Rate", },
+    { accessorKey: "description", header: "Description", },
+  ];
+
+  const dropdownFrequencyColumns = [
+    { accessorKey: "code", header: "Frequency", },
+    { accessorKey: "description", header: "Description", },
+  ];
+
+  const taxCodeInputRef = useRef(null);
+  const taxDropdownRef = useRef(null);
+
+  const frequencyCodeInputRef = useRef(null);
+  const frequencyDropdownRef = useRef(null);
+
+  const onClickRowTax = (row) => {
+    form.setValue("tax", row.UUID);
+    form.setValue("taxCode", row.taxCode);
+    form.setValue("taxTypeCode", row.taxTypeCode);
+    form.setValue("taxRate", isNaN(row.taxRate) ? "0" : row.taxRate); // Ensure taxRate is numerical or set to 0
+
+    updateTaxRelatedFields({ totalSubTotalEInvoice, totalDiscountAmount, totalFeeAmount, totalTaxAmount });
+
+    setShowTaxTable(false);
+  }
+
+  const onClickRowFrequency = (row) => {
+    form.setValue("frequency", row.UUID)
+    form.setValue("frequencyCode", row.code)
+    setShowFrequencyTable(false)
+  }
+
+  useEffect(() => {
+    form.setValue("eInvoiceType", "01");
+    form.setValue("eInvoiceTypeDescription", "Consolidate E-Invoice");
+
+  }, [form]);
+
+  const fetchTaxDropdownData = async () => {
+    try {
+      var form_data = new FormData()
+      form_data.append(`table[0]`, "tax")
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch dropdown data');
+      }
+      const data = await response.json();
+      setTaxDropdownData(data.rows)
+      setShowTaxTable(true);
+    } catch (error) {
+      throw new Error('Failed to fetch dropdown data');
+    }
+  };
+
+  const fetchFrequencyDropdownData = async () => {
+    try {
+      var form_data = new FormData()
+      form_data.append(`table[0]`, "frequency")
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch dropdown data');
+      }
+      const data = await response.json();
+      setFrequencyDropdownData(data.rows)
+      setShowFrequencyTable(true);
+    } catch (error) {
+      throw new Error('Failed to fetch dropdown data');
+    }
+  };
+
+  return (
+    <Card className="w-full border-none !shadow-none">
+      <div className="px-0.5 pt-1.5">
+        <CardTitle className="text-sm font-bold">Document Details</CardTitle>
+      </div>
+      <CardContent className="p-0">
+        <Form {...form}>
+          <form>
+            <div className="flex flex-col gap-y-2.5 pt-1.5">
+
+              {/* First Row */}
+              <div className="grid grid-cols-2 items-center gap-x-2">
+                {/* Version */}
+                <FormField
+                  control={form.control}
+                  name="eInvoiceVersion"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md bg-erp-gray-1 border-gray-200 px-2 text-[11px] text-black focus-visible:ring-0 focus-visible:outline-none"
+                                readOnly
+                                {...field}
+                                placeholder="Version"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Version
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Type */}
+                <FormField
+                  control={form.control}
+                  name="eInvoiceType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md bg-erp-gray-1 border-gray-200 px-2 text-[11px] text-black focus-visible:ring-0 focus-visible:outline-none"
+                                readOnly
+                                {...field}
+                                value="01"
+                                placeholder="Type"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Type
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Second Row */}
+              <div className="grid grid-cols-2 items-center gap-x-2">
+
+                {/* Type Description */}
+                <FormField
+                  control={form.control}
+                  name="eInvoiceTypeDescription"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md bg-erp-gray-1 border-gray-200 px-2 text-[11px] text-black focus-visible:ring-0 focus-visible:outline-none"
+                                readOnly
+                                {...field}
+                                value="Consolidate E-Invoice"
+                                placeholder="Type Description"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Type Description
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Code */}
+                <FormField
+                  control={form.control}
+                  name="eInvoiceCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md bg-erp-gray-1 border-gray-200 px-2 text-[11px] text-black focus-visible:ring-0 focus-visible:outline-none"
+                                readOnly
+                                {...field}
+                                placeholder="Code"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Code
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+              </div>
+
+              {/* Third Row */}
+              <div className="grid grid-cols-2 items-center gap-x-2">
+
+                {/* Digital Signature */}
+                <FormField
+                  control={form.control}
+                  name="digitalSignature"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md bg-erp-gray-1 border-gray-200 px-2 text-[11px] text-black focus-visible:ring-0 focus-visible:outline-none"
+                                readOnly
+                                {...field}
+                                placeholder="Digital Signature"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Digital Signature
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Frequency UUID */}
+                <FormField
+                  control={form.control}
+                  name="frequency"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormLabel>UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Frequency Code */}
+                <FormField
+                  control={form.control}
+                  name="frequencyCode"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl className="relative">
+                        <div className="relative">
+                          <TooltipProvider delayDuration={1000}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Input
+                                  className="h-7 rounded-md px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                  {...field}
+                                  onClick={fetchFrequencyDropdownData}
+                                  ref={frequencyCodeInputRef}
+                                  autoComplete="off"
+                                  placeholder="Frequency Of Billing"
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" align="center">
+                                Frequency Of Billing
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="size-3 text-gray-400" />
+                          </div>
+                          {showFrequencyTable && (
+                            <div
+                              ref={frequencyDropdownRef}
+                              className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownFrequencyColumns}
+                                  data={frequencyDropdownData}
+                                  onClickRow={onClickRowFrequency}
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Billing Period */}
+                <FormField
+                  control={form.control}
+                  name="billingPeriod"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                moduleName="consolidatedInvoice"
+                                fieldName="billingPeriod"
+                                columnName="Billing Period"
+                                placeholder="Billing Period"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Billing Period
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {/* Ori Ref No */}
+                <FormField
+                  control={form.control}
+                  name="oriRefNo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md bg-erp-gray-1 border-gray-200 px-2 text-[11px] text-black focus-visible:ring-0 focus-visible:outline-none"
+                                readOnly
+                                {...field}
+                                placeholder="Ori Ref No"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Ori Ref No
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Forth Row */}
+              <div className="flex hidden items-center justify-center gap-x-2">
+                {/* Tax */}
+                <FormField
+                  control={form.control}
+                  name="taxCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl className="relative">
+                        <div className="relative">
+                          <TooltipProvider delayDuration={1000}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Input
+                                  className="h-7 rounded-md px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                  {...field}
+                                  readOnly
+                                  onClick={fetchTaxDropdownData}
+                                  ref={taxCodeInputRef}
+                                  autoComplete="off"
+                                  placeholder="Tax"
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" align="center">
+                                Tax
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="size-3 text-gray-400" />
+                          </div>
+                          {showTaxTable && (
+                            <div
+                              ref={taxDropdownRef}
+                              className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownTaxColumns}
+                                  data={taxDropdownData}
+                                  onClickRow={onClickRowTax}
+                                />
+                                <ScrollBar orientation="vertical" />
+                              </ScrollArea>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Tax UUID */}
+                <FormField
+                  control={form.control}
+                  name="tax"
+                  render={({ field }) => (
+                    <FormItem className="flex hidden flex-col space-y-1">
+                      <FormLabel>Tax UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Tax Type */}
+                <FormField
+                  control={form.control}
+                  name="taxTypeCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md bg-erp-gray-1 px-2 text-[11px] text-black outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                readOnly
+                                placeholder="Tax Type"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Tax Type
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Tax Rate*/}
+                <FormField
+                  control={form.control}
+                  name="taxRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md bg-erp-gray-1 px-2 text-[11px] text-black outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                readOnly
+                                placeholder="Tax Rate"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Tax Rate
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Tax Amount */}
+                <FormField
+                  control={form.control}
+                  name="taxAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md bg-erp-gray-1 px-2 text-[11px] text-black outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                readOnly
+                                placeholder="Tax Amount"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Tax Amount
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Fifth Row */}
+              <div className="flex hidden items-center justify-center gap-x-2">
+                {/* Total Excl Tax*/}
+                <FormField
+                  control={form.control}
+                  name="totalExclTax"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md bg-erp-gray-1 px-2 text-[11px] text-black outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                readOnly
+                                placeholder="Total Excl Tax"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Total Excl Tax
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Total Net Amount */}
+                <FormField
+                  control={form.control}
+                  name="totalNetAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md bg-erp-gray-1 px-2 text-[11px] text-black outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                readOnly
+                                placeholder="Total Net Amount"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Total Net Amount
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Total Incl Tax */}
+                <FormField
+                  control={form.control}
+                  name="totalInclTax"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md bg-erp-gray-1 px-2 text-[11px] text-black outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                readOnly
+                                placeholder="Total Incl Tax"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Total Incl Tax
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Total Payable Amount */}
+                <FormField
+                  control={form.control}
+                  name="totalPayableAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md bg-erp-gray-1 px-2 text-[11px] text-black outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                readOnly
+                                placeholder="Total Payable Amount"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Total Payable Amount
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Sixth Row */}
+              <div className="flex hidden items-center justify-start">
+                <FormField
+                  control={form.control}
+                  name="roundingAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 w-[117px] rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                value={field.value || "0.00"}
+                                readOnly
+                                onChange={(e) => {
+                                  const newValue = e.target.value;
+
+                                  // Mark as manually changed only if value is not 0
+                                  const numericValue = Number(newValue) || 0;
+
+                                  setIsRoundingManuallyChanged(numericValue !== 0);
+
+                                  form.setValue("roundingAmount", newValue);
+
+                                  // Recalculate total payable with manual rounding amount
+                                  const prepaymentAmount = form.getValues("prepaymentAmount")
+                                    ? Number(form.getValues("prepaymentAmount"))
+                                    : 0;
+                                  const totalPayableBeforeRounding =
+                                    totalSubTotalEInvoice -
+                                    totalDiscountAmount +
+                                    totalTaxAmount -
+                                    prepaymentAmount +
+                                    totalFeeAmount;
+                                  const manualRoundingAmount = Number(newValue) || 0;
+                                  const newTotalPayable =
+                                    totalPayableBeforeRounding + manualRoundingAmount;
+
+                                  form.setValue(
+                                    "totalPayableAmount",
+                                    newTotalPayable.toFixed(decimal),
+                                  );
+                                }}
+                                onBlur={() =>
+                                  updateTaxRelatedFields({
+                                    totalSubTotalEInvoice,
+                                    totalDiscountAmount,
+                                    totalFeeAmount,
+                                    totalTaxAmount,
+                                  })
+                                }
+                                placeholder="Rounding Amount"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Rounding Amount
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Seventh Row */}
+              <div className="flex hidden items-center justify-center gap-x-2">
+                {/* Discount Rate */}
+                <FormField
+                  control={form.control}
+                  name="discountRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                readOnly={discountRateReadOnly}
+                                {...field}
+                                value={field.value || "0.00"} // Default to "0.00" if empty
+                                style={
+                                  discountRateReadOnly
+                                    ? {
+                                      backgroundColor: "#f2f2f2",
+                                      color: "gray",
+                                    }
+                                    : {}
+                                }
+                                onChange={(e) => {
+                                  const newValue = e.target.value;
+                                  // Check if both discountRate and discountAmount have values
+                                  if (newValue && form.getValues("discountAmount")) {
+                                    setDiscountRateReadOnly(true);
+                                    setDiscountAmountReadOnly(true);
+                                  } else if (!(discountAmountReadOnly || discountRateReadOnly)) {
+                                    setDiscountAmountReadOnly(true);
+                                  }
+                                  handleFieldChange(e, 2);
+                                }}
+                                placeholder="Discount Rate"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="center">
+                              Discount Rate
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Discount Amount */}
+                <FormField
+                  control={form.control}
+                  name="discountAmount"
+                  render={({ field }) => {
+                    const discountAmount = form.getValues("discountAmount");
+                    const discountRate = form.getValues("discountRate");
+
+                    // Check if both fields have values and set them as read-only
+                    if (
+                      discountAmount &&
+                      discountRate &&
+                      !discountRateReadOnly &&
+                      !discountAmountReadOnly
+                    ) {
+                      setDiscountRateReadOnly(true);
+                      setDiscountAmountReadOnly(true);
+                    }
+
+                    return (
+                      <FormItem>
+                        <FormControl>
+                          <TooltipProvider delayDuration={1000}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Input
+                                  className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                  readOnly={discountAmountReadOnly}
+                                  {...field}
+                                  value={field.value || "0.00"} // Default to "0.00" if empty
+                                  style={
+                                    discountAmountReadOnly
+                                      ? {
+                                        backgroundColor: "#f2f2f2",
+                                        color: "gray",
+                                      }
+                                      : {}
+                                  }
+                                  onChange={(e) => {
+                                    if (!(discountAmountReadOnly || discountRateReadOnly)) {
+                                      setDiscountRateReadOnly(true);
+                                    }
+                                    handleFieldChange(e, 2);
+                                  }}
+                                  placeholder="Discount Amount"
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" align="center">
+                                Discount Amount
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+
+                {/* Fee Rate */}
+                <FormField
+                  control={form.control}
+                  name="feeRate"
+                  render={({ field }) => {
+                    const feeRate = form.getValues("feeRate");
+                    const feeAmount = form.getValues("feeAmount");
+
+                    // Check if both fields have values and set them as read-only
+                    if (feeRate && feeAmount && !feeRateReadOnly && !feeAmountReadOnly) {
+                      setFeeRateReadOnly(true);
+                      setFeeAmountReadOnly(true);
+                    }
+
+                    return (
+                      <FormItem>
+                        <FormControl>
+                          <TooltipProvider delayDuration={1000}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Input
+                                  className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                  readOnly={feeRateReadOnly}
+                                  {...field}
+                                  value={field.value || "0.00"} // Default to "0.00" if empty
+                                  style={
+                                    feeRateReadOnly
+                                      ? {
+                                        backgroundColor: "#f2f2f2",
+                                        color: "gray",
+                                      }
+                                      : {}
+                                  }
+                                  onChange={(e) => {
+                                    if (!(feeRateReadOnly || feeAmountReadOnly)) {
+                                      setFeeAmountReadOnly(true);
+                                    }
+                                    handleFieldChange(e, 2);
+                                  }}
+                                  placeholder="Fee Rate"
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" align="center">
+                                Fee Rate
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+
+                {/* Fee Amount */}
+                <FormField
+                  control={form.control}
+                  name="feeAmount"
+                  render={({ field }) => {
+                    const feeRate = form.getValues("feeRate");
+                    const feeAmount = form.getValues("feeAmount");
+
+                    // Check if both fields have values and set them as read-only
+                    if (feeRate && feeAmount && !feeRateReadOnly && !feeAmountReadOnly) {
+                      setFeeRateReadOnly(true);
+                      setFeeAmountReadOnly(true);
+                    }
+
+                    return (
+                      <FormItem>
+                        <FormControl>
+                          <TooltipProvider delayDuration={1000}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Input
+                                  className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                  readOnly={feeAmountReadOnly}
+                                  {...field}
+                                  value={field.value || "0.00"} // Default to "0.00" if empty
+                                  style={
+                                    feeAmountReadOnly
+                                      ? {
+                                        backgroundColor: "#f2f2f2",
+                                        color: "gray",
+                                      }
+                                      : {}
+                                  }
+                                  onChange={(e) => {
+                                    if (!(feeRateReadOnly || feeAmountReadOnly)) {
+                                      setFeeRateReadOnly(true);
+                                    }
+                                    handleFieldChange(e, 2);
+                                  }}
+                                  placeholder="Fee Amount"
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" align="center">
+                                Fee Amount
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+              </div>
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

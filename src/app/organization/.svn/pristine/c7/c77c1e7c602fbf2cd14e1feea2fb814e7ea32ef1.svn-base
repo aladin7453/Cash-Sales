@@ -1,0 +1,117 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import type { Table } from "@tanstack/react-table";
+
+import CloneButton from "@/components/data-table/ActionButton/Clone";
+import DeleteButton from "@/components/data-table/ActionButton/Delete";
+import EditButton from "@/components/data-table/ActionButton/Edit";
+import NewButton from "@/components/data-table/ActionButton/New";
+import RestoreButton from "@/components/data-table/ActionButton/Restore";
+import TrashButton from "@/components/data-table/ActionButton/Trash";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import Validity from "@/components/data-table/Validity";
+
+import ResetPasswordButton from "./ResetPassword";
+
+type Props<TData> = {
+  table: Table<TData>;
+  refreshTable: any;
+  totalNumOfRows?: number;
+  defaultColumns?: VisibilityState;
+  dataStatusBadgeDisplay?: React.ReactNode;
+};
+
+export default function UserDataTableToolbar<TData>({
+  table,
+  refreshTable,
+  defaultColumns,
+  dataStatusBadgeDisplay,
+  totalNumOfRows
+}: Props<TData>) {
+  return (
+    <div className="flex items-center justify-between p-1.5">
+      <ActionGroupStart table={table} refreshTable={refreshTable} />
+
+      <Pagination table={table} totalNumOfRows={totalNumOfRows}/>
+      
+      <ActionGroupEnd
+        table={table}
+        refreshTable={refreshTable}
+        defaultColumns={defaultColumns}
+        dataStatusBadgeDisplay={dataStatusBadgeDisplay}
+      />
+    </div>
+  );
+}
+
+function ActionGroupStart<TData>({ table, refreshTable }: Props<TData>) {
+  const [selectedRow, setSelectedRow] = useState("");
+  const [username, setUsername] = useState("");
+
+  const selectedRowModel = table.getSelectedRowModel();
+
+  useEffect(() => {
+    if (selectedRowModel.rows.length === 1) {
+      setSelectedRow(selectedRowModel.rows[0].original.UUID);
+      setUsername(selectedRowModel.rows[0].original.username);
+    }
+  }, [selectedRowModel]);
+
+  return (
+    <div className="flex flex-wrap items-center justify-start gap-x-2 p-1">
+      <NewButton destination="/organization/user/new" />
+      <EditButton
+        table={table}
+        destination={`/organization/user/edit?item=${username}&id=${selectedRow}`}
+      />
+      <CloneButton 
+        table={table} 
+        destination={`/organization/user/clone?id=${selectedRow}`} 
+      />
+      <TrashButton 
+        table={table} 
+        module={"user"} 
+        model={"user"} 
+        refreshTable={refreshTable} 
+      />
+      <RestoreButton 
+        table={table} 
+        module={"user"} 
+        model={"user"} 
+        refreshTable={refreshTable}
+      />
+      <DeleteButton 
+        table={table} 
+        module={"user"} 
+        model={"user"} 
+        refreshTable={refreshTable}
+      />
+      <ResetPasswordButton table={table} />
+    </div>
+  );
+}
+
+function ActionGroupEnd<TData>({ 
+  table, 
+  refreshTable, 
+  defaultColumns,
+  dataStatusBadgeDisplay 
+}: Props<TData>) {
+  return (
+    <div className="relative flex items-center gap-x-1 pr-1.5 text-erp-blue-14">
+      <span className="absolute -left-32">{dataStatusBadgeDisplay}</span>
+      
+      <Export table={table} module={"user"} mainModule={"organization"}/>
+      <Refresh refreshTable={refreshTable} />
+      <Validity table={table} />
+      <ColumnVisibilityToggle 
+        table={table} 
+        defaultColumns={defaultColumns} 
+      />
+    </div>
+  );
+}

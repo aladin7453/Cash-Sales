@@ -1,0 +1,250 @@
+"use client";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type Customer = {
+  UUID: string;
+  account: string;
+  company: string;
+  customerGroup: string;
+  GLCode: string;
+  location: string;
+  agent: string;
+  currency: string;
+  creditTerm: string;
+  customerName: string;
+  description: string;
+  customerCode: string;
+  BRN: string;
+  businessNature: string;
+  address: string;
+  TIN: string;
+  SSTNo: string;
+  creditLimit: string;
+  overdueLimit: string;
+  billingAddress: string;
+  TaxExNo: string;
+  TaxExNoExpiry: string;
+  approvalStatus: string;
+  rejectReason: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  valid: "0" | "1";
+  deliveryAddress: string;
+  postcode: string;
+  city: string;
+  state: string;
+  country: string;
+  companyName: string;
+  accountName: string;
+  customerGroupName: string;
+  GLCodeCode: string;
+  locationName: string;
+  salesAgent: string;
+  currencyCode: string;
+  creditTermCode: string;
+  stateCode: string;
+  countryOfOriginCode: string;
+  CreatedByUsername: string;
+  createdAtFormat: string;
+  UpdatedByUsername: string;
+  updatedAtFormat: string;
+  outstandingAmountAmount: number;
+  preferenceData?: any;
+};
+
+// Preference (Format Number Function)
+const formatNumber = (value: string | number, decimalPlaces: number = 2): string => {
+  if (value === null || value === undefined || value === '') {
+    return (0).toFixed(decimalPlaces);
+  }
+  
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  
+  if (isNaN(numValue)) {
+    return (0).toFixed(decimalPlaces);
+  }
+  
+  return numValue.toFixed(decimalPlaces);
+};
+
+
+export const columns: ColumnDef<Customer>[] = [
+  {
+    id: "customerGroupName",
+    accessorKey: "customerGroupName",
+    header: "Customer Group",
+    filterFn: "includesString",
+  },
+  {
+    id: "GLCode",
+    accessorKey: "GLCode",
+    header: "GL Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "salesAgent",
+    accessorKey: "salesAgent",
+    header: "Agent",
+    filterFn: "includesString",
+  },
+  {
+    id: "currencyCode",
+    accessorKey: "currencyCode",
+    header: "Currency",
+    filterFn: "includesString",
+  },
+  {
+    id: "creditTermCode",
+    accessorKey: "creditTermCode",
+    header: "Credit Terms",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerName",
+    accessorKey: "customerName",
+    header: "Customer",
+    filterFn: "includesString",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    filterFn: "includesString",
+  },
+  {
+    id: "customerCode",
+    accessorKey: "customerCode",
+    header: "Customer Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "BRN",
+    accessorKey: "BRN",
+    header: "BRN",
+    filterFn: "includesString",
+  },
+  {
+    id: "businessNature",
+    accessorKey: "businessNature",
+    header: "Business Nature",
+    filterFn: "includesString",
+  },
+  {
+    id: "MISCCode",
+    accessorKey: "MISCCode",
+    header: "MSIC Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "address",
+    accessorKey: "address",
+    header: "Address",
+    filterFn: "includesString",
+  },
+  {
+    id: "TIN",
+    accessorKey: "TIN",
+    header: "TIN",
+    filterFn: "includesString",
+  },
+  {
+    id: "SSTNo",
+    accessorKey: "SSTNo",
+    header: "SST No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "creditLimit",
+    accessorKey: "creditLimit",
+    header: "Credit Limit",
+    filterFn: "includesString",
+  },
+  {
+    id: "overdueLimit",
+    accessorKey: "overdueLimit",
+    header: "Overdue Limit",
+    filterFn: "includesString",
+  },
+  {
+    id: "outstandingAmountAmount",
+    accessorKey: "outstandingAmountAmount",
+    header: "Outstanding Amount",
+    // Preference (Format Number Implementation)
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.totalSubtotal, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  // {
+  //   id: "overdue",
+  //   accessorKey: "overdue",
+  //   header: "Overdue",
+  //   filterFn: "includesString",
+  // },
+  {
+    id: "TaxExNo",
+    accessorKey: "TaxExNo",
+    header: "Tax Ex. No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "TaxExNoExpiry",
+    accessorKey: "TaxExNoExpiry",
+    header: "Tax Ex. No. Expiry",
+    filterFn: "includesString",
+  },
+  {
+    id: "approvalStatus",
+    accessorKey: "approvalStatus",
+    header: "Approval Status",
+    filterFn: "includesString",
+  },
+  {
+    id: "rejectReason",
+    accessorKey: "rejectReason",
+    header: "Reject Reason",
+    filterFn: "includesString",
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+    filterFn: "includesString",
+  },
+  {
+    id: "CreatedByUsername",
+    accessorKey: "CreatedByUsername",
+    header: "Created by",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+    filterFn: "includesString",
+  },
+  {
+    id: "UpdatedByUsername",
+    accessorKey: "UpdatedByUsername",
+    header: "Updated by",
+    filterFn: "includesString",
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as Customer["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    filterFn: "includesString",
+  },
+];

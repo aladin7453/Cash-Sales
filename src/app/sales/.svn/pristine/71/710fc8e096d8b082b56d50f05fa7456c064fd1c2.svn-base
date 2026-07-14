@@ -1,0 +1,1013 @@
+"use client";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+
+import type { ColumnDef } from "@tanstack/react-table";
+import {autoWordSize} from "@/lib/constants";
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+export type CashSales = {
+  UUID: string;
+  docNo: string;
+  docDate: string;
+  salesAgent: string;
+  servicingAgent: string;
+  collectionAgent: string;
+  salesAgentName: string;
+  servicingAgentName: string;
+  collectionAgentName: string;
+  dealer: string;
+  creditTerm: string;
+  customerCode: string;
+  customerName: string;
+  BRN: string;
+  TIN: string;
+  SSTNo: string;
+  address: string;
+  attention: string;
+  phoneNo: string;
+  email: string;
+  paymentMethod: string;
+  bankCharge: string;
+  chequeNo: string;
+  paidAmount: string;
+  paymentProject: string;
+  currency: string;
+  currencyRate: string;
+  project: string;
+  docValidity: string;
+  shipper: string;
+  taxExNo: string;
+  remark1: string;
+  remark2: string;
+  remark3: string;
+  remark4: string;
+  quotation: string;
+  salesOrder: string;
+  jobOrder: string;
+  deliveryOrder: string;
+  deliveryTerm: string;
+  deliveryAddress: string;
+  postingDate: string;
+  taxDate: string;
+  note: string;
+  attachment: string;
+  attachmentLink?: {
+    name: string;
+    link: string;
+  }[];
+  attachmentFiles?: any[];
+  description: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  valid: "0" | "1";
+  _version: string;
+  _actionUUID: string;
+  totalAmount: string;
+  totalDiscount: string;
+  totalTax: string;
+  totalPayable: string;
+  totalFeeAmount: string;
+  totalSubtotal: string;
+  additionalDiscount: string;
+  account: string;
+  company: string;
+  invoiceType: string;
+  id: string;
+  totalTaxAmount: string;
+  totalLocalTaxAmount: string;
+  currencyCode: string;
+  dealerName: string;
+  attentionName: string;
+  creditTermCode: string;
+  customerCodeCode: string;
+  paymentMethodCode: string;
+  totalRecord: string;
+  totalQuantity: string;
+  totalSubtotalTax: string;
+  netTotal: string;
+  localNetTotal: string;
+  totalNetAmount: string;
+  totalExclTax: string;
+  totalInclTax: string;
+  projectCode: string;
+  shipperCode: string;
+  quotationDocNo: string;
+  salesOrderDocNo: string;
+  docDateFormat: string;
+  postingDateFormat: string;
+  createdAtFormat: string;
+  updatedAtFormat: string;
+  CreatedByUsername: string;
+  UpdatedByUsername: string;
+  approvalUUID: string;
+  approvalStatus: string;
+  rejectReason: string;
+  consolidatedInvoiceDocNo: string;
+  preferenceData?: any;
+};
+
+// Preference (Format Number Function)
+const formatNumber = (value: string | number, decimalPlaces: number = 2): string => {
+  if (value === null || value === undefined || value === '') {
+    return (0).toFixed(decimalPlaces);
+  }
+
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+
+  if (isNaN(numValue)) {
+    return (0).toFixed(decimalPlaces);
+  }
+
+  return numValue.toFixed(decimalPlaces);
+};
+
+export const rawColumns: ColumnDef<CashSales>[] = [
+  {
+    id: "docNo",
+    accessorKey: "docNo",
+    header: "Doc.No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "docDateFormat",
+    accessorKey: "docDateFormat",
+    header: "Doc. Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "salesAgentName",
+    accessorKey: "salesAgentName",
+    header: "Sales Agent",
+    filterFn: "includesString",
+  },
+  {
+    id: "servicingAgentName",
+    accessorKey: "servicingAgentName",
+    header: "Servicing Agent",
+    filterFn: "includesString",
+  },
+  {
+    id: "collectionAgentName",
+    accessorKey: "collectionAgentName",
+    header: "Collection Agent",
+    filterFn: "includesString",
+  },
+  {
+    id: "dealerName",
+    accessorKey: "dealerName",
+    header: "Dealer",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerCodeCode",
+    accessorKey: "customerCodeCode",
+    header: "Customer Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerName",
+    accessorKey: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+  },
+  {
+    id: "BRN",
+    accessorKey: "BRN",
+    header: "BRN",
+    filterFn: "includesString",
+  },
+  {
+    id: "TIN",
+    accessorKey: "TIN",
+    header: "TIN",
+    filterFn: "includesString",
+  },
+  {
+    id: "SSTNo",
+    accessorKey: "SSTNo",
+    header: "SSTNo",
+    filterFn: "includesString",
+  },
+  {
+    id: "address",
+    accessorKey: "address",
+    header: "Address",
+    filterFn: "includesString",
+  },
+  {
+    id: "attentionName",
+    accessorKey: "attentionName",
+    header: "Attention",
+    filterFn: "includesString",
+  },
+  {
+    id: "phoneNo",
+    accessorKey: "phoneNo",
+    header: "Phone No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "email",
+    accessorKey: "email",
+    header: "Email",
+    filterFn: "includesString",
+  },
+  {
+    id: "bankCharge",
+    accessorKey: "bankCharge",
+    header: "Bank Charge",
+    // Preference (Format Number Implementation)
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.bankCharge, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "chequeNo",
+    accessorKey: "chequeNo",
+    header: "Cheque No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "paidAmount",
+    accessorKey: "paidAmount",
+    header: "Tender Amount",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.paidAmount, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "paymentProject",
+    accessorKey: "paymentProject",
+    header: "Payment Project",
+    filterFn: "includesString",
+  },
+  {
+    id: "totalRecord",
+    accessorKey: "totalRecord",
+    header: "Total Record",
+    filterFn: "includesString",
+  },
+  {
+    id: "totalQuantity",
+    accessorKey: "totalQuantity",
+    header: "Total Quantity",
+    filterFn: "includesString",
+  },
+  {
+    id: "totalSubtotal",
+    accessorKey: "totalSubtotal",
+    header: "Total Subtotal",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.totalSubtotal, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "totalTaxAmount",
+    accessorKey: "totalTaxAmount",
+    header: "Total Tax Amount",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.totalTaxAmount, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "totalLocalTaxAmount",
+    accessorKey: "totalLocalTaxAmount",
+    header: "Total Local Tax Amount",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.totalLocalTaxAmount, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "totalSubtotalTax",
+    accessorKey: "totalSubtotalTax",
+    header: "Total Subtotal (Tax)",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.totalSubtotalTax, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "roundingAmount",
+    accessorKey: "roundingAmount",
+    header: "Rounding Amount",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.roundingAmount, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "localNetTotal",
+    accessorKey: "localNetTotal",
+    header: "Local Net Total",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.localNetTotal, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "netTotal",
+    accessorKey: "netTotal",
+    header: "Net Total",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.netTotal, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "currencyCode",
+    accessorKey: "currencyCode",
+    header: "Currency Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "currencyRate",
+    accessorKey: "currencyRate",
+    header: "Currency Rate",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.currencyRate, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "projectCode",
+    accessorKey: "projectCode",
+    header: "Project",
+    filterFn: "includesString",
+  },
+  {
+    id: "docValidity",
+    accessorKey: "docValidity",
+    header: "Doc. Validity",
+    filterFn: "includesString",
+  },
+  {
+    id: "shipperCode",
+    accessorKey: "shipperCode",
+    header: "Shipper",
+    filterFn: "includesString",
+  },
+  {
+    id: "taxExNo",
+    accessorKey: "taxExNo",
+    header: "Tax EX",
+    filterFn: "includesString",
+  },
+  {
+    id: "remark1",
+    accessorKey: "remark1",
+    header: "Remark 1",
+    filterFn: "includesString",
+  },
+  {
+    id: "remark2",
+    accessorKey: "remark2",
+    header: "Remark 2",
+    filterFn: "includesString",
+  },
+  {
+    id: "remark3",
+    accessorKey: "remark3",
+    header: "Remark 3",
+    filterFn: "includesString",
+  },
+  {
+    id: "remark4",
+    accessorKey: "remark4",
+    header: "Remark 4",
+    filterFn: "includesString",
+  },
+  {
+    id: "quotationNo",
+    accessorKey: "quotationNo",
+    header: "QT No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "salesOrderNo",
+    accessorKey: "salesOrderNo",
+    header: "SO No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerPaymentNo",
+    accessorKey: "customerPaymentNo",
+    header: "OR No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "jobOrderNo",
+    accessorKey: "jobOrderNo",
+    header: "JO No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "deliveryOrderNo",
+    accessorKey: "deliveryOrderNo",
+    header: "DO No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "consolidatedInvoiceDocNo",
+    accessorKey: "consolidatedInvoiceDocNo",
+    header: "CEI No.",
+    filterFn: "includesString",
+  },
+  // {
+  //   id: "salesCreditNoteTransferred",
+  //   accessorKey: "salesCreditNoteTransferred",
+  //   header: "CN No.",
+  //   cell: ({ row }) => {
+  //     const salesCreditNoteTransferred = row.original.salesCreditNoteTransferred || {};
+
+  //     const { docNo } = salesCreditNoteTransferred;
+
+  //     return <div>{docNo || ""}</div>;
+  //   },
+  //   filterFn: "includesString",
+  // },
+  {
+    id: "deliveryTerm",
+    accessorKey: "deliveryTerm",
+    header: "Delivery Terms",
+    filterFn: "includesString",
+  },
+  {
+    id: "deliveryAddress",
+    accessorKey: "deliveryAddress",
+    header: "Delivery Address",
+    filterFn: "includesString",
+  },
+  {
+    id: "postingDateFormat",
+    accessorKey: "postingDateFormat",
+    header: "Posting Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "taxDateFormat",
+    accessorKey: "taxDateFormat",
+    header: "Tax Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "note",
+    accessorKey: "note",
+    header: "Note",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} columnName="note" />,
+    filterFn: "includesString",
+  },
+  {
+    id: "attachment",
+    accessorKey: "attachment",
+    header: "Attachment",
+    cell: ({ row }) => {
+      const attachment = row.original.attachment;
+      const attachmentLinks = row.original.attachmentLink || [];
+      const attachmentFiles = row.original.attachmentFiles || [];
+
+      // Handle new records with attachmentFiles
+      if (attachmentFiles.length > 0) {
+        return attachmentFiles
+          .map((file, index) => {
+            const link = attachmentLinks?.find((al) => al.name === file.name);
+            return link ? (
+              <a
+                key={index}
+                href={link.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "blue" }}
+              >
+                {file.name}
+              </a>
+            ) : (
+              <span key={index} style={{ color: "blue" }}>
+                {file.name}
+              </span>
+            );
+          })
+          .reduce(
+            (prev, curr, index) => (index === 0 ? [curr] : [prev, ", ", curr]),
+            []
+          );
+      }
+
+      // Handle existing records with attachment JSON
+      if (!attachment) {
+        return null;
+      }
+
+      try {
+        const attachments = JSON.parse(attachment);
+
+        if (!attachments || attachments.length === 0) {
+          return null;
+        }
+
+        return attachments
+          .map((att, index) => {
+            const link = attachmentLinks.find((al) => al.name === att.Name);
+            return link ? (
+              <a
+                key={index}
+                href={link.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "blue" }}
+              >
+                {att.Name}
+              </a>
+            ) : (
+              <span key={index} style={{ color: "gray" }}>
+                {att.Name}
+              </span>
+            );
+          })
+          .reduce((prev, curr) => [prev, ", ", curr]);
+      } catch (error) {
+        return null;
+      }
+    },
+    filterFn: filterWithStringConversion,
+  },
+  {
+    id: "supplierName",
+    accessorKey: "supplierName",
+    header: "Supplier Name",
+    filterFn: "includesString",
+  },
+  {
+    id: "supplierTIN",
+    accessorKey: "supplierTIN",
+    header: "Supplier TIN",
+    filterFn: "includesString",
+  },
+  {
+    id: "supplierBRN",
+    accessorKey: "supplierBRN",
+    header: "Supplier BRN/NRIC/Passport",
+    filterFn: "includesString",
+  },
+  {
+    id: "supplierSSTNo",
+    accessorKey: "supplierSSTNo",
+    header: "Supplier SST NO.",
+    filterFn: "includesString",
+  },
+  {
+    id: "supplierTTXNo",
+    accessorKey: "supplierTTXNo",
+    header: "TTx No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "supplierMSICCodeCode",
+    accessorKey: "supplierMSICCodeCode",
+    header: "MSIC Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "supplierBusinessNature",
+    accessorKey: "supplierBusinessNature",
+    header: "BusinessNature",
+    filterFn: "includesString",
+  },
+  {
+    id: "supplierEmail",
+    accessorKey: "supplierEmail",
+    header: "Supplier Email",
+    filterFn: "includesString",
+  },
+  {
+    id: "supplierPhoneNo",
+    accessorKey: "supplierPhoneNo",
+    header: "Supplier Phone No",
+    filterFn: "includesString",
+  },
+  {
+    id: "supplierAddress",
+    accessorKey: "supplierAddress",
+    header: "Supplier Address",
+    filterFn: "includesString",
+  },
+  {
+    id: "buyerName",
+    accessorKey: "buyerName",
+    header: "Buyer Name",
+    filterFn: "includesString",
+  },
+  {
+    id: "buyerTIN",
+    accessorKey: "buyerTIN",
+    header: "Buyer TIN",
+    filterFn: "includesString",
+  },
+  {
+    id: "buyerBRN",
+    accessorKey: "buyerBRN",
+    header: "Buyer BRN/NRIC/Passport",
+    filterFn: "includesString",
+  },
+  {
+    id: "buyerSSTNo",
+    accessorKey: "buyerSSTNo",
+    header: "Buyer SST NO.",
+    filterFn: "includesString",
+  },
+  {
+    id: "buyerEmail",
+    accessorKey: "buyerEmail",
+    header: "Buyer Email",
+    filterFn: "includesString",
+  },
+  {
+    id: "buyerPhoneNo",
+    accessorKey: "buyerPhoneNo",
+    header: "Buyer Phone No",
+    filterFn: "includesString",
+  },
+  {
+    id: "buyerAddress",
+    accessorKey: "buyerAddress",
+    header: "Buyer Address",
+    filterFn: "includesString",
+  },
+  {
+    id: "eInvoiceVersion",
+    accessorKey: "eInvoiceVersion",
+    header: "e-Invoice Version",
+    filterFn: "includesString",
+  },
+  {
+    id: "invoiceType",
+    accessorKey: "invoiceType",
+    header: "e-Invoice Type",
+    filterFn: "includesString",
+  },
+  {
+    id: "eInvoiceCode",
+    accessorKey: "eInvoiceCode",
+    header: "e-Invoice Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "oriRefNo",
+    accessorKey: "oriRefNo",
+    header: "Ori. Ref. No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "eInvoiceDateTimeFormat",
+    accessorKey: "eInvoiceDateTimeFormat",
+    header: "e-Invoice Date Time",
+    filterFn: "includesString",
+  },
+  {
+    id: "eInvoiceStatus",
+    accessorKey: "eInvoiceStatus",
+    header: "e-Invoice Status",
+    filterFn: "includesString",
+  },
+  {
+    id: "eInvoiceRejectedReason",
+    accessorKey: "eInvoiceRejectedReason",
+    header: "e-Invoice Rejected Reason",
+    filterFn: "includesString",
+  },
+  {
+    id: "cancelRejectTimeLeft",
+    accessorKey: "cancelRejectTimeLeft",
+    header: "E-Invoice Cancellation Time Left",
+    filterFn: "includesString"
+  },
+  {
+    id: "digitalSignature",
+    accessorKey: "digitalSignature",
+    header: "Digital Signature",
+    filterFn: "includesString",
+  },
+  {
+    id: "frequencyCode",
+    accessorKey: "frequencyCode",
+    header: "Frequency",
+    filterFn: "includesString",
+  },
+  {
+    id: "billingPeriod",
+    accessorKey: "billingPeriod",
+    header: "Billing Period",
+    filterFn: "includesString",
+  },
+  {
+    id: "taxCode",
+    accessorKey: "taxCode",
+    header: "Tax",
+    filterFn: "includesString",
+  },
+  {
+    id: "taxTypeCode",
+    accessorKey: "taxTypeCode",
+    header: "Tax Type",
+    filterFn: "includesString",
+  },
+  {
+    id: "taxRate",
+    accessorKey: "taxRate",
+    header: "Tax Rate",
+    cell: ({ row }) => <p className="text-right">{row.original.taxRate}</p>,
+    filterFn: "includesString",
+  },
+  {
+    id: "totalExclTax",
+    accessorKey: "totalExclTax",
+    header: "Total Excl. Tax",
+    cell: ({ row }) => <p className="text-right">{row.original.totalExclTax}</p>,
+    filterFn: "includesString",
+  },
+  {
+    id: "totalNetAmount",
+    accessorKey: "totalNetAmount",
+    header: "Total Net Amount",
+    cell: ({ row }) => {
+      const value = row.original.totalNetAmount;
+      return <div className="text-right">{value == null || isNaN(value) ? 0 : value}</div>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "totalInclTax",
+    accessorKey: "totalInclTax",
+    header: "Total Incl. Tax",
+    cell: ({ row }) => <p className="text-right">{row.original.totalInclTax}</p>,
+    filterFn: "includesString",
+  },
+  {
+    id: "totalPayableAmount",
+    accessorKey: "totalPayableAmount",
+    header: "Total Payable Amount",
+    cell: ({ row }) => <p className="text-right">{row.original.totalPayableAmount}</p>,
+    filterFn: "includesString",
+  },
+  {
+    id: "totalTaxableAmountPerTaxType",
+    accessorKey: "totalTaxableAmountPerTaxType",
+    header: "Total Taxable Amount per Tax Type",
+    cell: ({ row }) => {
+      const value = row.original.totalTaxableAmountPerTaxType;
+      return <div className="text-right">{value == null || isNaN(value) ? 0 : value}</div>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "discountRate",
+    accessorKey: "discountRate",
+    header: "Discount Rate",
+    cell: ({ row }) => {
+      const value = row.original.discountRate;
+      return <div className="text-right">{value == null || isNaN(value) ? 0 : value}</div>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "discountAmount",
+    accessorKey: "discountAmount",
+    header: "Discount Amount",
+    cell: ({ row }) => {
+      const value = row.original.discountAmount;
+      return <div className="text-right">{value == null || isNaN(value) ? 0 : value}</div>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "feeRate",
+    accessorKey: "feeRate",
+    header: "Fee Rate",
+    cell: ({ row }) => {
+      const value = row.original.feeRate;
+      return <div className="text-right">{value == null || isNaN(value) ? 0 : value}</div>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "feeAmount",
+    accessorKey: "feeAmount",
+    header: "Fee Amount",
+    cell: ({ row }) => {
+      const value = row.original.feeAmount;
+      return <div className="text-right">{value == null || isNaN(value) ? 0 : value}</div>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "paymentMethodCode",
+    accessorKey: "paymentMethodCode",
+    header: "Payment Method",
+    filterFn: "includesString",
+  },
+  {
+    id: "bankACNo",
+    accessorKey: "bankACNo",
+    header: "Bank A/C No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "paymentTerm",
+    accessorKey: "paymentTerm",
+    header: "Payment Terms",
+    filterFn: "includesString",
+  },
+  {
+    id: "prepaymentAmount",
+    accessorKey: "prepaymentAmount",
+    header: "Prepayment Amount",
+    filterFn: "includesString",
+  },
+  {
+    id: "prepaymentDateFormat",
+    accessorKey: "prepaymentDateFormat",
+    header: "Prepayment Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "prepaymentRefNo",
+    accessorKey: "prepaymentRefNo",
+    header: "Prepayment Ref. No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "billRefNo",
+    accessorKey: "billRefNo",
+    header: "Bill Ref. No.",
+    filterFn: "includesString",
+  },
+  {
+    id: "recipient",
+    accessorKey: "recipient",
+    header: "Recipient Name",
+    filterFn: "includesString",
+  },
+  {
+    id: "recipientAddress",
+    accessorKey: "recipientAddress",
+    header: "Recipient Address",
+    filterFn: "includesString",
+  },
+  {
+    id: "recipientTIN",
+    accessorKey: "recipientTIN",
+    header: "Recipient TIN",
+    filterFn: "includesString",
+  },
+  {
+    id: "recipientBRN",
+    accessorKey: "recipientBRN",
+    header: "Recipient BRN",
+    filterFn: "includesString",
+  },
+  {
+    id: "customFormRefNo1",
+    accessorKey: "customFormRefNo1",
+    header: "Ref. No. of Customs Form No. 1, 9, etc",
+    filterFn: "includesString",
+  },
+  {
+    id: "interTradeRule",
+    accessorKey: "interTradeRule",
+    header: "Incoterms",
+    filterFn: "includesString",
+  },
+  {
+    id: "tariffCode",
+    accessorKey: "tariffCode",
+    header: "Tariff Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "FTA",
+    accessorKey: "FTA",
+    header: "FTA",
+    filterFn: "includesString",
+  },
+  {
+    id: "exporterNo",
+    accessorKey: "exporterNo",
+    header: "Exporter No",
+    filterFn: "includesString",
+  },
+  {
+    id: "customFormRefNo2",
+    accessorKey: "customFormRefNo2",
+    header: "Ref. No. of Custom Form No. 2",
+    filterFn: "includesString",
+  },
+  {
+    id: "countryOfOriginCode",
+    accessorKey: "countryOfOriginCode",
+    header: "Country",
+    filterFn: "includesString",
+  },
+  {
+    id: "otherCharges",
+    accessorKey: "otherCharges",
+    header: "Other Charges",
+    filterFn: "includesString",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    filterFn: "includesString",
+  },
+  {
+    id: "approvalStatus",
+    accessorKey: "approvalStatus",
+    header: "Approval Status",
+    filterFn: "includesString",
+  },
+  {
+    id: "rejectReason",
+    accessorKey: "rejectReason",
+    header: "Reject Reason",
+    filterFn: "includesString",
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+    filterFn: "includesString",
+  },
+  {
+    id: "CreatedByUsername",
+    accessorKey: "CreatedByUsername",
+    header: "Created by",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+    filterFn: "includesString",
+  },
+  {
+    id: "UpdatedByUsername",
+    accessorKey: "UpdatedByUsername",
+    header: "Updated by",
+    filterFn: "includesString",
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as CashSales["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    filterFn: "includesString",
+  },
+];
+
+export const columns: ColumnDef<CashSales>[] = rawColumns.map(
+  (col) => {
+    if (typeof col.header === "string") {
+      const sizes = autoWordSize(col.header);
+
+      return {
+        ...col,
+        sizes,
+        size: sizes, // 👈 applied automatically
+        minSize:50
+      };
+    }
+
+    return col;
+  }
+);

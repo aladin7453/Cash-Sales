@@ -1,0 +1,28 @@
+import type { TransferToConfig } from "@/components/features/transfer/transferTo";
+import { salesInvoiceTransferToColumns } from "./columns";
+
+export const salesInvoiceTransferToConfig: TransferToConfig = {
+  module: "sales_invoice",
+  model: "sales-invoice",
+  apiNamespace: "sales",
+  transferDocType: "salesInvoice",
+  itemsEndpointSuffix: "get-sales-invoice-has-details",
+  transferEndpointSuffix: "transfer-to-data",
+  queryParam: "salesInvoiceUUID",
+  destinations: [
+    {
+      key: "salesCreditNote",
+      label: "Sales Credit Note",
+      route: "sales/sales-credit-note",
+    },
+     {
+      key: "jobOrder",
+      label: "Job Order",
+      route: "job-management/job-order",
+    },
+  ],
+  columns: salesInvoiceTransferToColumns,
+  buttonText: "T-To",
+  dialogTitle: "Transfer to",
+  popoverTitle: "Select Item",
+};

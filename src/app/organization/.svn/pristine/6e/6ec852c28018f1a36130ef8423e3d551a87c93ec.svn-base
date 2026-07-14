@@ -1,0 +1,57 @@
+"use client";
+
+import { format, parseISO } from "date-fns";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type Agreement = {
+  docNo: string;
+  docDate: string;
+  description: string;
+  attachment: string;
+  validity: 0 | 1;
+};
+
+export const agreementColumns: ColumnDef<Agreement>[] = [
+  {
+    accessorKey: "docNo",
+    header: "Doc. No.",
+    filterFn: "includesString"
+
+  },
+  {
+    accessorKey: "docDate",
+    header: "Doc. Date",
+    cell: ({ row }) => {
+      const date = row.getValue("docDate");
+      return format(parseISO(date as string), "yyyy-MM-dd h:mm:ss a");
+    },
+    filterFn: "includesString"
+
+  },
+  {
+    accessorKey: "description",
+    header: "Description",
+    filterFn: "includesString"
+
+  },
+  {
+    accessorKey: "attachment",
+    header: "Attachment (.pdf, .png, .jpg, ,jpeg)",
+    filterFn: "includesString"
+
+  },
+  {
+    accessorKey: "validity",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("validity") as Agreement["validity"];
+      return validity ? "Valid" : "Invalid";
+    },
+    // Custom filter function that first convert the row's numeric boolean
+    // value to string, then check if the string contains the filterValue
+    filterFn: filterWithStringConversion,
+  },
+];

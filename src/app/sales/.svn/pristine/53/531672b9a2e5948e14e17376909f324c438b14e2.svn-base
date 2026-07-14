@@ -1,0 +1,36 @@
+import type { TransferFromConfig } from "@/components/features/transfer/transferFrom";
+import { deliveryOrderDocumentColumns } from "./documentColumns";
+import { deliveryOrderItemColumns } from "./itemColumns";
+
+export const deliveryOrderTransferFromConfig: TransferFromConfig = {
+  module: "delivery_order",
+  model: "delivery-order",
+  apiNamespace: "sales",
+  sources: [
+    {
+      key: "quotation",
+      label: "Quotation",
+      apiDocType: "quotation",
+      transferDocType: "quotation",
+    },
+    {
+      key: "salesOrder",
+      label: "Sales Order",
+      apiDocType: "salesOrder",
+      transferDocType: "sales-order",
+    },
+    {
+      key: "jobOrder",
+      label: "Job Order",
+      apiDocType: "jobOrder",
+      transferDocType: "jobOrder",
+    },
+  ],
+  documentColumns: deliveryOrderDocumentColumns,
+  itemColumns: deliveryOrderItemColumns,
+  transferEndpointSuffix: "transfer-from",
+  buttonText: "T-From",
+  dialogTitle: "Transfer from",
+  documentPopoverTitle: "Select Document",
+  detailsPopoverTitle: "Transfer Details",
+};

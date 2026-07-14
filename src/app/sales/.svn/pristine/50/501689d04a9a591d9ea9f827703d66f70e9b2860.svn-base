@@ -1,0 +1,86 @@
+"use client";
+
+import React from "react";
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type TransferFromDocument = {
+  UUID: string;
+  docNo: string;
+  docDate: string;
+  docDateFormat: string;
+  customerCode: string;
+  customerCodeCode: string;
+  customerName: string;
+  currencyCode: string;
+  currencyCodeCode: string;
+  currencyRate: string;
+  localNetTotal: string;
+  netTotal: string;
+  projectCode: string;
+  description: string;
+  createdAt: string;
+  createdAtFormat: string;
+  createdBy: string;
+  CreatedByUsername: string;
+  updatedBy: string;
+  UpdatedByUsername: string;
+  updatedAt: string;
+  updatedAtFormat: string;
+  valid: string;
+};
+
+export const salesInvoiceDocumentColumns: ColumnDef<TransferFromDocument>[] = [
+  {
+    accessorKey: "docNo",
+    header: "Doc. No.",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "docDateFormat",
+    header: "Doc. Date",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "customerCodeCode",
+    header: "Customer Code",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "currencyCodeCode",
+    header: "Currency Code",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "currencyRate",
+    header: "Currency Rate",
+    cell: ({ row }) => <p className="text-right">{row.original.currencyRate}</p>,
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "localNetTotal",
+    header: "Local Net Total",
+    cell: ({ row }) => <p className="text-right">{row.original.localNetTotal}</p>,
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "netTotal",
+    header: "Net Total",
+    cell: ({ row }) => <p className="text-right">{row.original.netTotal}</p>,
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "projectCode",
+    header: "Project",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "description",
+    header: "Description",
+    filterFn: "includesString"
+  },
+];

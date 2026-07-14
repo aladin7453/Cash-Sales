@@ -1,0 +1,854 @@
+"use client";
+
+import {
+  ColumnFiltersState,
+  flexRender,
+  getCoreRowModel,
+  getExpandedRowModel,
+  getFilteredRowModel,
+  PaginationState,
+  SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import useSWR from "swr";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  checkAccessToken,
+  DEFAULT_DATA_TABLE_PAGE_SIZE,
+  getAuthHeaders,
+  getCurrentCompanyUUID,
+  ORIGIN,
+} from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+
+import {
+  buildFlatPermissionMap,
+  buildPermissionKey,
+  buildSectionsFromBackend,
+  normalizeKey,
+  parseRule,
+} from "../standard/utils/permissionUtils";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+import type { Section } from "./sections";
+
+export type Action =
+  | typeof VIEW_ACTION
+  | (typeof STANDARD_ACTIONS)[number]
+  | (typeof DOCUMENT_ACTIONS)[number]
+  | (typeof E_INVOICE_ACTIONS)[number];
+
+// type Row = {
+//   name: string;
+//   allowedActions: Action[];
+//   children?: Row[];
+// };
+
+const VIEW_ACTION = "View";
+
+const STANDARD_ACTIONS = [
+  "Create",
+  "Update",
+  "Clone",
+  "Throw",
+  "Restore",
+  "Reset",
+  "Delete",
+  "Download",
+  "Auth",
+  "Bill",
+  "Export",
+  "Preview",
+  "Print",
+  "Confirm",
+  "Verify",
+  "Compulsary",
+  "Generate-QR-Code",
+  "Disable",
+  "Upload",
+] as const;
+
+const DOCUMENT_ACTIONS = ["Transfer-To", "Transfer-From"] as const;
+
+const E_INVOICE_ACTIONS = ["Generate", "Edit", "Submit", "Cancel", "Share"] as const;
+
+const SCOPE_OPTION = [
+  { id: "personal", name: "Personal" },
+  { id: "personal-supervisor", name: "Personal + Supervisor" },
+  { id: "personal-subordinate", name: "Personal + Subordinate" },
+  { id: "all", name: "All" },
+];
+
+let tokenValidationPromise: Promise<boolean> | null = null;
+
+const validateToken = async () => {
+  if (!tokenValidationPromise) {
+    const username = JSON.parse(localStorage.getItem("username") || "null");
+    const authToken = JSON.parse(localStorage.getItem("authToken") || "null");
+
+    tokenValidationPromise = checkAccessToken(username, authToken);
+  }
+
+  return tokenValidationPromise;
+};
+
+const fetcher = async (url: string, options: { method?: string; body?: FormData } = {}) => {
+  const isValid = await validateToken();
+
+  if (!isValid) {
+    console.error("Session expired. Redirecting to login.");
+    throw new Error("Session expired");
+  }
+
+  const headers = getAuthHeaders();
+
+  return fetch(url, {
+    method: options.method || "GET",
+    headers,
+    ...(options.body ? { body: options.body } : {}),
+  }).then(async (res) => {
+    if (!res.ok) {
+      throw new Error("Failed to fetch data");
+    }
+
+    try {
+      return await res.json();
+    } catch (error) {
+      throw new Error("Failed to parse response JSON");
+    }
+  });
+};
+
+export default function StandardActionDataTable({
+  form,
+  userUUID,
+  grantAllPermissions,
+  revokeAllPermissions,
+  setGrantAllPermissions,
+  setRevokeAllPermissions,
+  permissionsData,
+  setPermissionsData,
+  permissions,
+  setPermissions,
+  rules,
+  ruleTemplate,
+}) {
+  type PermissionAction = {
+    value: boolean;
+    disabled: boolean;
+  };
+
+  type SubModulePermissions = Record<string, PermissionAction>;
+  type CategoryPermissions = Record<string, SubModulePermissions>;
+  type PermissionsMap = Record<string, CategoryPermissions>;
+
+  // const data: StandardAction[] = defaultData;
+  // const columns = useMemo(() => standardActionColumns, []);
+  const headers = getAuthHeaders();
+  const [selectedAccounts, setSelectedAccounts] = useState([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+  });
+  const [sorting, setSorting] = useState<SortingState>([{ id: "createdAt", desc: true }]);
+  const companyUUID = getCurrentCompanyUUID();
+
+  const { data: accessTableData, isLoading } = useSWR(
+    [`${ORIGIN}/user/api/user/generate-access-table`],
+    ([url]) => {
+      const params = new FormData();
+
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append("param[offset]", `${pagination.pageIndex * pagination.pageSize}`);
+
+      const columnFiltersWithoutValid = columnFilters.filter((filter) => filter.id !== "valid");
+      params.append(
+        "param[filter]",
+        columnFiltersWithoutValid.length > 0
+          ? JSON.stringify(
+              columnFiltersWithoutValid.reduce<Record<string, unknown>>((acc, curr) => {
+                acc[curr.id] = curr.value;
+                return acc;
+              }, {}),
+            )
+          : "{}",
+      );
+
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc",
+      );
+      params.append("param[valid]", columnFilters.find((row) => row.id === "valid")?.value || "");
+      params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "createdAt");
+
+      params.append("user", userUUID);
+      params.append("company", companyUUID);
+
+      return fetcher(url, {
+        method: "POST",
+        body: params,
+      });
+    },
+  );
+
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
+  const [isLoadedSuccessfully, setIsLoadedSuccessfully] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isLoading || !accessTableData) {
+      setLoadingProgress(90);
+    } else {
+      setIsLoadedSuccessfully(true);
+    }
+  }, [isLoading, accessTableData]);
+
+  const defaultKeys = [
+    "view",
+    "create",
+    "update",
+    "throw",
+    "restore",
+    "delete",
+    "download",
+    "auth",
+    "bill",
+    "print",
+    "preview",
+    "transfer-from",
+    "transfer-to",
+    "export",
+    "confirm",
+    "verify",
+    "compulsary",
+    "assignment",
+    "progress",
+    "generate-qr-code",
+    "disable",
+    "upload",
+  ];
+
+  const buildPermissionsFromApi = (data: any[], userRules: string[] = []) => {
+    const userRuleSet = new Set(userRules.map((r) => normalizeKey(r)));
+
+    const normalizeRules = (rules: string[], module: string) => {
+      const normalized: Record<string, boolean> = {};
+      const allowedActions: Set<string> = new Set();
+      const currentModuleKey = normalizeKey(module);
+
+      rules.forEach((rule) => {
+        const parsed = parseRule(rule);
+        if (!parsed) return;
+
+        const actionKey = parsed.action;
+        const moduleKey = normalizeKey(parsed.module);
+        if (moduleKey !== currentModuleKey) return;
+
+        allowedActions.add(actionKey);
+      });
+
+      return { allowedActions };
+    };
+
+    const permissions: Record<string, any> = {};
+
+    data.forEach((category) => {
+      const categoryKey = normalizeKey(category.module);
+      if (!permissions[categoryKey]) {
+        permissions[categoryKey] = {};
+      }
+
+      if (!category.children && Array.isArray(category.rules)) {
+        const subKey = normalizeKey(category.module);
+        const { allowedActions } = normalizeRules(category.rules || [], category.module);
+
+        const actionsWithMetadata: Record<string, any> = {};
+        defaultKeys.forEach((key) => {
+          const ruleKey = `${key}-${subKey}`;
+          const hasRule = userRuleSet.has(ruleKey);
+          actionsWithMetadata[key] = {
+            value: hasRule,
+            disabled: !allowedActions.has(key),
+          };
+        });
+
+        permissions[categoryKey][subKey] = {
+          ...actionsWithMetadata,
+          children: {},
+        };
+      }
+
+      if (Array.isArray(category.children)) {
+        category.children.forEach((subModule) => {
+          const subKey = normalizeKey(subModule.module);
+          const { allowedActions } = normalizeRules(subModule.rules || [], subModule.module);
+
+          const actionsWithMetadata: Record<string, any> = {};
+          defaultKeys.forEach((key) => {
+            const ruleKey = `${key}-${subKey}`;
+            const hasRule = userRuleSet.has(ruleKey);
+            actionsWithMetadata[key] = {
+              value: hasRule,
+              disabled: !allowedActions.has(key),
+            };
+          });
+
+          permissions[categoryKey][subKey] = {
+            ...actionsWithMetadata,
+            children: {},
+          };
+
+          if (Array.isArray(subModule.children)) {
+            subModule.children.forEach((childModule) => {
+              const childKey = normalizeKey(childModule.module);
+              const { allowedActions: childAllowed } = normalizeRules(
+                childModule.rules || [],
+                childModule.module,
+              );
+
+              const childActions: Record<string, any> = {};
+              defaultKeys.forEach((key) => {
+                const ruleKey = `${key}-${childKey}`;
+                const hasRule = userRuleSet.has(ruleKey);
+                childActions[key] = {
+                  value: hasRule,
+                  disabled: !childAllowed.has(key),
+                };
+              });
+
+              permissions[categoryKey][subKey].children[childKey] = {
+                ...childActions,
+                children: {},
+              };
+            });
+          }
+        });
+      }
+    });
+
+    return permissions;
+  };
+
+  const applyRuleToPermissions = (permissions: Record<string, any>, ruleValue: string) => {
+    const normalizeKey = (key: string) => key.trim().toLowerCase().replace(/\s+/g, "-");
+
+    ruleValue = normalizeKey(ruleValue);
+
+    let action = "";
+    let moduleKey = "";
+
+    const matchedAction = defaultKeys.find((key) => ruleValue.startsWith(`${key}-`));
+
+    if (matchedAction) {
+      action = matchedAction;
+      moduleKey = ruleValue.slice(action.length + 1);
+    } else {
+      const [actionPart, ...rest] = ruleValue.split("-");
+      action = normalizeKey(actionPart);
+      moduleKey = normalizeKey(rest.join("-"));
+    }
+
+    const traverse = (node: any, path: string[]): boolean => {
+      const currentPath = normalizeKey(path.join("/"));
+      const lastSegment = path[path.length - 1];
+
+      const isMatch = normalizeKey(lastSegment) === moduleKey || currentPath === moduleKey;
+
+      if (isMatch && node[action] && node[action].disabled === false) {
+        node[action].value = true;
+        return true;
+      }
+
+      if (node.children) {
+        for (const childKey in node.children) {
+          if (traverse(node.children[childKey], [...path, childKey])) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    };
+
+    for (const categoryKey in permissions) {
+      const category = permissions[categoryKey];
+
+      for (const subKey in category) {
+        const node = category[subKey];
+        traverse(node, [subKey]);
+      }
+    }
+  };
+
+  const [dynamicSections, setDynamicSections] = useState<Section[]>([]);
+
+  useEffect(() => {
+    if (!accessTableData || !Array.isArray(accessTableData)) return;
+
+    const parsedSections = buildSectionsFromBackend(accessTableData);
+    const initialPermissions = buildFlatPermissionMap(accessTableData);
+
+    setDynamicSections(parsedSections);
+    setPermissions(initialPermissions);
+  }, [accessTableData]);
+
+  const flattenPermissions = (permTree: any): Record<string, boolean> => {
+    const flat: Record<string, boolean> = {};
+
+    const walk = (obj: any, parentKey = "") => {
+      for (const key in obj) {
+        if (key === "children") {
+          walk(obj[key], parentKey);
+          continue;
+        }
+
+        if (typeof obj[key] === "object" && "value" in obj[key]) {
+          const compositeKey = `${key}-${parentKey}`;
+          flat[compositeKey] = obj[key].value;
+        }
+
+        if (typeof obj[key] === "object") {
+          walk(obj[key], key);
+        }
+      }
+    };
+
+    walk(permTree);
+    return flat;
+  };
+
+  const applyPermissions = (rawRules) => {
+    const parsedPermissions = buildPermissionsFromApi(accessTableData);
+    const updated = JSON.parse(JSON.stringify(parsedPermissions));
+    const updatedActions = new Set();
+
+    (rawRules || []).forEach((ruleValue: string) => {
+      if (typeof ruleValue !== "string") return;
+      if (updatedActions.has(ruleValue)) return;
+      updatedActions.add(ruleValue);
+
+      applyRuleToPermissions(updated, ruleValue);
+    });
+
+    const flatUpdated = flattenPermissions(updated);
+    setPermissions(flatUpdated);
+    setPermissionsData(updated);
+  };
+
+  useEffect(() => {
+    const fetchAndBuildPermissions = async () => {
+      if (!accessTableData || !Array.isArray(accessTableData)) return;
+
+      try {
+        const data = ruleTemplate !== null ? ruleTemplate.userHasRule : rules.rule;
+        applyPermissions(data);
+      } catch (error) {
+        console.error("Error fetching user permissions:", error);
+        const fallback = buildPermissionsFromApi(accessTableData);
+        setPermissions(flattenPermissions(fallback));
+      }
+    };
+
+    fetchAndBuildPermissions();
+  }, [accessTableData, rules, ruleTemplate]);
+
+  useEffect(() => {
+    if (grantAllPermissions) {
+      setPermissions((prev) => {
+        const updated: Record<string, boolean> = {};
+        for (const key in prev) {
+          updated[key] = true;
+        }
+        return updated;
+      });
+      setGrantAllPermissions(false);
+    }
+  }, [grantAllPermissions]);
+
+  useEffect(() => {
+    if (revokeAllPermissions) {
+      setPermissions((prev) => {
+        const updated: Record<string, boolean> = {};
+        for (const key in prev) {
+          updated[key] = false;
+        }
+        return updated;
+      });
+      setRevokeAllPermissions(false);
+    }
+  }, [revokeAllPermissions]);
+
+  const togglePermission = (access: string, action: Action) => {
+    const key = buildPermissionKey(action, access);
+    setPermissions((prev) => {
+      const newValue = !prev[key];
+
+      setPermissionsData((prevData) => {
+        const newData = JSON.parse(JSON.stringify(prevData));
+
+        const normalize = (str: string) => str.trim().toLowerCase().replace(/\s+/g, "-");
+
+        const targetAccess = normalize(access);
+
+        const updateNode = (node: any, path: string[] = []) => {
+          if (!node || typeof node !== "object") return;
+
+          const currentKey = path.length > 0 ? normalize(path[path.length - 1]) : null;
+          const isTargetMatch = currentKey === targetAccess;
+
+          if (isTargetMatch && node[action] && typeof node[action] === "object") {
+            node[action].value = newValue;
+          }
+
+          if (node.children) {
+            for (const childKey in node.children) {
+              updateNode(node.children[childKey], [...path, childKey]);
+            }
+          }
+        };
+
+        for (const categoryKey in newData) {
+          const modules = newData[categoryKey];
+
+          for (const moduleKey in modules) {
+            if (normalize(moduleKey) === targetAccess) {
+              if (modules[moduleKey][action]) {
+                modules[moduleKey][action].value = newValue;
+              }
+            }
+
+            updateNode(modules[moduleKey]);
+          }
+        }
+
+        return newData;
+      });
+
+      return {
+        ...prev,
+        [key]: newValue,
+      };
+    });
+  };
+
+  const prepareRows = (sections: Section[]): Section[] => {
+    return sections.map((section) => ({
+      ...section,
+      children: section.children ? prepareRows(section.children) : [],
+    }));
+  };
+
+  const rows = useMemo(() => prepareRows(dynamicSections), [dynamicSections]);
+
+  const toDisplayLabel = (key: string): string =>
+    key
+      .split("-")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+
+  const columns = useMemo<ColumnDef<Section>[]>(() => {
+    return [
+      {
+        accessorKey: "all",
+        header: "All",
+        cell: ({ row }) => {
+          const { access, allowedActions } = row.original;
+          if (!allowedActions?.length) return null;
+
+          // Is every action checked?
+          const allChecked = allowedActions.every((action) => {
+            const key = buildPermissionKey(action, access);
+            return permissions[key];
+          });
+
+          const toggleAllForRow = () => {
+            allowedActions.forEach((action) => {
+              const key = buildPermissionKey(action, access);
+              setPermissions((prev) => ({
+                ...prev,
+                [key]: !allChecked,
+              }));
+
+              setPermissionsData((prevData) => {
+                const newData = JSON.parse(JSON.stringify(prevData));
+                const normalize = (str: string) => str.trim().toLowerCase().replace(/\s+/g, "-");
+
+                const targetAccess = normalize(access);
+
+                const updateNode = (node: any, path: string[] = []) => {
+                  if (!node || typeof node !== "object") return;
+
+                  const currentKey = path.length > 0 ? normalize(path[path.length - 1]) : null;
+                  const isTargetMatch = currentKey === targetAccess;
+
+                  if (isTargetMatch && node[action] && typeof node[action] === "object") {
+                    node[action].value = !allChecked;
+                  }
+
+                  if (node.children) {
+                    for (const childKey in node.children) {
+                      updateNode(node.children[childKey], [...path, childKey]);
+                    }
+                  }
+                };
+
+                for (const categoryKey in newData) {
+                  const modules = newData[categoryKey];
+                  for (const moduleKey in modules) {
+                    if (normalize(moduleKey) === targetAccess) {
+                      allowedActions.forEach((action) => {
+                        if (modules[moduleKey][action]) {
+                          modules[moduleKey][action].value = !allChecked;
+                        }
+                      });
+                    }
+                    updateNode(modules[moduleKey]);
+                  }
+                }
+
+                return newData;
+              });
+            });
+          };
+
+          return (
+            <Checkbox
+              className="border-erp-blue-11 data-[state=checked]:bg-erp-blue-11"
+              checked={allChecked}
+              onCheckedChange={toggleAllForRow}
+            />
+          );
+        },
+        meta: { rowSpan: 2 },
+      },
+      {
+        accessorKey: "access",
+        header: "Access",
+        cell: ({ row, getValue }) => {
+          const rawValue = getValue() as string;
+          const displayLabel = toDisplayLabel(rawValue);
+
+          return (
+            <div className="min-w-80" style={{ paddingLeft: `${row.depth * 2.5 + 0.5}rem` }}>
+              <div
+                className={cn(
+                  "flex items-center gap-x-3",
+                  row.depth === 0 && "font-semibold",
+                  row.depth === 0 && row.getIsExpanded() && "text-erp-blue-13",
+                )}
+              >
+                {row.getCanExpand() && (
+                  <div className="flex items-center justify-center">
+                    <button
+                      onClick={(e) => {
+                        row.toggleExpanded();
+                        e.stopPropagation();
+                      }}
+                      className="cursor-pointer text-erp-blue-12"
+                    >
+                      {!row.getIsExpanded() ? (
+                        <ChevronUp size={16} strokeWidth={2.5} />
+                      ) : (
+                        <ChevronDown size={16} strokeWidth={2.5} />
+                      )}
+                    </button>
+                  </div>
+                )}
+                {displayLabel}
+              </div>
+            </div>
+          );
+        },
+        meta: { rowSpan: 2 },
+      },
+      {
+        accessorKey: "view",
+        header: "View",
+        cell: ({ row }) => {
+          const action = "View";
+          const { access, allowedActions } = row.original;
+          if (!allowedActions?.includes(action)) return null;
+
+          const id = buildPermissionKey(action, access);
+          return (
+            <Checkbox
+              className="border-erp-blue-11 data-[state=checked]:bg-erp-blue-11"
+              checked={permissions[id] || false}
+              onCheckedChange={() => togglePermission(access, action)}
+            />
+          );
+        },
+        meta: { rowSpan: 2 },
+      },
+      {
+        header: "Standard Action",
+        columns: STANDARD_ACTIONS.map((action) => ({
+          header: action,
+          id: action,
+          cell: ({ row }) => {
+            const { access, allowedActions } = row.original;
+            if (!allowedActions?.includes(action)) return null;
+
+            const id = buildPermissionKey(action, access);
+            return (
+              <Checkbox
+                className="border-erp-blue-11 data-[state=checked]:bg-erp-blue-11"
+                checked={permissions[id] || false}
+                onCheckedChange={() => togglePermission(access, action)}
+              />
+            );
+          },
+        })),
+      },
+      {
+        header: "Document Action",
+        columns: DOCUMENT_ACTIONS.map((action) => ({
+          header: action,
+          id: action,
+          cell: ({ row }) => {
+            const { access, allowedActions } = row.original;
+            if (!allowedActions?.includes(action)) return null;
+
+            const id = buildPermissionKey(action, access);
+            return (
+              <Checkbox
+                className="border-erp-blue-11 data-[state=checked]:bg-erp-blue-11"
+                checked={permissions[id] || false}
+                onCheckedChange={() => togglePermission(access, action)}
+              />
+            );
+          },
+        })),
+      },
+      {
+        header: "e-Invoice",
+        columns: E_INVOICE_ACTIONS.map((action) => ({
+          header: action,
+          id: action,
+          cell: ({ row }) => {
+            const { access, allowedActions } = row.original;
+            if (!allowedActions?.includes(action)) return null;
+
+            const id = buildPermissionKey(action, access);
+            return (
+              <Checkbox
+                className="border-erp-blue-11 data-[state=checked]:bg-erp-blue-11"
+                checked={permissions[id] || false}
+                onCheckedChange={() => togglePermission(access, action)}
+              />
+            );
+          },
+        })),
+      },
+    ];
+  }, [permissions]);
+
+  const table = useReactTable({
+    data: rows,
+    columns,
+    getSubRows: (row) => row.children,
+    getCoreRowModel: getCoreRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+  });
+
+  return (
+    <ScrollArea className="-m-1.5 h-[72cqh] w-[calc(100vw-202px)]">
+      <Table className="border-separate border-spacing-1.5 whitespace-nowrap">
+        <TableHeader className="sticky top-0">
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id}>
+              {headerGroup.headers.map((header) => {
+                const columnRelativeDepth = header.depth - header.column.depth;
+                if (columnRelativeDepth > 1) {
+                  return null;
+                }
+
+                let rowSpan = 1;
+                if (header.isPlaceholder) {
+                  const leafs = header.getLeafHeaders();
+                  rowSpan = leafs[leafs.length - 1].depth - header.depth;
+                }
+
+                return (
+                  <TableHead
+                    className="h-8 min-w-24 rounded-md bg-erp-blue-11 p-1 text-center font-normal"
+                    colSpan={header.colSpan}
+                    rowSpan={rowSpan}
+                    key={header.id}
+                  >
+                    <div className="flex flex-col gap-y-1.5">
+                      <div className="flex items-center justify-center gap-x-0.5 font-bold text-white">
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                      </div>
+                      {(header.column.id === "access" || header.column.id === "scope") && (
+                        <TableHeadColumnTextFilter column={header.column} table={table} />
+                      )}
+                    </div>
+                  </TableHead>
+                );
+              })}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow
+                data-state={row.getIsSelected() && "selected"}
+                // onClick={onRowSelection(row)}
+                key={row.id}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell
+                    className={cn(
+                      "h-8 rounded-md border border-erp-gray-4",
+                      !(cell.column.id === "scope") ? "p-1" : "p-0",
+                    )}
+                    key={cell.id}
+                  >
+                    <div
+                      className={cn(
+                        "flex items-center",
+                        !(cell.column.id === "access" || cell.column.id === "scope")
+                          ? "justify-center"
+                          : "justify-start",
+                      )}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </div>
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : (
+            <NoResultsTableRow columns={columns} />
+          )}
+        </TableBody>
+      </Table>
+      <ScrollBar orientation="horizontal" />
+    </ScrollArea>
+  );
+}

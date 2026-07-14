@@ -1,0 +1,800 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { ColumnFiltersState, PaginationState, SortingState } from "@tanstack/react-table";
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+import React, { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { FaClipboard, FaLayerGroup, FaPerson, FaTableList } from "react-icons/fa6";
+import useSWR from "swr";
+import { z } from "zod";
+import { Dialog, DialogClose, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import CloneButton from "@/components/form/ActionButton/Clone";
+import DeleteButton from "@/components/form/ActionButton/Delete";
+import NewButton from "@/components/form/ActionButton/New";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+import TopActionBar from "@/components/layouts/TopActionBar";
+import LoadingUI from "@/components/LoadingUI";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsNavigator } from "@/components/ui/TabsNavigator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  DEFAULT_DATA_TABLE_PAGE_SIZE,
+  getAuthHeaders,
+  getCurrentAcc,
+  getCurrentAccount,
+  ORIGIN,
+} from "@/lib/constants";
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+import { X } from "lucide-react"
+import { changelogColumns } from "./changelog/columns";
+import CompanyChangelogDataTable from "./changelog/DataTable";
+import { EInvoiceSettingForm } from "./e-InvoiceSetting/EInvoiceUsageSetting";
+import { BankAccountColumns } from "./main-details/bank-account-details/columns";
+import BankAccountDetailsDataTable from "./main-details/bank-account-details/DataTable";
+import { EInvoiceUsageForm } from "./main-details/e-invoice-usage/EInvoiceUsageForm";
+import { CompanyForm } from "./main-details/general-details/CompanyForm";
+import { customInformationColumns } from "./more-details/custom-information/columns";
+import CustomInformationDataTable from "./more-details/custom-information/DataTable";
+import AccessControlDataTable from "./subscription/AccessControlDataTable";
+import { userListColumns } from "./user-list/columns";
+import UserListDataTable from "./user-list/DataTable";
+
+type PageParams = {
+  params: { slug: string };
+};
+
+const validRoutes = ["new", "edit", "clone"] as const;
+
+
+const fetcher = async (url: string) => {
+  const headers = getAuthHeaders();
+
+  return fetch(url, { headers }).then(async (res) => {
+    if (!res.ok) {
+      throw new Error("Failed to fetch data");
+    }
+
+    try {
+      return await res.json();
+    } catch (error) {
+      throw new Error("Failed to parse response JSON");
+    }
+  });
+};
+
+type ValidRoute = (typeof validRoutes)[number];
+
+export type LogoAttachment = {
+  name: string;
+  link: string;
+};
+
+interface DefaultUser {
+  username: string;
+  fullname: string;
+  baseCompany: string;
+  remark: string;
+  valid: string;
+}
+
+const companyFormSchema = z.object({
+  //   account: z.string().min(1).nonempty({
+  //     message: "Please select a status.",
+  //   }),
+  //   businessNature: z.string().min(2, {
+  //     message: "Business Nature must be at least 2 characters.",
+  //   }),
+  //   faxNo: z.string().min(2, {
+  //     message: "Fax Number must be at least 2 characters.",
+  //   }),
+  //   address: z.string().min(2, {
+  //     message: "Address must be at least 2 characters.",
+  //   }),
+  //   description: z.string().min(2, {
+  //     message: "Description must be at least 2 characters.",
+  //   }),
+  //   email: z.string().email({
+  //     message: "Invalid email format",
+  //   }),
+  //   parentCompany: z.string().min(1).nonempty({
+  //     message: "Please select a status.",
+  //   }),
+  //   website: z.string().url({
+  //     message: "Invalid website URL",
+  //   }),
+  company: z.string().min(2, {
+    message: "Company must be at least 2 characters.",
+  }),
+  // attention: z.string().min(1).nonempty({
+  //   message: "Please select a status.",
+  // }),
+  //   coordinate: z.string().min(2, {
+  //     message: "Coordinate must be at least 2 characters.",
+  //   }),
+  // BRN: z.string().min(2, {
+  //   message: "BRN must be at least 2 characters.",
+  // }),
+  //   phoneNo: z.string().min(2, {
+  //     message: "Phone Number must be at least 2 characters.",
+  // }),
+});
+
+// Function to check if a route is valid
+function isValidRoute(route: string): route is ValidRoute {
+  return validRoutes.includes(route as ValidRoute);
+}
+
+// {
+//   id: "subscription",
+//   name: "Subscription",
+//   icon: SVGPricing,
+// },
+// {
+//   id: "eInvoiceSetting",
+//   name: "E-Invoice Settings",
+//   icon: RiSettingsFill ,
+// },
+
+export default function AccountDetailsPage({ params }: PageParams) {
+  const slug = params.slug;
+  const router = useRouter();
+  const [tempCompanyLogo, setTempCompanyLogo] = useState<LogoAttachment>();
+  const [tempRowBankAccountDetails, setTempRowBankAccountDetails] = useState([]);
+  const [tempRowCustomInfo, setTempRowCustomInfo] = useState([]);
+  const [tempRowUserList, setTempRowUserList] = useState([]);
+  const [tempUserList, setTempUserList] = useState<DefaultUser[]>([]);
+  const { toast } = useToast();
+  const headers = getAuthHeaders();
+  const currentAcc = getCurrentAcc();
+  const currentAccount = getCurrentAccount();
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUserMatch, setIsUserMatch] = useState(false);
+
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const [formResetKey, setFormResetKey] = useState(0);
+
+  const [companyData, setCompanyData] = useState({});
+
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+  });
+  const [sorting, setSorting] = useState<SortingState>([{ id: "createdAt", desc: true }]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const [duplicateBRNLog, setDuplicateBRNLog] = useState<any>(null);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null)
+
+  const resetForm = () => {
+    setFormResetKey((prevKey) => prevKey + 1);
+  };
+
+  if (!isValidRoute(slug)) {
+    notFound();
+  }
+
+  const {
+    data: company,
+    error,
+    isLoading,
+    mutate: mutateCompanyData,
+  } = useSWR(id ? `${ORIGIN}/company/api/company/get-update-company-data?id=${id}` : null, fetcher,{ revalidateOnFocus: false });
+
+  const {
+    data: BankAccountDetails,
+    error: BankAccountDetailsError,
+    mutate: mutateBankAccountDetails,
+  } = useSWR(
+    id ? `${ORIGIN}/company/api/company/get-company-has-bank-account?id=${id}` : null,
+    fetcher,{ revalidateOnFocus: false }
+  );
+
+  const {
+    data: customInformationData,
+    error: customInfoError,
+    mutate: mutateCustomInfo,
+  } = useSWR(
+    id ? [`${ORIGIN}/company/api/company/get-update-company-has-custom-info-data?id=${id}`] : null,
+    ([url]) => {
+      const params = new FormData();
+
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append("param[offset]", `${pagination.pageIndex * pagination.pageSize}`);
+
+      const columnFiltersWithoutValid = columnFilters.filter((filter) => filter.id !== "valid");
+      params.append(
+        "param[filter]",
+        columnFiltersWithoutValid.length > 0
+          ? JSON.stringify(
+            columnFiltersWithoutValid.reduce<Record<string, unknown>>((acc, curr) => {
+              acc[curr.id] = curr.value;
+              return acc;
+            }, {}),
+          )
+          : "{}",
+      );
+
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc",
+      );
+      params.append(
+        "param[valid]",
+        columnFilters.length > 0 ? `${columnFilters.find((row) => row.id === "valid")?.value}` : "",
+      );
+      params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "createdAt");
+
+      return fetcher(url, { method: "POST", body: params });
+    },{ revalidateOnFocus: false }
+  );
+
+  const {
+    data: userListData,
+    error: userListError,
+    mutate: mutateUserList,
+  } = useSWR(
+    id ? `${ORIGIN}/company/api/company/get-update-company-has-user-data?id=${id}` : null,
+    fetcher,{ revalidateOnFocus: false }
+  );
+
+  useEffect(() => {
+    if (error) {
+      if (error.message === "Session expired") {
+        if (isUserMatch) {
+          toast({
+            variant: "destructive",
+            title: "Session Expired",
+            description: "Your session has expired. Redirecting to login page.",
+          });
+        }
+        setTimeout(() => {
+          mutateCompanyData(undefined, false);
+          router.push("/login");
+        }, 500);
+      }
+    }
+  }, [error, router, toast]);
+
+  useEffect(() => {
+    if (company) {
+      setCompanyData(company.data);
+      setTempCompanyLogo(Array.isArray(company.data.logoLink) && company.data.logoLink[0]);
+      setTempRowUserList(company.companyHasUser.rows);
+    }
+  }, [company]);
+
+  useEffect(() => {
+    if (BankAccountDetails) {
+      setTempRowBankAccountDetails(BankAccountDetails.rows);
+    }
+  }, [BankAccountDetails]);
+
+  const revalidateBankAccountDetailsData = () => {
+    mutateBankAccountDetails();
+  };
+
+  const revalidateCustomInfoData = () => {
+    mutateCustomInfo();
+  };
+
+  const revalidateUserListData = () => {
+    mutateUserList();
+  };
+
+  const handleSubmit = async () => {
+    const values = form.getValues();
+
+    if (!values.company) {
+      form.setError("company", {
+        type: "required",
+        message: "Required",
+      });
+
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await form.trigger();
+      await form.handleSubmit(onSubmit)();
+    } catch (error) {
+      console.error("Form submission error:", error);
+      setIsSaving(false);
+    }
+  };
+
+  const form = useForm<z.infer<typeof companyFormSchema>>({
+    resolver: zodResolver(companyFormSchema),
+    defaultValues: {
+      account: company?.account ?? currentAccount,
+      accountName: company?.accountName ?? currentAcc,
+      businessNature: company?.businessNature ?? "",
+      faxNo: company?.faxNo ?? "",
+      address: company?.address ?? "",
+      postcode: company?.postcode ?? "",
+      city: company?.city ?? "",
+      state: company?.state ?? "",
+      stateCode: company?.stateCode ?? "",
+      country: company?.country ?? "",
+      countryOfOriginCode: company?.countryOfOriginCode ?? "",
+      description: company?.description ?? "",
+      email: company?.email ?? "",
+      mainCompany: company?.mainCompany ?? "",
+      website: company?.website ?? "",
+      company: company?.company ?? "",
+      attention: company?.attention ?? "",
+      coordinate: company?.coordinate ?? "",
+      BRN: company?.BRN ?? "",
+      phoneNo: company?.phoneNo ?? "",
+      valid: company?.valid ?? "1",
+    },
+  });
+
+  const onSubmit = async () => {
+
+
+
+    var form_data = new FormData();
+    var formValues = form.getValues();
+    var saveType =
+      slug == "clone" ? `create-data?c_id=1` : id ? `update-company-data?id=${id}` : `create-data`;
+
+    for (var key in formValues) {
+      form_data.append(`company[${key}]`, formValues[key] ? formValues[key] : "");
+    }
+
+    if (saveType === "create-data") {
+      if ("File" in window && tempCompanyLogo instanceof File) {
+        const base64 = await getFileToBase64(tempCompanyLogo);
+
+        form_data.append(`company[logo][0][Name]`, tempCompanyLogo.name);
+        form_data.append(`company[logo][0][File]`, base64);
+      }
+
+      tempRowBankAccountDetails.forEach((row, index) => {
+        for (const key in row) {
+          form_data.append(`companyHasBankAccount[${index}][${key}]`, row[key]);
+        }
+      });
+
+      tempRowCustomInfo.forEach((row, index) => {
+        for (const key in row) {
+          if (key !== "attachment") {
+            form_data.append(`companyHasCustomInfo[${index}][${key}]`, row[key]);
+          }
+        }
+      });
+
+      for (let i = 0; i < tempRowCustomInfo.length; i++) {
+        const row = tempRowCustomInfo[i];
+
+        var counter = 0;
+
+        for (const file of row.attachmentFiles) {
+          const base64 = await getFileToBase64(file);
+
+          form_data.append(`companyHasCustomInfo[${i}][attachment][${counter}][Name]`, file.name);
+          form_data.append(`companyHasCustomInfo[${i}][attachment][${counter}][File]`, base64);
+
+          counter++;
+        }
+      }
+
+      tempRowUserList.forEach((row, index) => {
+        for (const key in row) {
+          form_data.append(`companyHasUser[${index}][${key}]`, row[key]);
+        }
+      });
+    } else {
+      if ("File" in window && tempCompanyLogo instanceof File) {
+        const base64 = await getFileToBase64(tempCompanyLogo);
+
+        form_data.append(`company[logo][0][Name]`, tempCompanyLogo.name);
+        form_data.append(`company[logo][0][File]`, base64);
+      } else {
+        if (tempCompanyLogo?.link) {
+          form_data.append(`company[logo][0][Name]`, tempCompanyLogo.name);
+          form_data.append(`company[logo][0][File]`, "");
+        }
+      }
+    }
+
+    try {
+      const response = await fetch(`${ORIGIN}/company/api/company/${saveType}`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        throw new Error(errorData.message);
+      }
+
+      const responseData = await response.json();
+
+      if (responseData && responseData.item) {
+        const url = `/organization/company/edit?item=${responseData.item}&id=${responseData.data}`;
+
+        if (responseData.validation.company && responseData.validation.company.length > 0) {
+          setDialogOpen(true);
+          setDuplicateBRNLog(responseData.validation.company);
+          setPendingUrl(url);
+        } else {
+          router.push(url);
+        }
+
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      } else if (responseData.message) {
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      } else if (slug === "clone" && id) {
+        router.push(`/organization/company/clone?id=${id}`);
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      console.error("Error creating new company data:", error);
+
+      toast({
+        title: `${error.message}`,
+        duration: 2000,
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  //changelog
+  const [changelogData, setChangelogData] = useState(null);
+  const handleTableParamsChange = (
+    newFilters: ColumnFiltersState,
+    newPagination: PaginationState,
+    newSorting: SortingState,
+  ) => {
+    setColumnFilters(newFilters);
+    setPagination(newPagination);
+    setSorting(newSorting);
+  };
+
+  useEffect(() => {
+    if (company) {
+      setCompanyData(company.data);
+      if (company.historyData) {
+        const historyData = {
+          company: company.historyData.companyHistory || { rows: [] },
+          companyHasCustomInfo: company.historyData.companyHasCustomInfoHistory || {
+            rows: [],
+          },
+          companyHasBankAccount: company.historyData.companyHasBankAccountHistory || {
+            rows: [],
+          },
+          companyHasUser: company.historyData.userHasCompanyHistory || {
+            rows: [],
+          },
+        };
+        setChangelogData(historyData);
+      }
+    }
+  }, [company]);
+
+  const tabs = [
+    {
+      id: "mainDetails",
+      name: "Main Details",
+      shortName: "Main",
+      icon: FaClipboard,
+    },
+    {
+      id: "moreDetails",
+      name: "More Details",
+      shortName: "More",
+      icon: FaLayerGroup,
+    },
+    {
+      id: "userList",
+      name: "User List",
+      shortName: "User",
+      icon: FaPerson,
+    },
+
+    ...(slug !== "new"
+      ? [
+        {
+          id: "changelog",
+          name: "Changelog",
+          shortName: "Changelog",
+          icon: FaTableList,
+        },
+      ]
+      : []),
+  ];
+
+  useEffect(() => {
+    if (!companyData) return;
+
+    form.reset({
+      ...companyData,
+      ClientID: slug === "clone" ? "" : companyData.ClientID,
+      ClientSecret1: slug === "clone" ? "" : companyData.ClientSecret1,
+      ClientSecret2: slug === "clone" ? "" : companyData.ClientSecret2,
+      productionClientID: slug === "clone" ? "" : companyData.productionClientID,
+      productionClientSecret1: slug === "clone" ? "" : companyData.productionClientSecret1,
+      productionClientSecret2: slug === "clone" ? "" : companyData.productionClientSecret2,
+    });
+  }, [companyData, slug, form]);
+
+  const creatorUsername = JSON.parse(localStorage.getItem("username") || "");
+  const creatorFullName = JSON.parse(localStorage.getItem("userFullName") || "");
+  const localBaseCompany = localStorage.getItem("currentCompany");
+  const currentCompany = JSON.parse(localBaseCompany || "");
+  const creatorBasecompany = currentCompany.company;
+
+  useEffect(() => {
+    if (slug === "new" || slug === "clone") {
+      const newUserList: DefaultUser[] = [
+        {
+          username: `${creatorUsername}`,
+          fullname: `${creatorFullName}`,
+          baseCompany: `${creatorBasecompany}`,
+          remark: "Default user from auto generate (creator)",
+          valid: "1",
+        },
+      ];
+      setTempUserList(newUserList);
+    }
+  }, [slug]);
+
+  const handleReset = () => {
+    const excludedKeys = [
+      "account",
+      "accountName",
+      "_actionUUID",
+      "_version",
+      "UUID",
+      "companyName",
+    ];
+    if (params.slug == "new") {
+      //new reset all to empty
+      const defaultValues = Object.keys(form.getValues()).reduce((acc, key) => {
+        const originalValue = form.getValues(key); // Get the original value
+
+        if (!excludedKeys.includes(key)) {
+          acc[key] = ""; // Reset to an empty string
+        } else {
+          acc[key] = originalValue; // Keep the original value
+        }
+        return acc;
+      }, {});
+      defaultValues.valid = "1";
+      form.reset(defaultValues);
+    } else {
+      //reset back to previous data
+      form.reset();
+    }
+  };
+
+  const handleSave = async () => {
+    handleSubmit();
+  };
+
+  const tableUserData = useMemo(() => {
+    if (id) return tempRowUserList;
+    if (tempRowUserList.length === 0) return tempUserList;
+    return [...tempUserList, ...tempRowUserList];
+  }, [id, tempUserList, tempRowUserList]);
+
+  return (
+    <div className="relative flex h-full flex-col">
+      <TopActionBar
+        left={
+          <>
+            <SaveButton onSubmit={handleSave} />
+            {id && slug !== "clone" && <NewButton destination="/organization/company/new" />}
+            {id && slug !== "clone" && (
+              <CloneButton destination={`/organization/company/clone?id=${id}`} />
+            )}
+            <ResetButton onClick={handleReset} />
+            {id && slug !== "clone" && (
+              <DeleteButton
+                module={"company"}
+                model={"company"}
+                id={`${id}`}
+                indexPath={`/organization/company/`}
+              />
+            )}
+            <CancelButton onClick={() => router.push(`/organization/company/`)} />
+          </>
+        }
+        right={
+          <>
+            <Form id="topActionBarForm" {...form}>
+              {" "}
+              {/* Added onSubmit to Form */}
+              <FormField
+                control={form.control}
+                name="valid"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-x-2 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value === "1"}
+                        onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                      />
+                    </FormControl>
+                    <FormLabel>Valid</FormLabel>
+                  </FormItem>
+                )}
+              />
+            </Form>
+          </>
+        }
+      />
+      <Form {...form}>
+        <div className="grid h-full grid-cols-[1fr_auto] gap-x-2 overflow-hidden">
+          <ScrollArea className="h-full">
+            <div id="mainDetails" className="mt-2">
+              <CompanyForm
+                // key={formResetKey}
+                // customInformationData={customInformationData}
+                // tempRowCustomInfo={tempRowCustomInfo}
+                company={companyData}
+                form={form}
+                slug={slug}
+                tempCompanyLogo={tempCompanyLogo}
+                setTempCompanyLogo={setTempCompanyLogo}
+              />
+            </div>
+            <div className="mt-2">
+              <EInvoiceUsageForm key={formResetKey} form={form} slug={slug} />
+            </div>
+            <div className="mt-2">
+              <BankAccountDetailsDataTable
+                columns={BankAccountColumns}
+                data={
+                  id && slug !== "clone"
+                    ? BankAccountDetails
+                      ? BankAccountDetails.rows
+                      : []
+                    : tempRowBankAccountDetails
+                }
+                tempRowBankAccountDetails={tempRowBankAccountDetails}
+                setTempRowBankAccountDetails={setTempRowBankAccountDetails}
+                revalidateBankAccountDetailsData={revalidateBankAccountDetailsData}
+                tempRow={[]}
+                slug={slug}
+              />
+            </div>
+            <div id="moreDetails" className="mt-2">
+              {/* Removed OtherDetailForm component */}
+            </div>
+            <div className="mt-2">
+              <CustomInformationDataTable
+                columns={customInformationColumns}
+                data={
+                  id && slug !== "clone"
+                    ? customInformationData
+                      ? customInformationData.rows
+                      : []
+                    : tempRowCustomInfo
+                }
+                tempRowCustomInfo={tempRowCustomInfo}
+                setTempRowCustomInfo={setTempRowCustomInfo}
+                revalidateCustomInfoData={revalidateCustomInfoData}
+                slug={slug}
+              />
+            </div>
+            <div id="userList" className="mt-2">
+              <UserListDataTable
+                columns={userListColumns}
+                accountId={companyData?.account}
+                data={tableUserData}
+                tempRowUserList={tempRowUserList}
+                setTempRowUserList={setTempRowUserList}
+                revalidateUserListData={revalidateUserListData}
+                isLoading={isLoading}
+                form={form}
+                setIsUserMatch={setIsUserMatch}
+                mutateCompanyData={mutateCompanyData}
+                slug={slug}
+              />
+            </div>
+            {/* <div id="subscription" className="mt-2">
+            <AccessControlDataTable />
+            </div>
+
+
+            <div id="diposalDetails" className="mt-2">
+            <EInvoiceSettingForm key={formResetKey} form={form} />
+            </div> */}
+
+            {slug !== "new" && (
+              <div id="changelog" className="mt-2">
+                <CompanyChangelogDataTable
+                  columns={changelogColumns}
+                  initialData={changelogData}
+                  onTableParamsChange={handleTableParamsChange}
+                />
+              </div>
+            )}
+          </ScrollArea>
+
+          <TabsNavigator tabs={tabs} initialActiveTabId="mainDetails" />
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open && pendingUrl) {
+              router.push(pendingUrl);
+              setPendingUrl(null);
+            }
+          }} className="m-2">
+            <DialogContent className="max-w-6xl bg-erp-blue-3 p-2">
+
+
+              <p className="">Warning: Same BRN/TIN</p>
+              {duplicateBRNLog?.length > 0 ? (
+                <div className="max-h-[400px] overflow-y-auto border border-white-300">
+                  <table className="w-full bg-white">
+                    <thead className="sticky top-0 bg-erp-blue-11 font-normal z-10">
+                      <tr>
+                        <th className="border px-3 py-2 text-left text-white">Name</th>
+                        <th className="border px-3 py-2 text-left text-white">BRN (new)</th>
+                        <th className="border px-3 py-2 text-left text-white">BRN (Old)</th>
+                        <th className="border px-3 py-2 text-left text-white">TIN</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {duplicateBRNLog.map((item: any, index: number) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="border px-3 py-2">{item.company}</td>
+                          <td className="border px-3 py-2">{item.BRN}</td>
+                          <td className="border px-3 py-2">{item.BRNOld}</td>
+                          <td className="border px-3 py-2">{item.TIN}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 py-6">
+                  No duplicate BRN found
+                </div>
+              )}
+
+              {/* Footer */}
+              <DialogFooter className="mt-4 flex justify-end">
+                <DialogClose asChild>
+                  <button
+                    className="rounded-md bg-primary px-4 py-2 text-sm text-white"
+                  >
+                    Cancel
+                  </button>
+                </DialogClose>
+              </DialogFooter>
+
+            </DialogContent>
+          </Dialog>
+        </div>
+        {(isLoading || isSaving) && <LoadingUI />}
+      </Form>
+    </div>
+  );
+}

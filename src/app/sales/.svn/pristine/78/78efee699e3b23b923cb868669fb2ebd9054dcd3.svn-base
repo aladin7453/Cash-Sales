@@ -1,0 +1,1196 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { FaFileCirclePlus, FaCircleXmark, FaMagnifyingGlass } from "react-icons/fa6";
+import { CalendarIcon } from "lucide-react";
+
+import moment from 'moment';
+
+import { cn } from "@/lib/utils/cn";
+import { DATE_FORMAT, ORIGIN, getAuthHeaders } from "@/lib/constants";
+
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { Input, NumberInputField } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+import Link from 'next/link'
+
+// Preference (Define Param)
+type Params = {
+  tempRowAttachments: any;
+  setTempRowAttachments: ([]) => void;
+  form: any;
+  slug?: string;
+  isPaid?: boolean;
+  preferenceData?: any;
+  onCurrencyChange?: (currencyUUID: string) => void; // Accurate Currency Rate Update
+};
+
+// HTML Utility Function
+function stripHtml(html) {
+  if (!html) return "";
+  // Replace <br> and <br/> with newlines
+  let text = html.replace(/<br\s*\/?>/gi, '\n');
+  // Replace <p> with nothing, </p> with newline
+  text = text.replace(/<p[^>]*>/gi, '').replace(/<\/p>/gi, '\n');
+  // Remove all other HTML tags
+  text = text.replace(/<[^>]+>/g, '');
+  // Replace HTML entities
+  text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+
+  return text;
+}
+
+export function OtherDetailsFormOld({
+  form,
+  tempRowAttachments,
+  setTempRowAttachments,
+  slug,
+  isPaid,
+  preferenceData,
+  onCurrencyChange // Accurate Currency Rate Update
+}: Params) {
+  const headers = getAuthHeaders();
+  const inputRef = useRef(null);
+
+  // Preference (Define Decimal)
+  const decimal = preferenceData?.data?.decimal || 2;
+
+  const handleClickOutside = (event) => {
+    if (currencyDropdownRef.current && !currencyDropdownRef.current.contains(event.target) && currencyInputRef.current !== event.target) {
+      setShowCurrencyTable(false);
+    }
+
+    if (projectDropdownRef.current && !projectDropdownRef.current.contains(event.target) && projectInputRef.current !== event.target) {
+      setShowProjectTable(false);
+    }
+
+    if (shipperDropdownRef.current && !shipperDropdownRef.current.contains(event.target) && shipperInputRef.current !== event.target) {
+      setShowShipperTable(false);
+    }
+
+    if (deliveryAddressDropdownRef.current && !deliveryAddressDropdownRef.current.contains(event.target) && deliveryAddressInputRef.current !== event.target) {
+      setShowTableDeliveryAddress(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener('click', handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  // Fetch Dropdown Data
+  const fetchDropdownData = async (table: string) => {
+    try {
+      var formData = new FormData;
+
+      formData.append("table[0]", table);
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`,
+        {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch dropdown data');
+      }
+
+      const data = await response.json();
+
+      if (table == "currency") {
+        setCurrencyDropdownData(data.rows);
+        setShowCurrencyTable(true);
+      } else if (table == "project") {
+        setProjectDropdownData(data.rows);
+        setShowProjectTable(true);
+      } else if (table == "shipper") {
+        setShipperDropdownData(data.rows);
+        setShowShipperTable(true);
+      }
+    } catch (error) {
+      console.error('Error fetching dropdown data:', error);
+
+      throw new Error('Failed to fetch dropdown data');
+    }
+  };
+
+  // Default Currency Function
+  const setDefaultCurrency = async () => {
+    if (preferenceData?.data?.currency && !form.getValues("currency")) {
+      try {
+        var formData = new FormData;
+        formData.append("table[]", "currency");
+        formData.append("table[]", "paymentMethod");
+
+        const response = await fetch(`${ORIGIN}/universal/get-multiple-drop-down-table-data`,
+          {
+            method: 'POST',
+            headers,
+            body: formData,
+          });
+
+        if (response.ok) {
+          const data = await response.json();
+          // const defaultCurrency = data.rows?.find(row => row.UUID === preferenceData.data.currency);
+
+          const defaultCurrencyData = data.find(item => item.table === "currency");
+          const defaultCurrency = defaultCurrencyData.rows?.find(row => row.UUID === preferenceData.data.currency);
+
+          const defaultPaymentMethodData = data.find(item => item.table === "paymentMethod");
+          const defaultPaymentMethod = defaultPaymentMethodData.rows?.find(row => row.UUID === preferenceData.data.customerPaymentMethod);
+
+  
+          if (defaultPaymentMethod) {
+            form.setValue("paymentMethod", defaultPaymentMethod.UUID);
+            form.setValue("paymentMethodCode", defaultPaymentMethod.paymentMethodCode);
+          }
+          if (defaultCurrency) {
+            form.setValue("currency", defaultCurrency.UUID);
+            form.setValue("currencyCode", defaultCurrency.currencyCode);
+            form.setValue("currencySymbol", defaultCurrency.currencySymbol);
+            form.setValue("currencyRate", defaultCurrency.exchangeRateSales);
+          }
+        }
+      } catch (error) {
+        console.error('Error setting default currency:', error);
+      }
+    }
+  };
+
+  // useEffect(() => {
+    
+  //   if (preferenceData?.data?.currency && slug === "new") {
+  //     setDefaultCurrency();
+  //   }
+  // }, [preferenceData]);
+
+  // Currency Dropdown
+  const [currencyDropdownData, setCurrencyDropdownData] = useState<[]>([]);
+  const [showCurrencyTable, setShowCurrencyTable] = useState(false);
+  const [currencyFilter, setCurrencyFilter] = useState("");
+  const currencyInputRef = useRef(null);
+  const currencyDropdownRef = useRef(null);
+
+  const dropdownCurrencyColumns = [
+    { accessorKey: "currencyCode", header: "Currency Code" },
+    { accessorKey: "description", header: "Description" },
+  ];
+
+  const onClickRowCurrency = (row) => {
+    form.setValue("currency", row.UUID);
+    form.setValue("currencyCode", row.currencyCode);
+    form.setValue("currencySymbol", row.currencySymbol);
+    form.setValue("currencyRate", row.exchangeRateSales);
+
+    // Accurate Currency Rate Update
+    if (onCurrencyChange) {
+      onCurrencyChange(row.UUID);
+    }
+
+    setShowCurrencyTable(false);
+    setCurrencyFilter("");
+  };
+
+  // Project Dropdown
+  const [projectDropdownData, setProjectDropdownData] = useState<[]>([]);
+  const [showProjectTable, setShowProjectTable] = useState(false);
+  const [projectFilter, setProjectFilter] = useState("");
+
+  const projectInputRef = useRef(null);
+  const projectDropdownRef = useRef(null);
+
+  const dropdownProjectColumns = [
+    { accessorKey: "projectCode", header: "Project Code", },
+    { accessorKey: "description", header: "Description", },
+  ];
+
+  const onClickRowProject = (row) => {
+    form.setValue("project", row.UUID);
+    form.setValue("projectCode", row.projectCode);
+
+    setProjectFilter("");
+    setShowProjectTable(false);
+  };
+
+  // Shipper Dropdown
+  const [shipperDropdownData, setShipperDropdownData] = useState<[]>([]);
+  const [showShipperTable, setShowShipperTable] = useState(false)
+  const shipperInputRef = useRef(null);
+  const shipperDropdownRef = useRef(null);
+
+  const dropdownShipperColumns = [
+    { accessorKey: "shipperCode", header: "Shipper Code", },
+    { accessorKey: "description", header: "Description", },
+  ];
+
+  const onClickRowShipper = (row) => {
+    form.setValue("shipper", row.UUID);
+    form.setValue("shipperCode", row.shipperCode);
+
+    setShowShipperTable(false);
+  };
+
+  // Fetch Delivery Address Dropdown Data
+  const fetchDropdownDeliveryAddress = async () => {
+    const formData = new FormData();
+    const customerUUID = form.getValues('customerCode');
+
+    if (!showTableDeliveryAddress) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/universal/get-customer-has-delivery-location-by-customer?id=${customerUUID}`,
+          {
+            method: "POST",
+            headers,
+            body: formData,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch attention drop-down data");
+        }
+
+        const deliveryAddressData = await response.json();
+
+        setDeliveryAddressDropdownTableData(deliveryAddressData.rows);
+        setShowTableDeliveryAddress(true);
+      } catch (error) {
+        console.error("Error fetching attention drop-down data:", error);
+      }
+    } else {
+      setShowTableDeliveryAddress(false);
+    }
+  };
+
+  // Delivery Address Dropdown
+  const [showTableDeliveryAddress, setShowTableDeliveryAddress] = useState(false);
+  const [deliveryAddressDropdownTableData, setDeliveryAddressDropdownTableData] = useState([]);
+  const deliveryAddressInputRef = useRef(null);
+  const deliveryAddressDropdownRef = useRef(null);
+
+  const dropdownDeliveryAddressColumns = [
+    { accessorKey: "deliveryLocation", header: "Delivery Location", },
+    {
+      accessorKey: "deliveryAddress", header: "Delivery Address",
+      cell: ({ row }) => {
+        const address = row.original.deliveryAddress || "";
+        const addressStyle = {
+          whiteSpace: "pre-wrap",
+          wordWrap: "break-word",
+        };
+
+        return (
+          <span style={addressStyle}>
+            {address.length > 50 ? `${address}` : address}
+          </span>
+        );
+      },
+    },
+    { accessorKey: "description", header: "Remark", cell: ({ row }) => <DescriptionCellTooltip row={row} />, },
+  ];
+
+  const onClickRowDeliveryAddress = (row) => {
+    form.setValue('deliveryAddress', row.deliveryAddress);
+
+    setShowTableDeliveryAddress(false);
+  };
+
+  // File Attachment
+  const fileInputRef = useRef(null);
+
+  const handleChooseFileClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleFileChange = (event) => {
+    const fileList = Array.from(event.target.files);
+    const mergeArray = [...tempRowAttachments, ...fileList]
+
+    setTempRowAttachments(mergeArray)
+  };
+
+  function handleDeleteFile(index) {
+    var newCustomInfoFiles = [...tempRowAttachments];
+
+    newCustomInfoFiles.splice(index, 1);
+
+    setTempRowAttachments(newCustomInfoFiles);
+  }
+
+  return (
+    <Form {...form}>
+      <form>
+        <Card collapsible defaultCollapsed={false} className="shadow-md">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold">Other Details</CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5">
+              <FormField
+                control={form.control}
+                name="currency"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>Currency UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="currencySymbol"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>Currency Symbol:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="currencyCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Currency Code:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onClick={() => fetchDropdownData("currency")}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setCurrencyFilter(e.target.value);
+                          }}
+                          ref={currencyInputRef}
+                          autoComplete="off"
+                          disabled={isPaid}
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {showCurrencyTable && (
+                          <div ref={currencyDropdownRef} className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px]">
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownCurrencyColumns}
+                                data={currencyDropdownData}
+                                onClickRow={onClickRowCurrency}
+                                filterValue={currencyFilter}
+                                filterColumn="currencyCode"
+                              />
+                              <ScrollBar orientation="vertical" />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="currencyRate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Currency Rate:</FormLabel>
+                    <FormControl>
+                      <NumberInputField
+                        className="h-7.5"
+                        form={form}
+                        fieldName="currencyRate"
+                        value={field.value || ""}
+                        decimalPlaces={decimal}
+                        constUpdate={true}
+                        disabled={isPaid}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="project"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="projectCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Project:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onClick={() => fetchDropdownData("project")}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setProjectFilter(e.target.value);
+                          }}
+                          ref={projectInputRef}
+                          autoComplete="off"
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {showProjectTable && (
+                          <div ref={projectDropdownRef} className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px]">
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownProjectColumns}
+                                data={projectDropdownData}
+                                onClickRow={onClickRowProject}
+                                filterValue={projectFilter}
+                                filterColumn="projectCode"
+                              />
+                              <ScrollBar orientation="vertical" />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="docValidity"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Doc. Validity Days:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7"
+                        {...field}
+                        moduleName="cashSales"
+                        fieldName="docValidity"
+                        columnName="Doc Validity Days"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="shipper"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="shipperCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Shipper:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input className="h-7.5 pr-8" {...field} readOnly onClick={() => fetchDropdownData("shipper")} ref={shipperInputRef} autoComplete="off" />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {showShipperTable && (
+                          <div ref={shipperDropdownRef} className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px] right-0">
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownShipperColumns}
+                                data={shipperDropdownData}
+                                onClickRow={onClickRowShipper}
+                              />
+                              <ScrollBar orientation="vertical" />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-2 grid-cols-1 md:grid-cols-5 mt-2">
+              {/* <FormField
+                control={form.control}
+                name="taxExNo"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Tax EX:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7"
+                          {...field}
+                          moduleName="cashSales"
+                          fieldName="taxExNo"
+                          columnName="Tax EX"
+                        />
+                      </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              /> */}
+
+              <FormField
+                control={form.control}
+                name="remark1"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Remark 1:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="remark2"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Remark 2:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="remark3"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Remark 3:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="remark4"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Remark 4:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-2 grid-cols-1 md:grid-cols-5 mt-2">
+              <FormField
+                control={form.control}
+                name="deliveryTerm"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Delivery Terms:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="postingDate"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Posting Date:</FormLabel>
+                    <Popover > {/* Pass isOpen and onClose props */}
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            className={cn(
+                              "flex h-7.5 w-full",
+                              !field.value && "text-muted-foreground",
+                            )}
+                            variant="outline"
+                            size="sm"
+                          // disabled={!!field.value}
+                          >
+                            {field.value
+                              ? moment.unix(field.value).format(DATE_FORMAT)
+                              : "Pick a date"}
+                            <CalendarIcon className="ml-auto h-4 w-4" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? moment.unix(field.value).format(DATE_FORMAT) : undefined}
+                          onSelect={(date) => {
+                            const unixTimestamp = date ? Math.floor(date.getTime() / 1000) : null;
+                            field.onChange(unixTimestamp.toString());
+                          }}
+                          // disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                          initialFocus
+                          defaultMonth={field.value ? moment.unix(field.value).format(DATE_FORMAT) : undefined}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="taxDate"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Tax Date:</FormLabel>
+                    <Popover > {/* Pass isOpen and onClose props */}
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            className={cn(
+                              "flex h-7.5 w-full",
+                              !field.value && "text-muted-foreground",
+                            )}
+                            variant="outline"
+                            size="sm"
+                          // disabled={!!field.value}
+                          >
+                            {field.value
+                              ? moment.unix(field.value).format(DATE_FORMAT)
+                              : "Pick a date"}
+                            <CalendarIcon className="ml-auto h-4 w-4" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? moment.unix(field.value).format(DATE_FORMAT) : undefined}
+                          onSelect={(date) => {
+                            const unixTimestamp = date ? Math.floor(date.getTime() / 1000) : null;
+                            field.onChange(unixTimestamp.toString());
+                          }}
+                          // disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                          initialFocus
+                          defaultMonth={field.value ? moment.unix(field.value).format(DATE_FORMAT) : undefined}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex flex-col space-y-1 text-nowrap">
+                <FormLabel>QT No.:</FormLabel>
+                <ScrollArea className="flex flex-col h-7.5 px-3 py-1 rounded-md text-sm font-normal border border-input bg-erp-gray-1">
+                  {
+                    form.getValues("quotation") && form.getValues("quotationDocNo") && (
+                      (() => {
+                        const basePath = "/sales/quotation"
+                        const quotationID = form.getValues("quotation");
+                        const quotationDocNo = form.getValues("quotationDocNo");
+
+                        return (
+                          <Link
+                            href={`${basePath}/edit?item=${quotationDocNo}&id=${quotationID}`}
+                            target="_blank"
+                            className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+                          >
+                            {quotationDocNo}
+                          </Link>
+                        );
+                      })()
+                    )
+                  }
+                  <ScrollBar
+                    orientation="horizontal"
+                    className="h-1.5"
+                  />
+                </ScrollArea>
+              </div>
+
+              <div className="flex flex-col space-y-1 text-nowrap">
+                <FormLabel>SO No.:</FormLabel>
+                <ScrollArea className="flex flex-col h-7.5 px-3 py-1 rounded-md text-sm font-normal border border-input bg-erp-gray-1">
+                  {
+                    form.getValues("salesOrder") && form.getValues("salesOrderDocNo") && (
+                      (() => {
+                        const basePath = "/sales/sales-order"
+                        const salesOrderID = form.getValues("salesOrder");
+                        const salesOrderDocNo = form.getValues("salesOrderDocNo");
+
+                        return (
+                          <Link
+                            href={`${basePath}/edit?item=${salesOrderDocNo}&id=${salesOrderID}`}
+                            target="_blank"
+                            className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+                          >
+                            {salesOrderDocNo}
+                          </Link>
+                        );
+                      })()
+                    )
+                  }
+                  <ScrollBar
+                    orientation="horizontal"
+                    className="h-1.5"
+                  />
+                </ScrollArea>
+              </div>
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-2 grid-cols-1 md:grid-cols-5 mt-2">
+              <div className="flex flex-col space-y-1 text-nowrap">
+                <FormLabel>JO No.:</FormLabel>
+                <ScrollArea className="flex flex-col h-7.5 px-3 py-1 rounded-md text-sm font-normal border border-input bg-erp-gray-1">
+                  {
+                    form.getValues("jobOrder") && form.getValues("jobOrderDocNo") && (
+                      (() => {
+                        const basePath = "/job-management/job-order"
+                        const jobOrderID = form.getValues("jobOrder");
+                        const jobOrderDocNo = form.getValues("jobOrderDocNo");
+
+                        return (
+                          <Link
+                            href={`${basePath}/edit?item=${jobOrderDocNo}&id=${jobOrderID}`}
+                            target="_blank"
+                            className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+                          >
+                            {jobOrderDocNo}
+                          </Link>
+                        );
+                      })()
+                    )
+                  }
+                  <ScrollBar
+                    orientation="horizontal"
+                    className="h-1.5"
+                  />
+                </ScrollArea>
+              </div>
+
+              <div className="flex flex-col space-y-1 text-nowrap">
+                <FormLabel>DO No.:</FormLabel>
+                <ScrollArea className="flex flex-col h-7.5 px-3 py-1 rounded-md text-sm font-normal border border-input bg-erp-gray-1">
+                  {
+                    form.getValues("deliveryOrder") && form.getValues("deliveryOrderDocNo") && (
+                      (() => {
+                        const basePath = "/sales/sales-delivery-order"
+                        const deliveryOrderID = form.getValues("deliveryOrder");
+                        const deliveryOrderDocNo = form.getValues("deliveryOrderDocNo");
+
+                        return (
+                          <Link
+                            href={`${basePath}/edit?item=${deliveryOrderDocNo}&id=${deliveryOrderID}`}
+                            target="_blank"
+                            className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+                          >
+                            {deliveryOrderDocNo}
+                          </Link>
+                        );
+                      })()
+                    )
+                  }
+                  <ScrollBar
+                    orientation="horizontal"
+                    className="h-1.5"
+                  />
+                </ScrollArea>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="creditNoteTransferred"
+                render={() => (
+                  <div className="flex flex-col space-y-1 text-nowrap">
+                    <FormLabel>CN No.:</FormLabel>
+                    <ScrollArea className="flex flex-col h-7.5 px-3 py-1 rounded-md text-sm font-normal border border-input bg-erp-gray-1 text-gray-500">
+                      {
+                        form.getValues("creditNoteTransferred")?.map((doc, index) => (
+                          <Link
+                            key={index}
+                            href={`/sales/sales-credit-note/edit?item=${doc.docNo}&id=${doc.UUID}`}
+                            target="_blank"
+                            className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+                          >
+                            {doc.docNo + (index < form.getValues("creditNoteTransferred").length - 1 ? ', ' : '')}
+                          </Link>
+                        ))
+                      }
+                      <ScrollBar orientation="horizontal" />
+                    </ScrollArea>
+                  </div>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="customerPaymentTransferred"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>OR No.:</FormLabel>
+                    <FormControl>
+                      <div className="flex flex-col h-7.5 px-3 py-1 rounded-md text-sm font-normal border border-input bg-erp-gray-1 text-gray-500">
+                        {field.value?.docNo ? (
+                          <Link
+                            href={`/sales/customer-payment/edit?item=${field.value.docNo}&id=${field.value.customerPayment}`}
+                            target="_blank"
+                            className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+                          >
+                            {field.value.docNo}
+                          </Link>
+                        ) : (
+                          <span></span>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+
+              <div className="flex flex-col space-y-1 text-nowrap">
+                <FormLabel>Consolidated E-Invoice No.:</FormLabel>
+                <ScrollArea className="flex flex-col h-7.5 px-3 py-1 rounded-md text-sm font-normal border border-input bg-erp-gray-1">
+                  {
+                    slug !== "clone" && form.getValues("consolidateTo") && form.getValues("consolidatedInvoiceDocNo") && (
+                      (() => {
+                        const basePath = "/sales/consolidated-invoice"
+                        const consolidateToID = form.getValues("consolidateTo");
+                        const consolidatedInvoiceDocNo = form.getValues("consolidatedInvoiceDocNo");
+
+                        return (
+                          <Link
+                            href={`${basePath}/edit?item=${consolidatedInvoiceDocNo}&id=${consolidateToID}`}
+                            target="_blank"
+                            className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+                          >
+                            {consolidatedInvoiceDocNo}
+                          </Link>
+                        );
+                      })()
+                    )
+                  }
+                  <ScrollBar
+                    orientation="horizontal"
+                    className="h-1.5"
+                  />
+                </ScrollArea>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="UUID"
+                render={({ field }) => (
+                  <FormItem className={`col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1 ${slug === "clone" ? "hidden" : ""}`}>
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl className="relative">
+                      <Input
+                        className="h-7.5 pr-8 bg-erp-gray-1 text-gray-500"
+                        {...field}
+                        readOnly={true}
+                        ref={inputRef}
+                        autoComplete="off" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="mt-4">
+              <FormField
+                control={form.control}
+                name="note"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Note:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="cashSales"
+                        fieldName="note"
+                        columnName="Note"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+             <div className="mt-4">
+              <FormField
+                control={form.control}
+                name="note2"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Note 2:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="cashSales"
+                        fieldName="note2"
+                        columnName="Note2"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+             <div className="mt-4">
+              <FormField
+                control={form.control}
+                name="note3"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Note 3:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="cashSales"
+                        fieldName="note3"
+                        columnName="Note3"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+             <div className="mt-4">
+              <FormField
+                control={form.control}
+                name="note4"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Note 4:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="cashSales"
+                        fieldName="note4"
+                        columnName="Note4"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+             <div className="mt-4">
+              <FormField
+                control={form.control}
+                name="note5"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Note 5:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="cashSales"
+                        fieldName="note5"
+                        columnName="Note5"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+             <div className="mt-4">
+              <FormField
+                control={form.control}
+                name="note6"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Note 6:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="cashSales"
+                        fieldName="note6"
+                        columnName="Note6"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+             <div className="mt-4">
+              <FormField
+                control={form.control}
+                name="note7"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Note 7:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="cashSales"
+                        fieldName="note7"
+                        columnName="Note7"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+             <div className="mt-4">
+              <FormField
+                control={form.control}
+                name="note8"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Note 8:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        moduleName="cashSales"
+                        fieldName="note8"
+                        columnName="Note8"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Attachments section */}
+            <div className="mt-4">
+              <FormField
+                control={form.control}
+                name="attachment"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        Attachment: <button type="button" onClick={handleChooseFileClick} ><FaFileCirclePlus style={{ marginLeft: '5px' }} className="text-erp-blue-14" /></button>
+                      </div>
+                    </FormLabel>
+
+                    <FormControl>
+                      <Input id="attachments" type="file" multiple onChange={handleFileChange} ref={fileInputRef} className="hidden" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* You can render the files here */}
+              <div className="mt-2">
+                {tempRowAttachments && tempRowAttachments.map((file, index) => (
+                  <div key={index}>
+                    <a href={file.link} target="_blank" rel="noopener noreferrer" style={{ color: 'blue' }}>
+                      {file.name}
+                    </a>
+                    <button type="button" onClick={() => handleDeleteFile(index)} style={{ color: 'red' }}>
+                      <FaCircleXmark style={{ verticalAlign: "bottom", marginLeft: "2px", marginTop: "2px" }} title={"Remove"} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </form>
+    </Form>
+  );
+}

@@ -1,0 +1,132 @@
+export const modules = {
+  name: "",
+  children: [
+    {
+      name: "Organization",
+      children: [
+        {
+          name: "Company",
+          children: [{ name: "User List" }, { name: "Main Details" }, { name: "More Details" }],
+        },
+        {
+          name: "Department",
+          children: [{ name: "Main Details" }, { name: "More Details" }, { name: "User List" }],
+        },
+        {
+          name: "Job Title",
+          children: [
+            { name: "User List" },
+            { name: "Main Details" },
+            { name: "More Details" },
+            { name: "Authorized User" },
+          ],
+        },
+        {
+          name: "User Group",
+          children: [
+            { name: "Main Details" },
+            { name: "More Details" },
+            { name: "Authorized User" },
+            { name: "User List" },
+          ],
+        },
+        {
+          name: "User",
+          children: [
+            { name: "Main Details" },
+            { name: "More Details" },
+            { name: "Personal Details" },
+            { name: "Employement Details" },
+            { name: "Driver Details" },
+            { name: "Job Scope" },
+          ],
+        },
+        {
+          name: "Location Type",
+          children: [
+            { name: "Main Details" },
+            { name: "More Details" },
+            { name: "Authorized User" },
+          ],
+        },
+        {
+          name: "Location",
+          children: [
+            { name: "Main Details" },
+            { name: "More Details" },
+            { name: "User List" },
+            { name: "Authorized User" },
+            { name: "Location Contact" },
+            { name: "Stock Balance Details" },
+          ],
+        },
+      ],
+    },
+    {
+      name: "Asset Management",
+      children: [
+        {
+          name: "Asset",
+          children: [
+            { name: "Main Details" },
+            { name: "More Details" },
+            { name: "Acquisition Details" },
+            { name: "Valuation and Depreciation Details" },
+            { name: "Main & Sub Asset" },
+            { name: "Current Assignment Details" },
+            { name: "Borrower Details" },
+            { name: "Lease Out Details" },
+            { name: "Conversation Details" },
+            { name: "Diposal Details" },
+            { name: "Service and Maintenance Details" },
+            { name: "Qr Code" },
+          ],
+        },
+        {
+          name: "Asset Type",
+          children: [
+            { name: "Main Details" },
+            { name: "More Details" },
+            { name: "Computer" },
+            { name: "Authorized User" },
+          ],
+        },
+        {
+          name: "Asset Group",
+          children: [
+            { name: "Main Details" },
+            { name: "More Details" },
+          ],
+        },
+        {
+          name: "Asset Category",
+          children: [
+            { name: "Main Details" },
+            { name: "More Details" },
+          ],
+        },
+      ],
+    },
+    {
+      name: "Job Management",
+      children: [
+        {
+          name: "Job Order",
+          children: [
+            { name: "Main Details" },
+            { name: "More Details" },
+            { name: "Job Assignment" },
+          ],
+        },
+        {
+          name: "Job Order Category",
+          children: [{ name: "Main Details" }, { name: "More Details" }],
+        },
+        {
+          name: "Job Order Group",
+          children: [{ name: "More Details" }],
+        },
+      ],
+    },
+  ],
+};

@@ -1,0 +1,616 @@
+"use client";
+
+import { endOfMonth, startOfMonth } from "date-fns";
+import moment from "moment";
+import React, { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+
+import SalesReport from "@/components/templates/sales/salesReportTemplate";
+import { useToast } from "@/components/ui/use-toast";
+import { DEFAULT_DATA_TABLE_PAGE_SIZE, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+
+import {
+  customerBillsAndCollectionAnalysisColumns,
+  getCustomerBillsAndCollectionAnalysisColumns,
+} from "./Generate/columns";
+import CustomerBillsAndCollectionAnalysisDataTable from "./Generate/DataTable";
+import CustomerBillsAndCollectionAnalysisForm from "./Report/CustomerBillsAndCollectionAnalysisForm";
+import SummaryForm from "./Report/SummaryForm";
+
+import type { ColumnFiltersState, SortingState } from "@tanstack/react-table";
+
+const COLUMN_FILTERS_KEY = "customer-bills-and-collection-analysis.table.filters";
+const PAGINATION_KEY = "customer-bills-and-collection-analysis.table.pagination";
+const SORTING_KEY = "customer-bills-and-collection-analysis.table.sorting";
+
+export default function CustomerBillsAndCollectionAnalysisPage() {
+  const [tempGeneratedReportList, setTempGeneratedReportList] = useState<any[]>([]);
+  const [hasGenerated, setHasGenerated] = useState("0");
+  const [showReportTable, setShowReportTable] = useState(false);
+  const [previewPDF, setPreviewPDF] = useState<any>(null);
+  const [salesReportData, setSalesReportData] = useState<any>(null);
+  const [summaryData, setSummaryData] = useState<any>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [resultSummary, setResultSummary] = useState<any>(null);
+
+  const { toast } = useToast();
+
+  // Add totalCounts state with default total: 0
+  const [totalCounts, setTotalCounts] = useState<{ total: number }>({ total: 0 });
+
+  const [columnFilters, setColumnFilters] = useLocalStorage<ColumnFiltersState>(
+    COLUMN_FILTERS_KEY,
+    [],
+  );
+
+  const [pagination, setPagination] = useLocalStorage(PAGINATION_KEY, {
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+  });
+
+  const [sorting, setSorting] = useLocalStorage<SortingState>(SORTING_KEY, []);
+
+  const headers = getAuthHeaders();
+
+  // Build filter object from the column filter fields
+  const filterFields = [
+    "customerName",
+    "currencyCode",
+    "slMonth1",
+    "slMonth1Local",
+    "colMonth1",
+    "colMonth1Local",
+    "slMonth2",
+    "slMonth2Local",
+    "colMonth2",
+    "colMonth2Local",
+    "slMonth3",
+    "slMonth3Local",
+    "colMonth3",
+    "colMonth3Local",
+    "slMonth4",
+    "slMonth4Local",
+    "colMonth4",
+    "colMonth4Local",
+    "slMonth5",
+    "slMonth5Local",
+    "colMonth5",
+    "colMonth5Local",
+    "slMonth6",
+    "slMonth6Local",
+    "colMonth6",
+    "colMonth6Local",
+    "slMonth7",
+    "slMonth7Local",
+    "colMonth7",
+    "colMonth7Local",
+    "slMonth8",
+    "slMonth8Local",
+    "colMonth8",
+    "colMonth8Local",
+    "slMonth9",
+    "slMonth9Local",
+    "colMonth9",
+    "colMonth9Local",
+    "slMonth10",
+    "slMonth10Local",
+    "colMonth10",
+    "colMonth10Local",
+    "slMonth11",
+    "slMonth11Local",
+    "colMonth11",
+    "colMonth11Local",
+    "slMonth12",
+    "slMonth12Local",
+    "colMonth12",
+    "colMonth12Local",
+  ];
+
+  const form = useForm({
+    defaultValues: {
+      startDate: Math.floor(startOfMonth(new Date()).getTime() / 1000).toString(),
+      endDate: (() => {
+        const end = endOfMonth(new Date());
+
+        end.setHours(23, 59, 59, 999);
+
+        return Math.floor(end.getTime() / 1000).toString();
+      })(),
+      customer: "",
+      customerName: "",
+      agent: "",
+      agentName: "",
+      currency: "",
+      currencyCode: "",
+      projectCode: "",
+
+      slMonth1: "",
+      slMonth1Local: "",
+      colMonth1: "",
+      colMonth1Local: "",
+      slMonth2: "",
+      slMonth2Local: "",
+      colMonth2: "",
+      colMonth2Local: "",
+      slMonth3: "",
+      slMonth3Local: "",
+      colMonth3: "",
+      colMonth3Local: "",
+      slMonth4: "",
+      slMonth4Local: "",
+      colMonth4: "",
+      colMonth4Local: "",
+      slMonth5: "",
+      slMonth5Local: "",
+      colMonth5: "",
+      colMonth5Local: "",
+      slMonth6: "",
+      slMonth6Local: "",
+      colMonth6: "",
+      colMonth6Local: "",
+      slMonth7: "",
+      slMonth7Local: "",
+      colMonth7: "",
+      colMonth7Local: "",
+      slMonth8: "",
+      slMonth8Local: "",
+      colMonth8: "",
+      colMonth8Local: "",
+      slMonth9: "",
+      slMonth9Local: "",
+      colMonth9: "",
+      colMonth9Local: "",
+      slMonth10: "",
+      slMonth10Local: "",
+      colMonth10: "",
+      colMonth10Local: "",
+      slMonth11: "",
+      slMonth11Local: "",
+      colMonth11: "",
+      colMonth11Local: "",
+      slMonth12: "",
+      slMonth12Local: "",
+      colMonth12: "",
+      colMonth12Local: "",
+      totalSalesAmount: "",
+      totalSalesAmountLocal: "",
+      totalCollectionAmount: "",
+      totalCollectionAmountLocal: "",
+
+      // Add summary fields
+      totalCustomer: "",
+      totalCurrency: "",
+      totalSLMonth1: "",
+      totalSLMonth1Local: "",
+      totalColMonth1: "",
+      totalColMonth1Local: "",
+      totalSLMonth2: "",
+      totalSLMonth2Local: "",
+      totalColMonth2: "",
+      totalColMonth2Local: "",
+      totalSLMonth3: "",
+      totalSLMonth3Local: "",
+      totalColMonth3: "",
+      totalColMonth3Local: "",
+      totalSLMonth4: "",
+      totalSLMonth4Local: "",
+      totalColMonth4: "",
+      totalColMonth4Local: "",
+      totalSLMonth5: "",
+      totalSLMonth5Local: "",
+      totalColMonth5: "",
+      totalColMonth5Local: "",
+      totalSLMonth6: "",
+      totalSLMonth6Local: "",
+      totalColMonth6: "",
+      totalColMonth6Local: "",
+      totalSLMonth7: "",
+      totalSLMonth7Local: "",
+      totalColMonth7: "",
+      totalColMonth7Local: "",
+      totalSLMonth8: "",
+      totalSLMonth8Local: "",
+      totalColMonth8: "",
+      totalColMonth8Local: "",
+      totalSLMonth9: "",
+      totalSLMonth9Local: "",
+      totalColMonth9: "",
+      totalColMonth9Local: "",
+      totalSLMonth10: "",
+      totalSLMonth10Local: "",
+      totalColMonth10: "",
+      totalColMonth10Local: "",
+      totalSLMonth11: "",
+      totalSLMonth11Local: "",
+      totalColMonth11: "",
+      totalColMonth11Local: "",
+      totalSLMonth12: "",
+      totalSLMonth12Local: "",
+      totalColMonth12: "",
+      totalColMonth12Local: "",
+      totalsalesAmount: "",
+      totalsalesAmountLocal: "",
+      totalcollectionAmount: "",
+      totalcollectionAmountLocal: "",
+
+      valid: "1",
+    },
+  });
+
+  const generateReport = async (formData: any) => {
+    try {
+      // Validate date range before continuing
+      const fromDate = formData.startDate;
+      const toDate = formData.endDate;
+
+      if (fromDate && toDate) {
+        const from = moment.unix(fromDate);
+        const to = moment.unix(toDate);
+        const monthDiff = to.diff(from, "months", true);
+
+        if (monthDiff > 12) {
+          toast({
+            variant: "destructive",
+            title: "Invalid Date",
+            description: "Please choose the Date within 12 months",
+          });
+          return;
+        }
+      }
+
+      // Reset totals before regenerating
+      const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
+      form.setValue("totalsalesAmount", "");
+      form.setValue("totalsalesAmountLocal", "");
+      form.setValue("totalcollectionAmount", "");
+      form.setValue("totalcollectionAmountLocal", "");
+      form.setValue("totalCustomer", "");
+      form.setValue("totalCurrency", "");
+
+      months.forEach((m) => {
+        form.setValue(`totalSLMonth${m}` as any, "");
+        form.setValue(`totalSLMonth${m}Local` as any, "");
+        form.setValue(`totalColMonth${m}` as any, "");
+        form.setValue(`totalColMonth${m}Local` as any, "");
+      });
+
+      // Get all form values
+      const allFormValues = form.getValues();
+
+      const filterObject: Record<string, any> = {};
+
+      filterFields.forEach((key) => {
+        if ((allFormValues as any)[key]) {
+          let filterKey = key;
+          let filterValue = (allFormValues as any)[key];
+
+          // if (key === "startDate" || key === "endDate") {
+          //   // Convert Unix timestamp to YYYY-MM-DD format
+          //   filterValue = moment.unix(filterValue).format("YYYY-MM-DD");
+          //   filterKey = key === "docDate" ? "docDateFormat" : "matureDateFormat";
+          // }
+
+          filterObject[filterKey] = filterValue;
+        }
+      });
+
+      const params = new FormData();
+
+      params.append(
+        "param[filter]",
+        Object.keys(filterObject).length > 0 ? JSON.stringify(filterObject) : "{}",
+      );
+
+      params.append("param[offset]", `${pagination.pageIndex * pagination.pageSize}`);
+
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "createdAtFormat");
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc",
+      );
+
+      // Add valid parameter
+      if (formData.valid) {
+        params.append("param[valid]", formData.valid);
+      }
+
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value) {
+          params.append(`sales[${key}]`, value as string);
+        }
+      });
+
+      const response = await fetch(
+        `${ORIGIN}/sales_report/api/sales-report/generate-report?docType=customer&reportType=customerBillsAndCollection`,
+        {
+          method: "POST",
+          headers,
+          body: params,
+        },
+      );
+
+      const responseSummary = await fetch(`${ORIGIN}/sales_report/api/sales-report/summary`, {
+        method: "POST",
+        headers,
+        body: params,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate customer bills and collection analysis");
+      }
+
+      if (!responseSummary.ok) {
+        throw new Error("Failed to generate customer bills and collection analysis");
+      }
+
+      const result = await response.json();
+      const rows = result.rows || [];
+
+      const resultSummary = await responseSummary.json();
+
+      // Set totalCounts after fetching
+      setTotalCounts({ total: result.total ?? rows.length });
+
+      // Handle summary values dynamically
+      const summary = result.summary || {};
+
+      const summarySummary = resultSummary || {};
+
+      // Static summary fields
+      form.setValue("totalCustomer", result.total ?? "0.00");
+      form.setValue("totalCurrency", result.summary?.totalCurrencyCount ?? "0.00");
+      form.setValue("totalsalesAmount", result.summary?.totalSalesAmount ?? "0.00");
+      form.setValue("totalsalesAmountLocal", result.summary?.totalLocalSalesAmount ?? "0.00");
+      form.setValue("totalcollectionAmount", result.summary?.totalCollectionAmount ?? "0.00");
+      form.setValue(
+        "totalcollectionAmountLocal",
+        result.summary?.totalLocalCollectionAmount ?? "0.00",
+      );
+
+      // Sales
+      Object.entries(summarySummary).forEach(([key, value]) => {
+        const matchSales = key.match(/^total(Local)?Sales_\d{4}_(\d{1,2})$/);
+
+        if (matchSales) {
+          const isLocal = !!matchSales[1];
+          const monthNumber = parseInt(matchSales[2]);
+          const fieldName = `totalSLMonth${monthNumber}${isLocal ? "Local" : ""}`;
+          form.setValue(fieldName, value ?? "0.00");
+        }
+      });
+
+      // Collection
+      Object.entries(summarySummary).forEach(([key, value]) => {
+        const matchCol = key.match(/^total(Local)?Collection_\d{4}_(\d{1,2})$/);
+
+        if (matchCol) {
+          const isLocal = !!matchCol[1];
+          const monthNumber = parseInt(matchCol[2]);
+          const fieldName = `totalColMonth${monthNumber}${isLocal ? "Local" : ""}`;
+          form.setValue(fieldName, value ?? "0.00");
+        }
+      });
+
+      setTempGeneratedReportList(result.rows || []);
+      setShowReportTable(true);
+      setHasGenerated("1");
+    } catch (error) {
+      console.error("Error generating customer bills and collection analysis:", error);
+    }
+  };
+
+  const previewReport = async (formData: any) => {
+    setPreviewPDF(null);
+    setIsPreviewLoading(true);
+
+    try {
+      let reportName = null;
+
+      const reportTypeName = formData.reportTypeName;
+
+      const levelMatch = reportTypeName.match(/lv(\d+)/i);
+
+      if (levelMatch) {
+        reportName = `level${levelMatch[1]}`;
+      }
+
+      // Get all form values
+      const allFormValues = form.getValues();
+
+      const filterObject: Record<string, any> = {};
+
+      filterFields.forEach((key) => {
+        if ((allFormValues as any)[key]) {
+          let filterKey = key;
+          let filterValue = (allFormValues as any)[key];
+
+          // if (key === "startDate" || key === "endDate") {
+          //   // Convert Unix timestamp to YYYY-MM-DD format
+          //   filterValue = moment.unix(filterValue).format("YYYY-MM-DD");
+          //   filterKey = key === "docDate" ? "docDateFormat" : "matureDateFormat";
+          // }
+
+          filterObject[filterKey] = filterValue;
+        }
+      });
+
+      const params = new FormData();
+
+      params.append(
+        "param[filter]",
+        Object.keys(filterObject).length > 0 ? JSON.stringify(filterObject) : "{}",
+      );
+
+      params.append("param[offset]", `${pagination.pageIndex * pagination.pageSize}`);
+
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "createdAtFormat");
+
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc",
+      );
+
+      // Add valid parameter
+      if (formData.valid) {
+        params.append("param[valid]", formData.valid);
+      }
+
+      // Add form data to params
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value) params.append(`sales[${key}]`, value as string);
+      });
+
+      if (reportName) {
+        // const hasCustomerName = /customername/i.test(reportTypeName);
+
+        params.append("sales[groupBy][0]", "customerCode");
+        params.append("sales[groupBy][1]", "customerName");
+        // params.append("sales[groupBy][1]", hasCustomerName ? "docDateFormat" : "docNo");
+      }
+
+      const baseUrl = `${ORIGIN}/sales_report/api/sales-report/preview-pdf`;
+
+      let url = `${baseUrl}?docType=customer&reportType=customerBillsAndCollection`;
+
+      if (reportName) {
+        url += `&reportName=${reportName}`;
+      }
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: params,
+      });
+
+      // const response = await fetch(
+      //   `${ORIGIN}/sales_report/api/sales-report/preview-pdf?docType=customer&reportType=customerBillsAndCollection`,
+      //   {
+      //     method: "POST",
+      //     headers,
+      //     body: params,
+      //   }
+      // );
+
+      const responseSummary = await fetch(`${ORIGIN}/sales_report/api/sales-report/summary`, {
+        method: "POST",
+        headers,
+        body: params,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to preview customer bills and collection analysis");
+      }
+
+      if (!responseSummary.ok) {
+        throw new Error("Failed to preview customer bills and collection analysis");
+      }
+
+      const result = await response.json();
+      const rows = result.rows || [];
+
+      const resultSummary = await responseSummary.json();
+
+      // Set totalCounts after fetching
+      setTotalCounts({ total: result.total ?? rows.length });
+
+      // Handle summary values dynamically
+      const summary = result.summary || {};
+
+      // Static summary fields
+      form.setValue("totalCustomer", result.total ?? "0.00");
+      form.setValue("totalCurrency", result.summary?.totalCurrencyCount ?? "0.00");
+      form.setValue("totalsalesAmount", result.summary?.totalSalesAmount ?? "0.00");
+      form.setValue("totalsalesAmountLocal", result.summary?.totalLocalSalesAmount ?? "0.00");
+      form.setValue("totalcollectionAmount", result.summary?.totalCollectionAmount ?? "0.00");
+      form.setValue(
+        "totalcollectionAmountLocal",
+        result.summary?.totalLocalCollectionAmount ?? "0.00",
+      );
+
+      // Sales
+      Object.entries(summary).forEach(([key, value]) => {
+        const matchSales = key.match(/^total(Local)?Sales_\d{4}_(\d{1,2})$/);
+
+        if (matchSales) {
+          const isLocal = !!matchSales[1];
+          const monthNumber = parseInt(matchSales[2]); // e.g. 10 → "totalSLMonth10"
+          const fieldName = `totalSLMonth${monthNumber}${isLocal ? "Local" : ""}`;
+          form.setValue(fieldName, value ?? "0.00");
+        }
+      });
+
+      // Collection
+      Object.entries(summary).forEach(([key, value]) => {
+        const matchCol = key.match(/^total(Local)?Collection_\d{4}_(\d{1,2})$/);
+
+        if (matchCol) {
+          const isLocal = !!matchCol[1];
+          const monthNumber = parseInt(matchCol[2]); // e.g. 10 → "totalColMonth10"
+          const fieldName = `totalColMonth${monthNumber}${isLocal ? "Local" : ""}`;
+          form.setValue(fieldName, value ?? "0.00");
+        }
+      });
+
+      setPreviewPDF(result);
+      setSalesReportData(formData);
+      setResultSummary(resultSummary);
+    } catch (error) {
+      console.error("Error previewing customer bills and collection analysis:", error);
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  const onSubmit = (data: any) => {
+    setTempGeneratedReportList([]);
+    setShowReportTable(false);
+
+    generateReport(data);
+  };
+
+  // Dynamically generate columns based on API data
+  const dynamicColumns = useMemo(() => {
+    if (tempGeneratedReportList && tempGeneratedReportList.length > 0) {
+      return getCustomerBillsAndCollectionAnalysisColumns(tempGeneratedReportList);
+    }
+    // Fallback if no data yet
+    return customerBillsAndCollectionAnalysisColumns;
+  }, [tempGeneratedReportList]);
+
+  return (
+    <>
+      <CustomerBillsAndCollectionAnalysisForm
+        form={form}
+        onSubmit={onSubmit}
+        onPreview={previewReport}
+        previewPDF={previewPDF}
+        dataSummary={resultSummary}
+        salesReportData={salesReportData}
+        generatedReport={tempGeneratedReportList}
+        salesReportColumns={dynamicColumns}
+        filterFields={filterFields}
+        sorting={sorting}
+      />
+      <SummaryForm form={form} onSubmit={onSubmit} />
+      {showReportTable && (
+        <CustomerBillsAndCollectionAnalysisDataTable
+          columns={dynamicColumns}
+          data={tempGeneratedReportList}
+          revalidateCustomerBillsAndCollectionAnalysis={() => generateReport(form.getValues())}
+          columnFilters={columnFilters}
+          setColumnFilters={setColumnFilters}
+          pagination={pagination}
+          setPagination={setPagination}
+          sorting={sorting}
+          setSorting={setSorting}
+          formData={form.getValues()}
+          totalNumOfRows={+totalCounts.total}
+        />
+      )}
+    </>
+  );
+}

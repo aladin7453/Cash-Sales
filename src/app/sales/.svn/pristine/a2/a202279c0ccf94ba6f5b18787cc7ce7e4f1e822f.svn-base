@@ -1,0 +1,264 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { useSearchParams, useRouter } from "next/navigation";
+
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  ORIGIN,
+  getAuthHeaders,
+  getCurrentAcc,
+  getCurrentAccount,
+  getCurrentCompanyUUID,
+  getCurrentCompany,
+} from "@/lib/constants";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+import type { CustomerTag } from "../../../columns";
+
+type Params = {
+  customerTag?: CustomerTag | null;
+};
+
+export function CustomerTagForm({
+  customerTag,
+  customInformationData,
+  tempRowCustomInfo,
+  form,
+  slug,
+}: Params) {
+  const headers = getAuthHeaders();
+  const currentAcc = getCurrentAcc();
+  const currentAccount = getCurrentAccount();
+  const currentCompanyName = getCurrentCompany();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  const [showTableCompany, setShowTableCompany] = useState(false);
+
+  const [companyDropdownTableData, setCompanyDropdownTableData] = useState([]);
+
+  const dropdownCompanyColumns = [
+    { accessorKey: "companyID", header: "Company Code" },
+    { accessorKey: "company", header: "Company" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableCompany(false);
+    }
+
+    // if (
+    //   dropdownVesselRef.current &&
+    //   !dropdownVesselRef.current.contains(event.target) &&
+    //   inputRef.current !== event.target
+    // ) {
+    //   setShowTableVessel(false);
+    // }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+    return () => document.body.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  const toggleTableCompany = async () => {
+    if (!showTableCompany) {
+      const formData = new FormData();
+      formData.append("table[]", "company");
+
+      try {
+        const response = await fetch(
+          `${ORIGIN}/universal/get-all-drop-down-table-data`,
+          {
+            method: "POST",
+            headers,
+            body: formData,
+          }
+        );
+        if (!response.ok)
+          throw new Error("Failed to fetch company drop-down data");
+
+        const companyData = await response.json();
+        setCompanyDropdownTableData(companyData.rows);
+        setShowTableCompany(true);
+      } catch (error) {
+        console.error("Error fetching company drop-down data:", error);
+      }
+    } else {
+      setShowTableCompany(false);
+    }
+  };
+
+  const onClickRowCompanyCode = (row) => {
+    form.setValue("company", row.UUID);
+    form.setValue("companyName", row.company);
+    setShowTableCompany(false);
+  };
+
+  useEffect(() => {
+    const currentCompanyID = getCurrentCompanyUUID();
+    const currentCompanyName = getCurrentCompany();
+
+    if (!form.getValues("company")) {
+      form.setValue("company", currentCompanyID);
+    }
+
+    if (!form.getValues("companyName")) {
+      form.setValue("companyName", currentCompanyName);
+    }
+  }, []);
+
+  return (
+    <Card className="shadow-md">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg font-bold">General Details</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form className="space-y-8">
+            <div className="space-y-2.5">
+              <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="customerTagCode"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1 col-span-1">
+                      <FormLabel>Customer Tag Code:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          maxLength={255}
+                          moduleName="customerTag"
+                          fieldName="customerTagCode"
+                          columnName="Customer Tag Code"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="customerTag"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1 col-span-2">
+                      <FormLabel>Customer Tag:</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-7.5"
+                          {...field}
+                          maxLength={255}
+                          moduleName="customerTag"
+                          fieldName="customerTag"
+                          columnName="Customer Tag"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-2.5 grid-cols-1 md:grid-cols-5 ">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem className="col-span-5 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                      <FormLabel>Description:</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          className="h-7"
+                          {...field}
+                          maxLength={255}
+                          moduleName="customerTag"
+                          fieldName="description"
+                          columnName="Description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Hidden Fields */}
+              <FormField
+                control={form.control}
+                name="account"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7"
+                        {...field}
+                        value={currentAccount}
+                        readOnly
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="company"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

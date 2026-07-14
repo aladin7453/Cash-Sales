@@ -1,0 +1,178 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type CustomerStatementReport = {
+  UUID?: string;
+  customerCode?: string;
+  customerName?: string;
+  currencyCode?: string;
+  agentName?: string;
+  countryName?: string;
+  outstandingAmountAmount?: string;
+  debit?: string;
+  credit?: string;
+  balanceAmount?: string;
+};
+
+export const customerStatementReportColumns: ColumnDef<CustomerStatementReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "customerCode",
+    id: "customerCode",
+    header: "Customer Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "currencyCode",
+    id: "currencyCode",
+    header: "Currency",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "agentName",
+    id: "agentName",
+    header: "Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "countryName",
+    id: "countryName",
+    header: "Country",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "outstandingAmountAmount",
+    id: "outstandingAmountAmount",
+    header: "Outstanding",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{row.original.outstandingAmountAmount}</div>
+    ),
+  },
+];
+
+export const cusStatement12MonthsColumns: ColumnDef<CustomerStatementReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id: "docDateFormat",
+    header: "Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "docNo",
+    id: "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "transaction",
+    id: "transaction",
+    header: "Transaction Desc.",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "debit",
+    id: "debit",
+    header: "Debit",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{row.original.debit}</div>
+    ),
+  },
+  {
+    accessorKey: "credit",
+    id: "credit",
+    header: "Credit",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{row.original.credit}</div>
+    ),
+  },
+  {
+    accessorKey: "balanceAmount",
+    id: "balanceAmount",
+    header: "Balance",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{row.original.balanceAmount}</div>
+    ),
+  },
+];

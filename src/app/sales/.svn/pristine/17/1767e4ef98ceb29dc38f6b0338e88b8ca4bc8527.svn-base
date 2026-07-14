@@ -1,0 +1,41 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { DragHandle } from "@/components/data-table/row-drag-drop";
+
+export type ItemDetails = {
+  UUID: string;
+  code: string;
+  description: string;
+  quantity: string;
+  UOM: string;
+};
+
+export const itemDetailsColumns: ColumnDef<ItemDetails>[] = [
+  {
+    id: "code",
+    accessorKey: "code",
+    header: "Code",
+    filterFn: "includesString"
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} columnName="description"/>,
+    filterFn: "includesString"
+  },
+  {
+    id: "quantity",
+    accessorKey: "quantity",
+    header: "Quantity",
+    filterFn: "includesString"
+  },
+  {
+    id: "UOM",
+    accessorKey: "UOM",
+    header: "UOM",
+    filterFn: "includesString"
+  },
+];

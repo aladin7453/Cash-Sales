@@ -1,0 +1,552 @@
+"use client";
+
+import {
+  ColumnFiltersState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  PaginationState,
+  SortingState,
+  useReactTable,
+  VisibilityState,
+} from "@tanstack/react-table";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { FaListUl } from "react-icons/fa";
+import { FaSort, FaSortDown, FaSortUp } from "react-icons/fa6";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useToast } from "@/components/ui/use-toast";
+import { checkAccessToken, DEFAULT_DATA_TABLE_PAGE_SIZE, getAuthHeaders } from "@/lib/constants";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import { cn } from "@/lib/utils/cn";
+
+import ChangelogDataTableToolbar from "./DataTableToolbar";
+import ChangelogDetailsPopover from "./DetailsPopover";
+import { ChangelogTableProps } from "./types";
+
+function LoadingDots() {
+  const [dots, setDots] = useState(1);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots((prev) => (prev >= 3 ? 1 : prev + 1));
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return <span className="text-md font-medium">Loading changelog data{".".repeat(dots)}</span>;
+}
+
+export default function ChangelogDataTable<TData>({
+  columns,
+  initialData,
+  config,
+  entityId,
+  onTableParamsChange,
+}: ChangelogTableProps<TData>) {
+  const {
+    entityName,
+    defaultSortField = "createdAt",
+    storageKeyPrefix = "changelog",
+    tabs,
+    valueTransformers = {},
+    applyTransformersToTableData = false, // New flag to control transformer application
+  } = config;
+
+  const [data, setData] = useState<TData[]>([]);
+  const [totalRows, setTotalRows] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [refreshLoading, setRefreshLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [activeRowData, setActiveRowData] = useState<{
+    id: string;
+    action: string;
+  } | null>(null);
+
+  // Storage keys based on entity name
+  const COLUMN_FILTERS_KEY = `${storageKeyPrefix}.${entityName}.filters`;
+  const COLUMN_VISIBILITY_KEY = `${storageKeyPrefix}.${entityName}.columns`;
+  const PAGINATION_KEY = `${storageKeyPrefix}.${entityName}.pagination`;
+  const SORTING_KEY = `${storageKeyPrefix}.${entityName}.sorting`;
+  const ACTIVE_TAB_KEY = `${storageKeyPrefix}.${entityName}.activeTab`;
+
+  // Tab-related state
+  const [activeTab, setActiveTab] = useLocalStorage<string>(
+    ACTIVE_TAB_KEY,
+    tabs.length > 0 ? tabs[0].value : entityName,
+  );
+
+  // Store data for each tab type with proper typing
+  const [tabData, setTabData] = useState<Record<string, ChangelogItem[]>>(
+    tabs.reduce((acc, tab) => ({ ...acc, [tab.value]: [] }), {}),
+  );
+
+  // Track tab counts
+  const [tabCounts, setTabCounts] = useState<Record<string, number>>(
+    tabs.reduce((acc, tab) => ({ ...acc, [tab.value]: 0 }), {}),
+  );
+
+  const { toast } = useToast();
+  const router = useRouter();
+
+  const [columnFilters, setColumnFilters] = useLocalStorage<ColumnFiltersState>(
+    COLUMN_FILTERS_KEY,
+    [],
+  );
+
+  const defaultColumnVisibility: VisibilityState = {};
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    COLUMN_VISIBILITY_KEY,
+    defaultColumnVisibility,
+  );
+
+  const [pagination, setPagination] = useLocalStorage<PaginationState>(PAGINATION_KEY, {
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+  });
+
+  const [sorting, setSorting] = useLocalStorage<SortingState>(SORTING_KEY, [
+    { id: defaultSortField, desc: true },
+  ]);
+
+  // Safe transform function that only applies if flag is enabled
+  const safeTransformDetails = (details: Record<string, any>) => {
+    if (!applyTransformersToTableData || !valueTransformers) {
+      return details;
+    }
+
+    const transformed = { ...details };
+    Object.keys(valueTransformers).forEach((field) => {
+      if (transformed[field] !== undefined && transformed[field] !== null) {
+        try {
+          transformed[field] = valueTransformers[field](transformed[field]);
+        } catch (error) {
+          console.warn(`Error transforming field ${field}:`, error);
+          // Keep original value on error
+        }
+      }
+    });
+    return transformed;
+  };
+
+  // Initialize with provided initialData
+  useEffect(() => {
+    if (initialData) {
+      // Check data structure - do we have a nested structure with tabs or the simple structure?
+      if (
+        tabs.length > 0 &&
+        typeof initialData === "object" &&
+        !Array.isArray(initialData) &&
+        !initialData.rows
+      ) {
+        // Handle multi-tab structure where initialData has tab properties instead of direct rows
+        const activeTabData = initialData[activeTab];
+
+        // Set data for the active tab if it exists
+        if (activeTabData && activeTabData.rows) {
+          const transformedData = activeTabData.rows.map((row: any) => safeTransformDetails(row));
+          setData(transformedData as unknown as TData[]);
+          setTotalRows(parseInt(String(activeTabData.total || "0"), 10));
+
+          // Update tab data and counts
+          const newTabData: Record<string, ChangelogItem[]> = {};
+          const newTabCounts: Record<string, number> = {};
+
+          tabs.forEach((tab) => {
+            if (initialData[tab.value] && initialData[tab.value].rows) {
+              const tabRows = initialData[tab.value].rows.map((row: any) =>
+                safeTransformDetails(row),
+              );
+              newTabData[tab.value] = tabRows;
+              newTabCounts[tab.value] = parseInt(
+                String(initialData[tab.value].total || tabRows.length),
+                10,
+              );
+            } else {
+              newTabData[tab.value] = [];
+              newTabCounts[tab.value] = 0;
+            }
+          });
+
+          setTabData(newTabData);
+          setTabCounts(newTabCounts);
+        }
+      } else if (initialData.rows) {
+        // Original structure with direct rows array
+        const transformedData = initialData.rows.map((row: any) => safeTransformDetails(row));
+        setData(transformedData as unknown as TData[]);
+        setTotalRows(parseInt(String(initialData.total || "0"), 10));
+
+        // If we have tabs, update the active tab data
+        if (tabs.length > 0) {
+          const newTabData = { ...tabData };
+          newTabData[activeTab] = transformedData;
+          setTabData(newTabData);
+
+          const newTabCounts = { ...tabCounts };
+          newTabCounts[activeTab] = transformedData.length;
+          setTabCounts(newTabCounts);
+        }
+      }
+
+      setLoading(false);
+    }
+  }, [initialData, activeTab]); // Add activeTab as dependency
+
+  // Update displayed data when tab changes
+  useEffect(() => {
+    if (tabs.length > 0 && tabData[activeTab]) {
+      setData(tabData[activeTab] as unknown as TData[]);
+      setTotalRows(tabCounts[activeTab] || 0);
+    }
+  }, [activeTab, tabData, tabCounts]);
+
+  // Handle tab change
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+  };
+
+  // Add effect to notify parent component of table parameter changes
+  useEffect(() => {
+    if (onTableParamsChange) {
+      onTableParamsChange(columnFilters, pagination, sorting);
+    }
+  }, [columnFilters, pagination, sorting, onTableParamsChange]);
+
+  // Add effect to refresh data when filters change
+  useEffect(() => {
+    if (!loading) {
+      refreshData();
+    }
+  }, [columnFilters, pagination, sorting, activeTab]);
+
+  // Helper function to get current tab's API URLs
+  const getCurrentTabUrls = () => {
+    const currentTab = tabs.find((tab) => tab.value === activeTab);
+    return {
+      getHistoryUrl: currentTab?.getHistoryUrl || config.getHistoryUrl,
+      getDetailsUrl: currentTab?.getDetailsUrl || config.getDetailsUrl,
+    };
+  };
+
+  // Manual refresh function that fetches fresh data
+  const refreshData = async () => {
+    if (!entityId) return;
+
+    try {
+      setRefreshLoading(true);
+      setError(null);
+
+      const username = JSON.parse(localStorage.getItem("username") ?? '""');
+      const authToken = JSON.parse(localStorage.getItem("authToken") ?? '""');
+
+      const isValid = await checkAccessToken(username, authToken);
+      if (!isValid) {
+        throw new Error("Session expired");
+      }
+
+      const params = new FormData();
+      const columnFiltersWithoutValid = columnFilters.filter((filter) => filter.id !== "valid");
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append("param[offset]", `${pagination.pageIndex * pagination.pageSize}`);
+      params.append(
+        "param[filter]",
+        columnFiltersWithoutValid.length > 0
+          ? JSON.stringify(
+              columnFiltersWithoutValid.reduce<Record<string, unknown>>((acc, curr) => {
+                acc[curr.id] = curr.value;
+                return acc;
+              }, {}),
+            )
+          : "{}",
+      );
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "desc",
+      );
+      params.append(
+        "param[valid]",
+        columnFilters.length > 0
+          ? `${columnFilters.find((row) => row.id === "valid")?.value || ""}`
+          : "",
+      );
+      params.append("param[sort]", sorting.length > 0 ? sorting[0].id : defaultSortField);
+
+      const headers = getAuthHeaders();
+
+      // Use tab-specific URL
+      const { getHistoryUrl } = getCurrentTabUrls();
+      const url = getHistoryUrl(entityId);
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: params,
+      });
+
+      if (!response.ok) {
+        const errorData = await response
+          .json()
+          .catch(() => ({ message: "Failed to parse error response" }));
+        throw new Error(errorData.message || "Failed to fetch changelog data");
+      }
+
+      const responseData = await response.json();
+
+      // Handle both response formats - data might be nested in historyData or at top level
+      const freshData = Array.isArray(responseData)
+        ? responseData[0]
+        : responseData.historyData || responseData;
+
+      const rowsData = freshData.rows
+        ? freshData.rows.map((row: any) => safeTransformDetails(row))
+        : [];
+
+      if (tabs.length > 0) {
+        // If we have tabs, update tab data
+        const newTabData = { ...tabData };
+        newTabData[activeTab] = rowsData;
+        setTabData(newTabData);
+
+        // Update tab counts
+        const newTabCounts = { ...tabCounts };
+        newTabCounts[activeTab] = parseInt(String(freshData.total || rowsData.length), 10);
+        setTabCounts(newTabCounts);
+      }
+
+      setData(rowsData as unknown as TData[]);
+      setTotalRows(parseInt(String(freshData.total || "0"), 10));
+    } catch (error: any) {
+      console.error("Error refreshing changelog:", error);
+      setError(error.message || "Failed to refresh changelog");
+
+      if (error.message === "Session expired") {
+        // toast({
+        //   variant: "destructive",
+        //   title: "Session Expired",
+        //   description: "Your session has expired. Redirecting to login page.",
+        // });
+        router.push("/login");
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Refresh failed",
+          description: error.message || "Failed to refresh changelog",
+        });
+      }
+    } finally {
+      setRefreshLoading(false);
+    }
+  };
+
+  // Create modified columns with the details column handled here
+  const columnsWithDetails = [...columns];
+
+  // Get current tab's reference field
+  const currentTab = tabs.find((tab) => tab.value === activeTab);
+  const referenceField = currentTab?.referenceField;
+
+  // Update reference column if referenceField is specified for current tab
+  if (referenceField && columnsWithDetails.length > 0) {
+    const referenceColumnIndex = columnsWithDetails.findIndex((col) => col.header === "Reference");
+
+    if (referenceColumnIndex !== -1) {
+      columnsWithDetails[referenceColumnIndex] = {
+        ...columnsWithDetails[referenceColumnIndex],
+        accessorKey: referenceField,
+        cell: ({ row }) => {
+          const value = row.getValue(referenceField) as string;
+          return value || "-";
+        },
+      };
+    }
+  }
+
+  // Replace the last column (details column) with our implementation
+  if (columnsWithDetails.length > 0) {
+    const detailsColumnIndex = columnsWithDetails.findIndex(
+      (col) => col.header === "Details" && col.accessorKey === "",
+    );
+
+    if (detailsColumnIndex !== -1) {
+      columnsWithDetails[detailsColumnIndex] = {
+        accessorKey: "",
+        header: "Details",
+        cell: ({ row }) => {
+          const id = (row.original as any).historyUUID;
+          const action = (row.original as any).action;
+
+          return (
+            <div className="flex justify-center">
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => handleOpenDetails(id, action)}
+                className="h-5 w-5 p-0"
+              >
+                <FaListUl className="h-3 w-3" />
+              </Button>
+            </div>
+          );
+        },
+      };
+    }
+  }
+
+  const handleOpenDetails = (id: string, action: string) => {
+    setActiveRowData({ id, action });
+    setDetailsOpen(true);
+  };
+
+  const handleCloseDetails = () => {
+    setDetailsOpen(false);
+  };
+
+  const table = useReactTable({
+    data,
+    columns: columnsWithDetails,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    onColumnFiltersChange: (filters) => {
+      setColumnFilters(filters);
+      setPagination((prev) => ({ ...prev, pageIndex: 0 })); // Reset to first page on filter change
+    },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onPaginationChange: setPagination,
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      pagination,
+    },
+    pageCount: totalRows ? Math.ceil(totalRows / pagination.pageSize) : -1,
+    manualPagination: true,
+    manualSorting: true,
+    manualFiltering: true,
+  });
+
+  // Create tabs with counts
+  const tabsWithCounts = tabs.map((tab) => ({
+    ...tab,
+    count: tabCounts[tab.value] || 0,
+  }));
+
+  return (
+    <Card className="h-auto p-0 shadow-md">
+      <CardContent className="p-2">
+        <div className="flex h-[70cqh] flex-col rounded-md bg-erp-blue-3 @container-[size]">
+          <ChangelogDataTableToolbar
+            table={table}
+            refreshData={refreshData}
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            tabs={tabsWithCounts}
+          />
+          <Separator className="bg-erp-blue-11" />
+          <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+            <Table className="border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1">
+              <TableHeader className="sticky top-0">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <TableHead className="bg-erp-blue-11 font-normal" key={header.id}>
+                        <div className="flex flex-col gap-y-0.5">
+                          <div
+                            className={cn(
+                              "flex items-center gap-x-0.5 text-white",
+                              header.column.getCanSort() ? "cursor-pointer select-none" : "",
+                            )}
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            <span className="font-bold">
+                              {header.isPlaceholder
+                                ? null
+                                : flexRender(header.column.columnDef.header, header.getContext())}
+                            </span>
+                            {{
+                              asc: <FaSortUp />,
+                              desc: <FaSortDown />,
+                            }[header.column.getIsSorted() as string] ?? <FaSort />}
+                          </div>
+                          <TableHeadColumnTextFilter column={header.column} table={table} />
+                        </div>
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {loading || refreshLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center">
+                      <LoadingDots />
+                    </TableCell>
+                  </TableRow>
+                ) : error ? (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center text-red-500">
+                      {error}
+                    </TableCell>
+                  </TableRow>
+                ) : table.getRowModel().rows?.length ? (
+                  table.getRowModel().rows.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+                      data-state={row.getIsSelected() && "selected"}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (
+                  <NoResultsTableRow columns={columns} />
+                )}
+              </TableBody>
+            </Table>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </div>
+      </CardContent>
+
+      {/* Render the details popover */}
+      {activeRowData && (
+        <ChangelogDetailsPopover
+          id={activeRowData.id}
+          action={activeRowData.action}
+          isOpen={detailsOpen}
+          onClose={handleCloseDetails}
+          config={{
+            ...config,
+            // Override with tab-specific URLs
+            ...getCurrentTabUrls(),
+          }}
+        />
+      )}
+    </Card>
+  );
+}

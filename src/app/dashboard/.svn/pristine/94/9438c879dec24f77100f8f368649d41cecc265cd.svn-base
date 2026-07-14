@@ -1,0 +1,50 @@
+/* First tab group styles */
+.react-tabs__tab-list {
+  border-bottom: none;
+  display: flex;
+  gap: 5px;
+  margin: 0; /* remove spacing below */
+}
+
+.react-tabs__tab {
+  list-style: none;
+  padding: 6px 16px;
+  cursor: pointer;
+  background: white;
+  border: 1px solid #ccc;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.react-tabs__tab--selected {
+  background: rgb(186,236,242,1);
+  color: black;
+  border-color: rgb(186,236,242,1);
+}
+
+/* Second group buttons */
+.custom-btn-group {
+  display: flex;
+  
+}
+
+.custom-btn {
+  padding: 6px 16px;
+  border: 1px solid #ccc;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.tab-green {
+  color: green;
+}
+
+.custom-btn:focus {
+  outline: none;
+}
+
+/* Tab panels */
+.react-tabs__tab-panel {
+  margin-top: 20px;
+}

@@ -1,0 +1,84 @@
+"use client";
+
+import { ColumnDef } from "@tanstack/react-table";
+import { useSearchParams } from "next/navigation";
+import { ORIGIN } from "@/lib/constants";
+import ChangelogDataTable from "../changelog/ChangelogDataTable";
+import { ChangelogConfig } from "../changelog/types";
+
+// Define the rule template changelog config
+const RuleTemplateChangelogConfig: ChangelogConfig = {
+  // Default endpoints (fallback)
+  getHistoryUrl: (id: string) =>
+    `${ORIGIN}/rule_template/api/rule-template/get-rule-template-log?id=${id}`,
+  getDetailsUrl: (id: string, action: string) =>
+    `${ORIGIN}/rule_template/api/rule-template/get-rule-template-log-details?id=${id}&action=${action}`,
+
+  fieldNameMapping: {
+    // Main Details
+    ruleTemplate: "Rule Template",
+    createdAtFormat: "Created At",
+    createdByUsername: "Created By",
+    accessControl: "Access Control",
+  },
+
+  fieldsToFilter: [
+    "UUID",
+    "account",
+    "company",
+    "historyUUID",
+    "createdAt",
+    "createdBy",
+    "_actionUUID",
+    "_version",
+    "action",
+    "date_created",
+    "user_id",
+    "updatedAt",
+    "updatedBy",
+    "valid",
+  ],
+
+  entityName: "ruleTemplate",
+
+  defaultSortField: "createdAt",
+
+  tabs: [
+    {
+      value: "ruleTemplate",
+      label: "Rule Template",
+      referenceField: "ruleTemplate",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/rule_template/api/rule-template/get-rule-template-log?id=${id}&tableName=ruleTemplate`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/rule_template/api/rule-template/get-rule-template-log-details?id=${id}&action=${action}&tableName=ruleTemplate`,
+    },
+  ],
+};
+
+export default function RuleTemplateChangelogDataTable<TData, TValue>({
+  columns,
+  initialData,
+  onTableParamsChange,
+}: {
+  columns: ColumnDef<TData, TValue>[];
+  initialData?: any | null;
+  onTableParamsChange?: any;
+}) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return <div>Missing entity ID</div>;
+  }
+
+  return (
+    <ChangelogDataTable
+      columns={columns}
+      initialData={initialData}
+      config={RuleTemplateChangelogConfig}
+      entityId={id}
+      onTableParamsChange={onTableParamsChange}
+    />
+  );
+}

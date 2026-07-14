@@ -1,0 +1,932 @@
+"use client";
+
+import React, { useEffect, useRef, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
+import type { UseFormReturn } from "react-hook-form";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import { useSearchParams } from "next/navigation";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import {
+  getAuthHeaders,
+  getCurrentAcc,
+  getCurrentAccount,
+  ORIGIN,
+} from "@/lib/constants";
+
+import type { Agent } from "../../../columns";
+import type { ProfileImageAttachment } from "../../page";
+
+type Params = {
+  agent?: Agent | null;
+  form: UseFormReturn;
+  tempProfileImage?: ProfileImageAttachment;
+  setTempProfileImage: Dispatch<SetStateAction<ProfileImageAttachment | File | undefined | null>>;
+};
+
+type DropdownConfig = {
+  tableName: string;
+  columns: { accessorKey: string; header: string }[];
+  valueField: string;
+  displayField: string;
+  formValueField: string;
+  formDisplayField: string;
+  additionalMappings?: { sourceField: string; targetFormField: string }[];
+};
+
+export function AgentForm({
+  agent,
+  customInformationData,
+  tempRowCustomInfo,
+  form,
+  tempProfileImage,
+  setTempProfileImage,
+}: Params) {
+  const headers = getAuthHeaders();
+
+  const [dropdownState, setDropdownState] = useState({
+    currentDropdown: null as string | null,
+    data: [] as any[],
+    originalData: [] as any[],
+    showTable: false,
+  });
+
+  const dropdownInputRef = useRef(null);
+  const dropdownTableRef = useRef(null);
+
+  const dropdownConfigs: Record<string, DropdownConfig> = {
+    location: {
+      tableName: "location",
+      columns: [
+        // { accessorKey: "locationName", header: "Location" },
+        { accessorKey: "locationCode", header: "Location Code" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "locationCode",
+      formValueField: "location",
+      formDisplayField: "locationCode",
+    },
+    shipper: {
+      tableName: "shipper",
+      columns: [
+        // { accessorKey: "shipperName", header: "shipper" },
+        { accessorKey: "shipperCode", header: "Shipper Code" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "shipperCode",
+      formValueField: "shipper",
+      formDisplayField: "shipperCode",
+    },
+    agentType: {
+      tableName: "agentType",
+      columns: [
+        // { accessorKey: "agentCode", header: "Agent Code" },
+        // { accessorKey: "agentName", header: "Agent Name" },
+        { accessorKey: "agentTypeCode", header: "Agent Type Code" },
+        { accessorKey: "agentType", header: "Agent Type" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "agentType",
+      formValueField: "agentTypeCode",
+      formDisplayField: "agentTypeCode",
+    },
+  };
+
+  const fetchDropdownData1 = async (dropdownKey: string) => {
+    try {
+      const config = dropdownConfigs[dropdownKey];
+
+      if (!config) return;
+
+      var form_data = new FormData();
+
+      form_data.append(`table[0]`, config.tableName);
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: form_data,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${dropdownKey} data`);
+      }
+
+      const data = await response.json();
+
+      setDropdownState({
+        currentDropdown: dropdownKey,
+        data: data.rows,
+        originalData: data.rows,
+        showTable: true,
+      });
+    } catch (error) {
+      console.error(`Error fetching ${dropdownKey} data:`, error);
+
+      throw new Error(`Failed to fetch ${dropdownKey} data`);
+    }
+  };
+
+  const onClickRow = (row: any) => {
+    const config = dropdownConfigs[dropdownState.currentDropdown!];
+
+    if (config) {
+      form.setValue(config.formValueField, row[config.valueField]);
+      form.setValue(config.formDisplayField, row[config.displayField]);
+
+      if (config.additionalMappings) {
+        config.additionalMappings.forEach((mapping) => {
+          if (row[mapping.sourceField]) {
+            form.setValue(mapping.targetFormField, row[mapping.sourceField]);
+          }
+        });
+      }
+    }
+
+    setDropdownState((prev) => ({ ...prev, showTable: false }));
+  };
+
+  const searchParams = useSearchParams();
+
+  const id = searchParams.get("id");
+
+  const { toast } = useToast();
+
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [showTableAccount, setShowTableAccount] = useState(false);
+  const [showTableUserGroup, setShowTableUserGroup] = useState(false);
+  const [showTableAgentType, setShowTableAgentType] = useState(false);
+  const [agentTypeDropdownData, setAgentTypeDropdownData] = useState([]);
+  const [userDropdownData, setUserDropdownData] = useState([]);
+  const [showTableUser, setShowTableUser] = useState(false);
+
+  const genderList = [
+    { value: "Male", label: "Male" },
+    { value: "Female", label: "Female" },
+    { value: "Others", label: "Others" },
+  ];
+
+  const dropdownAgentTypeColumns = [
+    { accessorKey: "agentTypeCode", header: "Agent Type Code" },
+    { accessorKey: "agentType", header: "Agent Type" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const dropdownUserColumns = [
+    { accessorKey: "fullName", header: "Name" },
+    { accessorKey: "email", header: "Email" },
+    { accessorKey: "title", header: "Title" },
+  ];
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownTableRef.current &&
+      !dropdownTableRef.current.contains(event.target) &&
+      dropdownInputRef.current !== event.target
+    ) {
+      setDropdownState((prev) => ({ ...prev, showTable: false }));
+    }
+
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableAccount(false);
+      setShowTableUserGroup(false);
+      setShowTableAgentType(false);
+      setShowTableUser(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (tempProfileImage?.link) {
+      // Handle different types of image links
+      const link = tempProfileImage.link;
+      
+      if (link.includes('/view')) {
+        // Google Drive link
+        const previewLink = link.replace(/\/view.*$/, "/preview");
+
+        setImageSrc(previewLink);
+      } else {
+        // Direct server URL or other link types
+        setImageSrc(link);
+      }
+    }
+  }, [tempProfileImage]);
+
+  const handleImageChange = async (files: FileList | null) => {
+    const selectedFiles = files ? Array.from(files) : [];
+
+    if (selectedFiles.length > 0) {
+      const selectedFile = selectedFiles[0];
+
+      try {
+        // Create a URL for preview
+        const logoUrl = URL.createObjectURL(selectedFile);
+
+        // Set the file itself for later upload
+        setTempProfileImage(selectedFile);
+
+        // Set the preview URL
+        setImageSrc(logoUrl);
+      } catch (error) {
+        console.error("Error handling image:", error);
+
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to process the selected image.",
+        });
+      }
+    }
+  };
+
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+
+  const handleImageClick = () => {
+    if (imageSrc) {
+      setImageDialogOpen(true);
+    } else {
+      document.getElementById("fileInput")?.click();
+    }
+  };
+
+  const toggleTableAgentType = async () => {
+    const formData = new FormData();
+    const agentType = "agentType";
+
+    formData.append("table[]", agentType);
+
+    if (!showTableAgentType) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/universal/get-all-drop-down-table-data`,
+          {
+            method: "POST",
+            headers,
+            body: formData,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch agent type drop-down data");
+        }
+
+        const agentTypeData = await response.json();
+
+        setAgentTypeDropdownData(agentTypeData.rows);
+        setShowTableAgentType(true);
+      } catch (error) {
+        console.error("Error fetching agent type drop-down data:", error);
+      }
+    } else {
+      setShowTableAgentType(false);
+    }
+  };
+
+  const toggleTableUser = async () => {
+    const formData = new FormData();
+
+    formData.append("table[]", "user");
+
+    if (!showTableUser) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/universal/get-all-drop-down-table-data`,
+          {
+            method: "POST",
+            headers,
+            body: formData,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch user drop-down data");
+        }
+
+        const userData = await response.json();
+
+        setUserDropdownData(userData.rows);
+        setShowTableUser(true);
+      } catch (error) {
+        console.error("Error fetching user drop-down data:", error);
+      }
+    } else {
+      setShowTableUser(false);
+    }
+  };
+
+  const onClickRowAgentType = (row) => {
+    form.setValue("agentType", row.UUID);
+    form.setValue("agentTypeCode", row.agentType);
+
+    setShowTableAgentType(false);
+  };
+
+  const onClickRowUser = (row) => {
+    form.setValue("user", row.UUID);
+    form.setValue("agentName", row.fullName || "");
+    form.setValue("gender", row.gender || "");
+    form.setValue("title", row.title || "");
+    form.setValue("email", row.email || "");
+    form.setValue("phoneNo", row.phoneNo || "");
+
+    setShowTableUser(false);
+  };
+
+  // Verify function
+  const verifyField = async (field: "agentCode", value: string) => {
+    form.clearErrors(field);
+
+    if (!value) {
+      form.setError(field, {
+        type: "custom",
+        message: "This field is empty.",
+      });
+
+      return;
+    } else if (!/^[^ ].+[^ ]$/.test(value)) {
+      form.setError(field, {
+        type: "custom",
+        message: "This field must not start or end with a space.",
+      });
+
+      return;
+    }
+
+    const formData = new FormData();
+
+    formData.append(`agent[${field}]`, value);
+
+    try {
+      const res = await fetch(`${ORIGIN}/agent/api/agent/verify`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+
+        if (res.status === 403) {
+          toast({
+            title: "Error",
+            description: errorData.message,
+            variant: "destructive",
+          });
+        }
+
+        throw new Error(errorData.message);
+      }
+
+      const data: boolean = await res.json();
+
+      form.setError(field, {
+        type: "custom",
+        message: data
+          ? `"${value}" already exists.`
+          : `"${value}" is available.`,
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleDropdownSearchChange = (dropdownKey: string, searchTerm: string) => {
+    const config = dropdownConfigs[dropdownKey];
+    if (!config) return;
+
+    form.setValue(config.formDisplayField, searchTerm);
+
+    if (!dropdownState.originalData || dropdownState.currentDropdown !== dropdownKey) {
+      fetchDropdownData1(dropdownKey);
+      return;
+    }
+
+    const filtered = dropdownState.originalData.filter((row: any) =>
+      row[config.displayField]
+        ?.toString()
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
+    );
+
+    setDropdownState((prev) => ({
+      ...prev,
+      data: filtered,
+      showTable: true,
+      currentDropdown: dropdownKey,
+    }));
+  };
+
+  return (
+    <>
+      <Card collapsible defaultCollapsed={false} className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold">Document Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form>
+              <div className="flex flex-col md:flex-row md:space-x-8">
+                <FormField
+                  control={form.control}
+                  name="profileImage"
+                  render={({ field }) => (
+                    <FormItem className="row-span-4 grid h-full grid-rows-[auto_1fr] space-y-1.5">
+                      <FormLabel>Profile Image:</FormLabel>
+                      <FormControl>
+                        <div
+                          onClick={handleImageClick}
+                          className="border-2 border-dashed border-gray-300 w-full max-w-[400px] max-h-[460px] md:w-[300px] md:h-[360px] flex items-center justify-center cursor-pointer relative overflow-hidden mt-0.5"
+                        >
+                          {imageSrc ? (
+                            imageSrc.includes('/preview') ? (
+                              <iframe
+                                src={imageSrc}
+                                className="size-full object-cover pointer-events-none"
+                                title="Profile Image Preview"
+                              />
+                            ) : imageSrc.startsWith('blob:') ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={imageSrc}
+                                alt="Uploaded Profile Image"
+                                className="size-full object-cover"
+                              />
+                            ) : (
+                              // Direct server URL or other image URLs
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={imageSrc}
+                                alt="Profile Image"
+                                className="size-full object-cover"
+                                onError={(e) => {
+                                  console.error("Failed to load image:", imageSrc);
+                                  e.currentTarget.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyUzYuNDggMjIgMTIgMjJTMjIgMTcuNTIgMjIgMTJTMTcuNTIgMiAxMiAyWk0xMiAyMEM3LjU5IDIwIDQgMTYuNDEgNCAxMlM3LjU5IDQgMTIgNFMyMCA3LjU5IDIwIDEyUzE2LjQxIDIwIDEyIDIwWiIgZmlsbD0iIzk5OTk5OSIvPgo8cGF0aCBkPSJNMTIgNkM5Ljc5IDYgOCA3Ljc5IDggMTBDOCAxMi4yMSA5Ljc5IDE0IDEyIDE0QzE0LjIxIDE0IDE2IDEyLjIxIDE2IDEwQzE2IDcuNzkgMTQuMjEgNiAxMiA2WiIgZmlsbD0iIzk5OTk5OSIvPgo8L3N2Zz4K";
+                                }}
+                              />
+                            )
+                          ) : (
+                            <span className="text-gray-500">
+                              Click to upload Profile Image
+                            </span>
+                          )}
+                          <input
+                            id="fileInput"
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleImageChange(e.target.files)}
+                          />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <div className="flex w-full flex-col space-y-2">
+                  <div className="grid grid-col-1 md:grid-cols-4 gap-x-4 gap-y-3">
+                    <FormField
+                      control={form.control}
+                      name="agentCode"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1.5">
+                          <FormLabel>Agent Code:</FormLabel>
+                          <FormControl>
+                            <div className="relative h-7.5">
+                              <Input
+                                className="h-7.5 pr-7"
+                                {...field}
+                                moduleName="agent"
+                                fieldName="agentCode"
+                                columnName="Agent Code"
+                                onBlur={() => {
+                                  if (field.value && field.value.trim()) {
+                                    verifyField("agentCode", field.value);
+                                  }
+                                }}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="user"
+                      render={({ field }) => (
+                        <FormItem className="hidden">
+                          <FormLabel>UUID:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7" {...field} readOnly={true} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="agentName"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1.5">
+                          <FormLabel>Agent Name:<span className="text-red-500">*</span></FormLabel>
+                          <FormControl className="relative">
+                            <div className="relative">
+                              <Input
+                                className="h-7.5 pr-8"
+                                {...field}
+                                onClick={toggleTableUser}
+                                ref={inputRef}
+                                autoComplete="off"
+                              />
+                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                <FaMagnifyingGlass className="text-gray-400" />
+                              </div>
+                              {showTableUser && (
+                                <div
+                                  ref={dropdownRef}
+                                  className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                                >
+                                  <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                    <DropdownTable
+                                      columns={dropdownUserColumns}
+                                      data={userDropdownData}
+                                      onClickRow={onClickRowUser}
+                                    />
+                                  </ScrollArea>
+                                </div>
+                              )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="agentType"
+                      render={({ field }) => (
+                        <FormItem className="hidden">
+                          <FormLabel>UUID:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7" {...field} readOnly={true} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="agentTypeCode"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormLabel>Agent Type:</FormLabel>
+                          <FormControl className="relative">
+                            <div className="relative">
+                              <Input
+                                className="h-7.5 pr-8"
+                                {...field}
+                                // readOnly
+                                onChange={(e) => handleDropdownSearchChange("agentType", e.target.value)}
+                                onClick={() => fetchDropdownData1("agentType")}
+                                ref={dropdownState.currentDropdown === "agentType" ? dropdownInputRef : null}
+                                autoComplete="off"
+                              />
+                              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                <FaMagnifyingGlass className="text-gray-400" />
+                              </div>
+                              {dropdownState.showTable && dropdownState.currentDropdown === "agentType" && (
+                                <div
+                                  ref={dropdownTableRef}
+                                  className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px] right-0"
+                                >
+                                  <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                                    <DropdownTable
+                                      columns={dropdownConfigs.agentType.columns}
+                                      data={dropdownState.data}
+                                      onClickRow={onClickRow}
+                                    />
+                                    <ScrollBar orientation="vertical" />
+                                  </ScrollArea>
+                                </div>
+                              )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="commission"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1.5">
+                          <FormLabel>Commission %:</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                              className="h-7.5"
+                              {...field}
+                              moduleName="agent"
+                              fieldName="commission"
+                              columnName="Commission %"
+                              onKeyDown={(e) => {
+                                if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-col-1 md:grid-cols-4 gap-x-8 gap-y-2">
+                    <FormField
+                      control={form.control}
+                      name="gender"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1.5">
+                          <FormLabel>Gender:</FormLabel>
+                          <FormControl>
+                            <Select
+                              value={field.value}
+                              onValueChange={field.onChange}
+                            >
+                              <SelectTrigger className="h-7.5 w-full">
+                                <SelectValue placeholder="Select gender" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {genderList.map((item) => (
+                                  <SelectItem
+                                    key={item.value}
+                                    value={item.value}
+                                  >
+                                    {item.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1.5">
+                          <FormLabel>Title:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="phoneNo"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1.5">
+                          <FormLabel>Phone No.:</FormLabel>
+                          <FormControl>
+                            <Input
+                              className="h-7.5"
+                              {...field}
+                              moduleName="agent"
+                              fieldName="phoneNo"
+                              columnName="Phone No."
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1.5">
+                          <FormLabel>Email:</FormLabel>
+                          <FormControl>
+                            <Input
+                              className="h-7.5"
+                              {...field}
+                              moduleName="agent"
+                              fieldName="email"
+                              columnName="Email"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-col-1 md:grid-cols-1 gap-x-8 gap-y-2">
+                    <FormField
+                      control={form.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem className="col-span-4 flex flex-col space-y-1.5">
+                          <FormLabel>Address:</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              maxLength={255}
+                              moduleName="agent"
+                              fieldName="address"
+                              columnName="Address"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-col-1 md:grid-cols-4 gap-x-8 gap-y-2">
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem className="col-span-4 flex flex-col space-y-1.5">
+                          <FormLabel>Description:</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              maxLength={255}
+                              moduleName="agent"
+                              fieldName="description"
+                              columnName="Description"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="account"
+                      render={({ field }) => (
+                        <FormItem className="hidden">
+                          <FormLabel>UUID:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7" {...field} readOnly={true} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <ProfileImageDialog
+        open={imageDialogOpen}
+        setOpen={setImageDialogOpen}
+        imageSrc={imageSrc}
+        setImageSrc={setImageSrc}
+        setTempProfileImage={setTempProfileImage}
+      />
+    </>
+  );
+}
+
+function ProfileImageDialog({
+  open,
+  setOpen,
+  imageSrc,
+  setImageSrc,
+  setTempProfileImage,
+}: {
+  open: boolean;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  imageSrc: string | null;
+  setImageSrc: Dispatch<SetStateAction<string | null>>;
+  setTempProfileImage: Dispatch<
+    SetStateAction<ProfileImageAttachment | File | null | undefined>
+  >;
+}) {
+  if (!imageSrc) return;
+
+  const onClickRemoveImage = () => {
+    setImageSrc(null);
+    setTempProfileImage(null);
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen} className="m-2">
+      <DialogContent className="w-fit max-w-6xl">
+        <DialogHeader>
+          <DialogTitle>Profile Image</DialogTitle>
+        </DialogHeader>
+        <div className="flex justify-center items-center">
+          {imageSrc.includes('/preview') ? (
+            <iframe
+              src={imageSrc}
+              className="max-w-full max-h-[65vh] object-cover pointer-events-none"
+              title="Profile Image Preview"
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img 
+              src={imageSrc} 
+              alt="Profile Image" 
+              className="max-w-full max-h-[65vh] object-contain"
+              onError={(e) => {
+                console.error("Failed to load image in dialog:", imageSrc);
+              }}
+            />
+          )}
+        </div>
+        <DialogFooter className="sm:justify-center">
+          <Button
+            onClick={onClickRemoveImage}
+            type="button"
+            variant="destructive"
+          >
+            Remove Image
+          </Button>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Close
+            </Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

@@ -1,0 +1,91 @@
+"use client";
+
+import * as Icons from "lucide-react";
+import { TrendingDown, TrendingUp } from "lucide-react";
+
+interface MeterPercentageCardProps {
+  title: string;
+  value: string | number;
+  lastValue?: string | number;
+  variance?: string;
+  showVariance?: boolean;
+  icon?: string;
+  interval?: string;
+}
+
+export default function MeterPercentageCard({
+  title,
+  value,
+  lastValue,
+  variance,
+  showVariance,
+  icon,
+  interval,
+}: MeterPercentageCardProps) {
+  const LucideIcon = (Icons as any)[icon as keyof typeof Icons] || Icons.Percent;
+
+  const iconColors = [
+    "text-green-600",
+    "text-blue-600",
+    "text-yellow-500",
+    "text-red-500",
+    "text-cyan-500",
+    "text-purple-500",
+    "text-orange-500",
+    "text-pink-500",
+    "text-indigo-500",
+    "text-emerald-500",
+  ];
+
+  const getIconColor = (iconName?: string) => {
+    if (!iconName) return "text-gray-500";
+
+    const charCodeSum = iconName.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+
+    return iconColors[charCodeSum % iconColors.length];
+  };
+
+  const iconColor = getIconColor(icon);
+
+  const varianceValue = variance?.replace("%", "") || "0";
+  const isPositive = Number(varianceValue) >= 0;
+
+  return (
+    <div className="flex h-full w-full items-center bg-[#fff] px-4 py-3">
+      <div className="flex w-full items-center justify-between gap-3">
+        <LucideIcon size={30} className={iconColor} />
+
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold text-gray-700">{title}</p>
+
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold leading-none">{value}</h2>
+
+            {showVariance && variance && variance !== "ERROR" && (
+              <div
+                className={`flex items-center gap-1 text-[8px] font-semibold ${
+                  isPositive ? "text-green-600" : "text-red-500"
+                }`}
+              >
+                {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+
+                <span>{variance}</span>
+              </div>
+            )}
+          </div>
+
+          {lastValue !== undefined &&
+            (interval === "week" ? (
+              <p className="whitespace-nowrap text-[10px] text-gray-500">
+                vs Last {interval}: {Number(lastValue).toLocaleString()}
+              </p>
+            ) : (
+              <p className="whitespace-nowrap text-[10px] text-gray-500">
+                vs {interval}: {Number(lastValue).toLocaleString()}
+              </p>
+            ))}
+        </div>
+      </div>
+    </div>
+  );
+}

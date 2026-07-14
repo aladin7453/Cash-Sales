@@ -1,0 +1,56 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type AgentList = {
+  UUID: string;
+  agentCode: string;
+  agentName: string;
+  agentType: string;
+  description: string;
+  contact: string;
+  email: string;
+  phoneNo: string;
+  address: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const AgentColumns: ColumnDef<AgentList>[] = [
+  {
+    id: "agentCode",
+    accessorKey: "agentCode",
+    header: "Agent Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "agentName",
+    accessorKey: "agentName",
+    header: "Agent Name",
+    filterFn: "includesString",
+  },
+    {
+    id: "agentType",
+    accessorKey: "agentType",
+    header: "Agent Type",
+    filterFn: "includesString",
+  },
+  {
+    id: "agentDescription",
+    accessorKey: "agentDescription",
+    header: "Description",
+    filterFn: "includesString",
+  },
+   {
+    id: "createdByUsername",
+    accessorKey: "createdByUsername",
+    header: "Created By",
+    filterFn: "includesString",
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created At",
+    filterFn: "includesString",
+  },
+];

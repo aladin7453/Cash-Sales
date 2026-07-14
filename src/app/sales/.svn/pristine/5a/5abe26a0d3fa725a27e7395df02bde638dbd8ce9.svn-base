@@ -1,0 +1,540 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { FaFileCirclePlus, FaCircleXmark, FaMagnifyingGlass } from "react-icons/fa6";
+
+import { ORIGIN, getAuthHeaders } from "@/lib/constants";
+
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Input, NumberInputField } from "@/components/ui/input";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+type Params = {
+  tempRowAttachments: any;
+  setTempRowAttachments: ([]) => void;
+  form: any;
+  slug?: string;
+  preferenceData?: any;
+};
+
+// HTML Utility Function
+function stripHtml(html) {
+  if (!html) return "";
+  // Replace <br> and <br/> with newlines
+  let text = html.replace(/<br\s*\/?>/gi, '\n');
+  // Replace <p> with nothing, </p> with newline
+  text = text.replace(/<p[^>]*>/gi, '').replace(/<\/p>/gi, '\n');
+  // Remove all other HTML tags
+  text = text.replace(/<[^>]+>/g, '');
+  // Replace HTML entities
+  text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+
+  return text;
+}
+
+export function OtherDetailsForm({
+  form,
+  tempRowAttachments,
+  setTempRowAttachments,
+  slug,
+  preferenceData
+}: Params) {
+  const headers = getAuthHeaders();
+
+  // Preference (Define Decimal)
+  const decimal = preferenceData?.data?.decimal || 2;
+
+  const handleClickOutside = (event) => {
+    if (dropdownTableRef.current &&
+      !dropdownTableRef.current.contains(event.target) &&
+      dropdownInputRef.current !== event.target) {
+      setDropdownState(prev => ({ ...prev, showTable: false }));
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener('click', handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  // Default Currency Function
+  const setDefaultCurrency = async () => {
+    if (preferenceData?.data?.currency && !form.getValues("currency")) {
+      try {
+        var formData = new FormData;
+        formData.append("table[0]", "currency");
+
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`,
+          {
+            method: 'POST',
+            headers,
+            body: formData,
+          });
+
+        if (response.ok) {
+          const data = await response.json();
+          const defaultCurrency = data.rows?.find(row => row.UUID === preferenceData.data.currency);
+
+          if (defaultCurrency) {
+            form.setValue("currency", defaultCurrency.UUID);
+            form.setValue("currencyCode", defaultCurrency.currencyCode);
+            form.setValue("currencyRate", defaultCurrency.exchangeRateSales);
+          }
+        }
+      } catch (error) {
+        console.error('Error setting default currency:', error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (preferenceData?.data?.currency && slug === "new") {
+      setDefaultCurrency();
+    }
+  }, [preferenceData, slug]);
+
+  // Currency Filter State
+  const [currencyFilter, setCurrencyFilter] = useState("");
+
+  // Unified Dropdown State
+  const [dropdownState, setDropdownState] = useState({
+    currentDropdown: null as string | null,
+    data: [] as any[],
+    showTable: false,
+  });
+
+  // Unified Dropdown Refs
+  const dropdownInputRef = useRef(null);
+  const dropdownTableRef = useRef(null);
+
+  // Unified Dropdown Configuration
+  const dropdownConfigs = {
+    currency: {
+      tableName: "currency",
+      columns: [
+        { accessorKey: "currencyCode", header: "Currency Code" },
+        { accessorKey: "description", header: "Description", cell: ({ row }) => <DescriptionCellTooltip row={row} /> }
+      ],
+      valueField: "UUID",
+      displayField: "currencyCode",
+      formValueField: "currency",
+      formDisplayField: "currencyCode"
+    }
+  };
+
+  // Unified Fetch Dropdown Data
+  const fetchDropdownData = async (dropdownKey: string) => {
+    try {
+      const config = dropdownConfigs[dropdownKey];
+
+      if (!config) return;
+
+      const formData = new FormData();
+
+      formData.append('table[]', config.tableName);
+
+      const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${dropdownKey} data`);
+      }
+
+      const data = await response.json();
+
+      setDropdownState({
+        currentDropdown: dropdownKey,
+        data: data.rows,
+        showTable: true,
+      });
+    } catch (error) {
+      console.error(`Error fetching ${dropdownKey} data:`, error);
+    }
+  };
+
+  // Unified Row Click Handler
+  const onClickRow = (row: any) => {
+    const config = dropdownConfigs[dropdownState.currentDropdown!];
+
+    if (config) {
+      form.setValue(config.formValueField, row[config.valueField]);
+      form.setValue(config.formDisplayField, row[config.displayField]);
+
+      // Reset currencyFilter if the current dropdown is 'currencyCode'
+      if (dropdownState.currentDropdown === 'currencyCode') {
+        setCurrencyFilter("");
+      }
+
+      // Special handling for currency dropdown to set exchange rate
+      if (dropdownState.currentDropdown === 'currency' && row.exchangeRateSales) {
+        form.setValue("currencyRate", Number(row.exchangeRateSales).toFixed(2));
+      }
+    }
+
+    setDropdownState(prev => ({ ...prev, showTable: false }));
+  };
+
+  // File Attachment
+  const fileInputRef = useRef(null);
+
+  const handleChooseFileClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleFileChange = (event) => {
+    const fileList = Array.from(event.target.files);
+    const mergeArray = [...tempRowAttachments, ...fileList]
+
+    setTempRowAttachments(mergeArray)
+  };
+
+  function handleDeleteFile(index) {
+    var newCustomInfoFiles = [...tempRowAttachments];
+
+    newCustomInfoFiles.splice(index, 1);
+
+    setTempRowAttachments(newCustomInfoFiles);
+  }
+
+  return (
+    <Form {...form}>
+      <form>
+        <Card collapsible defaultCollapsed={false} className="shadow-md">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold">Other Details</CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-3">
+              <FormField
+                control={form.control}
+                name="currency"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>Currency UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="currencyCode"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Currency:</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          moduleName="salesPurchaseContra"
+                          fieldName="currencyCode"
+                          columnName="Currency Code"
+                          onClick={() => { fetchDropdownData("currency"); }}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setCurrencyFilter(e.target.value);
+                          }}
+                          ref={dropdownInputRef}
+                          autoComplete="off"
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {dropdownState.showTable && dropdownState.currentDropdown === 'currency' && (
+                          <div ref={dropdownTableRef} className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px]">
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownConfigs.currency.columns}
+                                data={dropdownState.data}
+                                onClickRow={onClickRow}
+                                filterValue={currencyFilter}
+                                filterColumn="currencyCode"
+                              />
+                              <ScrollBar orientation="vertical" />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="currencyRate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Currency Rate:</FormLabel>
+                    <FormControl>
+                      <NumberInputField
+                        className="h-7.5"
+                        form={form}
+                        fieldName="currencyRate"
+                        value={field.value || ""}
+                        decimalPlaces={decimal}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-2 grid-cols-1 mt-4">
+              <FormField
+                control={form.control}
+                name="note"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        moduleName="salesPurchaseContra"
+                        fieldName="note"
+                        columnName="Note"
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-2 grid-cols-1 mt-4">
+              <FormField
+                control={form.control}
+                name="note2"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note 2:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        moduleName="salesPurchaseContra"
+                        fieldName="note2"
+                        columnName="Note2"
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+
+            <div className="grid items-start gap-x-8 gap-y-2 grid-cols-1 mt-4">
+              <FormField
+                control={form.control}
+                name="note3"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note 3:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        moduleName="salesPurchaseContra"
+                        fieldName="note3"
+                        columnName="Note3"
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+
+            <div className="grid items-start gap-x-8 gap-y-2 grid-cols-1 mt-4">
+              <FormField
+                control={form.control}
+                name="note4"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note 4:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        moduleName="salesPurchaseContra"
+                        fieldName="note4"
+                        columnName="Note4"
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+
+            <div className="grid items-start gap-x-8 gap-y-2 grid-cols-1 mt-4">
+              <FormField
+                control={form.control}
+                name="note5"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note 5:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        moduleName="salesPurchaseContra"
+                        fieldName="note5"
+                        columnName="Note5"
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+
+            <div className="grid items-start gap-x-8 gap-y-2 grid-cols-1 mt-4">
+              <FormField
+                control={form.control}
+                name="note6"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note 6:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        moduleName="salesPurchaseContra"
+                        fieldName="note6"
+                        columnName="Note6"
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+
+            <div className="grid items-start gap-x-8 gap-y-2 grid-cols-1 mt-4">
+              <FormField
+                control={form.control}
+                name="note7"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note 7:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        moduleName="salesPurchaseContra"
+                        fieldName="note7"
+                        columnName="Note7"
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+
+            <div className="grid items-start gap-x-8 gap-y-2 grid-cols-1 mt-4">
+              <FormField
+                control={form.control}
+                name="note8"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Note 8:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5"
+                        value={stripHtml(field.value)}
+                        moduleName="salesPurchaseContra"
+                        fieldName="note8"
+                        columnName="Note8"
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+
+            <div className="mt-4">
+              <FormField
+                control={form.control}
+                name="attachment"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1 mt-4">
+                    <FormLabel>
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        Attachment: <button type="button" onClick={handleChooseFileClick} ><FaFileCirclePlus style={{ marginLeft: '5px' }} className="text-erp-blue-14" /></button>
+                      </div></FormLabel>
+
+                    <FormControl>
+                      <Input id="attachments" type="file" multiple onChange={handleFileChange} ref={fileInputRef} className="hidden" />
+                    </FormControl>
+
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* You can render the files here */}
+            {tempRowAttachments && tempRowAttachments.map((file, index) => (
+              <div className="mt-2" key={index}>
+                <a href={file.link} target="_blank" rel="noopener noreferrer" style={{ color: 'blue' }}>
+                  {file.name}
+                </a>
+                <button type="button" onClick={() => handleDeleteFile(index)} style={{ color: 'red' }}>
+                  <FaCircleXmark style={{ verticalAlign: "bottom", marginLeft: "2px", marginTop: "2px" }} title={"Remove"} />
+                </button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </form>
+    </Form>
+  );
+}

@@ -1,0 +1,152 @@
+"use client";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type AddressDetails = {
+  UUID: string;
+  deliveryLocation: string;
+  deliveryAddress: string;
+  coordinate: string;
+  contact: string;
+  phoneNo: number;
+  attachment: string;
+  description: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  valid: string;
+  createdAtFormat: string;
+  updatedAtFormat: string;
+  createdByUsername: string;
+  updatedByUsername: string;
+  attachmentLink: {
+    name: string;
+    link: string;
+  }[];
+  attachmentFiles?: File[]; // New property for the new attachment format
+};
+
+export const AddressDetailsColumns: ColumnDef<AddressDetails>[] = [
+  // Column Drag and Drop and Resize (Add id for each column)
+  {
+    id: "deliveryLocation",
+    accessorKey: "deliveryLocation",
+    header: "Designated Location",
+    filterFn: "includesString"
+  },
+  {
+    id: "deliveryAddress",
+    accessorKey: "deliveryAddress",
+    header: "Address",
+    filterFn: "includesString"
+  },
+  {
+    id: "coordinate",
+    accessorKey: "coordinate",
+    header: "Coordinates",
+    filterFn: "includesString"
+  },
+  {
+    id: "contact",
+    accessorKey: "contact",
+    header: "Contact",
+    filterFn: "includesString"
+  },
+  {
+    id: "phoneNo",
+    accessorKey: "phoneNo",
+    header: "Phone No.",
+    filterFn: "includesString"
+  },
+  {
+    id: "attachment",
+    accessorKey: "attachment",
+    header: "Attachment (.pdf, .png, .jpg, ,jpeg)",
+    cell: ({ row }) => {
+      let attachments = [];
+      let attachmentFiles = row.original.attachmentFiles || [];
+
+      try {
+        attachments = row.original.attachment ? JSON.parse(row.original.attachment) : [];
+      } catch (error) {
+        console.error("Failed to parse attachment JSON:", error);
+      }
+
+      const attachmentLinks = row.original.attachmentLink;
+
+      const renderedAttachments = [
+        ...attachments.map((att: { Name: string }, index: number) => {
+          const link = attachmentLinks?.find((al) => al.name === att.Name);
+          return link ? (
+            <a
+              key={`attachment-${index}`}
+              href={link.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "blue" }}
+            >
+              {att.Name}
+            </a>
+          ) : (
+            <span key={`attachment-${index}`}>{att.Name}</span>
+          );
+        }),
+        ...attachmentFiles.map((file, index) => (
+          <span key={`file-${index}`}>
+            {file.name}
+          </span>
+        )),
+      ];
+
+      return renderedAttachments.length > 0
+        ? renderedAttachments.reduce((prev, curr) => [prev, ", ", curr])
+        : <span>No attachment</span>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Remark",
+    filterFn: "includesString"
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created at",
+    filterFn: "includesString"
+  },
+  {
+    id: "CreatedByUsername",
+    accessorKey: "CreatedByUsername",
+    header: "Created by",
+    filterFn: "includesString"
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated at",
+    filterFn: "includesString"
+  },
+  {
+    id: "UpdatedByUsername",
+    accessorKey: "UpdatedByUsername",
+    header: "Updated by",
+    filterFn: "includesString"
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as AddressDetails["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    // Custom filter function that first convert the row's numeric boolean
+    // value to string, then check if the string contains the filterValue
+    filterFn: filterWithStringConversion,
+  },
+];

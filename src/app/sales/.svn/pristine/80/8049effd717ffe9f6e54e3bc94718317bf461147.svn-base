@@ -1,0 +1,47 @@
+import { useRouter } from "next/navigation";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import SaveButton from "@/components/form/ActionButton/Save";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useDateRestriction } from "@/components/custom/DateRestrictionContext";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+type TopActionBarProps = {
+  onSave: () => void;
+};
+
+export default function TopActionBar({ onSave }: TopActionBarProps) {
+  const router = useRouter();
+  const { allowPastRecord, setAllowPastRecord } = useDateRestriction();
+
+  return (
+    <div className="-mx-2 -mt-1 flex items-center justify-between bg-erp-gray-3 px-4 py-2">
+      <div className="flex space-x-3">
+        <SaveButton onSubmit={onSave} />
+        {/* <CancelButton onClick={() => router.push("/")} /> */}
+      </div>
+      {/* Past Record checkbox */}
+      <TooltipProvider delayDuration={0}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="flex items-center gap-x-2">
+              <Checkbox
+                id="allowPastRecord"
+                checked={allowPastRecord}
+                onCheckedChange={(state) => setAllowPastRecord(state === true)}
+              />
+              <label
+                htmlFor="allowPastRecord"
+                className="cursor-pointer select-none text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Past Record
+              </label>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p>Allow backdated date / time entry on this record</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+  );
+}

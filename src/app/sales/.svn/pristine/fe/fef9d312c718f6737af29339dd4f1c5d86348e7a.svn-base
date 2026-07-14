@@ -1,0 +1,485 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { MdClose } from "react-icons/md";
+import { FaMagnifyingGlassPlus, FaDownload } from "react-icons/fa6";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { useSearchParams, useRouter } from "next/navigation";
+
+import GoogleMap from "./interactiveMap";
+
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+import type { DeliveryOrder } from "../../columns";
+
+type Params = {
+  deliveryOrder?: DeliveryOrder | null;
+  setDeliveryOrder: (data: any) => void;
+  tempRowDeliveryLink: any;
+  actualDeliveryAttachment: any;
+  form: any
+  row?: any;
+};
+
+const PODFormSchema = z.object({
+  UUID: z.union([z.string(), z.literal('')]),
+  actualDeliveryAddress: z.union([z.string(), z.literal('')]),
+  actualDeliveryCoordinates: z.union([z.string(), z.literal('')]),
+  actualDeliveryAtFormat: z.union([z.string(), z.literal('')]),
+  actualDeliveryNIRC: z.union([z.string(), z.literal('')]),
+  actualDeliveryRecipient: z.union([z.string(), z.literal('')]),
+  actualDeliveryRemark: z.union([z.string(), z.literal('')]),
+  actualDeliverySignatureLink: z.union([z.string(), z.literal('')]),
+  actualDeliveryAttachmentLink: z.union([z.string(), z.literal('')]),
+  actualDeliverySubmitedAtFormat: z.union([z.string(), z.literal('')]),
+  actualDeliverySubmitedByFullName: z.union([z.string(), z.literal('')]),
+});
+
+export default function DeliveryPointForm({
+  deliveryOrder,
+  jobAssignmentData,
+  tempRowDeliveryLink,
+  actualDeliveryAttachment
+}: Params) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const router = useRouter();
+  const data: any = jobAssignmentData;
+  const [showDialog, setShowDialog] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedImages, setSelectedImages] = useState([]);
+  const [imageSrc, setImageSrc] = useState('');
+
+  const updateAddressFields = (location) => {
+    const { placeName, coordinates } = location;
+
+    form.setValue('actualDeliveryAddress', placeName);
+    form.setValue('actualDeliveryCoordinates', `${coordinates.lat}, ${coordinates.lng}`);
+  };
+
+  const handleImageClick = (image) => {
+    // Handle different types of image links
+    if (typeof image === 'string' && image.includes('/view')) {
+      // Google Drive link
+      const newLink = image.replace(/\/view.*$/, "/preview");
+      setImageSrc(newLink);
+      setSelectedImage(newLink);
+    } else if (typeof image === 'string' && !image.startsWith('blob:')) {
+      // Direct server URL or other link types
+      setImageSrc(image);
+      setSelectedImage(image);
+    } else {
+      // Blob URL for local files
+      setSelectedImage(image);
+      setImageSrc(image);
+    }
+    setShowDialog(true);
+  };
+
+  const form = useForm<z.infer<typeof PODFormSchema>>({
+    resolver: zodResolver(PODFormSchema),
+    defaultValues: {
+      UUID: data?.UUID || "",
+      actualDeliveryAddress: data?.actualDeliveryAddress || "",
+      actualDeliveryCoordinates: data?.actualDeliveryCoordinates || "",
+      actualDeliveryAtFormat: data?.actualDeliveryAtFormat || "",
+      actualDeliveryNIRC: data?.actualDeliveryNIRC || "",
+      actualDeliveryRecipient: data?.actualDeliveryRecipient || "",
+      actualDeliveryRemark: data?.actualDeliveryRemark || "",
+      actualDeliverySignatureLink: data?.actualDeliverySignatureLink || "",
+      actualDeliveryAttachmentLink: data?.actualDeliveryAttachmentLink || "",
+      actualDeliverySubmitedAtFormat: data?.actualDeliverySubmitedAtFormat || "",
+      actualDeliverySubmitedByFullName: data?.actualDeliverySubmitedByFullName || "",
+    },
+  });
+
+  useEffect(() => {
+    form.reset({
+      UUID: data?.UUID || "",
+      actualDeliveryAddress: data?.actualDeliveryAddress || "",
+      actualDeliveryCoordinates: data?.actualDeliveryCoordinates || "",
+      actualDeliveryAtFormat: data?.actualDeliveryAtFormat || "",
+      actualDeliveryNIRC: data?.actualDeliveryNIRC || "",
+      actualDeliveryRecipient: data?.actualDeliveryRecipient || "",
+      actualDeliveryRemark: data?.actualDeliveryRemark || "",
+      actualDeliverySignatureLink: data?.actualDeliverySignatureLink || "",
+      actualDeliveryAttachmentLink: data?.actualDeliveryAttachmentLink || "",
+      actualDeliverySubmitedAtFormat: data?.actualDeliverySubmitedAtFormat || "",
+      actualDeliverySubmitedByFullName: data?.actualDeliverySubmitedByFullName || "",
+    });
+  }, [data, form]);
+
+  return (
+    <Form {...form}>
+      <div className="w-full flex flex-col px-1 py-1.5 gap-y-4">
+        {/* Top Container */}
+        <div className="flex item-center justify-between gap-x-2">
+          {/* Left Container */}
+          <GoogleMap
+            onLocationSelect={updateAddressFields}
+            initialCoordinates={data?.actualDeliveryCoordinates}
+          />
+
+          {/* Right Container */}
+          <div className="flex flex-col flex-1 px-2.5 gap-y-3">
+            {/* First Row */}
+            <div className="grid grid-cols-2 items-center gap-x-2">
+
+              {/* Coordinates */}
+              <FormField
+                control={form.control}
+                name="actualDeliveryCoordinates"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormControl>
+                      <TooltipProvider delayDuration={1000}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Input
+                              className="bg-erp-gray-1 border-gray-200 h-7.5 rounded-md px-2 text-[11px] focus-visible:ring-0 focus-visible:outline-none"
+                              {...field}
+                              placeholder="Coordinates"
+                              readOnly
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start">Coordinates</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Timestamp */}
+              <FormField
+                control={form.control}
+                name="actualDeliveryAtFormat"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormControl>
+                      <TooltipProvider delayDuration={1000}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Input
+                              className="bg-erp-gray-1 border-gray-200 h-7.5 rounded-md px-2 text-[11px] focus-visible:ring-0 focus-visible:outline-none"
+                              {...field}
+                              placeholder="Timestamp"
+                              readOnly
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start">Timestamp</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Second Row */}
+            <div className="grid grid-cols-2 items-center gap-x-2">
+
+              {/* Submitted At */}
+              <FormField
+                control={form.control}
+                name="actualDeliverySubmitedAtFormat"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormControl>
+                      <TooltipProvider delayDuration={1000}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Input
+                              className="bg-erp-gray-1 border-gray-200 h-7.5 rounded-md px-2 text-[11px] focus-visible:ring-0 focus-visible:outline-none"
+                              {...field}
+                              placeholder="Submitted At"
+                              readOnly
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start">Submitted At</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Submitted By */}
+              <FormField
+                control={form.control}
+                name="actualDeliverySubmitedByFullName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormControl>
+                      <TooltipProvider delayDuration={1000}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Input
+                              className="bg-erp-gray-1 border-gray-200 h-7.5 rounded-md px-2 text-[11px] focus-visible:ring-0 focus-visible:outline-none"
+                              {...field}
+                              placeholder="Submitted By"
+                              readOnly
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start">Submitted By</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Third Row */}
+            <div className="grid grid-cols-1 items-center">
+
+              {/* Address */}
+              <FormField
+                control={form.control}
+                name="actualDeliveryAddress"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormControl>
+                      <TooltipProvider delayDuration={1000}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Textarea
+                              className="min-h-[60px] resize-none bg-erp-gray-1 border-gray-200 rounded-md px-2 text-[11px] focus-visible:ring-0 focus-visible:outline-none"
+                              {...field}
+                              placeholder="Address"
+                              readOnly
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start">Address</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Forth Row */}
+            <div className="grid grid-cols-1 items-center">
+
+              {/* Remarks */}
+              <FormField
+                control={form.control}
+                name="actualDeliveryRemark"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormControl>
+                      <TooltipProvider delayDuration={1000}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Textarea
+                              className="min-h-[60px] resize-none bg-erp-gray-1 border-gray-200 rounded-md px-2 text-[11px] focus-visible:ring-0 focus-visible:outline-none"
+                              {...field}
+                              placeholder="Remarks"
+                              readOnly
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start">Remarks</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Fifth Row */}
+            <div className="grid grid-cols-2 items-center gap-x-2">
+
+              {/* Verifier */}
+              <FormField
+                control={form.control}
+                name="actualDeliveryRecipient"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormControl>
+                      <TooltipProvider delayDuration={1000}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Input
+                              className="bg-erp-gray-1 border-gray-200 h-7.5 rounded-md px-2 text-[11px] focus-visible:ring-0 focus-visible:outline-none"
+                              {...field}
+                              placeholder="Verifier"
+                              readOnly
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start">Verifier</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Verifier NRIC */}
+              <FormField
+                control={form.control}
+                name="actualDeliveryNIRC"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormControl>
+                      <TooltipProvider delayDuration={1000}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Input
+                              className="bg-erp-gray-1 border-gray-200 h-7.5 rounded-md px-2 text-[11px] focus-visible:ring-0 focus-visible:outline-none"
+                              {...field}
+                              placeholder="Verifier NRIC"
+                              readOnly
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start">Verifier NRIC</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Sixth Row */}
+            <div className="grid grid-cols-1 items-center">
+
+              {/* Signature */}
+              <FormField
+                control={form.control}
+                name="actualDeliverySignatureLink"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormControl>
+                      <div className="flex items-center">
+                        <Input
+                          className="bg-erp-gray-1 border-gray-200 h-7.5 rounded-md px-2 text-[11px] focus-visible:ring-0 focus-visible:outline-none"
+                          {...field}
+                          readOnly
+                          value={data?.actualDeliverySignatureLink ? data?.actualDeliverySignatureLink[0]?.name : 'No signature available'}
+                        />
+                        {data?.actualDeliverySignatureLink && (
+                          <div className="flex px-2 gap-x-2">
+                            <a
+                              href={data?.actualDeliverySignatureLink[0]?.link}
+                              download={data?.actualDeliverySignatureLink[0]?.name}
+                              target="_blank"
+                              className="bg-blue-500 text-white p-2.5 rounded-full flex items-center duration-300 ease-in-out transition-all justify-center hover:bg-blue-600 min-w-[30px]"
+                            >
+                              <FaMagnifyingGlassPlus className="size-3.5" />
+                            </a>
+                            <a
+                              href={data?.actualDeliverySignatureLink[0]?.link}
+                              download={data?.actualDeliverySignatureLink[0]?.name}
+                              className="bg-blue-500 text-white p-2.5 rounded-full flex items-center duration-300 ease-in-out transition-all justify-center hover:bg-blue-600 min-w-[30px]"
+                            >
+                              <FaDownload className="size-3.5" />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Container */}
+        <div className="w-full flex flex-col px-0.5 gap-y-3">
+          <h1 className="text-base font-bold">Photo Details</h1>
+          <div className="flex justify-start items-center gap-x-4">
+            {actualDeliveryAttachment?.length > 0 ? (
+              actualDeliveryAttachment.map((file, index) => {
+                const isGoogleDriveLink = file.link.includes('/view');
+                const previewLink = isGoogleDriveLink ? file.link.replace(/\/view.*$/, "/preview") : file.link;
+
+                return (
+                  <div key={index} className="relative w-40 h-32 cursor-pointer rounded-md overflow-hidden" onClick={() => handleImageClick(file.link)}>
+                    {isGoogleDriveLink ? (
+                      <iframe
+                        src={previewLink}
+                        className="w-full h-full object-cover pointer-events-none"
+                        title={`Attached ${index}`}
+                      />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={file.link}
+                        alt={`Attached ${index}`}
+                        className="object-cover w-full h-full"
+                        onError={(e) => {
+                          console.error("Failed to load starting attachment:", file.link);
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })) : (
+              <div className="w-full h-[132px] flex justify-center items-center">
+                <p>No Image Provided</p>
+              </div>
+            )}
+          </div>
+          {showDialog && selectedImage && (
+            <Dialog open={showDialog} onOpenChange={setShowDialog}>
+              <DialogContent className="max-w-3xl">
+                <div className="flex justify-center items-center relative p-5">
+                  <button
+                    className="absolute top-2 right-2 bg-gray-800 text-white p-2 rounded-full"
+                    onClick={() => setShowDialog(false)}
+                  >
+                    <MdClose size={20} />
+                  </button>
+                  {imageSrc.includes('/preview') ? (
+                    <iframe
+                      src={imageSrc}
+                      className="w-full h-full object-cover pointer-events-none"
+                      title="Preview Image"
+                    />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={selectedImage}
+                      alt="Clicked Image"
+                      onError={(e) => {
+                        console.error("Failed to load preview image:", selectedImage);
+                      }}
+                    />
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div >
+      </div >
+    </Form >
+  );
+}

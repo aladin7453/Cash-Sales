@@ -1,0 +1,82 @@
+"use client";
+
+import React from "react";
+import { UseFormReturn } from "react-hook-form";
+
+import { Input } from "@/components/ui/input";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
+
+interface SummaryFormProps {
+  form: UseFormReturn<any>;
+  onSubmit: (data: any) => void;
+}
+
+export default function SummaryForm({ form, onSubmit }: SummaryFormProps) {
+  return (
+    <>
+      <div className="rounded-sm w-full p-2 mx-auto bg-erp-blue-8 mt-2">
+        <div className="rounded-sm p-4 bg-erp-blue-4">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              <h2 className="text-md font-bold mb-4">Summary</h2>
+
+              <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-4">
+                {/* Total */}
+                <FormField
+                  control={form.control}
+                  name="total"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Count of Customer:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Total Current Balance */}
+                <FormField
+                  control={form.control}
+                  name="totalCurrentBalance"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total Current Balance:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Total Outstanding Amount */}
+                <FormField
+                  control={form.control}
+                  name="totalCurrentBalanceCarryForward"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Total C/F Balance:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7.5 text-right" {...field} readOnly />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </form>
+          </Form>
+        </div>
+      </div>
+    </>
+  );
+}

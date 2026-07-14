@@ -1,0 +1,53 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type KnockOffDetails = {
+  UUID?: string;
+  docType: string;
+  docNo: string;
+  docDate: string;
+  totalPayable: string;
+  knockoffAmount: string;
+  outstandingAmount: string;
+  [key: string]: any; // Allow additional dynamic properties
+};
+
+export const knockOffDetailsColumns: ColumnDef<KnockOffDetails>[] = [
+  {
+    id: "docType",
+    accessorKey: "docType",
+    header: "Doc. Type",
+    filterFn: "includesString"
+  },
+  {
+    id: "docDateFormat",
+    accessorKey: "docDateFormat",
+    header: "Doc. Date",
+    filterFn: "includesString"
+  },
+  {
+    id: "docNo",
+    accessorKey: "docNo",
+    header: "Doc. No.",
+    filterFn: "includesString"
+  },
+  {
+    id: "totalPayable",
+    accessorKey: "totalPayable",
+    header: "Original",
+    filterFn: "includesString"
+  },
+  {
+    id: "knockoffAmount",
+    accessorKey: "knockoffAmount",
+    header: "Knock-off",
+    filterFn: "includesString"
+  },
+  {
+    id: "outstandingAmount",
+    accessorKey: "outstandingAmount",
+    header: "Outstanding",
+    filterFn: "includesString"
+  },
+];

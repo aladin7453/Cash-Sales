@@ -1,0 +1,897 @@
+"use client";
+
+import { format, fromUnixTime } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import moment from "moment";
+import { useEffect, useRef, useState } from "react";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DATE_FORMAT,
+  getAuthHeaders,
+  getCurrentCompany,
+  getCurrentCompanyUUID,
+  ORIGIN,
+} from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+
+import type { User } from "../../../columns";
+
+type Params = {
+  user?: User | null;
+};
+
+const nationalityList = [{ label: "Malaysian", value: "Malaysian" }];
+const raceList = [{ label: "Others", value: "Others" }];
+const religionList = [{ label: "Others", value: "Others" }];
+
+const maritalStatusList = [
+  { label: "Married", value: "Married" },
+  { label: "Single", value: "Single" },
+  { label: "Others", value: "Others" },
+];
+
+export function EmployementDetailsForm({ user, form }: Params) {
+  const headers = getAuthHeaders();
+  const [dropdownEnumData, setDropdownEnumData] = useState<DropdownData | null>(null);
+  const [isDropdownEnumDataLoaded, setIsDropdownEnumDataLoaded] = useState(false);
+  const [baseCompanyDropdownTableData, setBaseCompanyDropdownTableData] = useState([]);
+  const [baseDepartmentDropdownTableData, setBaseDepartmentDropdownTableData] = useState([]);
+  const [jobTitleDropdownTableData, setJobTitleDropdownTableData] = useState([]);
+  const [baseLocationDropdownTableData, setBaseLocationDropdownTableData] = useState([]);
+
+  const [mentorDropdownTableData, setMentorDropdownTableData] = useState([]);
+  const [supervisorDropdownTableData, setSupervisorDropdownTableData] = useState([]);
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    fetchDropdownEnumData()
+      .then((data) => {
+        setDropdownEnumData(data);
+        setIsDropdownEnumDataLoaded(true);
+      })
+      .catch((error) => {
+        console.error("Error fetching dropdown data:", error);
+      });
+  }, []);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableCompany(false);
+      setshowTableDepartment(false);
+      setShowTableJobTitle(false);
+      setShowTableLocation(false);
+      setShowTableMentor(false);
+      setShowTableSupervisor(false);
+    }
+  };
+
+  // Attach click event listener to the document body
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    // Cleanup: remove event listener when component unmounts
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  const [showTableCompany, setShowTableCompany] = useState(false);
+  const [showTableDepartment, setshowTableDepartment] = useState(false);
+  const [showTableJobTitle, setShowTableJobTitle] = useState(false);
+  const [showTableLocation, setShowTableLocation] = useState(false);
+
+  const [showTableMentor, setShowTableMentor] = useState(false);
+  const [showTableSupervisor, setShowTableSupervisor] = useState(false);
+
+  const [supervisorFilter, setSupervisorFilter] = useState("");
+  const [mentorFilter, setMentorFilter] = useState("");
+
+  const dropdownCompanyColumns = [
+    { accessorKey: "company", header: "Company" },
+    { accessorKey: "description", header: "Description" },
+  ];
+  const dropdownDepartmentColumns = [
+    { accessorKey: "departmentID", header: "ID" },
+    { accessorKey: "department", header: "Department" },
+    { accessorKey: "description", header: "Description" },
+  ];
+  const dropdownLocationColumns = [
+    { accessorKey: "locationTypeCodeCode", header: "Location Type" },
+    { accessorKey: "locationName", header: "Location" },
+    { accessorKey: "description", header: "Description" },
+  ];
+  const dropdownJobTitleColumns = [
+    { accessorKey: "jobTitleID", header: "ID" },
+    { accessorKey: "jobTitle", header: "Job Title" },
+    { accessorKey: "description", header: "Description" },
+  ];
+  const dropdownMentorSupervisorColumns = [
+    { accessorKey: "fullName", header: "Full Name" },
+    { accessorKey: "userGroupuserGroup", header: "User Group" },
+    { accessorKey: "baseJobTitlebaseJobTitle", header: "Job Title" },
+  ];
+
+  const handleSupervisorSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSupervisorFilter(value);
+    form.setValue("supervisorName", value);
+
+    if (!showTableSupervisor) setShowTableSupervisor(true);
+  };
+
+  const handleMentorSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setMentorFilter(value);
+    form.setValue("mentorName", value);
+
+    if (!showTableMentor) setShowTableMentor(true);
+  };
+
+  const toggleTableDepartment = async () => {
+    var companyId = form.getValues("baseCompany");
+
+    if (!showTableDepartment) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/universal/get-department-by-company?id=${companyId}`,
+          {
+            headers,
+          },
+        );
+        if (!response.ok) {
+          throw new Error("Failed to fetch user list drop-down data");
+        }
+        const departmentData = await response.json();
+        setBaseDepartmentDropdownTableData(departmentData.rows);
+        setshowTableDepartment(true);
+      } catch (error) {
+        console.error("Error fetching user list drop-down data:", error);
+      }
+    } else {
+      setshowTableDepartment(false);
+    }
+  };
+
+  useEffect(() => {
+    const currentCompanyID = getCurrentCompanyUUID();
+    const currentCompanyName = getCurrentCompany();
+
+    if (!form.getValues("company")) {
+      form.setValue("baseCompany", currentCompanyID);
+    }
+
+    if (!form.getValues("companyName")) {
+      form.setValue("baseCompanyName", currentCompanyName);
+    }
+  }, []);
+
+  const toggleTableCompany = async () => {
+    var accountId = form.getValues("account");
+    accountId ? (accountId = accountId) : (accountId = "");
+
+    const formData = new FormData();
+    const company = "company";
+    formData.append("table[]", company);
+
+    if (!showTableCompany) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch company drop-down data");
+        }
+
+        const companyData = await response.json();
+
+        setBaseCompanyDropdownTableData(companyData.rows);
+        setShowTableCompany(true);
+      } catch (error) {
+        console.error("Error fetching company drop-down data:", error);
+      }
+    } else {
+      setShowTableCompany(false);
+    }
+  };
+
+  const toggleTableJobTitle = async () => {
+    var departmentId = form.getValues("baseDepartment");
+
+    if (!showTableJobTitle) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/universal/get-job-title-by-department?id=${departmentId}`,
+          {
+            headers,
+          },
+        );
+        if (!response.ok) {
+          throw new Error("Failed to fetch user list drop-down data");
+        }
+        const jobTitleData = await response.json();
+        setJobTitleDropdownTableData(jobTitleData.rows);
+        setShowTableJobTitle(true);
+      } catch (error) {
+        console.error("Error fetching user list drop-down data:", error);
+      }
+    } else {
+      setShowTableJobTitle(false);
+    }
+  };
+
+  const toggleTableLocation = async () => {
+    var companyId = form.getValues("baseCompany");
+
+    if (!showTableLocation) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/universal/get-location-by-company?id=${companyId}`,
+          {
+            headers,
+          },
+        );
+        if (!response.ok) {
+          throw new Error("Failed to fetch user list drop-down data");
+        }
+        const locationData = await response.json();
+        setBaseLocationDropdownTableData(locationData.rows);
+        setShowTableLocation(true);
+      } catch (error) {
+        console.error("Error fetching user list drop-down data:", error);
+      }
+    } else {
+      setShowTableLocation(false);
+    }
+  };
+
+  const toggleTableSupervisor = async () => {
+    var companyId = form.getValues("baseCompany");
+
+    if (!showTableSupervisor) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/user/api/user/get-mentor-or-supervisor-by-company?id=${companyId}`,
+          {
+            headers,
+          },
+        );
+        if (!response.ok) {
+          throw new Error("Failed to fetch user list drop-down data");
+        }
+        const supervisorData = await response.json();
+        setSupervisorDropdownTableData(supervisorData.rows);
+        setShowTableSupervisor(true);
+      } catch (error) {
+        console.error("Error fetching user list drop-down data:", error);
+      }
+    } else {
+      setShowTableSupervisor(false);
+    }
+  };
+
+  const toggleTableMentor = async () => {
+    var companyId = form.getValues("baseCompany");
+
+    if (!showTableMentor) {
+      setShowTableCompany(false);
+      setshowTableDepartment(false);
+      setShowTableJobTitle(false);
+      setShowTableLocation(false);
+      setShowTableSupervisor(false);
+      try {
+        const response = await fetch(
+          `${ORIGIN}/user/api/user/get-mentor-or-supervisor-by-company?id=${companyId}`,
+          {
+            headers,
+          },
+        );
+        if (!response.ok) {
+          throw new Error("Failed to fetch user list drop-down data");
+        }
+        const mentorData = await response.json();
+        setMentorDropdownTableData(mentorData.rows);
+        setShowTableMentor(true);
+      } catch (error) {
+        console.error("Error fetching user list drop-down data:", error);
+        // Handle error
+      }
+    } else {
+      setShowTableMentor(false);
+    }
+  };
+
+  const fetchDropdownEnumData = async () => {
+    try {
+      const response = await fetch(
+        `${ORIGIN}/user/api/user/get-all-enum-dropdown-data`,
+        {
+          headers,
+        },
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch dropdown data");
+      }
+      const data = await response.json();
+      const mappedData = {
+        exitReason: data.user.exitReason.map((item) => {
+          return { label: item, value: item };
+        }),
+        employmentType: data.user.employmentType.map((item) => {
+          return { label: item, value: item };
+        }),
+      };
+      return mappedData;
+    } catch (error) {
+      throw new Error("Failed to fetch dropdown data");
+    }
+  };
+
+  const onClickRowCompany = (row) => {
+    form.setValue("baseCompany", row.UUID);
+    form.setValue("baseCompanyName", row.company);
+    setShowTableCompany(false);
+  };
+
+  const onClickRowDepartment = (row) => {
+    form.setValue("baseDepartment", row.UUID);
+    form.setValue("baseDepartmentName", row.department);
+    setshowTableDepartment(false);
+  };
+
+  const onClickRowJobTitle = (row) => {
+    form.setValue("baseJobTitle", row.UUID);
+    form.setValue("baseJobTitleName", row.jobTitle);
+    setShowTableJobTitle(false);
+  };
+
+  const onClickRowLocation = (row) => {
+    form.setValue("baseLocation", row.UUID);
+    form.setValue("baseLocationName", row.locationName);
+    setShowTableLocation(false);
+  };
+
+  const onClickRowMentor = (row) => {
+    form.setValue("mentor", row.UUID);
+    form.setValue("mentorName", row.fullName);
+    setShowTableMentor(false);
+  };
+
+  const onClickRowSupervisor = (row) => {
+    form.setValue("supervisor", row.UUID);
+    form.setValue("supervisorName", row.fullName);
+    setShowTableSupervisor(false);
+  };
+
+  return (
+    <Card className="h-auto shadow-md">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg font-bold">Employement Details</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form className="space-y-2.5">
+            <div className="grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-5">
+              <FormField
+                control={form.control}
+                name="employeeID"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel className={form.formState.errors.employeeID ? "text-red-500" : ""}>
+                      Employee ID: <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl className="relative">
+                      <Input
+                        className="h-7.5 pr-8"
+                        {...field}
+                        moduleName="user"
+                        fieldName="employeeID"
+                        columnName="Employee ID"
+                      />
+                    </FormControl>
+                    {form.formState.errors.employeeID && (
+                      <FormMessage className="mt-1 w-60 text-sm text-red-500">
+                        {form.formState.errors.employeeID.message}
+                      </FormMessage>
+                    )}
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="baseCompanyName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel
+                      className={form.formState.errors.baseCompanyName ? "text-red-500" : ""}
+                    >
+                      Base Company: <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onClick={toggleTableCompany}
+                          ref={inputRef}
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />{" "}
+                          {/* Using the search icon */}
+                        </div>
+                        {showTableCompany && (
+                          <div
+                            ref={dropdownRef}
+                            className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                          >
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownCompanyColumns}
+                                data={baseCompanyDropdownTableData}
+                                onClickRow={onClickRowCompany}
+                              />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    {form.formState.errors.baseCompanyName && (
+                      <FormMessage className="mt-1 w-60 text-sm text-red-500">
+                        {form.formState.errors.baseCompanyName.message}
+                      </FormMessage>
+                    )}
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="baseCompany"
+                render={({ field }) => (
+                  <FormItem className="flex hidden flex-col space-y-1">
+                    <FormControl className="relative">
+                      <Input className="h-7.5 pr-8" {...field} readOnly />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {/* <FormField
+                control={form.control}
+                name="baseDepartmentName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Base Department:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onClick={toggleTableDepartment}
+                          ref={inputRef}
+                          autoComplete="off"
+                          readOnly={true}
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {showTableDepartment && (
+                          <div
+                            ref={dropdownRef}
+                            className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                          >
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownDepartmentColumns}
+                                data={baseDepartmentDropdownTableData}
+                                onClickRow={onClickRowDepartment}
+                              />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="baseDepartment"
+                render={({ field }) => (
+                  <FormItem className="flex hidden flex-col space-y-1">
+                    <FormControl className="relative">
+                      <Input className="h-7.5 pr-8" {...field} readOnly />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="baseJobTitleName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Base Job Title:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onClick={toggleTableJobTitle}
+                          ref={inputRef}
+                          autoComplete="off"
+                          readOnly={true}
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {showTableJobTitle && (
+                          <div
+                            ref={dropdownRef}
+                            className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                          >
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownJobTitleColumns}
+                                data={jobTitleDropdownTableData}
+                                onClickRow={onClickRowJobTitle}
+                              />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="baseJobTitle"
+                render={({ field }) => (
+                  <FormItem className="flex hidden flex-col space-y-1">
+                    <FormControl className="relative">
+                      <Input className="h-7.5 pr-8" {...field} readOnly />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="baseLocationName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Base Location:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onClick={toggleTableLocation}
+                          ref={inputRef}
+                          autoComplete="off"
+                          readOnly={true}
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />
+                        </div>
+                        {showTableLocation && (
+                          <div
+                            ref={dropdownRef}
+                            className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                          >
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownLocationColumns}
+                                data={baseLocationDropdownTableData}
+                                onClickRow={onClickRowLocation}
+                              />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="baseLocation"
+                render={({ field }) => (
+                  <FormItem className="flex hidden flex-col space-y-1">
+                    <FormControl className="relative">
+                      <Input className="h-7.5 pr-8" {...field} readOnly />
+                    </FormControl>
+                  </FormItem>
+                )}
+              /> */}
+
+              {isDropdownEnumDataLoaded && (
+                <FormField
+                  control={form.control}
+                  name="employmentType"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Employement Type:</FormLabel>
+                      <Select defaultValue={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger className="h-7.5 w-full">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {dropdownEnumData &&
+                            dropdownEnumData.employmentType.map((item) => (
+                              <SelectItem key={item.value} value={item.value}>
+                                {item.label}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <FormField
+                control={form.control}
+                name="supervisorName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Supervisor:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onClick={() => toggleTableSupervisor()}
+                          onChange={handleSupervisorSearchChange}
+                          ref={inputRef}
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />{" "}
+                          {/* Using the search icon */}
+                        </div>
+                        {showTableSupervisor && (
+                          <div
+                            ref={dropdownRef}
+                            className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                          >
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownMentorSupervisorColumns}
+                                data={supervisorDropdownTableData}
+                                onClickRow={onClickRowSupervisor}
+                                filterValue={supervisorFilter}
+                              />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supervisor"
+                render={({ field }) => (
+                  <FormItem className="flex hidden flex-col space-y-1">
+                    <FormControl className="relative">
+                      <Input className="h-7.5 pr-8" {...field} readOnly />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="mentorName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Mentor:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onClick={() => toggleTableMentor()}
+                          onChange={handleMentorSearchChange}
+                          ref={inputRef}
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />{" "}
+                          {/* Using the search icon */}
+                        </div>
+                        {showTableMentor && (
+                          <div
+                            ref={dropdownRef}
+                            className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                          >
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownMentorSupervisorColumns}
+                                data={mentorDropdownTableData}
+                                onClickRow={onClickRowMentor}
+                                filterValue={mentorFilter}
+                              />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="mentor"
+                render={({ field }) => (
+                  <FormItem className="flex hidden flex-col space-y-1">
+                    <FormControl className="relative">
+                      <Input className="h-7.5 pr-8" {...field} readOnly />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-flow-col-dense grid-cols-1 items-start gap-x-8 gap-y-1 md:grid-cols-5">
+              <FormField
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Start Date:</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            className={cn(
+                              "flex h-7.5 w-full",
+                              !field.value && "text-muted-foreground",
+                            )}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {field.value
+                              ? moment.unix(field.value).format(DATE_FORMAT)
+                              : "Pick a date"}
+                            <CalendarIcon className="ml-auto h-4 w-4" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? moment.unix(field.value).toDate() : undefined}
+                          onSelect={(date) => {
+                            const unixTimestamp = date ? Math.floor(date.getTime() / 1000) : "";
+                            field.onChange(unixTimestamp.toString());
+                          }}
+                          initialFocus
+                          defaultMonth={new Date()}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="endDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>End Date:</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            className={cn(
+                              "flex h-7.5 w-full",
+                              !field.value && "text-muted-foreground",
+                            )}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {field.value
+                              ? moment.unix(field.value).format(DATE_FORMAT)
+                              : "Pick a date"}
+                            <CalendarIcon className="ml-auto h-4 w-4" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? moment.unix(field.value).toDate() : undefined}
+                          onSelect={(date) => {
+                            const unixTimestamp = date ? Math.floor(date.getTime() / 1000) : "";
+                            field.onChange(unixTimestamp.toString());
+                          }}
+                          initialFocus
+                          defaultMonth={new Date()}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {isDropdownEnumDataLoaded && (
+                <FormField
+                  control={form.control}
+                  name="exitReason"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormLabel>Quit Reason:</FormLabel>
+                      <Select defaultValue={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger className="h-7.5 w-full">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {dropdownEnumData &&
+                            dropdownEnumData.exitReason.map((item) => (
+                              <SelectItem key={item.value} value={item.value}>
+                                {item.label}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

@@ -1,0 +1,952 @@
+"use client";
+
+import { useForm } from "react-hook-form";
+import { useEffect } from "react";
+
+import { useSearchParams } from "next/navigation";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DATE_FORMAT, ORIGIN, getAuthHeaders } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+import { HiOutlineClipboardDocumentList } from "react-icons/hi2";
+import { IoDocumentOutline } from "react-icons/io5";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Tab, TabList, TabPanel, Tabs } from "react-tabs";
+import { Input, NumberInputField } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+import type { DeliveryOrder } from "../../../columns";
+
+type Params = {
+  deliveryOrder?: DeliveryOrder | null;
+  setDeliveryOrder: (data: any) => void;
+  form: any;
+  row?: any;
+  jobAssignmentData?: any;
+};
+
+const jobAssignmentFormSchema = z.object({
+  UUID: z.union([z.string(), z.literal("")]),
+  jobID: z.union([z.string(), z.literal("")]),
+  deliveryOrderType: z.union([z.string(), z.literal("")]),
+  startPickupAtFormat: z.union([z.string(), z.literal("")]),
+  endPickupAtFormat: z.union([z.string(), z.literal("")]),
+  pickupLocation: z.union([z.string(), z.literal("")]),
+  pickupContact: z.union([z.string(), z.literal("")]),
+  pickupContactNo: z.union([z.string(), z.literal("")]),
+  pickupAddress: z.union([z.string(), z.literal("")]),
+  deliveryLocation: z.union([z.string(), z.literal("")]),
+  deliveryContact: z.union([z.string(), z.literal("")]),
+  deliveryContactNo: z.union([z.string(), z.literal("")]),
+  deliveryAddress: z.union([z.string(), z.literal("")]),
+  remark: z.union([z.string(), z.literal("")]),
+  estimateMinute: z.union([z.string(), z.literal("")]),
+  actualWorkingMinute: z.union([z.string(), z.literal("")]),
+  assignedAtFormat: z.union([z.string(), z.literal("")]),
+  assignedByFullName: z.union([z.string(), z.literal("")]),
+  startedAtFormat: z.union([z.string(), z.literal("")]),
+  startedByFullName: z.union([z.string(), z.literal("")]),
+  pickedUpAtFormat: z.union([z.string(), z.literal("")]),
+  pickedUpByFullName: z.union([z.string(), z.literal("")]),
+  deliveredAtFormat: z.union([z.string(), z.literal("")]),
+  deliveredByFullName: z.union([z.string(), z.literal("")]),
+  cancelledAtFormat: z.union([z.string(), z.literal("")]),
+  cancelledByFullName: z.union([z.string(), z.literal("")]),
+});
+
+export function JobAssignmentDetailsForm({ deliveryOrder, row, jobAssignmentData }: Params) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const data: any = jobAssignmentData;
+
+  const formatTime = (minutes: number) => {
+    if (minutes >= 60) {
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      return `${hours} Hour${hours > 1 ? "s" : ""} ${remainingMinutes} Minute${remainingMinutes > 1 ? "s" : ""
+        }`;
+    } else {
+      return `${minutes} Minute${minutes > 1 ? "s" : ""}`;
+    }
+  };
+
+  const formattedEstimateMinute = formatTime(Number(data?.estimateMinute) || 0);
+  const formattedActualWorkingMinute = formatTime(Number(data?.actualWorkingMinute) || 0);
+
+  const form = useForm<z.infer<typeof jobAssignmentFormSchema>>({
+    resolver: zodResolver(jobAssignmentFormSchema),
+    defaultValues: {
+      UUID: "",
+      jobID: "",
+      deliveryOrderType: "",
+      startPickupAtFormat: "",
+      endPickupAtFormat: "",
+      pickupLocation: "",
+      pickupContact: "",
+      pickupContactNo: "",
+      pickupAddress: "",
+      deliveryLocation: "",
+      deliveryContact: "",
+      deliveryContactNo: "",
+      deliveryAddress: "",
+      remark: "",
+      estimateMinute: "",
+      actualWorkingMinute: "",
+      assignedAtFormat: "",
+      assignedByFullName: "",
+      startedAtFormat: "",
+      startedByFullName: "",
+      pickedUpAtFormat: "",
+      pickedUpByFullName: "",
+      deliveredAtFormat: "",
+      deliveredByFullName: "",
+      cancelledAtFormat: "",
+      cancelledByFullName: "",
+    },
+  });
+
+  // Update form when jobAssignmentData changes
+  useEffect(() => {
+    if (data) {
+      const formattedEstimateMinute = formatTime(Number(data.estimateMinute) || 0);
+      const formattedActualWorkingMinute = formatTime(Number(data.actualWorkingMinute) || 0);
+
+      form.reset({
+        UUID: data.UUID || "",
+        jobID: data.jobID || "",
+        deliveryOrderType: data.deliveryOrderType || "",
+        startPickupAtFormat: data.startPickupAtFormat || "",
+        endPickupAtFormat: data.endPickupAtFormat || "",
+        pickupLocation: data.pickupLocation || "",
+        pickupContact: data.pickupContact || "",
+        pickupContactNo: data.pickupContactNo || "",
+        pickupAddress: data.pickupAddress || "",
+        deliveryLocation: data.deliveryLocation || "",
+        deliveryContact: data.deliveryContact || "",
+        deliveryContactNo: data.deliveryContactNo || "",
+        deliveryAddress: data.deliveryAddress || "",
+        remark: data.remark || "",
+        estimateMinute: formattedEstimateMinute,
+        actualWorkingMinute: formattedActualWorkingMinute,
+        assignedAtFormat: data.assignedAtFormat || "",
+        assignedByFullName: data.assignedByFullName || "",
+        startedAtFormat: data.startedAtFormat || "",
+        startedByFullName: data.startedByFullName || "",
+        pickedUpAtFormat: data.pickedUpAtFormat || "",
+        pickedUpByFullName: data.pickedUpByFullName || "",
+        deliveredAtFormat: data.deliveredAtFormat || "",
+        deliveredByFullName: data.deliveredByFullName || "",
+        cancelledAtFormat: data.cancelledAtFormat || "",
+        cancelledByFullName: data.cancelledByFullName || "",
+      });
+    }
+  }, [data, form]);
+
+  const handleReset = () => {
+    form.reset({
+      UUID: "",
+      jobID: "",
+      deliveryOrderType: "",
+      startPickupAtFormat: "",
+      endPickupAtFormat: "",
+      pickupLocation: "",
+      pickupContact: "",
+      pickupContactNo: "",
+      pickupAddress: "",
+      deliveryLocation: "",
+      deliveryContact: "",
+      deliveryContactNo: "",
+      deliveryAddress: "",
+    });
+  };
+
+  return (
+    <>
+      <Card className="h-[244px] w-full border-none !shadow-none">
+        <CardContent className="px-1.5 py-1">
+          <Form {...form}>
+            <form>
+              <Tabs className="flex w-full flex-col">
+                <TabList className="flex">
+                  {["Job Assignment", "Job History"].map(
+                    (label) => (
+                      <Tab
+                        key={label}
+                        className="cursor-pointer rounded-tl-md rounded-tr-md border-[1px] border-gray-200 bg-transparent px-2 py-1 text-[12px] text-black outline-none transition-all duration-300 ease-in-out"
+                        selectedClassName="!bg-blue-300 border-blue-300 text-white"
+                      >
+                        {label}
+                      </Tab>
+                    ),
+                  )}
+                </TabList>
+
+                {/* Tab Job Assignment */}
+                <TabPanel
+                  forceRender
+                  className="mt-0 hidden p-0"
+                  selectedClassName="react-tabs__tab-panel--selected"
+                >
+                  {/* First Row */}
+                  <div className="mt-1.5 flex items-center justify-center gap-x-2">
+                    {/*Job UUID */}
+                    <FormField
+                      control={form.control}
+                      name="UUID"
+                      render={({ field }) => (
+                        <FormItem className="hidden">
+                          <FormLabel>UUID:</FormLabel>
+                          <FormControl>
+                            <Input className="h-7.5" {...field} readOnly={true} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Job ID */}
+                    <FormField
+                      control={form.control}
+                      name="jobID"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-1 flex-col space-y-1">
+                          <FormControl className="relative">
+                            <div>
+                              <TooltipProvider delayDuration={1000}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Input
+                                      className={cn(
+                                        "h-7 rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out",
+                                        form.formState.errors.jobID &&
+                                        "border-red-500 placeholder:text-red-500 focus-visible:ring-red-500",
+                                      )}
+                                      {...field}
+                                      readOnly
+                                      placeholder="Job ID"
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" align="start">
+                                    Job ID
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Job Type */}
+                    <FormField
+                      control={form.control}
+                      name="deliveryOrderType"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-[2] flex-col space-y-1">
+                          <FormControl>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Input
+                                    className="h-7 rounded-xl px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    {...field}
+                                    readOnly
+                                    placeholder="Job Type"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="start">
+                                  Job Type
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Second Row */}
+                  <div className="mt-1.5 flex items-center justify-center gap-x-2">
+                    {/* Start Pickup Window */}
+                    <FormField
+                      control={form.control}
+                      name="startPickupAtFormat"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-1 flex-col space-y-1">
+                          <FormControl>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Input
+                                    className="h-7 rounded-xl px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    {...field}
+                                    readOnly
+                                    placeholder="Start Pickup Window"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="start">
+                                  Start Pickup Window
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* End Delivery Window */}
+                    <FormField
+                      control={form.control}
+                      name="endPickupAtFormat"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-1 flex-col space-y-1">
+                          <FormControl>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Input
+                                    className="h-7 rounded-xl px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    {...field}
+                                    readOnly
+                                    placeholder="End Delivery Window"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="start">
+                                  End Delivery Window
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Tab Section (Pickup and Delivery) */}
+                  <Tabs className="mt-2 flex flex-col">
+                    <TabList className="flex">
+                      {["Pickup Details", "Delivery Details"].map((label) => (
+                        <Tab
+                          key={label}
+                          className="cursor-pointer rounded-tl-md rounded-tr-md border-[1px] border-gray-200 bg-transparent px-2 py-1 text-[12px] text-black text-black outline-none transition-all duration-300 ease-in-out"
+                          selectedClassName="!bg-blue-300 border-blue-300 text-white"
+                        >
+                          {label}
+                        </Tab>
+                      ))}
+                    </TabList>
+
+                    {/* Tab Pickup Details */}
+                    <TabPanel
+                      forceRender
+                      className="mt-0 hidden p-0"
+                      selectedClassName="react-tabs__tab-panel--selected"
+                    >
+                      <div className="flex items-center justify-center gap-x-2.5 pb-0.5">
+                        <div className="flex-1">
+                          <FormField
+                            control={form.control}
+                            name="pickupAddress"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col p-0">
+                                <FormControl>
+                                  <Textarea
+                                    className="h-[97px] resize-none text-[12px] outline-none transition-all duration-300 ease-in-out"
+                                    {...field}
+                                    moduleName="deliveryOrder"
+                                    fieldName="pickupAddress"
+                                    columnName="Pickup Address"
+                                    placeholder="Pickup Address"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="flex flex-1 flex-col gap-y-1.5">
+                          {/* Pickup Location */}
+                          <FormField
+                            control={form.control}
+                            name="pickupLocation"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col space-y-1">
+                                <FormControl>
+                                  <TooltipProvider delayDuration={1000}>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Input
+                                          className="h-7 rounded-xl px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                          {...field}
+                                          readOnly
+                                          placeholder="Pickup Location"
+                                        />
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" align="start">
+                                        Pickup Location
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Pickup Contact Name */}
+                          <FormField
+                            control={form.control}
+                            name="pickupContact"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col space-y-1">
+                                <FormControl className="relative">
+                                  <div>
+                                    <TooltipProvider delayDuration={1000}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Input
+                                            className="h-7 rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                            {...field}
+                                            readOnly
+                                            moduleName="deliveryOrder"
+                                            fieldName="pickupContact"
+                                            columnName="Pickup Contact Name"
+                                            placeholder="Contact Name"
+                                          />
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" align="start">
+                                          Contact Name
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Pickup Contact No */}
+                          <FormField
+                            control={form.control}
+                            name="pickupContactNo"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col space-y-1">
+                                <FormControl>
+                                  <TooltipProvider delayDuration={1000}>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Input
+                                          className="h-7 rounded-xl px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                          {...field}
+                                          readOnly
+                                          placeholder=" Contact No "
+                                        />
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" align="start">
+                                        Contact No
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </TabPanel>
+
+                    {/* Tab Delivery Address */}
+                    <TabPanel
+                      forceRender
+                      className="mt-0 hidden p-0"
+                      selectedClassName="react-tabs__tab-panel--selected"
+                    >
+                      {/* Delivery Address */}
+                      <div className="flex items-center justify-center gap-x-2.5 pb-0.5">
+                        <div className="flex-1">
+                          <FormField
+                            control={form.control}
+                            name="deliveryAddress"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col space-y-1">
+                                <FormControl className="relative">
+                                  <div>
+                                    <Textarea
+                                      className="h-[97px] resize-none pr-8 text-[12px] outline-none transition-all duration-300 ease-in-out"
+                                      {...field}
+                                      readOnly
+                                      placeholder="Delivery Address"
+                                    />
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        {/* Delivery Location */}
+                        <div className="flex flex-1 flex-col gap-y-1.5">
+                          <FormField
+                            control={form.control}
+                            name="deliveryLocation"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col space-y-1">
+                                <FormControl className="relative">
+                                  <div>
+                                    <TooltipProvider delayDuration={1000}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Input
+                                            className="h-7 rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                            {...field}
+                                            readOnly
+                                            moduleName="deliveryOrder"
+                                            fieldName="deliveryLocation"
+                                            columnName="Delivery Location"
+                                            placeholder="Delivery Location"
+                                          />
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" align="start">
+                                          Location
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                    {/*
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                  <FaMagnifyingGlass className="size-3 text-gray-400" />
+                                </div>
+                                {showDeliveryAttentionTable && (
+                                  <div
+                                    ref={deliveryAttentionDropdownRef}
+                                    className="absolute right-0 top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                                  >
+                                    <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                                      <DropdownTable
+                                        columns={dropdownDeliveryAttentionColumns}
+                                        data={deliveryAttentionDropdownData}
+                                        onClickRow={onClickRowDeliveryAttention}
+                                        filterValue={deliveryAttentionFilter}
+                                        filterColumn="contact"
+                                      />
+                                      <ScrollBar orientation="vertical" />
+                                    </ScrollArea>
+                                    <div className="flex items-center justify-end border-t bg-white p-2">
+                                       <Button
+                                                  type="button"
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() => {
+                                                    setShowDeliveryAttentionTable(false);
+                                                    setShowAddADeliveryttentionDialog(true);
+                                                  }}
+                                                >
+                                                  +
+                                                  Add
+                                                </Button>
+                                    </div>
+                                  </div>
+                                )}
+                                */}
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Delivery Phone Contact*/}
+                          <FormField
+                            control={form.control}
+                            name="deliveryContact"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col space-y-1">
+                                <FormControl>
+                                  <TooltipProvider delayDuration={1000}>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Input
+                                          className="h-7 rounded-xl px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                          {...field}
+                                          readOnly
+                                          placeholder="Phone Contact"
+                                        />
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" align="start">
+                                        Phone Contact
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Delivery Phone Contact No*/}
+                          <FormField
+                            control={form.control}
+                            name="deliveryContactNo"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col space-y-1">
+                                <FormControl>
+                                  <div className="relative">
+                                    <TooltipProvider delayDuration={1000}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Input
+                                            className="h-7 rounded-xl px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                            {...field}
+                                            readOnly
+                                            placeholder="Phone Contact No"
+                                          />
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" align="start">
+                                          Phone Contact No
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </TabPanel>
+                  </Tabs>
+                </TabPanel>
+
+                {/* Tab Job History */}
+                <TabPanel
+                  forceRender
+                  className="mt-0 hidden p-0"
+                  selectedClassName="react-tabs__tab-panel--selected"
+                >
+                  <div className="flex flex-col gap-y-2 pt-1.5">
+                    {/* First Row */}
+                    <div className="flex items-center justify-center gap-x-2">
+                      {/* Estimated Working Hour */}
+                      <FormField
+                        control={form.control}
+                        name="estimateMinute"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormControl className="relative">
+                              <div className="relative">
+                                <TooltipProvider delayDuration={1000}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Input
+                                        className="h-7 rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                        {...field}
+                                        readOnly
+                                        placeholder="Estimated Working Hour"
+                                      />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Estimated Working Hour</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Actual Working Hour */}
+                      <FormField
+                        control={form.control}
+                        name="actualWorkingMinute"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormControl>
+                              <TooltipProvider delayDuration={1000}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Input
+                                      className="h-7 rounded-xl px-2 text-left text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                      {...field}
+                                      readOnly
+                                      placeholder="Actual Working Hour"
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent>Actual Working Hour</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Second Row */}
+                    <div className="flex items-center justify-center gap-x-2">
+                      {/* Assigned At */}
+                      <FormField
+                        control={form.control}
+                        name="assignedAtFormat"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormControl>
+                              <TooltipProvider delayDuration={1000}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Input
+                                      className="h-7 rounded-xl px-2 text-left text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                      {...field}
+                                      readOnly
+                                      placeholder="Assigned At"
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent>Assigned At</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Assigned By */}
+                      <FormField
+                        control={form.control}
+                        name="assignedByFullName"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormControl className="relative">
+                              <div className="relative">
+                                <TooltipProvider delayDuration={1000}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Input
+                                        className="h-7 rounded-xl px-2 pr-8 text-left text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                        {...field}
+                                        readOnly
+                                        placeholder="Assigned By"
+                                      />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Assigned By</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Third Row */}
+                    <div className="flex items-center justify-center gap-x-2">
+                      {/* Started At */}
+                      <FormField
+                        control={form.control}
+                        name="startedAtFormat"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-1 flex-col">
+                            <FormControl className="relative">
+                              <div className="relative">
+                                <TooltipProvider delayDuration={1000}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Input
+                                        className="h-7 w-full rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                        {...field}
+                                        readOnly
+                                        placeholder="Started At"
+                                      />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Started At</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Started By */}
+                      <FormField
+                        control={form.control}
+                        name="startedByFullName"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-1 flex-col">
+                            <FormControl className="relative">
+                              <div className="relative">
+                                <TooltipProvider delayDuration={1000}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Input
+                                        className="h-7 w-full rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                        {...field}
+                                        readOnly
+                                        placeholder="Started By"
+                                      />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Started By</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Fourth Row */}
+                    <div className="flex items-center justify-center gap-x-2">
+                      {/* Picked up At */}
+                      <FormField
+                        control={form.control}
+                        name="pickedUpAtFormat"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-1 flex-col">
+                            <FormControl className="relative">
+                              <div className="relative">
+                                <TooltipProvider delayDuration={1000}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Input
+                                        className="h-7 w-full rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                        {...field}
+                                        readOnly
+                                        placeholder="Picked up At"
+                                      />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Picked up At</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Picked up By */}
+                      <FormField
+                        control={form.control}
+                        name="pickedUpByFullName"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-1 flex-col">
+                            <FormControl className="relative">
+                              <div className="relative">
+                                <TooltipProvider delayDuration={1000}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Input
+                                        className="h-7 w-full rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                        {...field}
+                                        readOnly
+                                        placeholder="Picked up By"
+                                      />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Picked up By</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Fifth Row */}
+                    <div className="flex items-center justify-center gap-x-2">
+                      {/* Delivered At */}
+                      <FormField
+                        control={form.control}
+                        name="deliveredAtFormat"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-1 flex-col">
+                            <FormControl className="relative">
+                              <div className="relative">
+                                <TooltipProvider delayDuration={1000}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Input
+                                        className="h-7 w-full rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                        {...field}
+                                        readOnly
+                                        placeholder="Delivered At"
+                                      />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Delivered At</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Delivered By */}
+                      <FormField
+                        control={form.control}
+                        name="deliveredByFullName"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-1 flex-col">
+                            <FormControl className="relative">
+                              <div className="relative">
+                                <TooltipProvider delayDuration={1000}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Input
+                                        className="h-7 w-full rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                        {...field}
+                                        readOnly
+                                        placeholder="Delivered By"
+                                      />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Delivered By</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                  </div>
+                </TabPanel>
+              </Tabs>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </>
+  );
+}

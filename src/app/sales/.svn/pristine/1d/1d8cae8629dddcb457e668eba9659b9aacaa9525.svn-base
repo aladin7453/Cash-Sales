@@ -1,0 +1,153 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type KnockOffDetails = {
+  UUID?: string;
+  docType: string;
+  docNo: string;
+  docDate: string;
+  docDescription: string;
+  docPostingDate: string;
+  docProject: string;
+  docAgent: string;
+  amount: string;
+  currencyRate: string;
+  localAmount: string;
+  paidAmount: string;
+  lastPaidAmount?: string;
+  localPaid: string;
+  outstandingAmount: string;
+  salesDocument: string;
+  salesCreditNoteDocNo: string;
+  CNknockoffAmount: string;
+  salesCreditNoteOutstanding: string;
+  gainLoss: string;
+  knockOffTax: string;
+  date: string;
+  knockOffTaxDate?: string;
+  dateGainLoss?: string;
+  [key: string]: any; // Allow additional dynamic properties
+};
+
+export const knockOffDetailsColumns: ColumnDef<KnockOffDetails>[] = [
+  {
+    id: "docType",
+    accessorKey: "docType",
+    header: "Doc. Type",
+    filterFn: "includesString"
+  },
+  {
+    id: "docNo",
+    accessorKey: "docNo",
+    header: "Doc. No.",
+    filterFn: "includesString"
+  },
+  {
+    id: "docDateFormat",
+    accessorKey: "docDateFormat",
+    header: "Doc. Date",
+    filterFn: "includesString"
+  },
+  {
+    id: "docDescription",
+    accessorKey: "docDescription",
+    header: "Doc. Description",
+    filterFn: "includesString"
+  },
+  {
+    id: "postingDateFormat",
+    accessorKey: "postingDateFormat",
+    header: "Posting Date",
+    filterFn: "includesString"
+  },
+  {
+    id: "projectCode",
+    accessorKey: "projectCode",
+    header: "Doc. Project",
+    filterFn: "includesString"
+  },
+  {
+    id: "docAgent",
+    accessorKey: "docAgent",
+    header: "Doc. Agent",
+    filterFn: "includesString"
+  },
+  {
+    id: "amount",
+    accessorKey: "amount",
+    header: "Amount",
+    cell: ({ row }) => <p className="text-right">{row.original.amount}</p>,
+    filterFn: "includesString"
+  },
+  {
+    id: "currencyRate",
+    accessorKey: "currencyRate",
+    header: "Rate",
+    cell: ({ row }) => <p className="text-right">{row.original.currencyRate}</p>,
+    filterFn: "includesString"
+  },
+  {
+    id: "localAmount",
+    accessorKey: "localAmount",
+    header: "Local Amount",
+    cell: ({ row }) => <p className="text-right">{row.original.localAmount}</p>,
+    filterFn: "includesString"
+  },
+  {
+    id: "paidAmount",
+    accessorKey: "paidAmount",
+    header: "Paid",
+    filterFn: "includesString"
+  },
+  {
+    id: "localPaid",
+    accessorKey: "localPaid",
+    header: "Local Paid",
+    filterFn: "includesString"
+  },
+  {
+    id: "outstandingAmount",
+    accessorKey: "outstandingAmount",
+    header: "Outstanding",
+    filterFn: "includesString"
+  },
+  {
+    id: "salesDocument",
+    accessorKey: "salesDocument",
+    header: "CN Selection",
+    cell: ({ row }) => <p>{row.original.salesCreditNoteDocNo || "0.00"}</p>,
+    filterFn: "includesString"
+  },
+  {
+    id: "CNknockoffAmount",
+    accessorKey: "CNknockoffAmount",
+    header: "CN Paid Amount",
+    filterFn: "includesString"
+  },
+  {
+    id: "salesCreditNoteOutstanding",
+    accessorKey: "salesCreditNoteOutstanding",
+    header: "CN Amount Remaining",
+    cell: ({ row }) => <p className="text-right">{Number(row.original.salesCreditNoteOutstanding || "0").toFixed(2)}</p>,
+    filterFn: "includesString"
+  },
+  {
+    id: "gainLoss",
+    accessorKey: "gainLoss",
+    header: "GainLoss",
+    filterFn: "includesString"
+  },
+  {
+    id: "knockOffTaxDate",
+    accessorKey: "knockOffTaxDate",
+    header: "Knock Off Tax (Date)",
+    filterFn: "includesString"
+  },
+  {
+    id: "dateGainLoss",
+    accessorKey: "dateGainLoss",
+    header: "Date (GainLoss)",
+    filterFn: "includesString"
+  },
+];

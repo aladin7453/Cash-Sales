@@ -1,0 +1,349 @@
+"use client";
+
+import React, { useEffect, useRef, useState } from "react";
+import { FaArrowRotateLeft, FaMagnifyingGlass } from "react-icons/fa6";
+
+import { useRouter, useSearchParams } from "next/navigation";
+
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Button } from "@/components/ui/button";
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardTitle 
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+import { getAuthHeaders, getCurrentAccount, ORIGIN } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+import { isSystemOwner } from "@/lib/utils/isSystemOwner";
+import { useVerify } from "@/lib/hooks/useVerify";
+
+import type { Customer } from "../../../columns";
+
+type Params = {
+  customer?: Customer | null;
+  customInformationData: any;
+  tempRow: any;
+  form: any;
+  hasAssociations: boolean;
+};
+
+export function OtherDetailForm({
+  customer,
+  customInformationData,
+  tempRow,
+  form,
+  hasAssociations,
+}: Params) {
+  // const { verifyField } = useVerify(form, "/customer/api/customer/verify", "customer", form.watch("UUID"));
+
+  const headers = getAuthHeaders();
+  const currentAccountUUID = getCurrentAccount();
+
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const id = searchParams.get("id");
+  const router = useRouter();
+
+  const [showTableMSICCode, setShowTableMSICCode] = useState(false);
+  const [showTableAccount, setShowTableAccount] = useState(false);
+  const [showTableCompany, setShowTableCompany] = useState(false);
+  const [showTableCustomerGroup, setShowTableCustomerGroup] = useState(false);
+  const [showTableGLCode, setShowTableGLCode] = useState(false);
+  const [showTableAgent, setShowTableAgent] = useState(false);
+
+  const [MSICCodeDropdownTableData, setMSICCodeDropdownTableData] = useState([]);
+  const [accountDropdownTableData, setAccountDropdownTableData] = useState([]);
+  const [companyDropdownTableData, setCompanyDropdownTableData] = useState([]);
+  const [customerGroupDropdownTableData, setCustomerGroupDropdownTableData] = useState([]);
+  const [agentDropdownTableData, setAgentDropdownTableData] = useState([]);
+
+ 
+  const toggleTableCompany = async () => {
+    const formData = new FormData();
+    const company = "company";
+    formData.append("table[]", company);
+
+    if (!showTableCompany) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch company drop-down data");
+        }
+
+        const companyData = await response.json();
+
+        setCompanyDropdownTableData(companyData.rows);
+        setShowTableCompany(true);
+      } catch (error) {
+        console.error("Error fetching company drop-down data:", error);
+      }
+    } else {
+      setShowTableCompany(false);
+    }
+  };
+
+  const toggleTableAccount = async () => {
+    const formData = new FormData();
+    const account = "account";
+    formData.append("table[]", account);
+
+    if (!showTableAccount) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch account drop-down data");
+        }
+        const accountData = await response.json();
+
+        setAccountDropdownTableData(accountData.rows);
+        setShowTableAccount(true);
+      } catch (error) {
+        console.error("Error fetching account drop-down data:", error);
+      }
+    } else {
+      setShowTableAccount(false);
+    }
+  };
+
+  const dropdownRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const toggleTableCustomerGroup = async () => {
+    const formData = new FormData();
+    const customerGroup = "customerGroup";
+    formData.append("table[]", customerGroup);
+
+    if (!showTableCustomerGroup) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch company drop-down data");
+        }
+
+        const customerGroupData = await response.json();
+
+        setCustomerGroupDropdownTableData(customerGroupData.rows);
+        setShowTableCustomerGroup(true);
+      } catch (error) {
+        console.error("Error fetching company drop-down data:", error);
+      }
+    } else {
+      setShowTableCustomerGroup(false);
+    }
+  };
+
+  const toggleTableAgent = async () => {
+    const formData = new FormData();
+    const agent = "user";
+    formData.append("table[]", agent);
+
+    if (!showTableAgent) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch agent drop-down data");
+        }
+
+        const AgentData = await response.json();
+
+        setAgentDropdownTableData(AgentData.rows);
+        setShowTableAgent(true);
+      } catch (error) {
+        console.error("Error fetching agent drop-down data:", error);
+      }
+    } else {
+      setShowTableAgent(false);
+    }
+  };
+
+  const dropdownCompanyColumns = [
+    { accessorKey: "companyID", header: "Company Code" },
+    { accessorKey: "company", header: "Company" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const onClickRowCompanyCode = (row) => {
+    form.setValue("company", row.UUID);
+    form.setValue("companyName", row.company);
+    setShowTableCompany(false);
+  };
+
+  const onClickRowAccountCode = (row) => {
+    form.setValue("account", row.UUID);
+    form.setValue("accountName", row.account);
+    setShowTableAccount(false);
+  };
+
+  return (
+    <Form {...form}  >
+      <form>
+        <Card style={{ marginTop: "10px" }}>
+          <CardTitle></CardTitle>
+          <CardDescription></CardDescription>
+          <CardContent className={"pt-6"}>
+            <div className="space-y-2.5 px-4">
+              <h2 className="font-bold">Other Details</h2>
+              { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+              <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6">
+                <FormField
+                  control={form.control}
+                  name="account"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormLabel>UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="accountName"
+                  render={({ field }) => (
+                    <FormItem
+                      className={cn(
+                        "col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1",
+                       // currentAccountUUID && !isSystemOwner(currentAccountUUID) && "hidden",
+                      )}
+                    >
+                      <FormLabel>Sys Acc:</FormLabel>
+                      <FormControl className="relative">
+                        <div className="relative h-7.5">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                            // onClick={toggleTableAccount}
+                            ref={inputRef}
+                            autoComplete="off"
+                            readOnly
+                            disabled
+                          />
+                          {/* <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="text-gray-400" />
+                          </div> */}
+                          {/* {showTableAccount && (
+                            <div
+                              ref={dropdownRef}
+                              className="absolute top-full z-50 h-[200px] w-fit rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownAccountColumns}
+                                  data={accountDropdownTableData}
+                                  onClickRow={onClickRowAccountCode}
+                                />
+                              </ScrollArea>
+                            </div>
+                          )} */}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="company"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormLabel>UUID:</FormLabel>
+                      <FormControl>
+                        <Input className="h-7" {...field} readOnly={true} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="companyName"
+                  render={({ field }) => (
+                    <FormItem
+                      className={cn(
+                        "col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1",
+                        // currentAccountUUID && !isSystemOwner(currentAccountUUID) && "hidden",
+                      )}
+                    >
+                      <FormLabel>Ownership:</FormLabel>
+                      <FormControl className="relative">
+                        <div className="relative h-7.5">
+                          <Input
+                            className="h-7.5 pr-8"
+                            {...field}
+                           // onClick={toggleTableCompany}
+                            ref={inputRef}
+                            autoComplete="off"
+                            readOnly
+                            disabled
+                          />
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <FaMagnifyingGlass className="text-gray-400" />
+                          </div>
+                          {/* {showTableCompany && (
+                            <div
+                              ref={dropdownRef}
+                              className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                            >
+                              <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                                <DropdownTable
+                                  columns={dropdownCompanyColumns}
+                                  data={companyDropdownTableData}
+                                  onClickRow={onClickRowCompanyCode}
+                                />
+                              </ScrollArea>
+                            </div>
+                          )}  */}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </form>
+    </Form>
+  );
+}

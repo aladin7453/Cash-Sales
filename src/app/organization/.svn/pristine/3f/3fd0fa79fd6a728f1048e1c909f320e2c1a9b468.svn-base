@@ -1,0 +1,13 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Rule Template",
+};
+
+export default function RuleTemplatePageLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return children;
+}

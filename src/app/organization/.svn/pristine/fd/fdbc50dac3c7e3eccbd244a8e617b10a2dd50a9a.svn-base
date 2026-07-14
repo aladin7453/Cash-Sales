@@ -1,0 +1,16 @@
+import type { CustomInformation } from "./columns";
+
+export const customInformationData= [
+  {
+    fieldName: "Owner",
+    fieldValue: "Steve",
+    attachment: "Steve_099.pdf",
+    valid: 1,
+  },
+  {
+    fieldName: "Year introduced",
+    fieldValue: "2001",
+    attachment: "leexingying.pdf",
+    valid: 1,
+  },
+];

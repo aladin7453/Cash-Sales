@@ -1,0 +1,162 @@
+"use client";
+
+import React from "react";
+
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Card, 
+  CardHeader, 
+  CardContent, 
+  CardTitle 
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+
+import { useVerify } from "@/lib/hooks/useVerify";
+
+import type { OpeningClosingBalance } from "../../../columns";
+
+type Params = {
+  openingClosingBalance?: OpeningClosingBalance | null;
+};
+
+export function OpeningClosingBalanceForm({
+  openingClosingBalance,
+  customInformationData,
+  tempRowCustomInfo,
+  form,
+  slug,
+}: Params) {
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Counter Status:</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form className="space-y-4">
+            <div className="grid grid-flow-col-dense items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5">
+              <FormField
+                control={form.control}
+                name="counterNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 col-span-1">
+                    <FormLabel>
+                      Counter No.:
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        moduleName="openingClosingBalance"
+                        fieldName="counterNo"
+                        columnName="Counter No."
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 col-span-1">
+                    <FormLabel>
+                      Current Status:
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        moduleName="openingClosingBalance"
+                        fieldName="status"
+                        columnName="Current Status"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="cashier"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 col-span-1">
+                    <FormLabel>
+                      Cashier:
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        moduleName="openingClosingBalance"
+                        fieldName="cashier"
+                        columnName="Cashier"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 col-span-1">
+                    <FormLabel>
+                      Date:
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        moduleName="openingClosingBalance"
+                        fieldName="date"
+                        columnName="Date"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="time"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 col-span-1">
+                    <FormLabel>
+                      Time:
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        className="h-7.5" 
+                        {...field} 
+                        moduleName="openingClosingBalance"
+                        fieldName="time"
+                        columnName="Time"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

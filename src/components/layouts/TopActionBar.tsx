@@ -1,0 +1,25 @@
+"use client";
+
+import React from "react";
+
+type TopActionBarProps = {
+  left?: React.ReactNode;
+  right?: React.ReactNode;
+  className?: string;
+};
+
+export default function TopActionBar({
+  left,
+  right,
+  className,
+}: TopActionBarProps) {
+  return (
+    <div
+      className={`-mt-1 flex items-center justify-between 
+        bg-erp-gray-3 px-4 py-2 sticky z-25 w-auto ${className ?? ""}`}
+    >
+      <div className="flex gap-x-4 pl-1.5">{left}</div>
+      <div className="flex items-center gap-x-4">{right}</div>
+    </div>
+  );
+}

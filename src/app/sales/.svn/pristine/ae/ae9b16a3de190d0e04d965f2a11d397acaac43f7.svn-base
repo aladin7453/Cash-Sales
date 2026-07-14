@@ -1,0 +1,9 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  //title: "Tag",
+};
+
+export default function AgentTypePageLayout({ children }: { children: React.ReactNode }) {
+  return children;
+}

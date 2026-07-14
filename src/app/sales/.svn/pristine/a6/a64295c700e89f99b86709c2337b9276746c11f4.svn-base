@@ -1,0 +1,205 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+import { NumberFormatter } from "@/components/ui/number-formatter";
+
+export type CustomerBillsAndCollectionAnalysis = {
+  UUID?: string;
+  customerName?: string;
+  currencyCode?: string;
+  totalSalesAmount?: string;
+  totalLocalSalesAmount?: string;
+  totalCollectionAmount?: string;
+  totalLocalCollectionAmount?: string;
+  [key: string]: any;
+};
+
+// Static base columns
+const baseColumns: ColumnDef<CustomerBillsAndCollectionAnalysis>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "currencyCode",
+    id: "currencyCode",
+    header: "Currency",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "totalSalesAmount",
+    id: "totalSalesAmount",
+    header: "Total Sales Amount",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.totalSalesAmount} /></div>
+    ),
+  },
+  {
+    accessorKey: "totalLocalSalesAmount",
+    id: "totalLocalSalesAmount",
+    header: "Total Sales Amount (Local)",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.totalLocalSalesAmount} /></div>
+    ),
+  },
+  {
+    accessorKey: "totalCollectionAmount",
+    id: "totalCollectionAmount",
+    header: "Total Collection Amount",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.totalCollectionAmount} /></div>
+    ),
+  },
+  {
+    accessorKey: "totalLocalCollectionAmount",
+    id: "totalLocalCollectionAmount",
+    header: "Total Collection Amount (Local)",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.totalLocalCollectionAmount} /></div>
+    ),
+  },
+];
+
+// Function dynamically adds columns based on API response keys
+export const getCustomerBillsAndCollectionAnalysisColumns = (
+  sampleData?: CustomerBillsAndCollectionAnalysis[],
+): ColumnDef<CustomerBillsAndCollectionAnalysis>[] => {
+  if (!sampleData || sampleData.length === 0) return baseColumns;
+
+  const firstItem = sampleData[0];
+  const monthData: Record<
+    string,
+    {
+      sl?: ColumnDef<CustomerBillsAndCollectionAnalysis>;
+      slLocal?: ColumnDef<CustomerBillsAndCollectionAnalysis>;
+      col?: ColumnDef<CustomerBillsAndCollectionAnalysis>;
+      colLocal?: ColumnDef<CustomerBillsAndCollectionAnalysis>;
+    }
+  > = {};
+
+  Object.keys(firstItem).forEach((key) => {
+    const match = key.match(
+      /(localSales|localCollection|sales|collection)_(\d{4})_(\d{2})/i
+    );
+
+    if (!match) return;
+
+    const [, type, year, month] = match;
+    const monthNames = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
+    const monthName = monthNames[parseInt(month, 10) - 1] || month;
+    const shortYear = year.slice(-2);
+    const monthKey = `${year}_${month}`; // used for sorting
+
+    const isLocal = type.toLowerCase().startsWith("local");
+    const isSales = type.toLowerCase().includes("sales");
+    const prefix = isSales ? "SL" : "Col";
+    const headerLabel = `${prefix} ${monthName}-${shortYear}${
+      isLocal ? " (Local)" : ""
+    }`;
+
+    const column: ColumnDef<CustomerBillsAndCollectionAnalysis> = {
+      accessorKey: key,
+      id: key,
+      header: headerLabel,
+      cell: ({ row }) => {
+        const value = row.original[key];
+        return (
+          <div className="text-right">
+            {value !== null && value !== undefined && value !== "" ? (
+              <NumberFormatter value={value} />
+            ) : (
+              ""
+            )}
+          </div>
+        );
+      },
+      minSize: 120,
+      maxSize: 150,
+    };
+
+    // Assign column into grouped object
+    if (!monthData[monthKey]) {
+      monthData[monthKey] = {};
+    }
+
+    if (isSales && !isLocal) monthData[monthKey].sl = column;
+    if (isSales && isLocal) monthData[monthKey].slLocal = column;
+    if (!isSales && !isLocal) monthData[monthKey].col = column;
+    if (!isSales && isLocal) monthData[monthKey].colLocal = column;
+  });
+
+  // Sort months chronologically
+  const sortedMonthKeys = Object.keys(monthData).sort();
+
+  // Flatten into columns in correct order
+  const dynamicColumns: ColumnDef<CustomerBillsAndCollectionAnalysis>[] = [];
+  sortedMonthKeys.forEach((monthKey) => {
+    const group = monthData[monthKey];
+    if (group.sl) dynamicColumns.push(group.sl);
+    if (group.slLocal) dynamicColumns.push(group.slLocal);
+    if (group.col) dynamicColumns.push(group.col);
+    if (group.colLocal) dynamicColumns.push(group.colLocal);
+  });
+
+  // Combine into final column list
+  const columns = [...baseColumns];
+  const insertIndex = columns.findIndex((col) => col.id === "currencyCode");
+
+  if (insertIndex !== -1) {
+    columns.splice(insertIndex + 1, 0, ...dynamicColumns);
+  } else {
+    columns.push(...dynamicColumns);
+  }
+
+  return columns;
+};
+
+
+// Static export for default usage
+export const customerBillsAndCollectionAnalysisColumns = baseColumns;

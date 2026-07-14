@@ -1,0 +1,9 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Cash In/Cash Out",
+};
+
+export default function CashInCashOutLayout({ children } : { children: React.ReactNode }) {
+  return children;
+}

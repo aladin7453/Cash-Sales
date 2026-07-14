@@ -1,0 +1,1266 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { CalendarIcon } from "lucide-react";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+import { FiAlignLeft } from "react-icons/fi";
+import { BsFileEarmarkPdf } from "react-icons/bs";
+import { MdDelete } from "react-icons/md";
+import moment from "moment";
+import { Tab, TabList, TabPanel, Tabs } from "react-tabs";
+
+import TextEditorInline from "@/components/custom/TextEditorInline";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Textarea } from "@/components/ui/textarea";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { Input, NumberInputField } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils/cn";
+import { DATE_FORMAT, ORIGIN, getAuthHeaders, getCurrentAccount } from "@/lib/constants";
+import { useVerify } from "@/lib/hooks/useVerify";
+import MoreDetails from "../../more-details/MoreDetailsForm";
+
+type DocumentDetailsFormParams = {
+  form: any;
+  slug?: string;
+  preferenceData?: any;
+  isPaid?: boolean;
+  isExpand?: boolean;
+  customerPayment?: any;
+  onCurrencyChange?: () => void;
+  tempRowAttachments?: any[];
+  setTempRowAttachments?: (v: any) => void;
+};
+
+type DropdownConfig = {
+  tableName?: string;
+  endpoint?: string;
+  columns: { accessorKey: string; header: string; cell?: any }[];
+  valueField: string;
+  displayField: string;
+  formValueField: string;
+  formDisplayField: string;
+  additionalMappings?: { sourceField: string; targetFormField: string }[];
+  requiresCustomerUUID?: boolean;
+};
+
+export function DocumentDetailsForm({
+  form,
+  slug,
+  preferenceData,
+  isPaid,
+  isExpand,
+  customerPayment,
+  onCurrencyChange,
+  tempRowAttachments = [],
+  setTempRowAttachments = () => {},
+}: DocumentDetailsFormParams) {
+  const { verifyField } = useVerify(
+    form,
+    "/customer_payment/api/customer-payment/verify",
+    "customerPayment",
+    form.watch("UUID"),
+  );
+
+  const headers = getAuthHeaders();
+  const currentAccount = getCurrentAccount();
+  const decimal = preferenceData?.data?.decimal || 2;
+
+  // ─── Outside Click ────────────────────────────────────────────────────────────
+  const dropdownInputRef = useRef(null);
+  const dropdownTableRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownTableRef.current &&
+      !dropdownTableRef.current.contains(event.target) &&
+      dropdownInputRef.current !== event.target
+    ) {
+      setDropdownState((prev) => ({ ...prev, showTable: false }));
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  // ─── Unified Dropdown State ───────────────────────────────────────────────────
+  const [dropdownState, setDropdownState] = useState({
+    currentDropdown: null as string | null,
+    data: [] as any[],
+    originalData: [] as any[],
+    showTable: false,
+  });
+
+  const [currencyFilter, setCurrencyFilter] = useState("");
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
+
+  const dropdownConfigs: Record<string, DropdownConfig> = {
+    salesAgent: {
+      tableName: "agent",
+      columns: [
+        { accessorKey: "agentName", header: "Agent Name" },
+        { accessorKey: "agentTypeName", header: "Agent Type" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "agentName",
+      formValueField: "salesAgent",
+      formDisplayField: "salesAgentName",
+    },
+    servicingAgent: {
+      tableName: "agent",
+      columns: [
+        { accessorKey: "agentName", header: "Agent Name" },
+        { accessorKey: "agentTypeName", header: "Agent Type" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "agentName",
+      formValueField: "servicingAgent",
+      formDisplayField: "servicingAgentName",
+    },
+    collectionAgent: {
+      tableName: "agent",
+      columns: [
+        { accessorKey: "agentName", header: "Agent Name" },
+        { accessorKey: "agentTypeName", header: "Agent Type" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "UUID",
+      displayField: "agentName",
+      formValueField: "collectionAgent",
+      formDisplayField: "collectionAgentName",
+    },
+    paymentMethod: {
+      tableName: "paymentMethod",
+      columns: [
+        { accessorKey: "paymentMethodCode", header: "Payment Method Code" },
+        { accessorKey: "eInvoicePaymentMethodCode", header: "E-Invoice Payment Method Code" },
+        {
+          accessorKey: "description",
+          header: "Description",
+          cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+        },
+      ],
+      valueField: "UUID",
+      displayField: "paymentMethodCode",
+      formValueField: "paymentMethod",
+      formDisplayField: "paymentMethodCode",
+    },
+    currencyCode: {
+      tableName: "currency",
+      columns: [
+        { accessorKey: "currencyCode", header: "Currency Code" },
+        {
+          accessorKey: "description",
+          header: "Description",
+          cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+        },
+      ],
+      valueField: "UUID",
+      displayField: "currencyCode",
+      formValueField: "currency",
+      formDisplayField: "currencyCode",
+      additionalMappings: [{ sourceField: "exchangeRateSales", targetFormField: "currencyRate" }],
+    },
+    project: {
+      tableName: "project",
+      columns: [
+        { accessorKey: "projectCode", header: "Project Code" },
+        { accessorKey: "description", header: "Description" },
+      ],
+      valueField: "projectCode",
+      displayField: "projectCode",
+      formValueField: "paymentProject",
+      formDisplayField: "paymentProject",
+    },
+  };
+
+  const fetchDropdownData = async (dropdownKey: string) => {
+    try {
+      const config = dropdownConfigs[dropdownKey];
+      if (!config) return;
+
+      const formData = new FormData();
+      formData.append("table[]", config.tableName!);
+
+      const apiUrl = currentAccount
+        ? `${ORIGIN}/universal/get-all-drop-down-table-data?byAccount=${currentAccount}`
+        : `${ORIGIN}/universal/get-all-drop-down-table-data`;
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+
+      if (!response || !response.ok) throw new Error(`Failed to fetch ${dropdownKey} data`);
+
+      const data = await response.json();
+
+      setDropdownState({
+        currentDropdown: dropdownKey,
+        data: data.rows,
+        originalData: data.rows,
+        showTable: true,
+      });
+    } catch (error) {
+      console.error(`Error fetching ${dropdownKey} data:`, error);
+    }
+  };
+
+  const onClickRow = (row: any) => {
+    const config = dropdownConfigs[dropdownState.currentDropdown!];
+    if (config) {
+      form.setValue(config.formValueField, row[config.valueField]);
+      form.setValue(config.formDisplayField, row[config.displayField]);
+
+      if (config.additionalMappings) {
+        config.additionalMappings.forEach((mapping) => {
+          if (row[mapping.sourceField]) {
+            form.setValue(mapping.targetFormField, row[mapping.sourceField]);
+          }
+        });
+      }
+
+      if (dropdownState.currentDropdown === "currencyCode") {
+        setCurrencyFilter("");
+        if (onCurrencyChange) onCurrencyChange();
+      }
+
+      if (dropdownState.currentDropdown === "paymentMethod") {
+        setPaymentMethodFilter("");
+      }
+    }
+
+    setDropdownState((prev) => ({ ...prev, showTable: false }));
+  };
+
+  const handleDropdownSearchChange = (dropdownKey: string, searchTerm: string) => {
+    const config = dropdownConfigs[dropdownKey];
+    if (!config) return;
+
+    form.setValue(config.formDisplayField, searchTerm);
+
+    if (!dropdownState.originalData || dropdownState.currentDropdown !== dropdownKey) {
+      fetchDropdownData(dropdownKey);
+      return;
+    }
+
+    const filtered = dropdownState.originalData.filter((row: any) =>
+      row[config.displayField]?.toString().toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+
+    setDropdownState((prev) => ({
+      ...prev,
+      data: filtered,
+      showTable: true,
+      currentDropdown: dropdownKey,
+    }));
+  };
+
+  // ─── Default Payment Method ───────────────────────────────────────────────────
+  const setDefaultPaymentMethod = async () => {
+    if (preferenceData?.data?.customerPaymentMethod && !form.getValues("paymentMethod")) {
+      try {
+        const formData = new FormData();
+        formData.append("table[0]", "paymentMethod");
+
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const defaultPaymentMethod = data.rows?.find(
+            (row) => row.UUID === preferenceData.data.customerPaymentMethod,
+          );
+
+          if (defaultPaymentMethod) {
+            form.setValue("paymentMethod", defaultPaymentMethod.UUID);
+            form.setValue("paymentMethodCode", defaultPaymentMethod.paymentMethodCode);
+          }
+        }
+      } catch (error) {
+        console.error("Error setting default payment method:", error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (preferenceData?.data?.currency && slug === "new") {
+      setDefaultPaymentMethod();
+    }
+  }, [preferenceData, slug]);
+
+  // ─── Default Currency ─────────────────────────────────────────────────────────
+  const setDefaultCurrency = async () => {
+    if (preferenceData?.data?.currency && !form.getValues("currency")) {
+      try {
+        const formData = new FormData();
+        formData.append("table[0]", "currency");
+
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const defaultCurrency = data.rows?.find(
+            (row) => row.UUID === preferenceData.data.currency,
+          );
+
+          if (defaultCurrency) {
+            form.setValue("currency", defaultCurrency.UUID);
+            form.setValue("currencyCode", defaultCurrency.currencyCode);
+            form.setValue("currencyRate", defaultCurrency.exchangeRateSales);
+          }
+        }
+      } catch (error) {
+        console.error("Error setting default currency:", error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (preferenceData?.data?.currency && slug === "new") {
+      setDefaultCurrency();
+    }
+  }, [preferenceData, slug]);
+
+  // ─── Local Paid Amount Calculation ────────────────────────────────────────────
+  const calculateLocalPaidAmount = () => {
+    const paidAmount = parseFloat(form.getValues("paidAmount")) || 0;
+    const currencyRate = parseFloat(form.getValues("currencyRate")) || 0;
+    form.setValue("localPaidAmount", (paidAmount * currencyRate).toFixed(decimal));
+  };
+
+  useEffect(() => {
+    calculateLocalPaidAmount();
+  }, [form.watch("paidAmount"), form.watch("currencyRate")]);
+
+  // ─── Unapplied Amount Calculation ─────────────────────────────────────────────
+  const calculateUnappliedAmount = () => {
+    const paidAmount = parseFloat(form.getValues("paidAmount")) || 0;
+    const unappliedAmount = parseFloat(form.getValues("unappliedAmount") || 0);
+
+    let updatedPaidAmount = paidAmount - Number(customerPayment?.paidAmount || 0);
+    let updatedUnappliedAmount = Math.max(updatedPaidAmount + unappliedAmount, 0);
+
+    form.setValue("unappliedAmount", updatedUnappliedAmount.toFixed(decimal));
+    return updatedUnappliedAmount;
+  };
+
+  const handleBlur = () => {
+    calculateUnappliedAmount();
+  };
+
+  // ─── File Attachments ─────────────────────────────────────────────────────────
+  const fileInputRef = useRef(null);
+
+  const handleFileChange = (event) => {
+    const fileList = Array.from(event.target.files);
+    setTempRowAttachments([...tempRowAttachments, ...fileList]);
+  };
+
+  const handleDeleteFile = (index: number) => {
+    const updated = [...tempRowAttachments];
+    updated.splice(index, 1);
+    setTempRowAttachments(updated);
+  };
+
+  // ─── Default Note ─────────────────────────────────────────────────────────────
+  const [defaultNote, setDefaultNote] = useState("");
+
+  useEffect(() => {
+    const fetchDefaultNote = async () => {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-pdf-remark`, {
+          method: "GET",
+          headers,
+        });
+        if (!response.ok) throw new Error("Failed to fetch");
+        const data = await response.json();
+        setDefaultNote(data?.data || "");
+      } catch (error) {
+        console.error("Error fetching note:", error);
+      }
+    };
+
+    fetchDefaultNote();
+  }, []);
+
+  useEffect(() => {
+    if (slug === "new") {
+      form.setValue("note", defaultNote);
+    }
+  }, [slug, defaultNote]);
+
+  // ─── Agent dropdown shared renderer ──────────────────────────────────────────
+  const renderAgentField = (
+    dropdownKey: "salesAgent" | "servicingAgent" | "collectionAgent",
+    formValueField: string,
+    formDisplayField: string,
+    placeholder: string,
+  ) => (
+    <>
+      {/* Hidden UUID field */}
+      <FormField
+        control={form.control}
+        name={formValueField}
+        render={({ field }) => (
+          <FormItem className="hidden">
+            <FormControl>
+              <Input className="h-7.5" {...field} />
+            </FormControl>
+          </FormItem>
+        )}
+      />
+
+      {/* Visible name field */}
+      <FormField
+        control={form.control}
+        name={formDisplayField}
+        render={({ field }) => (
+          <FormItem className="flex flex-col space-y-1">
+            <FormControl className="relative">
+              <div className="relative">
+                <TooltipProvider delayDuration={1000}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Input
+                        className="h-7 rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                        {...field}
+                        onChange={(e) => handleDropdownSearchChange(dropdownKey, e.target.value)}
+                        onClick={() => fetchDropdownData(dropdownKey)}
+                        ref={
+                          dropdownState.currentDropdown === dropdownKey ? dropdownInputRef : null
+                        }
+                        autoComplete="off"
+                        placeholder={placeholder}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" align="start">
+                      {placeholder}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5">
+                  <FaMagnifyingGlass className="size-3 text-gray-400" />
+                </div>
+                {dropdownState.showTable && dropdownState.currentDropdown === dropdownKey && (
+                  <div
+                    ref={dropdownTableRef}
+                    className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                  >
+                    <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+                      <DropdownTable
+                        columns={dropdownConfigs[dropdownKey].columns}
+                        data={dropdownState.data}
+                        onClickRow={onClickRow}
+                      />
+                      <ScrollBar orientation="vertical" />
+                    </ScrollArea>
+                  </div>
+                )}
+              </div>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </>
+  );
+
+  return (
+    <Card className={isExpand ? "hidden" : "w-full shadow-sm"}>
+      <CardContent className="px-1.5 py-1">
+        <Form {...form}>
+          <form>
+            <Tabs className="flex w-full flex-col">
+              <TabList className="flex">
+                {["Document", "Other", "Remarks", "Attachment", "Payment"].map((label) => (
+                  <Tab
+                    key={label}
+                    className="cursor-pointer rounded-tl-md rounded-tr-md border-[1px] border-gray-200 bg-transparent px-2 py-1 text-[12px] text-black outline-none transition-all duration-300 ease-in-out"
+                    selectedClassName="!bg-blue-300 border-blue-300 text-white"
+                  >
+                    {label}
+                  </Tab>
+                ))}
+              </TabList>
+
+              {/* ── Tab: Document ──────────────────────────────────────────── */}
+              <TabPanel
+                forceRender
+                className="mt-0 hidden p-0"
+                selectedClassName="react-tabs__tab-panel--selected"
+              >
+                <div className="flex items-start justify-center gap-x-2.5 pb-1.5 pt-1.5">
+                  {/* Left: Description */}
+                  <div className="flex-1">
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormControl>
+                            <Textarea
+                              className="h-[232px] resize-none text-[12px] outline-none transition-all duration-300 ease-in-out"
+                              {...field}
+                              placeholder="Description"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Right: Doc No, Doc Date, Sales/Servicing/Collection Agent */}
+                  <div className="flex flex-1 flex-col gap-y-1.5">
+                    {/* Doc No */}
+                    <FormField
+                      control={form.control}
+                      name="docNo"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col space-y-1">
+                          <FormControl>
+                            <div className="relative">
+                              <TooltipProvider delayDuration={1000}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Input
+                                      className={cn(
+                                        "h-7 rounded-xl px-2 text-[11px] outline-none transition-all duration-300 ease-in-out",
+                                        slug === "edit" && "bg-erp-gray-1 text-gray-500",
+                                        form.formState.errors.docNo &&
+                                          "border-red-500 text-red-500 focus-visible:ring-red-500",
+                                      )}
+                                      {...field}
+                                      onBlur={() => {
+                                        if (field.value && field.value.trim()) {
+                                          verifyField("docNo", field.value);
+                                        }
+                                      }}
+                                      readOnly={slug === "edit"}
+                                      placeholder="Doc No"
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" align="start">Doc No</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Doc Date */}
+                    <FormField
+                      control={form.control}
+                      name="docDate"
+                      defaultValue={Math.floor(Date.now() / 1000)}
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <Popover>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        className={cn(
+                                          "h-7 w-full rounded-xl px-2 text-[11px] outline-none transition-all duration-300 ease-in-out",
+                                          !field.value && "text-muted-foreground",
+                                        )}
+                                        variant="outline"
+                                        size="sm"
+                                      >
+                                        {field.value
+                                          ? moment.unix(Number(field.value)).format(DATE_FORMAT)
+                                          : "Document Date"}
+                                        <CalendarIcon className="ml-auto size-3.5 text-gray-400" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="start">
+                                  Document Date
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={
+                                  field.value
+                                    ? moment.unix(Number(field.value)).toDate()
+                                    : undefined
+                                }
+                                onSelect={(date) => {
+                                  if (!date) {
+                                    field.onChange(null);
+                                    return;
+                                  }
+                                  field.onChange(Math.floor(date.getTime() / 1000));
+                                }}
+                                initialFocus
+                                defaultMonth={
+                                  field.value
+                                    ? moment.unix(Number(field.value)).toDate()
+                                    : new Date()
+                                }
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {renderAgentField("salesAgent", "salesAgent", "salesAgentName", "Sales Agent")}
+                    {renderAgentField("servicingAgent", "servicingAgent", "servicingAgentName", "Servicing Agent")}
+                    {renderAgentField("collectionAgent", "collectionAgent", "collectionAgentName", "Collection Agent")}
+                  </div>
+                </div>
+              </TabPanel>
+
+              {/* ── Tab: Other (More Details) ──────────────────────────────── */}
+              <TabPanel
+                forceRender
+                className="mt-0 hidden p-0"
+                selectedClassName="react-tabs__tab-panel--selected"
+              >
+                <MoreDetails
+                  form={form}
+                  customerPayment={customerPayment}
+                  slug={slug}
+                  preferenceData={preferenceData}
+                />
+              </TabPanel>
+
+              {/* ── Tab: Remarks ───────────────────────────────────────────── */}
+              <TabPanel
+                forceRender
+                className="mt-0 hidden p-0"
+                selectedClassName="react-tabs__tab-panel--selected"
+              >
+                <Tabs>
+                  <div className="flex overflow-hidden pt-1.5">
+                    {/* Left - Remark editors */}
+                    <div className="min-w-0 flex-1">
+                      {["remark1", "remark2", "remark3", "remark4"].map((remarkName) => (
+                        <TabPanel
+                          key={remarkName}
+                          forceRender
+                          className="hidden"
+                          selectedClassName="react-tabs__tab-panel--selected"
+                        >
+                          <Card className="h-[238px] w-full border-none !shadow-none">
+                            <CardContent className="p-0">
+                              <FormField
+                                control={form.control}
+                                name={remarkName}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <TextEditorInline
+                                        value={field.value || ""}
+                                        onChange={(val) => field.onChange(val)}
+                                        className="h-[190px]"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </CardContent>
+                          </Card>
+                        </TabPanel>
+                      ))}
+                    </div>
+
+                    {/* Right - Vertical TabList */}
+                    <ScrollArea className="h-[238px]">
+                      <TabList className="ml-1 flex flex-col gap-y-1">
+                        {["Remark 1", "Remark 2", "Remark 3", "Remark 4"].map((label, index) => (
+                          <Tab
+                            key={index}
+                            className="flex h-11 w-12 cursor-pointer flex-col items-center justify-center gap-y-0.5 rounded-md border border-gray-200 bg-white text-[9px] text-gray-600 outline-none transition-all duration-200 ease-in-out"
+                            selectedClassName="!bg-blue-300 border-blue-300 text-white"
+                          >
+                            <FiAlignLeft className="size-3.5" />
+                            <span>{label}</span>
+                          </Tab>
+                        ))}
+                      </TabList>
+                      <ScrollBar orientation="vertical" />
+                    </ScrollArea>
+                  </div>
+                </Tabs>
+              </TabPanel>
+
+              {/* ── Tab: Attachment ────────────────────────────────────────── */}
+              <TabPanel
+                forceRender
+                className="hidden"
+                selectedClassName="react-tabs__tab-panel--selected"
+              >
+                <Card className="h-[245px] w-full border-none !shadow-none">
+                  <CardContent className="h-full px-1">
+                    <div className="flex h-full flex-col gap-y-2 pt-1.5">
+                      {/* Upload Area */}
+                      <label
+                        htmlFor="attachments"
+                        className="flex w-full flex-1 cursor-pointer flex-col items-center justify-center gap-y-3 rounded-md border-2 border-dashed border-gray-300 bg-white px-6 shadow-sm transition-colors duration-200 hover:border-blue-400"
+                      >
+                        <BsFileEarmarkPdf className="size-8 text-gray-500" />
+                        <span className="text-[14px] font-normal text-gray-500">
+                          Click to upload file
+                        </span>
+                        <Input
+                          id="attachments"
+                          type="file"
+                          multiple
+                          onChange={handleFileChange}
+                          ref={fileInputRef}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {/* File List */}
+                      {tempRowAttachments?.length > 0 && (
+                        <ScrollArea className="h-full flex-1 px-2">
+                          {tempRowAttachments.map((file: any, index: number) => (
+                            <div
+                              className="flex min-w-0 items-center gap-x-1 py-0.5"
+                              key={index}
+                            >
+                              <a
+                                href={file.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex-1 truncate text-[13px] text-blue-600 hover:text-blue-800 hover:underline"
+                                title={file.name}
+                              >
+                                {file.name}
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteFile(index)}
+                                className="mr-1.5 flex-shrink-0 text-red-500 transition-all duration-300 ease-in-out hover:text-red-700"
+                              >
+                                <MdDelete className="size-4.5" title="Remove" />
+                              </button>
+                            </div>
+                          ))}
+                        </ScrollArea>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabPanel>
+
+              {/* ── Tab: Payment ───────────────────────────────────────────── */}
+              <TabPanel
+                forceRender
+                className="mt-0 hidden p-0"
+                selectedClassName="react-tabs__tab-panel--selected"
+              >
+                <div className="flex h-[244px] flex-col gap-y-2 pt-1.5">
+                  {/* Row 1: Payment Method + Currency Code + Currency Rate */}
+                  <div className="flex items-center justify-center gap-x-2">
+                    {/* Payment Method UUID hidden */}
+                    <FormField
+                      control={form.control}
+                      name="paymentMethod"
+                      render={({ field }) => (
+                        <FormItem className="hidden">
+                          <FormControl>
+                            <Input className="h-7.5" {...field} readOnly />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Payment Method Code */}
+                    <FormField
+                      control={form.control}
+                      name="paymentMethodCode"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl className="relative">
+                            <div className="relative">
+                              <TooltipProvider delayDuration={1000}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Input
+                                      className="h-7 rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                      {...field}
+                                      readOnly
+                                      onClick={() => fetchDropdownData("paymentMethod")}
+                                      onChange={(e) => {
+                                        field.onChange(e);
+                                        setPaymentMethodFilter(e.target.value);
+                                      }}
+                                      ref={
+                                        dropdownState.currentDropdown === "paymentMethod"
+                                          ? dropdownInputRef
+                                          : null
+                                      }
+                                      autoComplete="off"
+                                      placeholder="Payment Method"
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent>Payment Method</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                <FaMagnifyingGlass className="size-3 text-gray-400" />
+                              </div>
+                              {dropdownState.showTable &&
+                                dropdownState.currentDropdown === "paymentMethod" && (
+                                  <div
+                                    ref={dropdownTableRef}
+                                    className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                                  >
+                                    <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+                                      <DropdownTable
+                                        columns={dropdownConfigs.paymentMethod.columns}
+                                        data={dropdownState.data}
+                                        onClickRow={onClickRow}
+                                        filterValue={paymentMethodFilter}
+                                        filterColumn="paymentMethodCode"
+                                      />
+                                    </ScrollArea>
+                                  </div>
+                                )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Currency UUID hidden */}
+                    <FormField
+                      control={form.control}
+                      name="currency"
+                      render={({ field }) => (
+                        <FormItem className="hidden">
+                          <FormControl>
+                            <Input className="h-7.5" {...field} readOnly />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Currency Code */}
+                    <FormField
+                      control={form.control}
+                      name="currencyCode"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl className="relative">
+                            <div className="relative">
+                              <TooltipProvider delayDuration={1000}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Input
+                                      className="h-7 rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                      {...field}
+                                      readOnly
+                                      onClick={() => fetchDropdownData("currencyCode")}
+                                      onChange={(e) => {
+                                        field.onChange(e);
+                                        setCurrencyFilter(e.target.value);
+                                      }}
+                                      ref={
+                                        dropdownState.currentDropdown === "currencyCode"
+                                          ? dropdownInputRef
+                                          : null
+                                      }
+                                      autoComplete="off"
+                                      disabled={isPaid}
+                                      placeholder="Currency Code"
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent>Currency Code</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                <FaMagnifyingGlass className="size-3 text-gray-400" />
+                              </div>
+                              {dropdownState.showTable &&
+                                dropdownState.currentDropdown === "currencyCode" && (
+                                  <div
+                                    ref={dropdownTableRef}
+                                    className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                                  >
+                                    <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+                                      <DropdownTable
+                                        columns={dropdownConfigs.currencyCode.columns}
+                                        data={dropdownState.data}
+                                        onClickRow={onClickRow}
+                                        filterValue={currencyFilter}
+                                        filterColumn="currencyCode"
+                                      />
+                                    </ScrollArea>
+                                  </div>
+                                )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Currency Rate */}
+                    <FormField
+                      control={form.control}
+                      name="currencyRate"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <NumberInputField
+                                    className="h-7 rounded-xl px-2 text-left text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    form={form}
+                                    fieldName="currencyRate"
+                                    value={field.value || ""}
+                                    decimalPlaces={decimal}
+                                    constUpdate={true}
+                                    disabled={isPaid}
+                                    placeholder="Currency Rate"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>Currency Rate</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Row 2: Bank Charge + Bank Name + Cheque No */}
+                  <div className="flex items-center justify-center gap-x-2">
+                    <FormField
+                      control={form.control}
+                      name="bankCharge"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <NumberInputField
+                                    className="h-7 rounded-xl px-2 text-left text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    form={form}
+                                    value={field.value || ""}
+                                    decimalPlaces={decimal}
+                                    fieldName="bankCharge"
+                                    placeholder="Bank Charge"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>Bank Charge</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="bank"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Input
+                                    className="h-7 rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    {...field}
+                                    placeholder="Bank Name"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>Bank Name</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="chequeNo"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Input
+                                    className="h-7 rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    {...field}
+                                    placeholder="Cheque No"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>Cheque No</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Row 3: PDC Date + Paid Amount + Local Paid Amount */}
+                  <div className="flex items-center justify-center gap-x-2">
+                    {/* PDC Date */}
+                    <FormField
+                      control={form.control}
+                      name="PDCDate"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <Popover>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        className={cn(
+                                          "h-7 w-full rounded-xl px-2 text-[11px] outline-none transition-all duration-300 ease-in-out",
+                                          !field.value && "text-muted-foreground",
+                                        )}
+                                        variant="outline"
+                                        size="lg"
+                                      >
+                                        {field.value
+                                          ? moment.unix(Number(field.value)).format(DATE_FORMAT)
+                                          : "PDC Date"}
+                                        <CalendarIcon className="ml-auto size-3.5 text-gray-400" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent>PDC Date</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={
+                                  field.value
+                                    ? moment.unix(Number(field.value)).toDate()
+                                    : undefined
+                                }
+                                onSelect={(date) => {
+                                  if (!date) {
+                                    field.onChange(null);
+                                    return;
+                                  }
+                                  field.onChange(Math.floor(date.getTime() / 1000));
+                                }}
+                                initialFocus
+                                defaultMonth={
+                                  field.value
+                                    ? moment.unix(Number(field.value)).toDate()
+                                    : new Date()
+                                }
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Paid Amount */}
+                    <FormField
+                      control={form.control}
+                      name="paidAmount"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <NumberInputField
+                                    className="h-7 rounded-xl px-2 text-left text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                    form={form}
+                                    value={field.value || ""}
+                                    decimalPlaces={decimal}
+                                    fieldName="paidAmount"
+                                    placeholder="Paid Amount"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>Paid Amount</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Local Paid Amount (readonly) */}
+                    <FormField
+                      control={form.control}
+                      name="localPaidAmount"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <NumberInputField
+                                    className={cn(
+                                      "h-7 rounded-xl px-2 text-left text-[11px] outline-none transition-all duration-300 ease-in-out",
+                                      "bg-erp-gray-1 text-gray-500",
+                                    )}
+                                    form={form}
+                                    readOnly
+                                    fieldName="localPaidAmount"
+                                    value={field.value || ""}
+                                    decimalPlaces={decimal}
+                                    placeholder="Local Paid Amount"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>Local Paid Amount</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Row 4: Unapplied Amount + Payment Project */}
+                  <div className="flex items-center justify-center gap-x-2">
+                    {/* Unapplied Amount (readonly) */}
+                    <FormField
+                      control={form.control}
+                      name="unappliedAmount"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl>
+                            <TooltipProvider delayDuration={1000}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <NumberInputField
+                                    className="h-7 rounded-xl px-2 text-left text-[11px] outline-none bg-erp-gray-1 text-gray-500 transition-all duration-300 ease-in-out"
+                                    form={form}
+                                    readOnly
+                                    fieldName="unappliedAmount"
+                                    value={field.value ?? ""}
+                                    decimalPlaces={decimal}
+                                    placeholder="Unapplied Amount"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>Unapplied Amount</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Payment Project */}
+                    <FormField
+                      control={form.control}
+                      name="paymentProject"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl className="relative">
+                            <div className="relative">
+                              <TooltipProvider delayDuration={1000}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Input
+                                      className="h-7 rounded-xl px-2 pr-8 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                      {...field}
+                                      onClick={() => fetchDropdownData("project")}
+                                      onChange={(e) =>
+                                        handleDropdownSearchChange("project", e.target.value)
+                                      }
+                                      ref={
+                                        dropdownState.currentDropdown === "project"
+                                          ? dropdownInputRef
+                                          : null
+                                      }
+                                      autoComplete="off"
+                                      placeholder="Payment Project"
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent>Payment Project</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                <FaMagnifyingGlass className="size-3 text-gray-400" />
+                              </div>
+                              {dropdownState.showTable &&
+                                dropdownState.currentDropdown === "project" && (
+                                  <div
+                                    ref={dropdownTableRef}
+                                    className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                                  >
+                                    <ScrollArea className="h-[50cqh] bg-erp-gray-3">
+                                      <DropdownTable
+                                        columns={dropdownConfigs.project.columns}
+                                        data={dropdownState.data}
+                                        onClickRow={onClickRow}
+                                      />
+                                    </ScrollArea>
+                                  </div>
+                                )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              </TabPanel>
+            </Tabs>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

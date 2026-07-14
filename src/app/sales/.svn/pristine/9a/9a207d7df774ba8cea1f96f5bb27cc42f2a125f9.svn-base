@@ -1,0 +1,13 @@
+"use client";
+
+import React from "react";
+
+import AgentDataTable from "./DataTable";
+
+export default function AgentPage() {
+  return (
+    <div className="h-full">
+      <AgentDataTable/>
+    </div>
+  );
+}

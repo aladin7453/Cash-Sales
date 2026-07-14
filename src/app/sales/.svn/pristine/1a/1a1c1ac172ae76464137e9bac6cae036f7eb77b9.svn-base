@@ -1,0 +1,202 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type SalesPriceHistoryReport = {
+  UUID?: string;
+  docDateFormat?: string;
+  docNo?: string;
+  itemCode?: string;
+  itemType?: string;
+  customerName?: string;
+  quantity?: string;
+  itemUOM?: string;
+  price?: string;
+  totalDiscountAmount?: string;
+  subtotalTax?: string;
+};
+
+// Helper to format decimals
+const formatDecimal = (value: any) => {
+  if (value === undefined || value === null || value === "") return "0.00";
+
+  const num = parseFloat(value);
+
+  return isNaN(num) ? "0.00" : num.toFixed(2);
+};
+
+export const salesPriceHistoryColumns: ColumnDef<SalesPriceHistoryReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id: "docDateFormat",
+    header: "Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "docNo",
+    id: "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "itemCode",
+    id: "itemCode",
+    header: "Item Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "itemName",
+    id: "itemName",
+    header: "Item Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "itemType",
+    id: "itemType",
+    header: "Item Type",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "quantity",
+    id: "quantity",
+    header: "Quantity",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{row.original.quantity}</div>
+    ),
+  },
+  {
+    accessorKey: "itemUOM",
+    id: "itemUOM",
+    header: "UOM",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "price",
+    id: "price",
+    header: "Unit Price",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.price)}</div>
+    ),
+  },
+  {
+    accessorKey: "totalDiscountAmount",
+    id: "totalDiscountAmount",
+    header: "Discount",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.totalDiscountAmount)}</div>
+    ),
+  },
+  {
+    accessorKey: "subtotalTax",
+    id: "subtotalTax",
+    header: "Subtotal",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.subtotalTax)}</div>
+    ),
+  },
+];
+
+
+export const salesPriceHistory: ColumnDef<SalesPriceHistoryReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey:"docDateFormat",
+    header:"Date",
+  },
+  {
+    accessorKey:"customerName",
+    header:"Customer",
+  },
+  {
+    accessorKey:"docNo",
+    header:"Doc No",
+  },
+  {
+    accessorKey:"itemCode",
+    header:"Item Code",
+  },
+  {
+    accessorKey:"quantity",
+    header:"Quantity",
+  },
+  {
+    accessorKey:"itemUOM",
+    header:"UOM",
+  },
+  {
+    accessorKey:"price",
+    header:"U/Price",
+  },
+  {
+    accessorKey:"subtotalTax",
+    header:"Sub-Total",
+  },
+];

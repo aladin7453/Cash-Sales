@@ -1,0 +1,388 @@
+"use client";
+
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  Row,
+  SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { FaSort, FaSortDown, FaSortUp } from "react-icons/fa6";
+
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  DEFAULT_DATA_TABLE_PAGE_SIZE,
+  getAuthHeaders,
+  ORIGIN,
+} from "@/lib/constants";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils/cn";
+
+import AgentDataTableToolbar from "./DataTableToolbar";
+import AgentPopover from "./AgentPopover";
+import { AgentColumns } from "./agentColumns";
+import type { AgentListPopover } from "./agentColumns";
+import type { AgentList } from "./columns";
+
+// Mobile View (Imports)
+import MobileFormDataTable from "@/components/form/MobileFormDataTable";
+
+// Column Drag and Drop and Resize (Imports)
+import { memo } from "react";
+import type { MouseEvent } from "react";
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import { DATA_TABLE_DEFAULT_COLUMN_SIZING } from "@/lib/constants";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import getExcludedColumns from "@/lib/utils/data-table/getExcludedColumns";
+import handleDndDragEnd from "@/lib/utils/data-table/handleDndDragEnd";
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import type {
+  ColumnOrderState,
+  ColumnSizingState,
+  Table as TableType,
+  VisibilityState,
+} from "@tanstack/react-table";
+
+type AgentDataTableProps = {
+  columns: ColumnDef<AgentList>[];
+  data: AgentList[];
+  tempRowAgentList: any;
+  setTempRowAgentList: (data: any) => void;
+  revalidateAgentDetails: () => void;
+};
+
+// Column Drag and Drop and Resize (Local Storage Keys)
+const COLUMN_ORDERING_KEY = "package.agent.bs.table.ordering";
+const COLUMN_SIZING_KEY = "package.agent.bs.table.sizing";
+const COLUMN_VISIBILITY_KEY = "package.agent.bs.table.columns";
+
+export default function AgentDataTable({
+  columns,
+  data,
+  tempRowAgentList,
+  setTempRowAgentList,
+  revalidateAgentDetails,
+  onSelectionChange, // <-- add this prop
+}: AgentDataTableProps & { onSelectionChange?: (selectedAgents: AgentList[]) => void }) {
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  function setTempRowAgentListData(data, overwrite) {
+    if (overwrite) {
+      setTempRowAgentList(data);
+    } else {
+      setTempRowAgentList((prev) => [...prev, data]);
+    }
+  }
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  
+  // Column Drag and Drop and Resize (Constants)
+  const initialColumnOrder = columns?.filter(column => column?.id).map((column) => column.id!).filter(Boolean) || [];
+  const [columnOrder, setColumnOrder] = useLocalStorage<ColumnOrderState>(
+    COLUMN_ORDERING_KEY,
+    initialColumnOrder
+  );
+  const [columnSizing, setColumnSizing] = useLocalStorage<ColumnSizingState>(
+    COLUMN_SIZING_KEY,
+    {}
+  );
+  const defaultColumns: Array<keyof AgentList> = [
+    "agentCode",
+    "agentName",
+  ];
+  const defaultColumnVisibility: VisibilityState = getExcludedColumns(
+    columns || [],
+    defaultColumns
+  );
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    COLUMN_VISIBILITY_KEY,
+    defaultColumnVisibility
+  );
+
+  // Column Drag and Drop and Resize (Data Table)
+  const table = useReactTable({
+    columns: columns || [],
+    data: data || [],
+    state: { 
+      sorting, 
+      columnOrder,
+      columnSizing,
+      columnVisibility 
+    },
+    onSortingChange: setSorting,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+    onColumnVisibilityChange: setColumnVisibility,
+    autoResetPageIndex: false,
+    columnResizeMode: "onChange",
+    defaultColumn: DATA_TABLE_DEFAULT_COLUMN_SIZING,
+    enableColumnResizing: true,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      },
+    },
+  });
+
+  const sensors = useDndSensors();
+  const columnSizeVars = useColumnSizeVars(table);
+
+  useEffect(() => {
+    localStorage.setItem(
+      COLUMN_VISIBILITY_KEY,
+      JSON.stringify(columnVisibility)
+    );
+  }, [columnVisibility]);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<Row | null>(null);
+  const [agentData, setAgentData] = useState([]);
+
+  usePreventShiftTextSelect();
+
+  const openDialog = (row) => {
+    setSelectedRow(row);
+    setDialogOpen(true);
+  };
+  const onDoubleClick = (row: Row<AgentList>) => {
+    setDialogOpen(false);
+    setSelectedRow(null);
+    openDialog(row);
+  };
+  // Selection handler to update tempRowAgentList and call onSelectionChange
+  const handleSelectionChange = () => {
+    const selectedRows = table.getSelectedRowModel().rows.map(row => row.original);
+    setTempRowAgentList(selectedRows);
+    if (onSelectionChange) {
+      onSelectionChange(selectedRows);
+    }
+  };
+
+  // Update selection on row click
+  const onRowSelection = (row) => (event) => {
+    row.toggleSelected();
+    handleSelectionChange();
+  };
+
+  const handleOnAdd = () => {
+    setDialogOpen(true);
+    fetchAgentData();
+    setSelectedRow(null);
+  };
+  const params = new FormData();
+  params.append("param[limit]", "");
+  params.append("param[offset]", "0");
+  params.append("param[filter]", "{}");
+  params.append("param[order]", "desc");
+  params.append("param[valid]", "");
+  params.append("param[sort]", "createdAt");
+  const fetchAgentData = async () => {
+    try {
+      const response = await fetch(
+        `${ORIGIN}/customer/api/customer/get-agent`,
+
+        { method: "POST", headers, body: params }
+      );
+      if (!response.ok) throw new Error("Failed to fetch agent data");
+      const responseData = await response.json();
+      setAgentData(responseData.rows);
+    } catch (error) {
+      console.error(`Failed to fetch agent data`);
+    }
+  };
+
+  useEffect(() => {
+    if (!dialogOpen && selectedRow) {
+      selectedRow.toggleSelected();
+      setSelectedRow(null);
+    }
+  }, [dialogOpen]);
+
+  return (
+    <Card
+      collapsible
+      defaultCollapsed={false}
+      className="h-auto p-0 shadow-md"
+      style={{ marginTop: "10px" }}
+    >
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Agent Details</CardTitle>
+      </CardHeader>
+      <CardContent className="px-2 py-0">
+        <div className="h-[98cqh] p-2 md:h-[58cqh]">
+          <div className="flex h-[95cqh] flex-col rounded-md bg-erp-blue-3 @container-[size] md:h-[55cqh]">
+            <AgentDataTableToolbar
+              table={table}
+              onAdd={handleOnAdd}
+              setTempRowAgentListData={setTempRowAgentListData}
+              tempRowAgentList={tempRowAgentList}
+              revalidateAgentDetails={revalidateAgentDetails}
+            />
+            <Separator className="bg-erp-blue-11" />
+            <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+              {/* Mobile View (Form Data Table) */}
+              <MobileFormDataTable
+                table={table}
+                headerFields={["agentCode", "agentName"]}
+                initialVisibleFields={4}
+                setTempRowDetailsList={setTempRowAgentList}
+              />
+
+              {/* Web View (Data Table) */}
+              <div className="hidden md:block">
+                {/* Column Drag and Drop and Resize (DND Context) */}
+                <DndContext
+                  collisionDetection={closestCenter}
+                  modifiers={[restrictToHorizontalAxis]}
+                  onDragEnd={(event) => handleDndDragEnd(event, setColumnOrder)}
+                  sensors={sensors}
+                >
+                  {/* Column Drag and Drop and Resize (Table) */}
+                  <Table 
+                    className="table-fixed border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1"
+                    style={{ ...columnSizeVars, width: table.getTotalSize() }}
+                  >
+                    <TableHeader className="sticky top-0 z-10">
+                      {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id}>
+                          {/* Column Drag and Drop and Resize (Sortable Context) */}
+                          <SortableContext
+                            items={columnOrder.filter(Boolean)}
+                            strategy={horizontalListSortingStrategy}
+                          >
+                            {headerGroup.headers.map((header) => (
+                              // Column Drag and Drop and Resize (Dragable Table Head)
+                              <DragableTableHead
+                                key={header.id}
+                                header={header}
+                                className="bg-erp-blue-11 font-normal"
+                                style={{
+                                  width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                                }}
+                              >
+                                <TableHeadColumnTextFilter
+                                  column={header.column}
+                                  table={table}
+                                />
+                                <ColumnResizer header={header} />
+                              </DragableTableHead>
+                            ))}
+                          </SortableContext>
+                        </TableRow>
+                      ))}
+                    </TableHeader>
+                    {/* Column Drag and Drop and Resize (Table Body) */}
+                    {table.getState().columnSizingInfo.isResizingColumn ? (
+                      <MemoizedTableBody
+                        table={table}
+                        onRowSelection={onRowSelection}
+                      />
+                    ) : (
+                      <NonMemoizedTableBody
+                        table={table}
+                        onRowSelection={onRowSelection}
+                      />
+                    )}
+                  </Table>
+                </DndContext>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+            <AgentPopover
+              open={dialogOpen}
+              setOpen={setDialogOpen}
+              columns={AgentColumns}
+              setTempRowAgentListData={setTempRowAgentListData}
+              revalidateAgentDetails={revalidateAgentDetails}
+              data={agentData}
+              selectedRow={selectedRow}
+              setSelectedRow={setSelectedRow}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Column Drag and Drop and Resize (Table Body)
+type TableBodyProps = {
+  table: TableType<AgentList>;
+  onRowSelection: (
+    row: Row<AgentList>
+  ) => (event: MouseEvent<HTMLTableRowElement>) => void;
+};
+
+function NonMemoizedTableBody({ table, onRowSelection }: TableBodyProps) {
+  return (
+    <TableBody>
+      {table.getRowModel().rows?.length ? (
+        table.getRowModel().rows.map((row) => (
+          <TableRow
+            className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+            data-state={row.getIsSelected() && "selected"}
+            onClick={onRowSelection(row)}
+            key={row.id}
+          >
+            {row.getVisibleCells().map((cell) => (
+              <TableCell 
+                key={cell.id}
+                className="truncate"
+                title={(cell.getValue() ?? "").toString()}
+                style={{
+                  width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                  minWidth: cell.column.columnDef.minSize,
+                }}
+              >
+                {flexRender(
+                  cell.column.columnDef.cell,
+                  cell.getContext()
+                )}
+              </TableCell>
+            ))}
+          </TableRow>
+        ))
+      ) : (
+        <NoResultsTableRow columns={table.getVisibleLeafColumns()} />
+      )}
+    </TableBody>
+  );
+}
+
+const MemoizedTableBody = memo(
+  NonMemoizedTableBody,
+  (prev, next) => prev.table.options.data === next.table.options.data
+) as typeof NonMemoizedTableBody;

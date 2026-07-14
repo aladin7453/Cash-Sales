@@ -1,0 +1,234 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type SalesSNProfitLossReport = {
+UUID?: string;
+  docNo?: string;
+  docDateFormat?: string;
+  itemName?: string; 
+  itemCode?: string;
+  itemCost?: string;
+  itemUOM?: string;
+  price?: string;
+  customerName?: string;
+  customerCodeCode?: string;
+  itemProfitLoss?: string;
+  status?: string;
+  profitLossPercentage?: string;
+};
+
+// Helper to format decimals
+const formatDecimal = (value: any) => {
+  if (value === undefined || value === null || value === "") return "0.00";
+
+  const num = parseFloat(value);
+
+  return isNaN(num) ? "0.00" : num.toFixed(2);
+};
+
+export const salesSNProfitLossReportColumns: ColumnDef<SalesSNProfitLossReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "docNo",
+    id: "docNo",
+    header: "Doc No",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "docDateFormat",
+    id: "docDateFormat",
+    header: "Doc Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "itemName",
+    id: "itemName",
+    header: "Item Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "itemCode",
+    id: "itemCode",
+    header: "Item Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "itemCost",
+    id: "itemCost",
+    header: "Item Cost",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.itemCost)}</div>
+    ),
+  },
+  {
+    accessorKey: "itemUOM",
+    id: "itemUOM",
+    header: "Item UOM",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "price",
+    id: "price",
+    header: "Item Price",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.price)}</div>
+    ),
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "customerCodeCode",
+    id: "customerCodeCode",
+    header: "Customer Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "itemProfitLoss",
+    id: "itemProfitLoss",
+    header: "Item P/L",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.itemProfitLoss)}</div>
+    ),
+  },
+  {
+    accessorKey: "status",
+    id: "status",
+    header: "Status",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    accessorKey: "profitLossPercentage",
+    id: "profitLossPercentage",
+    header: "Percentage (%)",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right">{row.original.profitLossPercentage}</div>
+    ),
+  },
+  
+];
+
+
+export const salesSNProfitLossReportColumnColumn: ColumnDef<SalesSNProfitLossReport>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+
+      return (
+        <div className="text-right">
+          {pageIndex * pageSize + row.index + 1}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "docNo",
+    header: "Doc No",
+  },
+  {
+    accessorKey: "docDateFormat",
+    header: "Doc Date",
+  },
+  {
+    accessorKey: "itemCode",
+    header: "Item Code",
+  },
+  {
+    accessorKey: "price",
+    header: "Item Price",
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.price)}</div>
+    ),
+  },
+  {
+    accessorKey: "itemCost",
+    header: "Item Cost",
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.itemCost)}</div>
+    ),
+  },
+
+  {
+    accessorKey: "itemProfitLoss",
+    header: "Item P/L",
+    cell: ({ row }) => (
+      <div className="text-right">{formatDecimal(row.original.itemProfitLoss)}</div>
+    ),
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+  },
+  {
+    accessorKey: "profitLossPercentage",
+    header: "Percentage (%)",
+  },
+];

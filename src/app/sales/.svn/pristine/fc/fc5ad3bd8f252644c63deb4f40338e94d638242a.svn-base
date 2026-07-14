@@ -1,0 +1,331 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+import {autoWordSize} from "@/lib/constants";
+export type SalesPurchaseContra = {
+  id: string;
+  UUID: string;
+  docNo: string;
+  docDate: string;
+  customerCode: string;
+  customerName: string;
+  project: string;
+  description: string;
+  currency: string;
+  currencyRate: string;
+  totalOutstanding: string;
+  supplierCode: string;
+  supplierNameName: string;
+  currencyRateSupplier: string;
+  totalOutstandingSupplier: string;
+  currencySupplier: string;
+  totalContra: string;
+  salesAgent: string;
+  servicingAgent: string;
+  collectionAgent: string;
+  salesAgentName: string;
+  servicingAgentName: string;
+  collectionAgentName: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  attachment: string;
+  attachmentLink?: {
+    name: string;
+    link: string;
+  }[];
+  attachmentFiles?: any[];
+  valid: string;
+  preferenceData?: any;
+};
+
+// Preference (Format Number Function)
+const formatNumber = (value: string | number, decimalPlaces: number = 2): string => {
+  if (value === null || value === undefined || value === '') {
+    return (0).toFixed(decimalPlaces);
+  }
+  
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  
+  if (isNaN(numValue)) {
+    return (0).toFixed(decimalPlaces);
+  }
+  
+  return numValue.toFixed(decimalPlaces);
+};
+
+
+export const rawColumns: ColumnDef<SalesPurchaseContra>[] = [
+  {
+    id: "docNo",
+    accessorKey: "docNo",
+    header: "Doc. No",
+    filterFn: "includesString",
+  },
+  {
+    id: "docDateFormat",
+    accessorKey: "docDateFormat",
+    header: "Doc. Date",
+    filterFn: "includesString",
+  },
+  {
+    id: "description",
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => {
+      const content = row.original.description;
+      return (
+        <div
+          style={{
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            maxWidth: "150px",
+          }}
+          title={content}
+        >
+          {content}
+        </div>
+      );
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "salesAgentName",
+    accessorKey: "salesAgentName",
+    header: "Sales Agent",
+    filterFn: "includesString",
+  },
+  {
+    id: "servicingAgentName",
+    accessorKey: "servicingAgentName",
+    header: "Servicing Agent",
+    filterFn: "includesString",
+  },
+  {
+    id: "collectionAgentName",
+    accessorKey: "collectionAgentName",
+    header: "Collection Agent",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerCodeCode",
+    accessorKey: "customerCodeCode",
+    header: "Customer Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "customerName",
+    accessorKey: "customerName",
+    header: "Customer Name",
+    filterFn: "includesString",
+  },
+  {
+    id: "currencyCode",
+    accessorKey: "currencyCode",
+    header: "Currency",
+    filterFn: "includesString",
+  },
+  {
+    id: "currencyRate",
+    accessorKey: "currencyRate",
+    header: "Currency Rate",
+    // Preference (Format Number Implementation)
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.currencyRate, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "totalOutstanding",
+    accessorKey: "totalOutstanding",
+    header: "Total Outstanding",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.totalOutstanding, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "supplierCodeCode",
+    accessorKey: "supplierCodeCode",
+    header: "Supplier Code",
+    filterFn: "includesString",
+  },
+  {
+    id: "supplierNameName",
+    accessorKey: "supplierNameName",
+    header: "Supplier Name",
+    filterFn: "includesString",
+  },
+  {
+    id: "supplierCurrencyRate",
+    accessorKey: "supplierCurrencyRate",
+    header: "Currency Rate (Supplier)",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.supplierCurrencyRate, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "totalOutstandingSupplier",
+    accessorKey: "totalOutstandingSupplier",
+    header: "Total Outstanding (Supplier)",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.totalOutstandingSupplier, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "supplierCurrency",
+    accessorKey: "supplierCurrency",
+    header: "Currency (Supplier)",
+    filterFn: "includesString",
+  },
+  {
+    id: "totalContra",
+    accessorKey: "totalContra",
+    header: "Total Contra",
+    cell: ({ row }) => {
+      const decimal = row.original.preferenceData?.data?.decimal || 2;
+
+      return <p className="text-right">{formatNumber(row.original.totalContra, decimal)}</p>;
+    },
+    filterFn: "includesString",
+  },
+  {
+    id: "attachment",
+    accessorKey: "attachment",
+    header: "Attachment",
+    cell: ({ row }) => {
+      const attachment = row.original.attachment;
+      const attachmentLinks = row.original.attachmentLink || [];
+      const attachmentFiles = row.original.attachmentFiles || [];
+
+      // Handle new records with attachmentFiles
+      if (attachmentFiles.length > 0) {
+        return attachmentFiles
+          .map((file, index) => {
+            const link = attachmentLinks?.find((al) => al.name === file.name);
+            return link ? (
+              <a
+                key={index}
+                href={link.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "blue" }}
+              >
+                {file.name}
+              </a>
+            ) : (
+              <span key={index} style={{ color: "blue" }}>
+                {file.name}
+              </span>
+            );
+          })
+          .reduce(
+            (prev, curr, index) => (index === 0 ? [curr] : [prev, ", ", curr]),
+            []
+          );
+      }
+
+      // Handle existing records with attachment JSON
+      if (!attachment) {
+        return null;
+      }
+
+      try {
+        const attachments = JSON.parse(attachment);
+
+        if (!attachments || attachments.length === 0) {
+          return null;
+        }
+
+        return attachments
+          .map((att, index) => {
+            const link = attachmentLinks.find((al) => al.name === att.Name);
+            return link ? (
+              <a
+                key={index}
+                href={link.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "blue" }}
+              >
+                {att.Name}
+              </a>
+            ) : (
+              <span key={index} style={{ color: "gray" }}>
+                {att.Name}
+              </span>
+            );
+          })
+          .reduce((prev, curr) => [prev, ", ", curr]);
+      } catch (error) {
+        return null;
+      }
+    },
+    filterFn: filterWithStringConversion,
+  },
+  {
+    id: "createdAtFormat",
+    accessorKey: "createdAtFormat",
+    header: "Created At",
+    filterFn: "includesString",
+  },
+  {
+    id: "createdByUsername",
+    accessorKey: "createdByUsername",
+    header: "Created By",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedAtFormat",
+    accessorKey: "updatedAtFormat",
+    header: "Updated At",
+    filterFn: "includesString",
+  },
+  {
+    id: "updatedByUsername",
+    accessorKey: "updatedByUsername",
+    header: "Updated By",
+    filterFn: "includesString",
+  },
+  {
+    id: "valid",
+    accessorKey: "valid",
+    header: "Valid",
+    cell: ({ row }) => {
+      const validity = row.getValue("valid") as SalesPurchaseContra["valid"];
+      return validity === "1" ? "Valid" : "Invalid";
+    },
+    filterFn: "includesString",
+  },
+];
+
+export const columns: ColumnDef<SalesPurchaseContra>[] = rawColumns.map(
+  (col) => {
+    if (typeof col.header === "string") {
+      const sizes = autoWordSize(col.header);
+
+      return {
+        ...col,
+        sizes,
+        size: sizes, // 👈 applied automatically
+        minSize:50
+      };
+    }
+
+    return col;
+  }
+);

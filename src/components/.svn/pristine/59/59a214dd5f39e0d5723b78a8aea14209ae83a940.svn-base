@@ -1,0 +1,513 @@
+import { Document, Page, StyleSheet, Text, View, Image, Font } from "@react-pdf/renderer";
+import moment from 'moment';
+import { versionPath } from "@/lib/constants";
+// Avoid double registration in dev
+let fontsRegistered = false;
+if (!fontsRegistered) {
+  const isDev = process.env.NODE_ENV === 'development';
+  Font.register({
+    family: 'NotoSansSC',
+    src: isDev
+      ? '/fonts/NotoSansSC-Regular.ttf'
+      : `/${versionPath}/fonts/NotoSansSC-Regular.ttf`,
+  });
+  Font.register({
+    family: 'NotoSansSC-Black',
+    src: isDev
+      ? '/fonts/NotoSansSC-Black.ttf'
+      : `/${versionPath}/fonts/NotoSansSC-Black.ttf`,
+  });
+  fontsRegistered = true;
+}
+
+const styles = StyleSheet.create({
+  page: {
+    flexDirection: "column",
+    backgroundColor: "#FFFFFF",
+    padding: 30,
+    fontFamily: 'NotoSansSC'
+  },
+  logoContainer: {
+    position: "absolute",
+    top: 5,
+    left: 20,
+    width: 100,
+    height: 100,
+    marginBottom: 60,
+    overflow: "hidden",
+    padding: 0,
+  },
+  logoImage: {
+    width: 100,
+    height: 100,
+    objectFit: "contain",
+  },
+  header: {
+    fontSize: 9,
+    minHeight: 90,
+    marginLeft: 150,
+    marginBottom: 5,
+    textAlign: "left",
+  },
+  headerRow: {
+    flexDirection: "row",
+  },
+  headerText: {
+    fontSize: 8,
+    marginRight: 10,
+    marginTop: 5,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "right",
+  },
+  firstSeparator: {
+    width: "100%",
+    height: 1,
+    backgroundColor: "#000000",
+    marginTop: 30,
+    marginBottom: 2,
+  },
+  table: {
+    width: "100%",
+    marginTop: 10,
+    borderStyle: "solid",
+    borderColor: "#000000",
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderColor: "#000000",
+    borderBottomWidth: 1,
+  },
+  tableHeader: {
+    backgroundColor: "#deebf7",
+    fontWeight: "bold",
+    borderTopWidth: 1,
+  },
+  tableCellNo: {
+    padding: 5,
+    fontSize: 7,
+    flex: 1,
+    textAlign: "center",
+    borderRightWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: "#000000",
+  },
+  tableCell: {
+    padding: 5,
+    fontSize: 7,
+    flex: 4,
+    textAlign: "center",
+    borderRightWidth: 1,
+    borderColor: "#000000",
+  },
+  summaryBox: {
+    backgroundColor: "#deebf7",
+    padding: 5,
+    marginTop: 5,
+    borderRadius: 2,
+  },
+  summaryText: {
+    fontSize: 7,
+  },
+  summaryTitle: {
+    fontSize: 8,
+    fontWeight: "bold",
+  },
+  summaryField2: {
+    backgroundColor: "#FFFFFF",
+    padding: 2,
+    marginTop: 2,
+    borderWidth: 1,
+    borderRadius: 2,
+    borderColor: "#CCCCCC",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 80,
+    height: 18,
+  },
+  footerLine: {
+    width: "100%",
+    height: 1,
+    backgroundColor: "#000000",
+    marginTop: 5,
+  },
+  footerContainer: {
+    position: "absolute",
+    bottom: 10,
+    left: 30,
+    right: 30,
+  },
+  footerText: {
+    fontSize: 7,
+  },
+  agingTable: {
+    width: "100%",
+    marginTop: 10,
+    borderStyle: "solid",
+    borderColor: "#000000",
+    borderBottomWidth: 1,
+    borderLeftWidth: 1,
+  },
+  agingTableRow: {
+    flexDirection: "row",
+    borderColor: "#000000",
+  },
+  agingTableHeader: {
+    backgroundColor: "#deebf7",
+    fontWeight: "bold",
+  },
+  agingTableCell: {
+    padding: 4,
+    fontSize: 6,
+    flex: 1,
+    textAlign: "center",
+    borderTopWidth: 1,
+    borderRightWidth: 1,
+    borderColor: "#000000",
+  },
+  agingTitleCell: {
+    padding: 4,
+    fontSize: 7,
+    fontWeight: "bold",
+    textAlign: "center",
+    borderTopWidth: 1,
+    borderRightWidth: 1,
+    borderColor: "#000000",
+    backgroundColor: "#deebf7",
+  },
+});
+
+const StatementOfAccountTemplate = ({
+  data,
+  salesReportData,
+  generatedReport,
+  salesReportColumns,
+  orientation = 'portrait',
+}: {
+  data?: any;
+  salesReportData?: any;
+  generatedReport?: any;
+  salesReportColumns?: any[];
+  orientation?: 'portrait' | 'landscape';
+}) => {
+  let image64 = data?.currentCompany?.logoLink[0]?.base64;
+
+  const rows = data?.rows || generatedReport || [];
+
+  // Calculate balances for the rows
+  // const calculateBalances = (data: any[]) => {
+  //   let runningBalance = 0;
+    
+  //   return data.map((row) => {
+  //     const credit = parseFloat(row.credit) || 0;
+  //     const debit = parseFloat(row.debit) || 0;
+      
+  //     // If transaction is Credit, subtract from balance
+  //     // If transaction is Debit, add to balance
+  //     if (row.transaction === "Credit") {
+  //       runningBalance -= credit;
+  //     } else if (row.transaction === "Debit") {
+  //       runningBalance += debit;
+  //     }
+      
+  //     return {
+  //       ...row,
+  //       balance: runningBalance.toFixed(2),
+  //     };
+  //   });
+  // };
+
+  // const rowsWithBalances = calculateBalances(rows);
+
+  // Dynamic styles based on orientation
+  const getPageStyles = () => ({
+    ...styles.page,
+    padding: orientation === 'landscape' ? 20 : 30,
+  });
+
+  const getTableCellStyles = () => ({
+    ...styles.tableCell,
+    fontSize: orientation === 'landscape' ? 6 : 7,
+    padding: orientation === 'landscape' ? 3 : 5,
+  });
+
+  const getTableCellNoStyles = () => ({
+    ...styles.tableCellNo,
+    fontSize: orientation === 'landscape' ? 6 : 7,
+    padding: orientation === 'landscape' ? 3 : 5,
+  });
+
+  const getHeaderStyles = () => ({
+    ...styles.header,
+    fontSize: orientation === 'landscape' ? 8 : 9,
+    marginLeft: orientation === 'landscape' ? 120 : 150,
+  });
+
+  const getLogoStyles = () => ({
+    ...styles.logoContainer,
+    width: orientation === 'landscape' ? 80 : 100,
+    height: orientation === 'landscape' ? 80 : 100,
+  });
+
+  const getLogoImageStyles = () => ({
+    ...styles.logoImage,
+    width: orientation === 'landscape' ? 80 : 100,
+    height: orientation === 'landscape' ? 80 : 100,
+  });
+
+  const getSummaryStyles = () => ({
+    ...styles.summaryBox,
+    padding: orientation === 'landscape' ? 3 : 5,
+  });
+
+  const getAgingTableCellStyles = () => ({
+    ...styles.agingTableCell,
+    fontSize: orientation === 'landscape' ? 5 : 6,
+    padding: orientation === 'landscape' ? 2 : 4,
+  });
+
+  // Common header content with dynamic styles
+  const renderHeader = () => (
+    <>
+      <View style={getLogoStyles()}>
+        {image64 ? (
+          <Image
+            src={{ uri: image64, method: "GET", headers: { "Cache-Control": "no-cache" }, body: "" }}
+            style={getLogoImageStyles()}
+          />
+        ) : null}
+      </View>
+      <View style={getHeaderStyles()}>
+        <Text>
+          {data?.currentCompany?.company ?? ""}
+          {data?.currentCompany?.BRN ? ` (${data?.currentCompany?.BRN})` : ""}
+        </Text>
+        <Text style={styles.headerText}>{data?.currentCompany?.address ?? ""}</Text>
+        <View style={styles.headerRow}>
+          {data?.currentCompany?.phoneNo && (
+            <Text style={styles.headerText}>Phone No.: {data?.currentCompany?.phoneNo}</Text>
+          )}
+          {data?.currentCompany?.email && (
+            <Text style={styles.headerText}>Email: {data?.currentCompany?.email}</Text>
+          )}
+        </View>
+      </View>
+      <View>
+        <View style={styles.firstSeparator} />
+      </View>
+      <View>
+        <Text style={[styles.sectionTitle, { textAlign: "center" }]}>
+          STATEMENT OF ACCOUNT
+        </Text>
+      </View>
+      <View style={{ marginTop: orientation === 'landscape' ? 20 : 30 }}>
+        <Text style={{ fontSize: orientation === 'landscape' ? 6 : 7, textAlign: "left" }}>
+          Generated By: {data?.currentCompany?.currentUser ?? data?.currentUser ?? ""}
+        </Text>
+        <Text style={{ fontSize: orientation === 'landscape' ? 6 : 7, textAlign: "left" }}>
+          Customer: {data?.currentCustomer?.customerName ?? ""}
+        </Text>
+        <Text style={{ fontSize: orientation === 'landscape' ? 6 : 7, textAlign: "left" }}>
+          Attention: {data?.currentCustomer?.attentionName ?? ""}
+        </Text>
+        <Text style={{ fontSize: orientation === 'landscape' ? 6 : 7, textAlign: "left" }}>
+          Phone No.: {data?.currentCustomer?.phoneNo ?? ""}
+        </Text>
+        <Text style={{ fontSize: orientation === 'landscape' ? 6 : 7, textAlign: "left" }}>
+          Email: {data?.currentCustomer?.email ?? ""}
+        </Text>
+        <Text style={{ fontSize: orientation === 'landscape' ? 6 : 7, textAlign: "left" }}>
+          Debtor's Code: {data?.currentCustomer?.debitorCode ?? ""}
+        </Text>
+      </View>
+    </>
+  );
+
+  // Common table header with dynamic styles
+  const renderTableHeader = () => (
+    <View style={[styles.tableRow, styles.tableHeader]}>
+      {salesReportColumns?.map((column, index) => (
+        <Text
+          key={index}
+          style={column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+        >
+          {column.header}
+        </Text>
+      ))}
+    </View>
+  );
+
+  // Summary box content with dynamic styles
+  const renderSummaryBox = () => (
+    <View style={getSummaryStyles()}>
+      <Text style={styles.summaryTitle}>Summary: </Text>
+      <View style={{ flexDirection: "row", gap: orientation === 'landscape' ? 4 : 8 }}>
+        <View>
+          <Text style={styles.summaryText}>Total No. of Document:</Text>
+          <View style={styles.summaryField2}>
+            <Text style={styles.summaryText}>{data?.total ?? "0"}</Text>
+          </View>
+        </View>
+        <View>
+          <Text style={styles.summaryText}>Total Amount:</Text>
+          <View style={styles.summaryField2}>
+            <Text style={styles.summaryText}>{data?.summary?.totalAmountReport ?? ""}</Text>
+          </View>
+        </View>
+        <View>
+          <Text style={styles.summaryText}>Total Paid:</Text>
+          <View style={styles.summaryField2}>
+            <Text style={styles.summaryText}>{data?.summary?.totalPaidAmountReport ?? ""}</Text>
+          </View>
+        </View>
+        <View>
+          <Text style={styles.summaryText}>Total Outstanding:</Text>
+          <View style={styles.summaryField2}>
+            <Text style={styles.summaryText}>{data?.summary?.totalOutstandingReport ?? ""}</Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  // Outstanding Aging table with dynamic styles
+  const renderOutstandingAgingTable = () => (
+    <View style={styles.agingTable}>
+      {/* Title Row */}
+      <View style={styles.agingTableRow}>
+        <Text style={[styles.agingTitleCell, { flex: 7 }]}>
+          OUTSTANDING AGING
+        </Text>
+      </View>
+      {/* Header Row */}
+      <View style={[styles.agingTableRow, styles.agingTableHeader]}>
+        <Text style={getAgingTableCellStyles()}>{"< 1 MTHS"}</Text>
+        <Text style={getAgingTableCellStyles()}>{"1 MTHS/+"}</Text>
+        <Text style={getAgingTableCellStyles()}>{"2 MTHS/+"}</Text>
+        <Text style={getAgingTableCellStyles()}>{"3 MTHS/+"}</Text>
+        <Text style={getAgingTableCellStyles()}>{"4 MTHS/+"}</Text>
+        <Text style={getAgingTableCellStyles()}>{"5 MTHS/+"}</Text>
+        <Text style={getAgingTableCellStyles()}>{"6 MTHS/+"}</Text>
+      </View>
+      {/* Values Row */}
+      <View style={styles.agingTableRow}>
+        <Text style={getAgingTableCellStyles()}>{data?.summary?.lessThanOneMonthAge}</Text>
+        <Text style={getAgingTableCellStyles()}>{data?.summary?.oneMonthAge}</Text>
+        <Text style={getAgingTableCellStyles()}>{data?.summary?.twoMonthAge}</Text>
+        <Text style={getAgingTableCellStyles()}>{data?.summary?.threeMonthAge}</Text>
+        <Text style={getAgingTableCellStyles()}>{data?.summary?.fourMonthAge}</Text>
+        <Text style={getAgingTableCellStyles()}>{data?.summary?.fiveMonthAge}</Text>
+        <Text style={getAgingTableCellStyles()}>{data?.summary?.sixMonthAge}</Text>
+      </View>
+    </View>
+  );
+
+  // Format decimal values to 2 decimal places
+  const formatDecimal = (value: any) => {
+    if (value === undefined || value === null || value === "") return "0.00";
+    const num = parseFloat(value);
+    return isNaN(num) ? "0.00" : num.toFixed(2);
+  };
+
+  function insertZeroWidthSpace(str: string, orientation: 'portrait' | 'landscape') {
+    const charLimit = orientation === 'landscape' ? 18 : 16; // Allow more characters in landscape
+
+    // For long numbers only
+    if (/^\d+$/.test(str) && str.length > charLimit) {
+      return str.replace(new RegExp(`(.{${charLimit}})`, 'g'), '$1-\n');
+    }
+
+    // For long alphanumeric strings without spaces
+    if (/^[\w\d\-]+$/.test(str) && str.length > charLimit) {
+      return str.replace(new RegExp(`(.{${charLimit}})`, 'g'), '$1-\n');
+    }
+    
+    // For Chinese characters
+    return str.replace(/([\u4e00-\u9fa5])/g, '$1\u200B');
+  }
+
+  return (
+    <Document>
+      <Page size="A4" orientation={orientation} style={getPageStyles()}>
+        {/* Header (fixed on every page) */}
+        <View fixed>{renderHeader()}</View>
+
+        {/* Table */}
+        <View style={styles.table}>
+          {/* Table Header (fixed on every page) */}
+          <View fixed>{renderTableHeader()}</View>
+          {/* Table Rows */}
+          {/* {rowsWithBalances.length > 0 ? (
+            rowsWithBalances.map((item, rowIndex) => ( */}
+          {rows.length > 0 ? (
+            rows.map((item, rowIndex) => (
+              <View style={styles.tableRow} key={item.UUID} wrap={false}>
+                {salesReportColumns?.map((column, colIndex) => (
+                  <Text
+                    key={colIndex}
+                    style={column.header === "No" ? getTableCellNoStyles() : getTableCellStyles()}
+                  >
+                    {column.header === "No"
+                      ? rowIndex + 1
+                      : [
+                          "Debit",
+                          "Credit",
+                          "Balance"
+                        ].includes(column.header)
+                      ? formatDecimal(item[column.accessorKey])
+                      // Handle Chinese characters with zero-width space
+                      : typeof item[column.accessorKey] === "string"
+                        ? insertZeroWidthSpace(item[column.accessorKey], orientation)
+                        : item[column.accessorKey]}
+                  </Text>
+                ))}
+              </View>
+            ))
+          ) : (
+            <View style={styles.tableRow} wrap={false}>
+              <Text style={{ fontSize: orientation === 'landscape' ? 7 : 8, textAlign: "center", width: "100%" }}>
+                No Result
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Summary Box: Only render on last page */}
+        <View
+          render={({ pageNumber, totalPages }) =>
+            pageNumber === totalPages ? renderSummaryBox() : null
+          }
+          style={{ width: "100%" }}
+        />
+
+        {/* Outstanding Aging Table: Only render on last page */}
+        <View
+          render={({ pageNumber, totalPages }) =>
+            pageNumber === totalPages ? renderOutstandingAgingTable() : null
+          }
+          style={{ width: "100%" }}
+        />
+
+        {/* Footer (fixed on every page) */}
+        <View fixed style={styles.footerContainer}>
+          <View style={styles.footerLine} />
+          <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 5 }}>
+            <Text style={styles.footerText}>
+              Date Generated: {moment().format("YYYY-MM-DD")}
+            </Text>
+            <Text
+              style={styles.footerText}
+              render={({ pageNumber, totalPages }) =>
+                `Page ${pageNumber} of ${totalPages}`
+              }
+            />
+          </View>
+        </View>
+      </Page>
+    </Document>
+  );
+};
+
+export default StatementOfAccountTemplate;

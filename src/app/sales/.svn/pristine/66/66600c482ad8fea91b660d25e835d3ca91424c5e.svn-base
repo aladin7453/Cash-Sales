@@ -1,0 +1,314 @@
+"use client";
+
+import { endOfMonth, startOfMonth } from "date-fns";
+import moment from "moment";
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+
+import { DEFAULT_DATA_TABLE_PAGE_SIZE, getAuthHeaders, ORIGIN } from "@/lib/constants";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+
+import { statementOfAccountColumns } from "./Generate/columns";
+import StatementReportDataTable from "./Generate/DataTable";
+import StatementReportForm from "./Report/StatementReportForm";
+import SummaryForm from "./Report/SummaryForm";
+
+import type { ColumnFiltersState, SortingState } from "@tanstack/react-table";
+
+const COLUMN_FILTERS_KEY = "statement-of-account.table.filters";
+const PAGINATION_KEY = "statement-of-account.table.pagination";
+const SORTING_KEY = "statement-of-account.table.sorting";
+
+export default function StatementOfAccountPage() {
+  const [tempGeneratedReportList, setTempGeneratedReportList] = useState<any[]>([]);
+  const [hasGenerated, setHasGenerated] = useState("0");
+  const [showReportTable, setShowReportTable] = useState(false);
+  const [previewPDF, setPreviewPDF] = useState<any>(null);
+  const [salesReportData, setSalesReportData] = useState<any>(null);
+  const [summaryData, setSummaryData] = useState<any>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+  // Add totalCounts state with default total: 0
+  const [totalCounts, setTotalCounts] = useState<{ total: number }>({ total: 0 });
+
+  const [columnFilters, setColumnFilters] = useLocalStorage<ColumnFiltersState>(
+    COLUMN_FILTERS_KEY,
+    [],
+  );
+
+  const [pagination, setPagination] = useLocalStorage(PAGINATION_KEY, {
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+  });
+
+  const [sorting, setSorting] = useLocalStorage<SortingState>(SORTING_KEY, []);
+
+  const headers = getAuthHeaders();
+
+  const filterFields = [
+    "docNo",
+    "docDateFormat",
+    "docType",
+    "credit",
+    "debit",
+    "outstandingAmount",
+  ];
+
+  const form = useForm({
+    defaultValues: {
+      customerCode: "",
+      customerCodeCode: "",
+      startDate: Math.floor(startOfMonth(new Date()).getTime() / 1000).toString(),
+      endDate: Math.floor(endOfMonth(new Date()).getTime() / 1000).toString(),
+      docNo: "",
+      docDate: "",
+      docType: "",
+      debit: "",
+      credit: "",
+      outstandingAmount: "",
+      valid: "1",
+      // Add summary fields
+      total: "0",
+      totalAmountReport: "0.00",
+      totalPaidAmountReport: "0.00",
+      totalOutstandingReport: "0.00",
+
+      // Add aging fields
+      lessThanOneMonthAge: "0.00",
+      oneMonthAge: "0.00",
+      twoMonthAge: "0.00",
+      threeMonthAge: "0.00",
+      fourMonthAge: "0.00",
+      fiveMonthAge: "0.00",
+      sixMonthAge: "0.00",
+    },
+  });
+
+  const generateReport = async (formData: any) => {
+    try {
+      // Get all form values
+      const allFormValues = form.getValues();
+
+      const filterObject = {};
+      filterFields.forEach((key) => {
+        // Map docDate to docDateFormat for the filter
+        const formKey = key === "docDateFormat" ? "docDate" : key;
+        if (allFormValues[formKey]) {
+          if (key === "docDateFormat") {
+            // Format docDate as YYYY-MM-DD
+            const formattedDate = moment.unix(allFormValues[formKey]).format("YYYY-MM-DD");
+            filterObject[key] = formattedDate;
+          } else {
+            filterObject[key] = allFormValues[formKey];
+          }
+        }
+      });
+
+      // Extract docType for URL parameter and remove from filter
+      const docTypeParam = filterObject.docType || "statementOfAccount";
+      delete filterObject.docType;
+
+      const params = new FormData();
+
+      params.append(
+        "param[filter]",
+        Object.keys(filterObject).length > 0 ? JSON.stringify(filterObject) : "{}",
+      );
+
+      params.append("param[offset]", `${pagination.pageIndex * pagination.pageSize}`);
+
+      params.append("param[limit]", `${pagination.pageSize}`);
+      params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "docDateFormat");
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "asc",
+      );
+
+      // Add valid parameter
+      if (formData.valid) {
+        params.append("param[valid]", formData.valid);
+      }
+
+      // Add main filter data to params
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value) {
+          params.append(`sales[${key}]`, value as string);
+        }
+      });
+
+      const response = await fetch(
+        `${ORIGIN}/sales_report/api/sales-report/generate-report?docType=${docTypeParam}&reportType=statementOfAccount`,
+        {
+          method: "POST",
+          headers,
+          body: params,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate statement report");
+      }
+
+      const result = await response.json();
+      const rows = result.rows || [];
+
+      // Set totalCounts after fetching
+      setTotalCounts({ total: result.total ?? rows.length });
+
+      // Set summary values from backend response
+      form.setValue("total", result.total ?? "0");
+      form.setValue("totalAmountReport", result.summary?.totalAmountReport ?? "0.00");
+      form.setValue("totalPaidAmountReport", result.summary?.totalPaidAmountReport ?? "0.00");
+      form.setValue("totalOutstandingReport", result.summary?.totalOutstandingReport ?? "0.00");
+
+      // Set aging values from backend response
+      form.setValue("lessThanOneMonthAge", result.summary?.lessThanOneMonthAge ?? "0.00");
+      form.setValue("oneMonthAge", result.summary?.oneMonthAge ?? "0.00");
+      form.setValue("twoMonthAge", result.summary?.twoMonthAge ?? "0.00");
+      form.setValue("threeMonthAge", result.summary?.threeMonthAge ?? "0.00");
+      form.setValue("fourMonthAge", result.summary?.fourMonthAge ?? "0.00");
+      form.setValue("fiveMonthAge", result.summary?.fiveMonthAge ?? "0.00");
+      form.setValue("sixMonthAge", result.summary?.sixMonthAge ?? "0.00");
+
+      setTempGeneratedReportList(result.rows || []);
+      setShowReportTable(true);
+      setHasGenerated("1");
+    } catch (error) {
+      console.error("Error generating statement report:", error);
+    }
+  };
+
+  const previewReport = async (formData: any) => {
+    setPreviewPDF(null);
+    setIsPreviewLoading(true);
+    try {
+      // Get all form values
+      const allFormValues = form.getValues();
+
+      const filterObject = {};
+      filterFields.forEach((key) => {
+        // Map docDate to docDateFormat for the filter
+        const formKey = key === "docDateFormat" ? "docDate" : key;
+        if (allFormValues[formKey]) {
+          if (key === "docDateFormat") {
+            // Format docDate as YYYY-MM-DD
+            const formattedDate = moment.unix(allFormValues[formKey]).format("YYYY-MM-DD");
+            filterObject[key] = formattedDate;
+          } else {
+            filterObject[key] = allFormValues[formKey];
+          }
+        }
+      });
+
+      // Extract docType for URL parameter and remove from filter
+      const docTypeParam = filterObject.docType || "statementOfAccount";
+      delete filterObject.docType;
+
+      const params = new FormData();
+
+      params.append(
+        "param[filter]",
+        Object.keys(filterObject).length > 0 ? JSON.stringify(filterObject) : "{}",
+      );
+
+      params.append("param[offset]", `${pagination.pageIndex * pagination.pageSize}`);
+
+      // params.append("param[limit]", `${pagination.pageSize}`);
+      params.append("param[sort]", sorting.length > 0 ? sorting[0].id : "docDateFormat");
+
+      params.append(
+        "param[order]",
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : "asc",
+      );
+
+      // Add valid parameter
+      if (formData.valid) {
+        params.append("param[valid]", formData.valid);
+      }
+
+      // Add form data to params
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value) params.append(`sales[${key}]`, value as string);
+      });
+
+      const response = await fetch(
+        `${ORIGIN}/sales_report/api/sales-report/preview-pdf?docType=${docTypeParam}&reportType=statementOfAccount`,
+        {
+          method: "POST",
+          headers,
+          body: params,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to preview statement report");
+      }
+
+      const result = await response.json();
+      const rows = result.rows || [];
+
+      // Set totalCounts after fetching
+      setTotalCounts({ total: result.total ?? rows.length });
+
+      // Set summary values from backend response
+      form.setValue("total", result.total ?? "0");
+      form.setValue("totalAmountReport", result.summary?.totalAmountReport ?? "0.00");
+      form.setValue("totalPaidAmountReport", result.summary?.totalPaidAmountReport ?? "0.00");
+      form.setValue("totalOutstandingReport", result.summary?.totalOutstandingReport ?? "0.00");
+
+      // Set aging values from backend response
+      form.setValue("lessThanOneMonthAge", result.summary?.lessThanOneMonthAge ?? "0.00");
+      form.setValue("oneMonthAge", result.summary?.oneMonthAge ?? "0.00");
+      form.setValue("twoMonthAge", result.summary?.twoMonthAge ?? "0.00");
+      form.setValue("threeMonthAge", result.summary?.threeMonthAge ?? "0.00");
+      form.setValue("fourMonthAge", result.summary?.fourMonthAge ?? "0.00");
+      form.setValue("fiveMonthAge", result.summary?.fiveMonthAge ?? "0.00");
+      form.setValue("sixMonthAge", result.summary?.sixMonthAge ?? "0.00");
+
+      setPreviewPDF(result);
+      setSalesReportData(formData);
+    } catch (error) {
+      console.error("Error previewing statement report:", error);
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  const onSubmit = (data: any) => {
+    setTempGeneratedReportList([]); // Clear previous data
+    setShowReportTable(false); // Hide table until new data is loaded
+    generateReport(data);
+  };
+
+  return (
+    <>
+      <StatementReportForm
+        form={form}
+        onSubmit={onSubmit}
+        onPreview={previewReport}
+        previewPDF={previewPDF}
+        salesReportData={salesReportData}
+        generatedReport={tempGeneratedReportList}
+        salesReportColumns={statementOfAccountColumns}
+        filterFields={filterFields}
+        sorting={sorting}
+      />
+      <SummaryForm form={form} onSubmit={onSubmit} />
+      {showReportTable && (
+        <StatementReportDataTable
+          columns={statementOfAccountColumns}
+          data={tempGeneratedReportList}
+          revalidateStatementReport={() => generateReport(form.getValues())}
+          columnFilters={columnFilters}
+          setColumnFilters={setColumnFilters}
+          pagination={pagination}
+          setPagination={setPagination}
+          sorting={sorting}
+          setSorting={setSorting}
+          formData={form.getValues()}
+          totalNumOfRows={+totalCounts.total}
+        />
+      )}
+    </>
+  );
+}

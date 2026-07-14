@@ -1,0 +1,83 @@
+import type { ColumnDef, Table } from "@tanstack/react-table";
+
+export interface TransferDestination {
+  key: string;
+  label: string;
+  route: string;
+  devRoute?: string;
+}
+
+export interface UrlMapping {
+  devRoute: string;
+  prodRoute: string;
+}
+
+export interface TransferToConfig {
+  module: string;
+  model: string;
+  apiNamespace: string;
+  transferDocType: string;
+  destinations: TransferDestination[];
+  columns: ColumnDef<any>[];
+  itemsEndpoint?: string;
+  itemsEndpointSuffix: string;
+  queryParam?: string | string[];
+  transferEndpoint?: string;
+  transferEndpointSuffix: string;
+  buttonText?: string;
+  dialogTitle?: string;
+  popoverTitle?: string;
+  urlMappings: Record<string, UrlMapping>;
+}
+
+export interface TransferToButtonProps<TData = any> {
+  table?: Table<TData>;
+  id: string;
+  config: TransferToConfig;
+  forceEnabled?: boolean;
+  isMobile?: any;
+  autoOpen?: boolean;
+  onDialogClose?: () => void
+}
+
+export interface TransferToDialogProps {
+  open: boolean;
+  setOpen: (state: boolean) => void;
+  destinations: TransferDestination[];
+  onDestinationSelect: (docType: string) => void;
+  title?: string;
+}
+
+export interface TransferToPopoverProps {
+  open: boolean;
+  setOpen: (state: boolean) => void;
+  setOpenDialog: (state: boolean) => void;
+  columns: ColumnDef<any>[];
+  data: any[];
+  fetchItems: () => void;
+  id: string;
+  docType: string;
+  config: TransferToConfig;
+}
+
+export interface TransferToPopoverToolbarProps {
+  table: any;
+  setOpen: (state: boolean) => void;
+  setOpenDialog: (state: boolean) => void;
+  fetchItems: () => void;
+  setTransferQuantities: (transferQuantities: any) => void;
+  onSave: (prop: any) => void;
+}
+
+export interface TransferApiResponse {
+  message: string;
+  data: any;
+}
+
+export interface TransferItem {
+  UUID: string;
+  quantity: string;
+  transferQuantity: string;
+  transferableQuantity: string;
+  [key: string]: any;
+}

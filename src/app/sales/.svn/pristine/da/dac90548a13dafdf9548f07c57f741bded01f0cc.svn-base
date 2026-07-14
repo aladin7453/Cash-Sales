@@ -1,0 +1,432 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+import { NumberFormatter } from "@/components/ui/number-formatter";
+
+export type SalesAnalysisByDocument = {
+  iVValue?: string;
+  iVQty?: string;
+  cSValue?: string;
+  cSQty?: string;
+  cNValue?: string;
+  cNQty?: string;
+  dNValue?: string;
+  dNQty?: string;
+  dOValue?: string;
+  dOQty?: string;
+  qTValue?: string;
+  qTQty?: string;
+  cCValue?: string;
+  cCQty?: string;
+  totalValue?: string;
+  totalQty?: string;
+  extraDOValue?: string;
+  extraDOQty?: string;
+};
+
+export const SalesAnalysisByDocumentColumns: ColumnDef<SalesAnalysisByDocument>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "customerCode",
+    id: "customerCode",
+    header: "Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Description",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "currencyCode",
+    id: "currencyCode",
+    header: "Currency",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "iVValue",
+    id: "iVValue",
+    header: "Invoice",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.iVValue} /></div>
+    ),
+  },
+  {
+    accessorKey: "iVQty",
+    id: "iVQty",
+    header: "IV Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.iVQty} /></div>
+    ),
+  },
+  {
+    accessorKey: "cSValue",
+    id: "cSValue",
+    header: "Cash Sales",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.cSValue} /></div>
+    ),
+  },
+  {
+    accessorKey: "cSQty",
+    id: "cSQty",
+    header: "CS Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.cSQty} /></div>
+    ),
+  },
+  {
+    accessorKey: "cNValue",
+    id: "cNValue",
+    header: "Credit Note",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.cNValue} /></div>
+    ),
+  },
+  {
+    accessorKey: "cNQty",
+    id: "cNQty",
+    header: "CN Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.cNQty} /></div>
+    ),
+  },
+  {
+    accessorKey: "dNValue",
+    id: "dNValue",
+    header: "Debit Note",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.dNValue} /></div>
+    ),
+  },
+  {
+    accessorKey: "dNQty",
+    id: "dNQty",
+    header: "DN Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.dNQty} /></div>
+    ),
+  },
+  {
+    accessorKey: "dOValue",
+    id: "dOValue",
+    header: "Delivery Order",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.dOValue} /></div>
+    ),
+  },
+  {
+    accessorKey: "dOQty",
+    id: "dOQty",
+    header: "DO Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.dOQty} /></div>
+    ),
+  },
+  {
+    accessorKey: "qTValue",
+    id: "qTValue",
+    header: "Quotation",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.qTValue} /></div>
+    ),
+  },
+  {
+    accessorKey: "qTQty",
+    id: "qTQty",
+    header: "QT Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.qTQty} /></div>
+    ),
+  },
+  {
+    accessorKey: "cCValue",
+    id: "cCValue",
+    header: "Customer Contra",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.cCValue} /></div>
+    ),
+  },
+  {
+    accessorKey: "cCQty",
+    id: "cCQty",
+    header: "CC Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.cCQty} /></div>
+    ),
+  },
+  {
+    accessorKey: "totalValue",
+    id: "totalValue",
+    header: "Total Value",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.totalValue} /></div>
+    ),
+  },
+  {
+    accessorKey: "totalQty",
+    id: "totalQty",
+    header: "Total Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.totalQty} /></div>
+    ),
+  },
+  {
+    accessorKey: "extraDOValue",
+    id: "extraDOValue",
+    header: "Extra DO Value",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.extraDOValue} /></div>
+    ),
+  },
+  {
+    accessorKey: "extraDOQty",
+    id: "extraDOQty",
+    header: "Extra DO Qty",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.extraDOQty} /></div>
+    ),
+  },
+  {
+    accessorKey: "docDate",
+    id: "docDate",
+    header: "Doc Date",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "agent",
+    id: "agent",
+    header: "Agent",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "agentDescription",
+    id: "agentDescription",
+    header: "Agent Description",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "location",
+    id: "location",
+    header: "Location",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "locationDescription",
+    id: "locationDescription",
+    header: "Location Description",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+];
+
+export const SalesAnalysisByDocumentReportColumns: ColumnDef<SalesAnalysisByDocument>[] = [
+  {
+    accessorKey: "rowNumber",
+    id: "rowNumber",
+    header: "No",
+    cell: ({ table, row }) => {
+      const { pageIndex, pageSize } = table.getState().pagination;
+      return pageIndex * pageSize + row.index + 1;
+    },
+    enableSorting: false,
+    enableColumnFilter: false,
+    minSize: 60,
+    maxSize: 80,
+  },
+  {
+    accessorKey: "customerCode",
+    id: "customerCode",
+    header: "Code",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "customerName",
+    id: "customerName",
+    header: "Description",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "currencyCode",
+    id: "currencyCode",
+    header: "Currency",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 120,
+    maxSize: 200,
+  },
+  {
+    accessorKey: "iVValue",
+    id: "iVValue",
+    header: "Invoice",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.iVValue} /></div>
+    ),
+  },
+  {
+    accessorKey: "cSValue",
+    id: "cSValue",
+    header: "Cash Sales",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.cSValue} /></div>
+    ),
+  },
+  {
+    accessorKey: "cNValue",
+    id: "cNValue",
+    header: "Credit Note",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.cNValue} /></div>
+    ),
+  },
+  {
+    accessorKey: "dNValue",
+    id: "dNValue",
+    header: "Debit Note",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.dNValue} /></div>
+    ),
+  },
+  {
+    accessorKey: "totalValue",
+    id: "totalValue",
+    header: "Total Value",
+    filterFn: "includesString",
+    enableColumnFilter: false,
+    minSize: 100,
+    maxSize: 150,
+    cell: ({ row }) => (
+      <div className="text-right"><NumberFormatter value={row.original.totalValue} /></div>
+    ),
+  },
+];

@@ -1,0 +1,878 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { FaMagnifyingGlass, FaSort, FaSortDown, FaSortUp } from "react-icons/fa6";
+import type { ColumnDef, Row, SortingState, ColumnFiltersState, PaginationState, ColumnOrderState, ColumnSizingState, VisibilityState, Table as TableType } from "@tanstack/react-table";
+import { CalendarIcon } from "lucide-react";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+
+import moment from "moment";
+
+import { useSearchParams } from "next/navigation";
+
+import DropdownTable from "@/components/data-table/DropdownTable";
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { cn } from "@/lib/utils/cn";
+import formatNumber from "@/lib/utils/data-table/formatNumber";
+import {
+  DATE_FORMAT,
+  DEFAULT_DATA_TABLE_PAGE_SIZE_NEW,
+  getAuthHeaders,
+  ORIGIN,
+  DATA_TABLE_DEFAULT_COLUMN_SIZING,
+} from "@/lib/constants";
+
+import CustomerContraDetailsDataTableToolbar from "./DataTableToolbar";
+import ItemPopover from "./itemPopover";
+import type { CustomerContraDetails } from "./columns";
+
+// Mobile View (Imports)
+import MobileFormDataTable from "@/components/form/MobileFormDataTable";
+import DataTableTotals from "@/components/form/MobileFormDataTableTotals";
+
+// Row Drag and Drop (Imports)
+import { DragDropDataTable, DraggableRow, useDragDropTable } from "@/components/data-table/row-drag-drop";
+
+// Column Drag and Drop and Resize (Imports)
+import { memo } from "react";
+import type { MouseEvent } from "react";
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import getExcludedColumns from "@/lib/utils/data-table/getExcludedColumns";
+import handleDndDragEnd from "@/lib/utils/data-table/handleDndDragEnd";
+import { DragHandle } from "@/components/data-table/row-drag-drop";
+
+type DataTableProps = {
+  columns: ColumnDef<CustomerContraDetails>[];
+  data: CustomerContraDetails[];
+  tempRowCustomerContraDetailsList: any;
+  setTempRowCustomerContraDetailsList: (data: any) => void;
+  revalidateCustomerContraDetails: (tableState?: any) => void;
+  form: any;
+  customerContraData: any;
+  totalCount?: number;
+  slug: string;
+  isMobile?: boolean;
+};
+
+// Column Drag and Drop and Resize (Local Storage Keys)
+const COLUMN_ORDERING_KEY = "sales-purchase-contra.customer-contra-details.table.ordering";
+const COLUMN_SIZING_KEY = "sales-purchase-contra.customer-contra-details.table.sizing";
+const COLUMN_VISIBILITY_KEY = "sales-purchase-contra.customer-contra-details.table";
+
+export default function CustomerContraDetailsDataTable({
+  columns,
+  data,
+  tempRowCustomerContraDetailsList,
+  setTempRowCustomerContraDetailsList,
+  revalidateCustomerContraDetails,
+  form,
+  customerContraData,
+  totalCount = 0,
+  slug,
+  isMobile,
+}: DataTableProps) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+
+  // Add calculation functions
+  const calculateBalanceOutstandingAndContraAmount = (data: CustomerContraDetails[]) => {
+    if (!Array.isArray(data) || data.length === 0) return data;
+
+    // Ensure docType is set for new records
+    const dataWithDocType = data.map((item) => ({
+      ...item,
+      docType: item.docType || (item.salesInvoice ? "salesInvoice" : "purchaseInvoice"), // Default docType based on invoice type
+    }));
+
+    // Create a sorted copy for calculation purposes only
+    const sortedDataForCalculation = [...dataWithDocType].sort((a, b) => {
+      // Use docDate (as Unix timestamp string) for sorting, fall back to createdAt
+      let dateA: number;
+      let dateB: number;
+
+      if (a.docDate && b.docDate) {
+        dateA = parseInt(a.docDate || "0");
+        dateB = parseInt(b.docDate || "0");
+      } else {
+        dateA = parseInt(a.createdAt || "0");
+        dateB = parseInt(b.createdAt || "0");
+      }
+
+      return dateA - dateB;
+    });
+
+    // Separate sales and purchase invoices from sorted data
+    const salesInvoices = sortedDataForCalculation.filter((item) => item.docType === "salesInvoice");
+    const purchaseInvoices = sortedDataForCalculation.filter((item) => item.docType === "purchaseInvoice");
+
+    // Calculate total outstanding amounts
+    const totalSalesOutstanding = salesInvoices.reduce((sum, item) => sum + (Number(item.outstanding) || 0), 0);
+    const totalPurchaseOutstanding = purchaseInvoices.reduce((sum, item) => sum + (Number(item.outstanding) || 0), 0);
+
+    // Determine the maximum contra amount possible (minimum of the two totals)
+    const maxContraAmount = Math.min(totalSalesOutstanding, totalPurchaseOutstanding);
+
+    let remainingContraAmount = maxContraAmount;
+
+    // Create a map to store calculated values by item identifier
+    const calculatedValues = new Map();
+
+    // For CUSTOMER CONTRA: Prioritize sales invoices first, then purchase invoices
+    // Process sales invoices first
+    salesInvoices.forEach((item) => {
+      const outstanding = Number(item.outstanding) || 0;
+      let balanceOutstanding = outstanding;
+      let contraAmount = 0;
+
+      if (remainingContraAmount > 0) {
+        const contraForThisItem = Math.min(outstanding, remainingContraAmount);
+        contraAmount = contraForThisItem;
+        balanceOutstanding = outstanding - contraForThisItem;
+        remainingContraAmount -= contraForThisItem;
+      }
+
+      const itemKey = item.UUID || item.id || `${item.docNo}_${item.docDate}`;
+      calculatedValues.set(itemKey, {
+        balanceOutstanding: balanceOutstanding.toFixed(2),
+        contraAmount: contraAmount.toFixed(2),
+      });
+    });
+
+    // Process purchase invoices second
+    purchaseInvoices.forEach((item) => {
+      const outstanding = Number(item.outstanding) || 0;
+      let balanceOutstanding = outstanding;
+      let contraAmount = 0;
+
+      if (remainingContraAmount > 0) {
+        const contraForThisItem = Math.min(outstanding, remainingContraAmount);
+        contraAmount = contraForThisItem;
+        balanceOutstanding = outstanding - contraForThisItem;
+        remainingContraAmount -= contraForThisItem;
+      }
+
+      const itemKey = item.UUID || item.id || `${item.docNo}_${item.docDate}`;
+      calculatedValues.set(itemKey, {
+        balanceOutstanding: balanceOutstanding.toFixed(2),
+        contraAmount: contraAmount.toFixed(2),
+      });
+    });
+
+    // Apply calculated values back to the original data order
+    const calculatedData = data.map((item) => {
+      const itemKey = item.UUID || item.id || `${item.docNo}_${item.docDate}`;
+      const calculations = calculatedValues.get(itemKey) || {
+        balanceOutstanding: (Number(item.outstanding) || 0).toFixed(2),
+        contraAmount: "0.00",
+      };
+
+      return {
+        ...item,
+        balanceOutstanding: calculations.balanceOutstanding,
+        contraAmount: calculations.contraAmount,
+      };
+    });
+
+    return calculatedData;
+  };
+
+  // Update calculations whenever data changes
+  useEffect(() => {
+    if (Array.isArray(tempRowCustomerContraDetailsList) && tempRowCustomerContraDetailsList.length > 0) {
+      const calculatedData = calculateBalanceOutstandingAndContraAmount(tempRowCustomerContraDetailsList);
+
+      // Only update if calculations have changed to prevent infinite loops
+      const hasChanges = calculatedData.some((item, index) => {
+        const original = tempRowCustomerContraDetailsList[index];
+        return original && (
+          item.balanceOutstanding !== original.balanceOutstanding ||
+          item.contraAmount !== original.contraAmount
+        );
+      });
+
+      if (hasChanges) {
+        setTempRowCustomerContraDetailsList(calculatedData);
+      }
+    }
+  }, [tempRowCustomerContraDetailsList?.length, data]);
+
+  function setTempRowCustomerContraDetailsListData(data, overwrite) {
+    if (overwrite) {
+      // Overwrite with new data (ensure it's an array)
+      const newData = Array.isArray(data) ? data : [data];
+      // Apply calculations to new data
+      const calculatedData = calculateBalanceOutstandingAndContraAmount(newData);
+      setTempRowCustomerContraDetailsList(calculatedData);
+    } else {
+      // Append new data to current list
+      setTempRowCustomerContraDetailsList((prevList) => {
+        const currentList = Array.isArray(prevList) ? prevList : [];
+        const newData = Array.isArray(data) ? data : [data];
+        // Apply calculations to combined data
+        const calculatedData = calculateBalanceOutstandingAndContraAmount([...currentList, ...newData]);
+        return calculatedData;
+      });
+    }
+  }
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE_NEW,
+  });
+
+  // Column Drag and Drop and Resize (Constants)
+  const initialColumnOrder = columns?.filter(column => column?.id).map((column) => column.id!) || [];
+  const [columnOrder, setColumnOrder] = useLocalStorage<ColumnOrderState>(
+    COLUMN_ORDERING_KEY,
+    initialColumnOrder
+  );
+  const [columnSizing, setColumnSizing] = useLocalStorage<ColumnSizingState>(
+    COLUMN_SIZING_KEY,
+    {}
+  );
+  const defaultColumns: Array<keyof CustomerContraDetails> = [
+    "docNo",
+    "docDateFormat",
+    "description",
+    "outstanding",
+    "balanceOutstanding",
+    "contraAmount",
+  ];
+  const defaultColumnVisibility: VisibilityState = getExcludedColumns(
+    columns || [],
+    defaultColumns
+  );
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    COLUMN_VISIBILITY_KEY,
+    defaultColumnVisibility
+  );
+
+  // Drag and Drop (State & Functions)
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Use tempRowCustomerContraDetailsList if it exists, otherwise use data
+  const tableData = Array.isArray(tempRowCustomerContraDetailsList) ? tempRowCustomerContraDetailsList : [];
+
+  const {
+    items,
+    activeId,
+    isDragging,
+    handleDragStart,
+    handleDragEnd,
+    getRowId,
+  } = useDragDropTable({
+    data: tableData,
+    onReorder: (newData) => {
+      // Update sequence numbers for all items based on their new order
+      const dataWithUpdatedSeq = newData.map((item, index) => ({
+        ...item,
+        seq: (index + 1).toString(), // Update seq to reflect new order (1-based)
+      }));
+
+      // Apply calculations after reordering
+      const calculatedData = calculateBalanceOutstandingAndContraAmount(dataWithUpdatedSeq);
+
+      // Update the data immediately and force re-render
+      setTempRowCustomerContraDetailsList(calculatedData);
+      // Force table to update by incrementing refresh key
+      setRefreshKey((prev) => prev + 1);
+    },
+    idField: "UUID",
+    disabled: false,
+  });
+
+  // Column Drag and Drop and Resize (Data Table)
+  const table = useReactTable({
+    columns,
+    data: tableData,
+    state: {
+      sorting,
+      columnVisibility,
+      columnFilters,
+      pagination,
+      columnOrder,
+      columnSizing,
+    },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnFiltersChange: setColumnFilters,
+    onPaginationChange: setPagination,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+    manualPagination: true,
+    manualSorting: true,
+    manualFiltering: true,
+    pageCount: Math.ceil(totalCount / pagination.pageSize),
+    autoResetPageIndex: false,
+    columnResizeMode: "onChange",
+    defaultColumn: DATA_TABLE_DEFAULT_COLUMN_SIZING,
+    enableColumnResizing: true,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getRowId: (row, index) => getRowId(row, index),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE_NEW,
+      },
+      columnVisibility: JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}"),
+    },
+  });
+
+  const sensors = useDndSensors();
+  const columnSizeVars = useColumnSizeVars(table);
+
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Handle table state changes for server-side operations
+  useEffect(() => {
+    // Skip API call on initial load to prevent duplicate requests
+    if (id && !isInitialLoad) {
+      const tableState = {
+        columnFilters,
+        sorting,
+        pagination,
+      };
+      revalidateCustomerContraDetails(tableState);
+    } else if (isInitialLoad) {
+      // Calculate balance outstanding and contra amount on initial load
+      if (Array.isArray(tempRowCustomerContraDetailsList) && tempRowCustomerContraDetailsList.length > 0) {
+        const calculatedData = calculateBalanceOutstandingAndContraAmount(tempRowCustomerContraDetailsList);
+
+        setTempRowCustomerContraDetailsList(calculatedData);
+      }
+
+      setIsInitialLoad(false);
+    }
+  }, [pagination, sorting, columnFilters, id]);
+
+  useEffect(() => {
+    localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [isDisabled, setisDisabled] = useState(false);
+
+  usePreventShiftTextSelect();
+
+  const onDoubleClick = (row: Row<CustomerContraDetails>) => { };
+
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  const handleOnAdd = async () => {
+    const customerUUID = form.getValues('customerCode');
+
+    if (!customerUUID) {
+      toast({
+        title: "Customer Required",
+        description: "Please select a customer first before adding invoices.",
+        variant: "destructive",
+        duration: 3000,
+      });
+      return;
+    }
+
+    setDialogOpen(true);
+    setisDisabled(true);
+  };
+
+  const calculateTotal = (field: string) => {
+    if (field === "outstanding") {
+      // Find the lowest outstanding value
+      let minValue = Infinity;
+
+      table.getRowModel().rows.forEach((row) => {
+        const value = Number(row.original[field]) || 0;
+        if (value < minValue) {
+          minValue = value;
+        }
+      });
+
+      return minValue === Infinity ? 0 : minValue.toFixed(2);
+    } else {
+      // For other fields, sum them up as before
+      let total = 0;
+
+      table.getRowModel().rows.forEach((row) => {
+        total += Number(row.original[field]) || 0;
+      });
+
+      return total.toFixed(2);
+    }
+  };
+
+  const calculateNetTotal = (convertToLocal: boolean) => {
+    let total = 0;
+
+    table.getCoreRowModel().rows.forEach((row) => {
+      total += Number(row.original.balanceOutstanding ?? 0);
+    });
+
+    const currencyRateValue = form.getValues("currencyRate");
+
+    if (convertToLocal)
+      total *= currencyRateValue ? Number(currencyRateValue) : 1;
+
+    return total.toFixed(2);
+  };
+
+  const [textInputs, setTextInputs] = useState({});
+
+  const descriptionInputCell = ({ row, column: { id } }, className: string) => {
+    const onChange = (e) => {
+      const newValue = e.target.value;
+
+      row.original[id] = newValue;
+
+      // For description
+      setTextInputs((prevTextInputs) => ({
+        ...prevTextInputs,
+        [row.id]: {
+          ...prevTextInputs[row.id],
+          [id]: newValue,
+        },
+      }));
+
+      // Update the tempRowCustomerContraDetailsList to reflect the change
+      setTempRowCustomerContraDetailsList((prevList) =>
+        prevList.map((item, idx) => {
+          if ((item.UUID && item.UUID === row.original.UUID) || idx === row.index) {
+            return { ...item, [id]: newValue };
+          }
+          return item;
+        })
+      );
+    };
+
+    // Get current value based on field type
+    const currentValue = (textInputs[id] ? textInputs[id][row.id] : row.original[id]);
+
+    // Get placeholder text
+    const placeholder = 'Enter Description';
+
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <Input
+            className={className}
+            value={currentValue || ''}
+            onChange={onChange}
+            placeholder={placeholder}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </PopoverTrigger>
+        <PopoverContent className="bg-erp-blue-3 p-2">
+          <Textarea
+            className="p-2"
+            value={currentValue || ''}
+            onChange={onChange}
+            placeholder={placeholder}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  // Mobile View (Field Configurations)
+  const mobileFieldConfigs = {
+    docNo: {
+      type: 'text' as const,
+      label: 'Doc. No'
+    },
+    docDate: {
+      type: 'readonly' as const,
+      label: 'Doc. Date'
+    },
+    description: {
+      type: 'readonly' as const,
+      label: 'Description',
+      colSpan: 2 as const
+    },
+    outstanding: {
+      type: 'readonly' as const,
+      label: 'Outstanding'
+    },
+    balanceOutstanding: {
+      type: 'readonly' as const,
+      label: 'Balance Outstanding'
+    },
+    contraAmount: {
+      type: 'readonly' as const,
+      label: 'Contra Amount'
+    },
+  };
+
+  const handleMobileFieldChange = (rowId: string, fieldId: string, value: any) => {
+    const rowIndex = parseInt(rowId);
+    const row = table.getRowModel().rows[rowIndex];
+
+    if (!row) return;
+
+    row.original[fieldId] = value;
+
+    const updatedList = tempRowCustomerContraDetailsList.map((item, idx) => {
+      if ((item.UUID && item.UUID === row.original.UUID) || idx === row.index) {
+        return { ...item, [fieldId]: value };
+      }
+      return item;
+    });
+
+    // Apply calculations after updating
+    const calculatedData = calculateBalanceOutstandingAndContraAmount(updatedList);
+    setTempRowCustomerContraDetailsList(calculatedData);
+  };
+
+  // Mobile View (Totals Configuration)
+  const totalsConfig = {
+    title: "Total",
+    sections: [
+      {
+        fields: [
+          {
+            key: "noOfRecord",
+            label: "No. of Record",
+            value: table.getRowModel().rows ? table.getRowModel().rows.length : 0,
+            readOnly: true,
+          },
+          {
+            key: "totalContra",
+            label: "Total Contra",
+            value: table.getRowModel().rows ? calculateTotal("contraAmount") : 0,
+            readOnly: true,
+          },
+        ],
+      },
+      {
+        fields: [
+          {
+            key: "localNetTotal",
+            label: "Local Net Total",
+            value: table.getRowModel().rows ? calculateNetTotal(true) : 0,
+            readOnly: true,
+          },
+          {
+            key: "netTotal",
+            label: "Net Total (RM)",
+            value: table.getRowModel().rows ? calculateNetTotal(false) : 0,
+            readOnly: true,
+          },
+        ],
+      },
+    ],
+  };
+
+  // Unified drag handler for both rows and columns
+  const handleUnifiedDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    // Check if it's a column drag (column IDs are simple strings like "docNo", "description")
+    const isColumnDrag = columnOrder.includes(active.id as string);
+
+    if (isColumnDrag) {
+      // Handle column drag
+      handleDndDragEnd(event, setColumnOrder);
+    } else {
+      // Handle row drag
+      handleDragEnd(event);
+    }
+  };
+
+  return (
+    <Card className={isMobile ? "shadow-none rounded-none border-none p-0" : "w-full shadow-sm mb-2"}>
+      <div className="flex w-full items-center justify-between p-1">
+        <CardTitle className="px-1 hidden lg:block md:hidden sm:block text-nowrap text-sm font-bold">Customer Contra Details</CardTitle>
+
+        <CustomerContraDetailsDataTableToolbar
+          table={table}
+          onAdd={handleOnAdd}
+          setTempRowCustomerContraDetailsListData={setTempRowCustomerContraDetailsListData}
+          tempRowCustomerContraDetailsList={tempRowCustomerContraDetailsList}
+          revalidateCustomerContraDetails={() => revalidateCustomerContraDetails()}
+          form={form}
+          slug={slug}
+        />
+
+      </div>
+
+      <CardContent className="p-0">
+        <div className="flex h-[70cqh] md:h-[100cqh] flex-col justify-between rounded-md bg-erp-blue-3 @container-[size] md:max-h-[472px]">
+          <ScrollArea className="flex-1 min-h-0">
+            {/* Mobile View (Form Data Table) */}
+            <MobileFormDataTable
+              table={table}
+              headerFields={['docNo', 'docDate']}
+              fieldConfigs={mobileFieldConfigs}
+              initialVisibleFields={4}
+              onFieldChange={handleMobileFieldChange}
+            />
+
+            {/* Web View (Data Table) */}
+            <div className="hidden md:block">
+              {/* Unified DND Context for both row and column drag and drop */}
+              <DndContext
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleUnifiedDragEnd}
+                sensors={sensors}
+              >
+                {/* Row Drag and Drop (Data Table) - Tell it parent has DndContext */}
+                <DragDropDataTable
+                  items={items}
+                  disabled={false}
+                  hasParentDndContext={true}
+                >
+                  {/* Column Drag and Drop and Resize (Table) */}
+                  <Table
+                    className="table-fixed border-separate overflow-visible whitespace-nowrap text-[11px]"
+                    style={{ ...columnSizeVars, width: table.getTotalSize() }}
+                  >
+                    <TableHeader className="sticky top-0 z-10">
+                      {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id}>
+                          {/* Column Drag and Drop and Resize (Sortable Context) */}
+                          <SortableContext
+                            items={columnOrder}
+                            strategy={horizontalListSortingStrategy}
+                          >
+                            {headerGroup.headers.map((header) => (
+                              // Column Drag and Drop and Resize (Dragable Table Head)
+                              <DragableTableHead
+                                key={header.id}
+                                header={header}
+                                className="bg-erp-blue-11 font-normal"
+                                style={{
+                                  width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                                }}
+                              >
+                                {header.column.id === "valid" ? (
+                                  <TableHeadValidityFilter table={table} />
+                                ) : (
+                                  <TableHeadColumnTextFilter
+                                    column={header.column}
+                                    table={table}
+                                  />
+                                )}
+                                <ColumnResizer header={header} />
+                              </DragableTableHead>
+                            ))}
+                          </SortableContext>
+                        </TableRow>
+                      ))}
+                    </TableHeader>
+                    {/* Column Drag and Drop and Resize (Table Body) */}
+                    {table.getState().columnSizingInfo.isResizingColumn ? (
+                      <MemoizedTableBody
+                        table={table}
+                        onRowSelection={onRowSelection}
+                        getRowId={getRowId}
+                        refreshKey={refreshKey}
+                        descriptionInputCell={descriptionInputCell}
+                      />
+                    ) : (
+                      <NonMemoizedTableBody
+                        table={table}
+                        onRowSelection={onRowSelection}
+                        getRowId={getRowId}
+                        refreshKey={refreshKey}
+                        descriptionInputCell={descriptionInputCell}
+                      />
+                    )}
+                  </Table>
+                </DragDropDataTable>
+              </DndContext>
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+
+          {/* Web View (Totals) */}
+          <div className={isMobile ? "hidden" : "flex border-t border-border bg-white"}>
+            <ScrollArea>
+              <div className="flex pt-1">
+                <div className="flex min-w-[100px] flex-shrink-0 flex-col gap-y-1 border-r border-border p-2.5">
+                  <span className="text-[11px] text-muted-foreground">Records</span>
+                  <Input
+                    className="text-[11px] rounded-none font-medium border-none text-left w-16 h-3 bg-transparent outline-none focus-visible:ring-0 focus-visible:ring-offset-0 !px-0"
+                    readOnly
+                    value={table.getRowModel().rows ? table.getRowModel().rows.length : 0}
+                  />
+                </div>
+
+                <div className="flex min-w-[150px] flex-shrink-0 flex-col gap-y-1 border-r border-border p-2.5">
+                  <span className="text-[11px] text-muted-foreground">Total Contra</span>
+                  <Input
+                    className="text-[11px] rounded-none font-medium border-none text-left w-16 h-3 bg-transparent outline-none focus-visible:ring-0 focus-visible:ring-offset-0 !px-0"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateTotal("contraAmount") : 0}
+                  />
+                </div>
+
+                <div className="flex min-w-[150px] flex-shrink-0 flex-col gap-y-1 border-r border-border p-2.5">
+                  <span className="text-[11px] text-muted-foreground">Local Net Total</span>
+                  <Input
+                    className="text-[11px] rounded-none font-medium border-none text-left w-16 h-3 bg-transparent outline-none focus-visible:ring-0 focus-visible:ring-offset-0 !px-0"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateNetTotal(true) : 0}
+                  />
+                </div>
+
+                <div className="flex min-w-[150px] flex-shrink-0 flex-col gap-y-1 border-r border-border p-2.5">
+                  <span className="text-[11px] text-muted-foreground">Net Total</span>
+                  <Input
+                    className="text-[11px] rounded-none font-medium border-none text-left w-16 h-3 bg-transparent outline-none focus-visible:ring-0 focus-visible:ring-offset-0 !px-0"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateNetTotal(false) : 0}
+                  />
+                </div>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </div>
+
+          <ItemPopover
+            open={dialogOpen}
+            setOpen={setDialogOpen}
+            setTempRowCustomerContraDetailsListData={setTempRowCustomerContraDetailsListData}
+            revalidateCustomerContraDetails={revalidateCustomerContraDetails}
+            form={form}
+            slug={slug}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Column Drag and Drop and Resize (Table Body)
+type TableBodyProps = {
+  table: TableType<CustomerContraDetails>;
+  onRowSelection: (
+    row: Row<CustomerContraDetails>
+  ) => (event: MouseEvent<HTMLTableRowElement>) => void;
+  getRowId: (row: any, index: number) => string;
+  refreshKey: number;
+  descriptionInputCell: (cell: any, className: string) => JSX.Element;
+};
+
+function NonMemoizedTableBody({
+  table,
+  onRowSelection,
+  getRowId,
+  refreshKey,
+  descriptionInputCell,
+}: TableBodyProps) {
+  return (
+    <TableBody>
+      {table.getRowModel().rows?.length ? (
+        table.getRowModel().rows.map((row, index) => (
+          // Row Drag and Drop (Row)
+          <DraggableRow
+            key={`${getRowId(row.original, index)}-${refreshKey}`}
+            id={getRowId(row.original, index)}
+            className="bg-erp-blue-5 data-[state=selected]:bg-erp-blue-9"
+            data-state={row.getIsSelected() && "selected"}
+            onClick={onRowSelection(row)}
+            disabled={false}
+          >
+            {row.getVisibleCells().map((cell, cellIndex) => {
+              if (cell.column.id === "description") {
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className="text-center truncate"
+                    title={(cell.getValue() ?? "").toString()}
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                    }}
+                  >
+                    {descriptionInputCell(cell, "h-7.5 text-[11px] text-left p-1")}
+                  </TableCell>
+                );
+              } else {
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className="truncate"
+                    title={(cell.getValue() ?? "").toString()}
+                    style={{
+                      width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                      minWidth: cell.column.columnDef.minSize,
+                    }}
+                  >
+                    {cellIndex === 0 ? (
+                      // First column: show drag handle + original content
+                      <div className="flex items-center gap-2">
+                        <DragHandle
+                          id={getRowId(row.original, index)}
+                          className="flex-shrink-0"
+                        />
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </div>
+                    ) : (
+                      // Other columns: show original content
+                      flexRender(cell.column.columnDef.cell, cell.getContext())
+                    )}
+                  </TableCell>
+                );
+              }
+            })}
+          </DraggableRow>
+        ))
+      ) : (
+        <NoResultsTableRow columns={table.getVisibleLeafColumns()} />
+      )}
+    </TableBody>
+  );
+}
+
+const MemoizedTableBody = memo(
+  NonMemoizedTableBody,
+  (prev, next) => prev.table.options.data === next.table.options.data
+) as typeof NonMemoizedTableBody;

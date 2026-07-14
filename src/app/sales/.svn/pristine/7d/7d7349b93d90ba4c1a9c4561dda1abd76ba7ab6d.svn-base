@@ -1,0 +1,205 @@
+import { useEffect, useState } from "react";
+import useSWR from "swr";
+
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import { ORIGIN } from "@/lib/constants";
+import authorizedFetcher from "@/lib/utils/authorizedFetcher";
+
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+
+// Define possible roles using union types in TypeScript
+type UserRole = "admin" | "manager" | "user";
+
+type Location = {
+  UUID: string;
+  company: string;
+  account: string;
+  locationCode: string;
+  locationName: string;
+  parentLocation: string | null;
+  subLocations: Array<Location>;
+};
+
+type AuthorizedLocationData = {
+  data: Location[];
+};
+
+// Mocked RBAC roles and current user (replace with actual logic from your app)
+const currentUserRole: UserRole = "manager"; // Example: 'admin', 'manager', or 'user'
+const currentLocation = "Location 02"; // Example: User's currently assigned location
+
+const locationData = [
+  {
+    name: "Location 01",
+    subLocations: [
+      { name: "Location 01:01", subLocations: [] },
+      { name: "Location 01:02", subLocations: [] },
+    ],
+  },
+  {
+    name: "Location 02",
+    subLocations: [
+      {
+        name: "Location 02:01",
+        subLocations: [],
+      },
+      {
+        name: "Location 02:02",
+        subLocations: [{ name: "Location 02:02:01", subLocations: [] }],
+      },
+    ],
+  },
+];
+
+export function AuthorizedLocationForm({ open, setOpen }) {
+  const [selectedLocations, setSelectedLocations] = useState<{ [key: string]: boolean }>({});
+  const [defaultAccessLocations, setDefaultAccessLocations] = useState<string[]>([]);
+  const [showMessageBox, setShowMessageBox] = useState(false); // State for message box
+
+  const { data: authorizedLocationData } = useSWR<AuthorizedLocationData>(
+    `${ORIGIN}/customer_group/api/customer-group/get-authorized-location`,
+    authorizedFetcher,
+  );
+
+  useEffect(() => {
+    // Check localStorage for saved message
+    const messageSaved = localStorage.getItem("locationChangesSaved");
+    if (messageSaved === "true") {
+      setShowMessageBox(true);
+      localStorage.removeItem("locationChangesSaved"); // Clear message from localStorage
+    }
+
+    const defaultAccess = locationData.reduce(
+      (acc, location) => {
+        if (location.name === currentLocation || location.name === "Location 01") {
+          acc[location.name] = true;
+        }
+        return acc;
+      },
+      {} as { [key: string]: boolean },
+    );
+
+    setSelectedLocations(defaultAccess);
+    setDefaultAccessLocations(Object.keys(defaultAccess));
+  }, []);
+
+  const handleCheckboxChange = (checked: boolean, location: string) => {
+    setSelectedLocations((prev) => ({
+      ...prev,
+      [location]: checked,
+    }));
+  };
+
+  const canModifySubLocations = currentUserRole === "admin" || currentUserRole === "manager";
+
+  const handleSubmit = () => {
+    // Form submission logic
+    console.log("Selected locations:", selectedLocations);
+    setShowMessageBox(true);
+    localStorage.setItem("locationChangesSaved", "true"); // Persist the message
+  };
+
+  const handleReset = () => {
+    setSelectedLocations({});
+    localStorage.removeItem("locationChangesSaved"); // Clear message on reset
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+    localStorage.removeItem("locationChangesSaved"); // Clear message on dialog close
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-3xl bg-erp-blue-3 p-2">
+        <form className="space-y-2">
+          <div className="flex justify-between pr-4">
+            <div className="grid auto-cols-fr grid-flow-col gap-x-1.5">
+              <SaveButton onConfirm={handleSubmit} />
+              <ResetButton onClick={handleReset} />
+              <DialogClose asChild>
+                <CancelButton />
+              </DialogClose>
+            </div>
+          </div>
+
+          <div className="space-y-2.5 bg-white p-3 pt-2">
+            <h2 className="text-lg font-bold">Authorized Locations</h2>
+            <div className="max-h-96 overflow-auto">
+              <div className="space-y-2">
+                {authorizedLocationData &&
+                  authorizedLocationData.data.map((location, index) => (
+                    <NestedCheckbox
+                      key={index}
+                      location={location}
+                      checked={selectedLocations[location.locationName] || false}
+                      onChange={(checked) => handleCheckboxChange(checked, location.locationName)}
+                      isDisabled={
+                        !canModifySubLocations &&
+                        defaultAccessLocations.includes(location.locationName)
+                      }
+                    />
+                  ))}
+              </div>
+            </div>
+          </div>
+
+          {showMessageBox && (
+            <div className="mt-4 rounded bg-green-100 p-4 text-green-700">
+              Changes saved successfully!
+            </div>
+          )}
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function NestedCheckbox({
+  location,
+  checked,
+  onChange,
+  isDisabled,
+}: {
+  location: Location;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  isDisabled: boolean;
+}) {
+  const [isChecked, setIsChecked] = useState(checked);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsChecked(e.target.checked);
+    onChange(e.target.checked);
+  };
+
+  return (
+    <div className="space-y-2 pl-4">
+      <label className="inline-flex items-center space-x-2">
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          checked={isChecked}
+          onChange={handleChange}
+          disabled={isDisabled}
+        />
+        <span>{location.locationName}</span>
+      </label>
+      {location.subLocations.length > 0 && (
+        <div className="space-y-2 pl-4">
+          {location.subLocations.map((subLocation, idx) => (
+            <NestedCheckbox
+              key={idx}
+              location={subLocation}
+              checked={isChecked}
+              onChange={onChange}
+              isDisabled={isDisabled}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

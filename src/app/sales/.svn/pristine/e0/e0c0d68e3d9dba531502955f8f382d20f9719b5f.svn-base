@@ -1,0 +1,311 @@
+"use client";
+
+import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tab, TabList, TabPanel, Tabs } from "react-tabs";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+type Params = {
+  form: any;
+};
+
+export function BuyerDetailsForm({ form }: Params) {
+  return (
+    <Form {...form}>
+      <form>
+        {/* First Row */}
+        <div className="mt-1.5 grid grid-cols-3 items-center gap-x-2">
+          {/* Customer UUID */}
+          <FormField
+            control={form.control}
+            name="customerCode"
+            render={({ field }) => (
+              <FormItem className="hidden">
+                <FormLabel>Customer UUID:</FormLabel>
+                <FormControl>
+                  <Input className="h-7.5" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Customer Code */}
+          <FormField
+            control={form.control}
+            name="customerCodeCode"
+            render={({ field }) => (
+              <FormItem className="col-span-1 flex flex-col space-y-1">
+                <FormControl className="relative">
+                  <div>
+                    <TooltipProvider delayDuration={1000}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Input
+                            className="h-7 rounded-md px-2 text-[11px] bg-erp-gray-1 border-gray-200 text-black focus-visible:ring-0 focus-visible:outline-none"
+                            {...field}
+                            readOnly
+                            autoComplete="off"
+                            placeholder="Customer Code"
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="start">
+                          Customer Code
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </FormControl>
+              </FormItem>
+            )}
+          />
+
+          {/* Customer Name */}
+          <FormField
+            control={form.control}
+            name="buyerName"
+            render={({ field }) => (
+              <FormItem className="col-span-2 flex flex-col space-y-1">
+                <FormControl>
+                  <TooltipProvider delayDuration={1000}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Input
+                          className="h-7 rounded-md px-2 text-[11px] bg-erp-gray-1 border-gray-200 text-black focus-visible:ring-0 focus-visible:outline-none"
+                          {...field}
+                          moduleName="consolidatedInvoice"
+                          fieldName="customerName"
+                          columnName="Customer Name"
+                          placeholder="Customer Name"
+                          readOnly
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" align="start">
+                        Customer Name
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Second Row */}
+        <div className="mt-1.5 grid grid-cols-3 items-center gap-x-2">
+          {/* BRN */}
+          <FormField
+            control={form.control}
+            name="buyerBRN"
+            render={({ field }) => (
+              <FormItem className="flex flex-col space-y-1">
+                <FormControl>
+                  <TooltipProvider delayDuration={1000}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Input
+                          className="h-7 rounded-md px-2 text-[11px] bg-erp-gray-1 border-gray-200 text-black focus-visible:ring-0 focus-visible:outline-none"
+                          {...field}
+                          readOnly
+                          placeholder="BRN"
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" align="start">
+                        BRN
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* TIN */}
+          <FormField
+            control={form.control}
+            name="buyerTIN"
+            render={({ field }) => (
+              <FormItem className="flex flex-col space-y-1">
+                <FormControl>
+                  <TooltipProvider delayDuration={1000}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Input
+                          className="h-7 rounded-md px-2 text-[11px] bg-erp-gray-1 border-gray-200 text-black focus-visible:ring-0 focus-visible:outline-none"
+                          {...field}
+                          readOnly
+                          moduleName="consolidatedInvoice"
+                          fieldName="TIN"
+                          columnName="TIN"
+                          placeholder="TIN"
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" align="start">
+                        TIN
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* TaxEx No */}
+          <FormField
+            control={form.control}
+            name="TTXNo"
+            render={({ field }) => (
+              <FormItem className="hidden">
+                <FormLabel>TaxEx No.:</FormLabel>
+                <FormControl>
+                  <Input className="h-7.5" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* SST No */}
+          <FormField
+            control={form.control}
+            name="buyerSSTNo"
+            render={({ field }) => (
+              <FormItem className="flex flex-col space-y-1">
+                <FormControl>
+                  <TooltipProvider delayDuration={1000}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Input
+                          className="h-7 rounded-md px-2 text-[11px] bg-erp-gray-1 border-gray-200 text-black focus-visible:ring-0 focus-visible:outline-none"
+                          {...field}
+                          readOnly
+                          placeholder="SST No"
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" align="start">
+                        SST No
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Tab Section */}
+        <Tabs className="mt-2 flex flex-col">
+          <TabList className="flex">
+            {["Billing Details"].map((label) => (
+              <Tab
+                key={label}
+                className="cursor-pointer rounded-tl-md rounded-tr-md border-[1px] border-gray-200 bg-transparent px-2 py-1 text-[12px] text-black text-black outline-none transition-all duration-300 ease-in-out"
+                selectedClassName="!bg-blue-300 border-blue-300 text-white"
+              >
+                {label}
+              </Tab>
+            ))}
+          </TabList>
+
+          {/* Tab Billing Address */}
+          <TabPanel
+            forceRender
+            className="hidden"
+            selectedClassName="react-tabs__tab-panel--selected"
+          >
+            <div className="flex items-start justify-center gap-x-2.5 pt-1.5">
+              <div className="flex-1">
+                <FormField
+                  control={form.control}
+                  name="buyerAddress"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormControl>
+                        <Textarea
+                          className="h-[95px] resize-none text-[11px] outline-none px-2 bg-erp-gray-1 border-gray-200 text-black focus-visible:ring-0 focus-visible:outline-none"
+                          placeholder="Billing Address"
+                          readOnly
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="flex flex-1 flex-col gap-y-1.5">
+                {/* Phone No */}
+                <FormField
+                  control={form.control}
+                  name="buyerPhoneNo"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md px-2 text-[11px] bg-erp-gray-1 border-gray-200 text-black focus-visible:ring-0 focus-visible:outline-none"
+                                readOnly
+                                {...field}
+                                placeholder="Phone No"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start">
+                              Phone No
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Email */}
+                <FormField
+                  control={form.control}
+                  name="buyerEmail"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-1">
+                      <FormControl>
+                        <TooltipProvider delayDuration={1000}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Input
+                                className="h-7 rounded-md px-2 text-[11px] outline-none transition-all duration-300 ease-in-out"
+                                {...field}
+                                placeholder="Email"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start">
+                              Email
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+          </TabPanel>
+        </Tabs>
+      </form>
+    </Form>
+  );
+}

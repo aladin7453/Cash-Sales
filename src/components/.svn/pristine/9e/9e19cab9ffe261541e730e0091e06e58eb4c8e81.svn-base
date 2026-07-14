@@ -1,0 +1,136 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { FiUser } from "react-icons/fi";
+import { ORIGIN } from "@/lib/constants";
+import LoadingUI from "../LoadingUI";
+import { Dialog, DialogTrigger } from "../ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import { useToast } from "../ui/use-toast";
+import ChangePasswordDialog from "./ChangePasswordDialog";
+
+interface ProfileButtonProps {
+  isLoadingLogOut: boolean;
+  setIsLoadingLogOut: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+export function ProfileButton({
+  isLoadingLogOut,
+  setIsLoadingLogOut,
+}: ProfileButtonProps) {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const [username, setUsername] = useState<string>("");
+  const [authToken, setAuthToken] = useState<string>("");
+
+  useEffect(() => {
+    const username = localStorage.getItem("username");
+    const authToken = localStorage.getItem("authToken");
+
+    username && setUsername(JSON.parse(username));
+    authToken && setAuthToken(JSON.parse(authToken));
+  }, []);
+
+  useEffect(() => {
+    if (authToken !== "") {
+      setIsLoggedIn(true);
+    }
+  }, [authToken]);
+
+  const showSuccessToast = () =>
+    toast({
+      title: "Logout Successful",
+      description:
+        "You've successfully logged out of your account. You'll be redirected to the login page.",
+    });
+
+  const showErrorToast = () =>
+    toast({
+      variant: "destructive",
+      title: "Logout Failed",
+      description: "An error occurred while logging out. Please try again.",
+    });
+
+  const handleLogout = async () => {
+    setIsLoadingLogOut(true);
+
+    try {
+      const headers = new Headers();
+
+      headers.set("Authorization", "Basic " + btoa(`${username}:${authToken}`));
+
+      const response = await fetch(`${ORIGIN}/site/api/site/logout`, {
+        method: "POST",
+        headers,
+      });
+
+      const data = await response.json();
+
+      if (data.message === "Logout Successful") {
+        localStorage.removeItem("username");
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("currentAccount");
+        localStorage.removeItem("currentCompany");
+        localStorage.removeItem("currentLocation");
+        localStorage.removeItem("userAccess");
+        //Hard Code
+        localStorage.removeItem("Layout");
+
+        setIsLoggedIn(false);
+        showSuccessToast();
+
+        router.push("/login");
+      } else {
+        showErrorToast();
+      }
+    } catch (error) {
+      console.error("Logout Error:", error);
+      showErrorToast();
+    } finally {
+      setIsLoadingLogOut(false);
+    }
+  };
+
+  return (
+    <Dialog>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger className="transition-all duration-300 ease-in-out flex w-[2rem] md:w-[4.25rem] h-full flex-col items-center justify-center gap-y-0 sm:gap-y-1.5 p-1 text-sm font-medium leading-none tracking-tight hover:bg-[#EEEEEE] rounded-md outline-none">
+          <FiUser className="size-5 md:size-4.5 text-[#1E1E1E]" />
+          {username && (
+            <span className="hidden md:block w-full text-[clamp(10px,1.2vw,12px)] truncate">
+              {username}
+            </span>
+          )}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="[&_[role='menuitem']]:text-[clamp(11px,1.2vw,14px)]">
+          <DropdownMenuLabel>Profile</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DialogTrigger asChild>
+            <DropdownMenuItem disabled={!isLoggedIn || isLoadingLogOut}>
+              Change Password
+            </DropdownMenuItem>
+          </DialogTrigger>
+          <DropdownMenuItem>Change theme</DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={handleLogout}
+            disabled={!isLoggedIn || isLoadingLogOut}
+          >
+            Logout
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ChangePasswordDialog />
+    </Dialog>
+  );
+}

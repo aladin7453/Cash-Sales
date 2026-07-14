@@ -1,0 +1,320 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { FaArrowRotateLeft } from "react-icons/fa6";
+
+import { useRouter, useSearchParams } from "next/navigation";
+
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardTitle,
+  CardHeader
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+import { getAuthHeaders, getCurrentAcc, getCurrentAccount, ORIGIN } from "@/lib/constants";
+
+import type { CustomerGroup } from "../../../columns";
+
+type Params = {
+  customerGroup?: CustomerGroup | null;
+  customInformationData: any;
+  tempRowCustomInfo: any;
+  form: any;
+};
+
+export function CustomerGroupForm({
+  customerGroup,
+  customInformationData,
+  tempRowCustomInfo,
+  form,
+}: Params) {
+  const headers = getAuthHeaders();
+  const currentAcc = getCurrentAcc();
+  const currentAccountUUID = getCurrentAccount();
+
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const router = useRouter();
+
+  const [showTableAccount, setShowTableAccount] = useState(false);
+  const [showTableCompany, setShowTableCompany] = useState(false);
+
+  const [accountDropdownTableData, setAccountDropdownTableData] = useState([]);
+  const [companyDropdownTableData, setCompanyDropdownTableData] = useState([]);
+
+  const dropdownAccountColumns = [
+    { accessorKey: "code", header: "Account Code" },
+    { accessorKey: "account", header: "Account" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const dropdownCompanyColumns = [
+    { accessorKey: "companyID", header: "Company Code" },
+    { accessorKey: "company", header: "Company" },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    },
+  ];
+
+  const inputRef = useRef(null);
+  const { toast } = useToast();
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableCompany(false);
+      setShowTableAccount(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  const toggleTableCompany = async () => {
+    const formData = new FormData();
+    const company = "company";
+
+    formData.append("table[]", company);
+
+    if (!showTableCompany) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch company drop-down data");
+        }
+
+        const companyData = await response.json();
+
+        setCompanyDropdownTableData(companyData.rows);
+        setShowTableCompany(true);
+      } catch (error) {
+        console.error("Error fetching company drop-down data:", error);
+      }
+    } else {
+      setShowTableCompany(false);
+    }
+  };
+
+  const toggleTableAccount = async () => {
+    const formData = new FormData();
+    const account = "account";
+
+    formData.append("table[]", account);
+
+    if (!showTableAccount) {
+      try {
+        const response = await fetch(`${ORIGIN}/universal/get-all-drop-down-table-data`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch account drop-down data");
+        }
+        const accountData = await response.json();
+
+        setAccountDropdownTableData(accountData.rows);
+        setShowTableAccount(true);
+      } catch (error) {
+        console.error("Error fetching account drop-down data:", error);
+      }
+    } else {
+      setShowTableAccount(false);
+    }
+  };
+
+  const onClickRowCompanyCode = (row) => {
+    form.setValue("company", row.UUID);
+    form.setValue("companyName", row.company);
+    setShowTableCompany(false);
+  };
+
+  const onClickRowAccountCode = (row) => {
+    form.setValue("account", row.UUID);
+    form.setValue("accountName", row.account);
+    setShowTableAccount(false);
+  };
+
+  // Verify function
+  const verifyField = async (field: "customerGroupCode" | "customerGroupName", value: string) => {
+    form.clearErrors(field);
+
+    const formData = new FormData();
+    formData.append(`customerGroup[${field}]`, value);
+
+    try {
+      const res = await fetch(`${ORIGIN}/customer_group/api/customer-group/verify`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        if (res.status === 403) {
+          toast({
+            title: "Error",
+            description: errorData.message,
+            variant: "destructive",
+          });
+        }
+        throw new Error(errorData.message);
+      }
+
+      const data: boolean = await res.json();
+      form.setError(field, {
+        type: "custom",
+        message: data ? `"${value}" already exists.` : `"${value}" is available.`,
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">General Details</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form>
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5">
+              <FormField
+                control={form.control}
+                name="customerGroupCode"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Customer Group Code:</FormLabel>
+                    <FormControl>
+                      <div className="relative h-7.5">
+                        <Input
+                          className="h-7.5 pr-7"
+                          {...field}
+                          moduleName="customerGroup"
+                          fieldName="customerGroupCode"
+                          columnName="Customer Group Code"
+                          onBlur={() => {
+                            if (field.value && field.value.trim()) {
+                              verifyField("customerGroupCode", field.value);
+                            }
+                          }}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="customerGroupName"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>
+                      Customer Group: <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <div className="relative h-7.5">
+                        <Input
+                          className="h-7.5 pr-7"
+                          {...field}
+                          moduleName="customerGroup"
+                          fieldName="customerGroupName"
+                          columnName="Customer Group"
+                          onBlur={() => {
+                            if (field.value && field.value.trim()) {
+                              verifyField("customerGroupName", field.value);
+                            }
+                          }}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5 mt-4">
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem className="col-span-5 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Description:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7"
+                        {...field}
+                        moduleName="customerGroup"
+                        fieldName="description"
+                        columnName="Description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-5 mt-4">
+              <FormField
+                control={form.control}
+                name="account"
+                render={({ field }) => (
+                  <FormItem className="col-span-4 row-span-1 grid hidden h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function onReset() {
+  throw new Error("Function not implemented.");
+}

@@ -1,0 +1,224 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import type { Table, VisibilityState } from "@tanstack/react-table";
+
+import CloneButton from "@/components/data-table/ActionButton/Clone";
+import DeleteButton from "@/components/data-table/ActionButton/Delete";
+import EditButton from "@/components/data-table/ActionButton/Edit";
+import NewButton from "@/components/data-table/ActionButton/New";
+import RestoreButton from "@/components/data-table/ActionButton/Restore";
+import TrashButton from "@/components/data-table/ActionButton/Trash";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import Validity from "@/components/data-table/Validity";
+
+import { AuthorizedLocationForm } from "./[slug]/location/AuthorizedLocationFormPopover"; // Import the popover component
+import AuthorizedLocationButton from "./AuthorizedLocation";
+import type { AutoBillingConfig } from "./columns";
+
+// Mobile View (Imports)
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import MobileActionGroupStart from "@/components/data-table/MobileActionGroupStart";
+import MobileActionGroupEnd from "@/components/data-table/MobileActionGroupEnd";
+
+// Server-Side Filtering (Add totalNumOfRows)
+type Props = {
+  table: Table<AutoBillingConfig>;
+  refreshTable: any;
+  totalNumOfRows?: number;
+  defaultColumns?: VisibilityState;
+  dataStatusBadgeDisplay?: React.ReactNode;
+  onResetColumnOrdering?: () => void;
+};
+
+export default function AutoBillingConfigDataTableToolbar({
+  table,
+  refreshTable,
+  totalNumOfRows,
+  defaultColumns,
+  dataStatusBadgeDisplay,
+  onResetColumnOrdering,
+}: Props) {
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [selectedRowData, setSelectedRowData] = useState<any>(null);
+
+  return (
+    <>
+      <div className="flex items-center justify-between p-1.5">
+        <ActionGroupStart
+          table={table}
+          refreshTable={refreshTable}
+          setIsPopoverOpen={setIsPopoverOpen}
+          setSelectedRowData={setSelectedRowData}
+        />
+
+        {/* Mobile View (Hide Pagination) */}
+        <div className="hidden md:block">
+          {/* Server-Side Filtering (Pass totalNumOfRows) */}
+          <Pagination table={table} totalNumOfRows={totalNumOfRows} />
+        </div>
+
+        <ActionGroupEnd
+          table={table}
+          refreshTable={refreshTable}
+          defaultColumns={defaultColumns}
+          dataStatusBadgeDisplay={dataStatusBadgeDisplay}
+          onResetColumnOrdering={onResetColumnOrdering}
+        />
+      </div>
+
+      {/* <AuthorizedLocationForm
+        open={isPopoverOpen}
+        setOpen={setIsPopoverOpen}
+        row={selectedRowData}
+        revalidateAuthorizedLocationData={refreshTable}
+        setTempRowAuthorizedLocationData={() => {}}
+      /> */}
+    </>
+  );
+}
+
+function ActionGroupStart({
+  table,
+  refreshTable,
+  setIsPopoverOpen,
+  setSelectedRowData,
+}: Omit<Props, "defaultColumns" | "dataStatusBadgeDisplay"> & {
+  setIsPopoverOpen: (open: boolean) => void;
+  setSelectedRowData: (data: any) => void;
+}) {
+  const [selectedRow, setSelectedRow] = useState("");
+  const [autoBillingConfigName, setAutoBillingConfigName] = useState("");
+
+  const selectedRowModel = table.getSelectedRowModel();
+  const isAnyRowSelected = selectedRowModel.rows.length > 0;
+
+  useEffect(() => {
+    if (selectedRowModel.rows.length === 1) {
+      setSelectedRow(selectedRowModel.rows[0].original.UUID);
+      setAutoBillingConfigName(selectedRowModel.rows[0].original.ID);
+
+      if (autoBillingConfigName === "") {
+        setAutoBillingConfigName(selectedRowModel.rows[0].original.ID);
+      }
+    }
+  }, [selectedRowModel]);
+
+  const handleAuthorizedLocationClick = () => {
+    if (isAnyRowSelected) {
+      setSelectedRowData(selectedRowModel.rows[0].original);
+      setIsPopoverOpen(true);
+    }
+  };
+
+  // Mobile View (States)
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  return (
+    <div className="flex flex-wrap items-center justify-start gap-x-2 p-1">
+      {/* Mobile View (Start Menu) */}
+      <MobileActionGroupStart
+        table={table}
+        refreshTable={refreshTable}
+        config={{
+          newDestination: "/sales/auto-billing-config/new",
+          editDestination: (row) => `/sales/auto-billing-config/edit?item=${row.autoBillingConfigName}&id=${row.UUID}`,
+          cloneDestination: (row) => `/sales/auto-billing-config/clone?id=${row.UUID}`,
+          module: "auto_billing_config",
+          model: "auto-billing-config",
+        }}
+      >
+        {/* Additional Actions (Other than New, Edit, Clone, Trash, Restore, Delete) */}
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div onClick={() => setDropdownOpen(false)}>
+            {/* <AuthorizedLocationButton
+              table={table}
+              isDisabled={!isAnyRowSelected}
+              onClick={handleAuthorizedLocationClick}
+            /> */}
+          </div>
+        </DropdownMenuItem>
+      </MobileActionGroupStart>
+      
+      {/* Web View (Menu) */}
+      <div className="hidden md:flex flex-wrap items-center justify-start gap-x-2">
+        <NewButton destination="/sales/auto-billing-config/new" />
+        <EditButton
+          table={table}
+          destination={`/sales/auto-billing-config/edit?item=${autoBillingConfigName}&id=${selectedRow}`}
+        />
+        <CloneButton table={table} destination={`/sales/auto-billing-config/clone?id=${selectedRow}`} />
+        <TrashButton
+          table={table}
+          module={"auto_billing_config"}
+          model={"auto-billing-config"}
+          refreshTable={refreshTable}
+        />
+        <RestoreButton
+          table={table}
+          module={"auto_billing_config"}
+          model={"auto-billing-config"}
+          refreshTable={refreshTable}
+        />
+        <DeleteButton
+          table={table}
+          module={"auto_billing_config"}
+          model={"auto-billing-config"}
+          refreshTable={refreshTable}
+        />
+        {/* <AuthorizedLocationButton
+          table={table}
+          isDisabled={!isAnyRowSelected}
+          onClick={handleAuthorizedLocationClick}
+        /> */}
+      </div>
+    </div>
+  );
+}
+
+function ActionGroupEnd({ 
+  table, 
+  refreshTable, 
+  defaultColumns, 
+  dataStatusBadgeDisplay,
+  onResetColumnOrdering
+}: Props) {
+  return (
+    <div className="relative flex items-center gap-x-1 pr-1.5 text-erp-blue-14">
+      {/* Web View (End Menu) */}
+      <span className="absolute-left-32 hidden md:flex">
+        {dataStatusBadgeDisplay}
+      </span>
+      <div className="hidden md:flex items-center gap-x-1">
+        <Export 
+          table={table} 
+          module={"autoBillingConfig"} 
+          mainModule={"sales"} 
+        />
+        <Refresh 
+          refreshTable={refreshTable} 
+          resetRowSelection={() => table.resetRowSelection()} 
+        />
+        <Validity table={table} />
+        <ColumnVisibilityToggle 
+          table={table} 
+          defaultColumns={defaultColumns}
+          onResetColumnOrdering={onResetColumnOrdering} 
+        />
+      </div>
+
+      {/* Mobile View (Search and Sort) */}
+      <MobileActionGroupEnd
+        table={table}
+        config={{
+          searchColumn: "ID",
+          searchPlaceholder: "Search ID",
+          sortColumn: "ID"
+        }}
+      />
+    </div>
+  );
+}

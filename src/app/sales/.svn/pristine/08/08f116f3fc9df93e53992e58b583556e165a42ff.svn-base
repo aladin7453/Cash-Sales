@@ -1,0 +1,90 @@
+"use client";
+
+import { useSearchParams } from "next/navigation";
+import { ORIGIN } from "@/lib/constants";
+import ChangelogDataTable from "@/components/features/changelog/DataTable";
+import { ChangelogConfig } from "@/components/features/changelog/types";
+import { ColumnDef } from "@tanstack/react-table";
+
+// Define the type changelog config
+const CustomerCategoryChangelogConfig: ChangelogConfig = {
+  getHistoryUrl: (id: string) => `${ORIGIN}/customer_category/api/customer-category/get-customer-category-log?id=${id}`,
+  getDetailsUrl: (id: string, action: string) => `${ORIGIN}/customer_category/api/customer-category/get-customer-category-log-details?id=${id}&action=${action}`,
+  
+  fieldNameMapping: {
+    "customerCategoryCode":"Customer Category Code",
+    "customerCategory":"Customer Category",
+    "description": "Description",
+  },
+  
+  fieldsToFilter: [
+    "UUID",
+    "account",
+    "historyUUID",
+    "createdAt",
+    "createdBy",
+    "createdByUsername",
+    "_actionUUID",
+    "_version",
+    "action",
+    "date_created",
+    "user_id",
+    "updatedAt",
+    "updatedBy",
+    "valid",
+    "company",
+  ],
+  
+  entityName: "customerCategory",
+  
+  defaultSortField: "createdAt",
+
+   tabs: [
+    {
+      value: "customerCategory",
+      label: "Customer Category",
+      referenceField: "customerCategory",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/customer_category/api/customer-category/get-customer-category-log?id=${id}&tableName=customerCategory`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/customer_category/api/customer-category/get-customer-category-log-details?id=${id}&action=${action}&tableName=customerCategory`,
+    },
+    {
+      value: "customerCategoryHasCustomInfo",
+      label: "Custom Information",
+      referenceField: "fieldName",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/customer_category/api/customer-category/get-customer-category-log?id=${id}&tableName=customerCategoryHasCustomInfo`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/customer_category/api/customer-category/get-customer-category-log-details?id=${id}&action=${action}&tableName=customerCategoryHasCustomInfo`,
+    }
+  ],
+  
+};
+
+export default function CustomerCategoryChangelogDataTable<TData, TValue>({
+  columns,
+  initialData,
+  onTableParamsChange,
+}: {
+  columns: ColumnDef<TData, TValue>[];
+  initialData?: any | null;
+  onTableParamsChange?: any;
+}) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return <div>Missing entity ID</div>;
+  }
+
+  return (
+    <ChangelogDataTable
+      columns={columns}
+      initialData={initialData}
+      config={CustomerCategoryChangelogConfig}
+      entityId={id}
+      onTableParamsChange={onTableParamsChange}
+    />
+  );
+}

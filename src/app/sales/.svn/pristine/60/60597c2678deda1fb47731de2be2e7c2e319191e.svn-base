@@ -1,0 +1,114 @@
+"use client"
+
+import React, { useEffect, useState } from "react"
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TOOLTIP_DELAY_DURATION } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+
+export default function AutoBillingMonthFilter({ monthFilterValues, setMonthFilterValues }) {
+  const [selectedMonthsMap, setSelectedMonthsMap] = useState({
+    "JAN": false,
+    "FEB": false,
+    "MAR": false,
+    "APR": false,
+    "MAY": false,
+    "JUN": false,
+    "JUL": false,
+    "AUG": false,
+    "SEP": false,
+    "OCT": false,
+    "NOV": false,
+    "DEC": false,
+  })
+
+  const handleCheckedChange = (state, month) => {
+    setSelectedMonthsMap((selectedMonthsMap) => ({...selectedMonthsMap, [month]: state}))
+  }
+
+  useEffect(() => {
+    let tempArray = Array(0)
+    Object.entries(selectedMonthsMap).forEach(([month, state]) => {
+      if (state) {
+        tempArray.push(month)
+      }
+    })
+    setMonthFilterValues(tempArray)
+  }, [selectedMonthsMap])
+
+  const handleCheckboxCheckedChange = (e) => {
+    Object.entries(selectedMonthsMap).forEach(([month, state]) => {
+      handleCheckedChange(e, month)
+    })
+  }
+
+  return (
+    <div className="flex flex-row space-x-2 px-2">
+      <p className="w-28 text-center">Billing Month</p>
+      <p>:</p>
+      <div className="h-5.5 w-40 flex-auto">
+        <DropdownMenu>
+        <TooltipProvider delayDuration={TOOLTIP_DELAY_DURATION}>
+          <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button 
+              className={cn(
+                "flex h-5.5 w-full",
+                !(monthFilterValues.length > 0) && "text-muted-foreground",
+              )}
+              variant="outline"
+              size="sm">
+                {/* {monthFilterValues.length == 12 ? "All 12 Months" : monthFilterValues.join(", ")} */}
+                <p className="w-full truncate text-left">
+                  {
+                    monthFilterValues.length < 1 ? 
+                      "Pick a Month Filter": 
+                      (monthFilterValues.length == 12 ? "All 12 Months" : monthFilterValues.join(","))
+                  }
+                </p>
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent>
+            {/* <p className="font-medium text-wrap">{monthFilterValues.length == 12 ? "All 12 Months" : monthFilterValues.join(", ")}</p> */}
+            <p className="font-medium text-wrap">
+              {
+                monthFilterValues.length < 1 ? 
+                  "No Value": 
+                  (monthFilterValues.length == 12 ? "All 12 Months" : monthFilterValues.join(","))
+              }
+            </p>
+          </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <DropdownMenuContent align="end" className="p-2">
+          {
+            Object.entries(selectedMonthsMap).map(([month, state]) => (
+              <DropdownMenuCheckboxItem
+              className="pr-8"
+              checked={state}
+              onCheckedChange={(e) => {handleCheckedChange(e, month)}}
+              onSelect={(e) => e.preventDefault()}
+              key={`${month}Select`}
+              >
+              {month}
+              </DropdownMenuCheckboxItem>
+            ))
+          }
+        </DropdownMenuContent>
+        </DropdownMenu>
+        
+      </div>
+      <Checkbox className="flex items-center" checked={monthFilterValues.length==12} onCheckedChange={handleCheckboxCheckedChange} />
+    </div>
+  )
+}

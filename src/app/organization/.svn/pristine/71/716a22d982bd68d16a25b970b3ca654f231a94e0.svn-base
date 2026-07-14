@@ -1,0 +1,356 @@
+"use client";
+
+import { Check, MessageSquare, Minus } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+  AlertDialogDescription,
+} from "@/components/ui/alert-dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ORIGIN, getAuthHeaders } from "@/lib/constants";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
+import LoadingUI from "@/components/LoadingUI";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/use-toast";
+import { useMyContext } from "../../../contextProvider";
+
+import SetGlobalForbiddenMessageFormPopover from "./SetGlobalForbiddenMessageFormPopover";
+import StandardActionDataTable from "./standard/DataTable";
+
+const tabs = [
+  {
+    id: "standardAction",
+    name: "Standard Action",
+  },
+  // {
+  //   id: "documentActionTransferFrom",
+  //   name: "Document Action: Transfer from",
+  // },
+  // {
+  //   id: "documentActionTransferTo",
+  //   name: "Document Action: Transfer to",
+  // },
+];
+
+export default function RBACTabs({
+  userUUID,
+  rules,
+  permissions,
+  setPermissions,
+}) {
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+  const [showAccessControl, setShowAccessControl] = useState<boolean>(false);
+  const [permissionsData, setPermissionsData] = useState<any>({});
+  const [grantAllPermissions, setGrantAllPermissions] = useState(false);
+  const [revokeAllPermissions, setRevokeAllPermissions] = useState(false);
+  const shareDataValue = useMyContext();
+  const [showAlertDialog, setShowAlertDialog] = useState(false);
+  const [scopes, setScopes] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [showTableTemplate, setShowTableTemplate] = useState(false);
+  const [templateDropdownTableData, setTemplateDropdownTableData] = useState(
+    []
+  );
+  const [ruleTemplate, setRuleTemplate] = useState(null);
+
+  const [
+    isSetGlobalForbiddenMessageDialogOpen,
+    setIsSetGlobalForbiddenMessageDialogOpen,
+  ] = useState(false);
+
+  const dropdownTemplateColumns = [
+    { accessorKey: "ruleTemplate", header: "Rule Template" },
+  ];
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      inputRef.current !== event.target
+    ) {
+      setShowTableTemplate(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener("click", handleClickOutside);
+    return () => document.body.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  const toggleTableTemplate = async () => {
+    if (!showTableTemplate) {
+      const formData = new FormData();
+      formData.append("table[]", "ruleTemplate");
+
+      try {
+        const response = await fetch(
+          `${ORIGIN}/universal/get-all-drop-down-table-data`,
+          {
+            method: "POST",
+            headers,
+            body: formData,
+          }
+        );
+
+        if (!response.ok)
+          throw new Error("Failed to fetch rule template drop-down data");
+
+        const templateData = await response.json();
+        setTemplateDropdownTableData(templateData.rows);
+        setShowTableTemplate(true);
+      } catch (error) {
+        console.error("Error fetching rule template drop-down data:", error);
+      }
+    } else {
+      setShowTableTemplate(false);
+    }
+  };
+
+  const onClickRowTemplateCode = async (row) => {
+    form.setValue("ruleTemplateUUID", row.UUID);
+    form.setValue("ruleTemplate", row.ruleTemplate);
+
+    const data = await fetch(
+      `${ORIGIN}/user/api/user/load-rule-template-data?id=${row.UUID}`,
+      {
+        method: "POST",
+        headers,
+      }
+    );
+
+    if (!data.ok) throw new Error("Failed to fetch rule template data");
+
+    const ruleData = await data.json();
+    setRuleTemplate(ruleData);
+
+    setShowTableTemplate(false);
+  };
+
+  const form = useForm({
+    defaultValues: {
+      account: "",
+      accountName: "",
+    },
+  });
+
+  const handleConfirmGrantAll = () => {
+    setGrantAllPermissions(true);
+    setRevokeAllPermissions(false);
+  };
+
+  const handleConfirmRevokeAll = () => {
+    setRevokeAllPermissions(true);
+    setGrantAllPermissions(false);
+  };
+
+  return (
+    <>
+      <Card className="h-auto shadow-md">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between w-full">
+            <CardTitle className="text-lg font-bold">RBAC</CardTitle>
+
+            <div className="flex items-center gap-x-2">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button className="flex h-7.5 items-center gap-x-2 px-3 text-xs 2xl:text-sm">
+                    <span>Grant All</span>
+                    <Check size={15} />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="max-w-xs">
+                  <AlertDialogHeader className="sm:text-center">
+                    <AlertDialogTitle className="text-primary">
+                      Grant all access?
+                    </AlertDialogTitle>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="sm:justify-center sm:space-x-4">
+                    <AlertDialogCancel>No</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmGrantAll}>
+                      Yes
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button className="flex h-7.5 items-center gap-x-2 px-3 text-xs 2xl:text-sm">
+                    <span>Deny All</span>
+                    <Minus size={15} />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="max-w-xs">
+                  <AlertDialogHeader className="sm:text-center">
+                    <AlertDialogTitle className="text-primary">
+                      Deny all access?
+                    </AlertDialogTitle>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="sm:justify-center sm:space-x-4">
+                    <AlertDialogCancel>No</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmRevokeAll}>
+                      Yes
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <FormField
+                control={form.control}
+                name="ruleTemplate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 col-span-1">
+                    <FormControl>
+                      <div className="relative">
+                        <Button
+                          type="button"
+                          className="h-7.5 px-3 text-xs 2xl:text-sm flex items-center gap-x-2 w-full justify-between"
+                          onClick={toggleTableTemplate}
+                          ref={inputRef}
+                        >
+                          <span>
+                            {field.value
+                              ? "Template: " + field.value
+                              : "Load Template"}
+                          </span>
+                        </Button>
+
+                        {showTableTemplate && (
+                          <div
+                            ref={dropdownRef}
+                            className="absolute top-full bg-white border border-gray-200 rounded shadow-md z-50 h-[200px] right-0"
+                          >
+                            <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownTemplateColumns}
+                                data={templateDropdownTableData}
+                                onClickRow={onClickRowTemplateCode}
+                              />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 pt-0">
+          <Tabs defaultValue="standardAction">
+            <TabsList className="h-fit w-full justify-start bg-transparent p-0">
+              {tabs.map((tab) => (
+                <TabsTrigger
+                  className="py-2.5 decoration-2 underline-offset-[15px] aria-selected:underline data-[state=active]:text-erp-blue-12 data-[state=active]:shadow-none"
+                  value={tab.id}
+                  key={tab.id}
+                >
+                  {tab.name}
+                </TabsTrigger>
+              ))}
+              <div className="flex w-full items-center justify-between gap-x-6 pl-6">
+                {/* <div className="flex flex-col gap-y-0.5">
+                  <Button
+                    variant="link"
+                    className="flex h-fit items-center justify-normal gap-x-2 p-0 font-normal text-black"
+                    onClick={() =>
+                      setIsSetGlobalForbiddenMessageDialogOpen(true)
+                    }
+                  >
+                    <div className="flex size-4 items-center justify-center">
+                      <MessageSquare
+                        size={16}
+                        fill="hsl(var(--erp-blue-11))"
+                        stroke="hsl(var(--erp-blue-11))"
+                      />
+                    </div>
+                    <span className="text-[10px]/none 2xl:text-xs/none">
+                      Set Global Forbidden Message
+                    </span>
+                  </Button>
+                  <div className="flex items-center gap-x-2">
+                    <div className="flex size-4 items-center justify-center">
+                      <Checkbox
+                        id="useGlobalForbiddenMessage"
+                        className="h-3.5 w-3.5"
+                      />
+                    </div>
+                    <label
+                      htmlFor="useGlobalForbiddenMessage"
+                      className="text-[10px]/none text-black peer-disabled:cursor-not-allowed peer-disabled:opacity-70 2xl:text-xs/none"
+                    >
+                      Use Global Forbidden Message
+                    </label>
+                  </div>
+                </div> */}
+              </div>
+            </TabsList>
+            <Separator className="h-0.5 bg-erp-gray-3" />
+            <TabsContent value="standardAction">
+              <StandardActionDataTable
+                userUUID={userUUID}
+                form={form}
+                grantAllPermissions={grantAllPermissions}
+                revokeAllPermissions={revokeAllPermissions}
+                setGrantAllPermissions={setGrantAllPermissions}
+                setRevokeAllPermissions={setRevokeAllPermissions}
+                permissionsData={permissionsData}
+                setPermissionsData={setPermissionsData}
+                permissions={permissions}
+                setPermissions={setPermissions}
+                rules={rules}
+                ruleTemplate={ruleTemplate}
+              />
+            </TabsContent>
+            {/* <TabsContent value="documentActionTransferFrom">
+              Document Action: Transfer from
+            </TabsContent>
+            <TabsContent value="documentActionTransferTo">
+              Document Action: Transfer to
+            </TabsContent> */}
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* <SetGlobalForbiddenMessageFormPopover
+        open={isSetGlobalForbiddenMessageDialogOpen}
+        setOpen={setIsSetGlobalForbiddenMessageDialogOpen}
+      /> */}
+    </>
+  );
+}

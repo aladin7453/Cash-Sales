@@ -1,0 +1,281 @@
+"use client";
+
+import React from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { notFound, useSearchParams } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { useRouter } from "next/navigation";
+import moment from 'moment';
+import { CalendarIcon } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { DATE_FORMAT } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea";
+import { getAuthHeaders } from "@/lib/constants";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+import type { CheckedState } from "@radix-ui/react-checkbox";
+
+type Params = {
+  form: any;
+};
+
+export function BuyerDetailsForm({ form }: Params) {
+  const [currentCompanyUUID, setCurrentCompanyUUID] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const currentCompany = JSON.parse(localStorage.getItem("currentCompany") || "null");
+
+    if (currentCompany && currentCompany.UUID) {
+      setCurrentCompanyUUID(currentCompany.UUID);
+    } else {
+      setCurrentCompanyUUID(null);
+    }
+  }, []);
+  
+  useEffect(() => {
+    const savedState = localStorage.getItem("sales-debit-note.currentCustomerChecked");
+    if (savedState === "true") {
+      form.setValue("currentCustomer", "1");
+    } else {
+      form.setValue("currentCustomer", "0");
+    }
+  }, [form]);
+
+  const handleCurrentCustomerChange = (event: { target: { checked: CheckedState } }) => {
+    const isChecked = event.target.checked;
+
+    localStorage.setItem("sales-debit-note.currentCustomerChecked", isChecked.toString());
+
+    if (isChecked) {
+      form.setValue("buyerName", form.getValues("customerName"));
+      form.setValue("buyerTIN", form.getValues("TIN"));
+      form.setValue("buyerBRN", form.getValues("BRN"));
+      form.setValue("buyerSSTNo", form.getValues("SSTNo"));
+      form.setValue("buyerEmail", form.getValues("email"));
+      form.setValue("buyerPhoneNo", form.getValues("phoneNo"));
+      form.setValue("buyerAddress", form.getValues("address"));
+      form.setValue("buyerTTXNo", form.getValues("TTXNo"));
+      form.setValue("recipient", form.getValues("customerName"));
+      form.setValue("recipientTIN", form.getValues("TIN"));
+      form.setValue("recipientBRN", form.getValues("BRN"));
+      form.setValue("recipientSSTNo", form.getValues("SSTNo"));
+      form.setValue("recipientAddress", form.getValues("address"));
+      form.setValue("recipientTTXNo", form.getValues("TTXNo"));
+    } else {
+      form.setValue("buyerName", "");
+      form.setValue("buyerTIN", "");
+      form.setValue("buyerBRN", "");
+      form.setValue("buyerSSTNo", "");
+      form.setValue("buyerEmail", "");
+      form.setValue("buyerPhoneNo", "");
+      form.setValue("buyerAddress", "");
+      form.setValue("buyerTTXNo", "");
+      form.setValue("recipient", "");
+      form.setValue("recipientTIN", "");
+      form.setValue("recipientBRN", "");
+      form.setValue("recipientSSTNo", "");
+      form.setValue("recipientAddress", "");
+      form.setValue("recipientTTXNo", "");
+    }
+  };
+
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Customer Information</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form>
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6">
+              <FormField
+                control={form.control}
+                name="buyerName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Buyer Name:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7.5"
+                        {...field}
+                        moduleName="salesDebitNote"
+                        fieldName="buyerName"
+                        columnName="Buyer Name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="currentCustomer"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-1 grid h-full grid-rows-[auto_1fr] space-y-1 flex items-center">
+                    <div className="flex items-center"> {/* Flex container */}
+                      <FormControl>
+                      <Checkbox
+                            checked={field.value === "1"}
+                            onCheckedChange={(state) => {
+                              field.onChange(state ? "1" : "0");
+                              // Call the event handler when checkbox state changes
+                              handleCurrentCustomerChange({ target: { checked: state } });
+                            }}
+                          />
+                      </FormControl>
+                      <FormLabel className="ml-2">Current Customer</FormLabel>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="buyerTIN"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Buyer TIN:</FormLabel>
+                    <FormControl>
+                        <Input className="h-7.5" {...field}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="buyerBRN"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Buyer BRN/NRIC/Passport:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="buyerSSTNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Buyer SST No.:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="buyerEmail"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Buyer Email:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6 mt-4">
+              <FormField
+                control={form.control}
+                name="buyerPhoneNo"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Buyer Phone No.:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="buyerTTXNo"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 row-span-2 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Buyer TTx No.:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            { /* Mobile View CSS Class: grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-(Number of Maximum Columns)*/}
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6 mt-4">
+              <FormField
+                control={form.control}
+                name="buyerAddress"
+                render={({ field }) => (
+                  <FormItem className="col-span-6 row-span-3 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Buyer Address:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-20 resize-none"
+                        {...field}
+                        moduleName="salesDebitNote"
+                        fieldName="buyerAddress"
+                        columnName="Buyer Address"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

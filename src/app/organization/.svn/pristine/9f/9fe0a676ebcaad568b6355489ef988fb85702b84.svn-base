@@ -1,0 +1,24 @@
+import type { CompanyList } from "./columns";
+
+export const companyListData: CompanyList[] = [
+  {
+    company: "Company 1",
+    businessRegNo: "1234567890",
+    description: "Sample description",
+    createdAt: "2022-01-01",
+    createdBy: "john001",
+    updatedAt: "2022-01-01",
+    updatedBy: "john001",
+    validity: 1,
+  },
+  {
+    company: "Company 2",
+    businessRegNo: "1234567890",
+    description: "Sample description",
+    createdAt: "2022-01-01",
+    createdBy: "john001",
+    updatedAt: "2022-01-01",
+    updatedBy: "john001",
+    validity: 0,
+  },
+];

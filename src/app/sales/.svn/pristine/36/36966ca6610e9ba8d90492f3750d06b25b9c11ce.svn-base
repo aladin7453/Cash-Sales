@@ -1,0 +1,43 @@
+"use client";
+
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+
+type Props = {
+  table: any;
+  setOpen: any;
+  handleSave: any;
+  revalidateAgentDetails: any;
+  saveDisabled: boolean;
+};
+
+export default function AgentPopoverToolbar({
+  table,
+  setOpen,
+  handleSave,
+  revalidateAgentDetails,
+  saveDisabled,
+}: Props) {
+  return (
+    <>
+      <div className="flex items-center justify-between p-1.5">
+        <div className="grid auto-cols-fr grid-flow-col gap-x-1.5">
+          <SaveButton onClick={handleSave} disabled={saveDisabled} />
+          <ResetButton onClick={() => revalidateAgentDetails(true)} />
+          <CancelButton onClick={() => setOpen(false)} />
+        </div>
+        <Pagination table={table} />
+        <div className="flex items-center gap-x-1 text-erp-blue-14">
+          <Export table={table} />
+          <Refresh refreshTable={revalidateAgentDetails} />
+          <ColumnVisibilityToggle table={table} />
+        </div>
+      </div>
+    </>
+  );
+}

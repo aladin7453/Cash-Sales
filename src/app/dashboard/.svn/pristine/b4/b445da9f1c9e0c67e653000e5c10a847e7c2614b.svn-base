@@ -1,0 +1,56 @@
+"use client";
+
+import {
+  Chart as ChartJS,
+  Filler,
+  Legend,
+  LineElement,
+  PointElement,
+  RadialLinearScale,
+  Tooltip,
+} from "chart.js";
+import { Radar } from "react-chartjs-2";
+
+ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
+
+interface Dataset {
+  label: string;
+  data: number[];
+  borderColor?: string;
+  backgroundColor?: string;
+}
+
+interface RadarChartProps {
+  labels: string[];
+  datasets: Dataset[];
+}
+
+export default function RadarChart({ labels, datasets }: RadarChartProps) {
+  const chartData = {
+    labels,
+    datasets: datasets.map((ds) => ({
+      ...ds,
+      fill: true,
+      tension: 0.1,
+    })),
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "bottom" as const },
+    },
+    scales: {
+      r: {
+        beginAtZero: true,
+      },
+    },
+  };
+
+  return (
+    <div className="ml-4 flex w-full flex-col text-sm" style={{ height: "400px" }}>
+      <Radar data={chartData} options={options} />
+    </div>
+  );
+}

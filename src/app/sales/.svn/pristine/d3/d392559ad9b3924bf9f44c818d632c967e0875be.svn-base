@@ -1,0 +1,1449 @@
+"use client";
+
+import React, { useEffect, useRef, useState, memo } from "react";
+import { FaSort, FaSortDown, FaSortUp } from "react-icons/fa6";
+import type { ColumnDef, Row, SortingState, ColumnOrderState, ColumnSizingState, VisibilityState, Table as TableType } from "@tanstack/react-table";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+
+import { useSearchParams } from "next/navigation";
+import { useToast } from "@/components/ui/use-toast";
+import NoResultsTableRow from "@/components/data-table/NoResultsTableRow";
+import TableHeadColumnTextFilter from "@/components/data-table/TableHeadColumnTextFilter";
+import { TableHeadValidityFilter } from "@/components/data-table/TableHeadValidityFilter";
+import { Input } from "@/components/ui/input";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+
+// Column Drag and Drop and Resize (Imports)
+import type { MouseEvent } from "react";
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import { ColumnResizer } from "@/components/data-table/ColumnResizer";
+import DragableTableHead from "@/components/data-table/DragableTableHead";
+import { useColumnSizeVars } from "@/lib/hooks/useColumnSizeVars";
+import { useDndSensors } from "@/lib/hooks/useDndSensors";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import getExcludedColumns from "@/lib/utils/data-table/getExcludedColumns";
+import handleDndDragEnd from "@/lib/utils/data-table/handleDndDragEnd";
+import { DragHandle } from "@/components/data-table/row-drag-drop";
+
+import {
+  DEFAULT_DATA_TABLE_PAGE_SIZE,
+  getAuthHeaders,
+  ORIGIN,
+  DATA_TABLE_DEFAULT_COLUMN_SIZING,
+} from "@/lib/constants";
+
+import { useHandleRowSelect } from "@/lib/hooks/useHandleRowSelect";
+import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
+import { cn } from "@/lib/utils/cn";
+import formatNumber from "@/lib/utils/data-table/formatNumber";
+
+import { ConsolidateEInvoice } from "./columns";
+import ConsolidateEInvoiceDetailsDataTableToolbar from "./DataTableToolbar";
+import { ServiceColumns, StockColumns } from "./itemColumns";
+import ItemPopover from "./ItemPopover";
+
+// Mobile View (Imports)
+import MobileFormDataTable from "@/components/form/MobileFormDataTable";
+import DataTableTotals from "@/components/form/MobileFormDataTableTotals";
+
+// Drag and Drop (Imports)
+import { DragDropDataTable, DraggableRow, useDragDropTable } from "@/components/data-table/row-drag-drop";
+
+// Refactor Charges Details Input Cell (Imports)
+import { DropdownInputCellComponent, DateInputCellComponent } from "@/components/features/sales-purchase-transaction/charges-details/inputCell";
+
+type DataTableProps = {
+  columns: ColumnDef<ConsolidateEInvoice>[];
+  data: ConsolidateEInvoice[];
+  tempRowConsolidateEInvoiceDetailsList: any;
+  setTempRowConsolidateEInvoiceDetailsList: (data: any) => void;
+  revalidateConsolidateEInvoiceDetails: () => void;
+  form: any;
+  consolidateEInvoiceData: any;
+  preferenceData?: any;
+  UOMDetails: any[];
+  slug: string;
+};
+
+// Column Drag and Drop and Resize (Local Storage Keys)
+const COLUMN_ORDERING_KEY = "consolidated-invoice.details.bs.table.ordering";
+const COLUMN_SIZING_KEY = "consolidated-invoice.details.bs.table.sizing";
+const COLUMN_VISIBILITY_KEY = "consolidated-invoice.details.bs.table.columns";
+
+export default function ConsolidateEInvoiceDetailsDataTable({
+  columns,
+  data,
+  tempRowConsolidateEInvoiceDetailsList,
+  setTempRowConsolidateEInvoiceDetailsList,
+  revalidateConsolidateEInvoiceDetails,
+  form,
+  consolidateEInvoiceData,
+  preferenceData,
+  UOMDetails,
+  slug,
+}: DataTableProps) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const headers = getAuthHeaders();
+  const { toast } = useToast();
+  function setTempRowConsolidateEInvoiceDetailsListData(data, overwrite) {
+    if (overwrite) {
+      const updatedData = data.map((item, index) => ({
+        ...item
+      }));
+
+      setTempRowConsolidateEInvoiceDetailsList(updatedData);
+    } else {
+      const newData = Array.isArray(data) ? data : [data];
+
+      setTempRowConsolidateEInvoiceDetailsList((tempRowConsolidateEInvoiceDetailsList) => {
+        const existingData = [...tempRowConsolidateEInvoiceDetailsList];
+        const updatedData = [...existingData, ...newData];
+
+        return updatedData.map((item, index) => ({
+          ...item,
+        }));
+      });
+    }
+  }
+
+  // Column Drag and Drop and Resize (Constants)
+  const initialColumnOrder = columns?.filter(column => column?.id).map((column) => column.id!) || [];
+  const [columnOrder, setColumnOrder] = useLocalStorage<ColumnOrderState>(
+    COLUMN_ORDERING_KEY,
+    initialColumnOrder
+  );
+  const [columnSizing, setColumnSizing] = useLocalStorage<ColumnSizingState>(
+    COLUMN_SIZING_KEY,
+    {}
+  );
+  const defaultColumns: Array<keyof ConsolidateEInvoice> = [
+    "itemName",
+    "type",
+    "description",
+    "quantity",
+    "price",
+    "subtotalTax",
+  ];
+  const defaultColumnVisibility: VisibilityState = getExcludedColumns(
+    columns || [],
+    defaultColumns
+  );
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    COLUMN_VISIBILITY_KEY,
+    defaultColumnVisibility
+  );
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+
+  // Drag and Drop (State & Functions)
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const [rowSelection, setRowSelection] = useState({});
+
+  // Use tempRowConsolidateEInvoiceDetailsList if it exists, otherwise use data
+  const tableData = (tempRowConsolidateEInvoiceDetailsList) || slug === "clone"
+    ? tempRowConsolidateEInvoiceDetailsList
+    : data;
+
+  const {
+    items,
+    activeId,
+    isDragging,
+    handleDragStart,
+    handleDragEnd,
+    getRowId,
+  } = useDragDropTable({
+    data: tableData,
+    onReorder: (newData) => {
+      // Update sequence numbers for all items based on their new order
+      const dataWithUpdatedSeq = newData.map((item, index) => {
+        const updatedItem = {
+          ...item,
+          seq: (index + 1).toString(), // Update seq to reflect new order (1-based)
+        };
+
+        return updatedItem;
+      });
+
+      // Update the data immediately and force re-render
+      setTempRowConsolidateEInvoiceDetailsList(dataWithUpdatedSeq);
+
+      // Force table to update by incrementing refresh key
+      setRefreshKey(prev => prev + 1);
+    },
+
+    idField: "UUID",
+    disabled: false,
+  });
+
+  // Column Drag and Drop and Resize (Data Table)
+  const table = useReactTable({
+    columns,
+    data: tableData,
+    state: {
+      sorting,
+      columnVisibility,
+      rowSelection,
+      columnOrder,
+      columnSizing,
+    },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+    enableRowSelection: true,
+    autoResetPageIndex: false,
+    columnResizeMode: "onChange",
+    defaultColumn: DATA_TABLE_DEFAULT_COLUMN_SIZING,
+    enableColumnResizing: true,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getRowId: (row, index) => getRowId(row, index),
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_DATA_TABLE_PAGE_SIZE,
+      },
+      columnVisibility: JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) || "{}"),
+    },
+  });
+
+  const sensors = useDndSensors();
+  const columnSizeVars = useColumnSizeVars(table);
+
+  useEffect(() => {
+    localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [itemData, setItemData] = useState([]);
+  const [itemType, setItemType] = useState("service");
+  const [textInputs, setTextInputs] = useState({});
+  const [UOMInputs, setUOMInputs] = useState([]);
+  const [numberInputs, setNumberInputs] = useState({});
+
+  usePreventShiftTextSelect();
+
+  const onDoubleClick = (row: Row<ConsolidateEInvoice>) => { };
+
+  const onRowSelection = useHandleRowSelect(table, onDoubleClick);
+
+  const itemTable = useReactTable({
+    columns: itemType === "service" ? ServiceColumns : StockColumns,
+    data: itemData,
+    autoResetPageIndex: false,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+
+  const handleOnAdd = async () => {
+    setDialogOpen(true);
+
+    await fetchItemData();
+  };
+
+  const fetchItemData = async () => {
+    var formValues = form.getValues();
+    const consolidateDocType = formValues.consolidateDocType
+
+    const currencyUUID = form.getValues("currency") ? form.getValues("currency") : "";
+    if (!currencyUUID) {
+      toast({
+        title: "Missing Currency",
+        description: "Please wait for the currency to load or be filled in, then refresh the table.",
+        variant: "destructive",
+        duration: 4000,
+      });
+      return false
+    }
+    try {
+      const formData = new FormData();
+      formData.append(`currency`, currencyUUID);
+
+      const response = await fetch(
+        `${ORIGIN}/consolidated_invoice/api/consolidated-invoice/get-unsubmitted-sales-invoice?module=${consolidateDocType}`,
+        {
+          method: "POST",
+          headers: headers,
+          body: formData,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to create new service category data");
+      }
+
+      const responseData = await response.json();
+
+      setItemType(itemType);
+      setItemData(responseData.rows);
+    } catch (error) {
+      console.error(`Failed to fetch ${itemType} data`);
+    }
+  };
+
+  const calculateTotal = (field: string) => {
+    let total = 0;
+
+    table.getPrePaginationRowModel().rows.forEach((row) => {
+      const value = Number(row.original[field]);
+
+      if (Number.isFinite(value)) {
+        total += value;
+      }
+    });
+
+    // If the field is "quantity", return the total as an integer
+    if (field === "quantity") {
+      return Math.round(total).toString();
+    }
+
+    return total.toFixed(2);
+  };
+
+  const calculateNetTotal = (convertToLocal: boolean) => {
+    let total = 0;
+
+    table.getPrePaginationRowModel().rows.forEach((row) => {
+      if (row.original.subtotalTax) total += Number(row.original.subtotalTax);
+    });
+
+    // Add roundingAmount from the form
+    const roundingAmount = Number(form.getValues("roundingAmount")) || 0;
+
+    total += roundingAmount;
+
+    if (convertToLocal) {
+      total *= form.getValues("currencyRate") || 1;
+    }
+
+    return total.toFixed(2);
+  };
+
+  const textInputCell = ({ row, column: { id } }, className: string, onBlurUpdate: boolean) => {
+    const onBlur = () => {
+      if (onBlurUpdate)
+        updateItem({
+          row: row,
+          itemType: row.original.type ? row.original.type.toLowerCase() : "",
+          isUpdate: true,
+        });
+    };
+
+    const onChange = (e) => {
+      const newValue = e.target.value;
+
+      row.original[id] = `${newValue}`;
+
+      setTextInputs((textInputs) => ({
+        ...textInputs,
+        [id]: { ...textInputs[id], [row.id]: `${newValue}` },
+      }));
+    };
+
+    return (
+      <Input
+        className={className}
+        readOnly
+        style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+        value={textInputs.id ? [row.id] ?? textInputs[id][row.id] : row.original[id]}
+        onChange={onChange}
+        onBlur={onBlur}
+      />
+    );
+  };
+
+  const numberInputCell = (
+    { row, column: { id } },
+
+    decimalPoint: number,
+  ) => {
+    const onChange = (e) => {
+      let newValue = e.target.value
+        .replace(/(?<=\.\d*)\./g, "") // Allow only one decimal point
+        .replace(/[^\d.]/g, "") // Remove non-numeric characters except dots
+        .replace(".", ""); // Ensure only one decimal point is considered
+
+      // Ensure the value is formatted to the required number of decimal points
+      newValue =
+        (newValue.substr(0, newValue.length - decimalPoint)
+          ? newValue.substr(0, newValue.length - decimalPoint)
+          : "0") +
+        "." +
+        newValue.slice(newValue.length - decimalPoint);
+
+      newValue = Number(newValue).toFixed(decimalPoint).toString();
+
+      row.original[id] = newValue;
+
+      // Update related fields based on ID
+      if (id === "discountRate") {
+        if (Number(row.original.price)) {
+          row.original.discountAmount = (
+            (Number(row.original.price) * Number(row.original.quantity) * newValue) /
+            100
+          )
+            .toFixed(2)
+            .toString();
+        }
+      } else if (id === "discountAmount") {
+        if (Number(row.original.price)) {
+          row.original.discountRate = (
+            (100 * newValue) /
+            (Number(row.original.price) * Number(row.original.quantity))
+          )
+            .toFixed(2)
+            .toString();
+        }
+      } else if (id === "feeRate") {
+        if (Number(row.original.price)) {
+          row.original.feeAmount = (
+            (Number(row.original.price) * Number(row.original.quantity) * newValue) /
+            100
+          )
+            .toFixed(2)
+            .toString();
+        }
+      } else if (id === "feeAmount") {
+        if (Number(row.original.price)) {
+          row.original.feeRate = (
+            (100 * newValue) /
+            (Number(row.original.price) * Number(row.original.quantity))
+          )
+            .toFixed(2)
+            .toString();
+        }
+      }
+
+      // Update the state with the new value
+      setNumberInputs((numberInputs) => ({
+        ...numberInputs,
+        [id]: { ...numberInputs[id], [row.id]: newValue },
+      }));
+    };
+
+    // Default to "0.00" if the value is "0", null, or empty
+    const value = numberInputs[row.id]
+      ? numberInputs[id][row.id]
+      : row.original[id] === null || row.original[id] === "0"
+        ? "0.00"
+        : row.original[id];
+
+    return (
+      <Input
+        className="h-7.5 text-right"
+        value={value} // Ensures "0" is shown as "0.00"
+        onChange={onChange}
+        readOnly
+        style={{ backgroundColor: "#f2f2f2", color: "gray" }}
+        disabled={id === "feeRate" || id === "feeAmount"} // Make these fields read-only
+      />
+    );
+  };
+
+  // Dropdown
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const [showTables, setShowTables] = useState({});
+
+  const [dropdownDatas, setDropdownDatas] = useState({});
+  const [dropdownInputDatas, setDropdownInputDatas] = useState({});
+
+  const dropdownTableColumns = {
+    classificationCode: [
+      { accessorKey: "classificationCode", header: "Classification Code" },
+      { accessorKey: "description", header: "Description" },
+    ],
+  }
+
+  const fetchDropdownData = async (table: string) => {
+    try {
+      var form_data = new FormData();
+
+      form_data.append(`table[0]`, table.slice(0, -4));
+
+      const response = await fetch(
+        `${ORIGIN}/universal/get-all-drop-down-table-data`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch dropdown data");
+      }
+
+      const data = await response.json();
+
+      setDropdownDatas((dropdownDatas) => ({ ...dropdownDatas, [table]: data.rows }));
+    } catch (error) {
+      throw new Error("Failed to fetch dropdown data");
+    }
+  };
+
+  const dropDownInputCell = ({ row, column: { id } }) => {
+    return (
+      <DropdownInputCellComponent
+        row={row}
+        column={{ id }}
+        dropdownDatas={dropdownDatas}
+        setDropdownDatas={setDropdownDatas}
+        dropdownInputDatas={dropdownInputDatas}
+        setDropdownInputDatas={setDropdownInputDatas}
+        showTables={showTables}
+        setShowTables={setShowTables}
+        setTempRowDetailsList={setTempRowConsolidateEInvoiceDetailsList}
+        fetchDropdownData={fetchDropdownData}
+        dropdownTableColumns={dropdownTableColumns}
+        inputRef={inputRef}
+        dropdownRef={dropdownRef}
+      />
+    );
+  };
+
+  const dateInputCell = ({ row, column: { id } }) => {
+    return (
+      <DateInputCellComponent
+        row={row}
+        column={{ id }}
+        setTempRowDetailsList={setTempRowConsolidateEInvoiceDetailsList}
+      />
+    );
+  };
+
+  const updateItem = async (prop) => {
+    try {
+      const formData = new FormData();
+
+      var formValues = form.getValues();
+
+      let selectedRowModel = Array(0);
+
+      if (prop.table) {
+        // Selection Order (Logic)
+        if (prop.selectionOrder && prop.selectionOrder.length > 0) {
+          // Create a map of selected rows for quick lookup
+          const selectedRowsMap = new Map(
+            prop.table.getSelectedRowModel().rows.map(row => [row.id, row])
+          );
+          // Reorder selected rows based on selection order
+          selectedRowModel = prop.selectionOrder
+            .filter(rowId => selectedRowsMap.has(rowId))
+            .map(rowId => selectedRowsMap.get(rowId));
+        } else {
+          // Fallback to default table order if no selection order is provided
+          selectedRowModel = prop.table.getSelectedRowModel().rows;
+        }
+      } else {
+        selectedRowModel.push(prop.row);
+      }
+      // Calculate totals from all rows in the table
+      let totalAmount = table.getFilteredRowModel().rows.reduce((sum, row) => {
+        return sum + (row.original.amount ? parseFloat(row.original.amount) : 0);
+      }, 0);
+
+      let totalDiscount = table.getFilteredRowModel().rows.reduce((sum, row) => {
+        return sum + (row.original.discountAmount ? parseFloat(row.original.discountAmount) : 0);
+      }, 0);
+
+      let totalTax = table.getFilteredRowModel().rows.reduce((sum, row) => {
+        return sum + (row.original.taxAmount ? parseFloat(row.original.taxAmount) : 0);
+      }, 0);
+
+      if (!prop.isUpdate) {
+        selectedRowModel.forEach((row) => {
+          totalAmount += row.original.totalAmountAmount ? parseFloat(row.original.totalAmountAmount) : 0;
+        });
+
+        selectedRowModel.forEach((row) => {
+          totalTax += row.original.totalTaxtotalTax ? parseFloat(row.original.totalTaxtotalTax) : 0;
+        });
+      }
+
+      const prepaymentAmount = form.getValues("prepaymentAmount")
+      const currentCurrencyRate = form.getValues("currencyRate")
+
+      // Calculate subtotal tax (this is what should be used for outstanding amount)
+      const subtotalTax = totalAmount - totalDiscount + totalTax;
+      const roundTotalPayable = Math.round(subtotalTax * 20) / 20;
+      const roundTotalPayableAfterPrepayment = roundTotalPayable - (prepaymentAmount ? prepaymentAmount : 0)
+      const localNetTotal = roundTotalPayable * currentCurrencyRate
+
+      const roundingAmount = roundTotalPayable - subtotalTax;
+
+      const totalExclTax = totalAmount - totalDiscount
+
+      // Create consolidated invoice object (if needed for totals)      
+      const consolidatedInvoiceData = {
+        totalAmount: totalAmount.toFixed(2),
+        totalDiscount: totalDiscount.toFixed(2),
+        totalTax: totalTax.toFixed(2),
+        totalSubtotal: (totalAmount - totalDiscount).toFixed(2),
+        totalPayable: roundTotalPayableAfterPrepayment.toFixed(2),
+
+        localNetTotal: localNetTotal.toFixed(2),
+        netTotal: roundTotalPayable.toFixed(2),
+        roundingAmount: roundingAmount.toFixed(2),
+        totalNetAmount: totalExclTax.toFixed(2),
+        totalExclTax: totalExclTax.toFixed(2),
+        totalInclTax: subtotalTax.toFixed(2),
+        prepaymentAmount: prepaymentAmount ? prepaymentAmount : "0.00"
+
+      };
+
+      // Get current consolidated invoice details
+      let consolidatedInvoiceHasDetailsData = [];
+
+      const docTypeMap = {
+        salesInvoice: "INV",
+        salesCreditNote: "CN",
+        salesDebitNote: "DN",
+        cashSales: "CS",
+      } as const;
+
+      const type =
+        docTypeMap[
+        formValues.consolidateDocType as keyof typeof docTypeMap
+        ] || "";
+
+      if (prop.isUpdate) {
+        // For updates, use the current table data
+        consolidatedInvoiceHasDetailsData = table.getFilteredRowModel().rows.map(row => row.original);
+      } else {
+        // For new items, add selected items to existing data
+        const existingData = table.getFilteredRowModel().rows.map(row => row.original);
+
+        // Selection Order (Add Index and Sequence)
+        const newItems = selectedRowModel.map((row, index) => {
+          const item = row.original;
+
+          // Get the maximum existing sequence number
+          const existingData = table.getFilteredRowModel().rows.map(row => row.original);
+          const maxSeq = existingData.length > 0
+            ? Math.max(...existingData.map(item => parseInt(item.seq) || 0))
+            : 0;
+
+          return {
+            UUID: "",
+            seq: (maxSeq + index + 1).toString(),
+            item: item.UUID,
+            customerPayment: item.UUID,
+            type: type,
+            description: item.description || "",
+            price: item.promotionPrice || "",
+            taxAmount: item.totalTaxtotalTax || "",
+            quantity: item.quantity || "",
+            subtotalTax: item.totalSubtotalTax || "",
+            project: item.project || "",
+            amount: item.totalAmountAmount || "",
+            totalAmounttotalAmount: item.totalAmounttotalAmount || "",
+            subTotal: item.totalSubtotaltotalSubtotal || "",
+            classification: item.classification || "",
+            classificationCode: "004",
+          };
+        });
+
+        consolidatedInvoiceHasDetailsData = [...existingData, ...newItems];
+      }
+
+      // Combine consolidatedInvoice and consolidatedInvoiceHasDetails into single data object
+      const combinedData = {
+        consolidatedInvoice: consolidatedInvoiceData,
+        consolidatedInvoiceHasDetails: consolidatedInvoiceHasDetailsData
+      };
+
+      // Add combined data as JSON string
+      formData.append('data', JSON.stringify(combinedData));
+
+      const response = await fetch(
+        `${ORIGIN}/consolidated_invoice/api/consolidated-invoice/update-consolidated-invoice-has-details-data?id=${id}`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update user list data");
+      }
+
+      revalidateConsolidateEInvoiceDetails();
+    } catch (error) {
+      console.error("Error updating service data:", error);
+    }
+  };
+
+  // Mobile View (Field Configurations)
+  const mobileFieldConfigs = {
+    description: {
+      type: 'text' as const,
+      label: 'Description',
+      colSpan: 2 as const
+    },
+    '2ndDescription': {
+      type: 'text' as const,
+      label: '2nd Description',
+      colSpan: 2 as const
+    },
+    moreDescription: {
+      type: 'text' as const,
+      label: 'More Description',
+      colSpan: 2 as const
+    },
+    quantity: {
+      type: 'number' as const,
+      label: 'Quantity',
+      allowDecimal: false
+    },
+    price: {
+      type: 'number' as const,
+      label: 'Price',
+      allowDecimal: true,
+    },
+    discountRate: {
+      type: 'number' as const,
+      label: 'Discount %',
+      allowDecimal: true
+    },
+    discountAmount: {
+      type: 'number' as const,
+      label: 'Discount Amount',
+      allowDecimal: true
+    },
+    startAt: {
+      type: 'date' as const,
+      label: 'Start Date'
+    },
+    endAt: {
+      type: 'date' as const,
+      label: 'End Date'
+    },
+    taxInclusive: {
+      type: 'checkbox' as const,
+      label: 'Tax Inclusive'
+    },
+    UOM: {
+      type: 'uom' as const,
+      label: 'UOM'
+    },
+    itemUOM: {
+      type: 'uom' as const,
+      label: 'Item UOM'
+    },
+    permitNo: {
+      type: 'text' as const,
+      label: 'Permit No'
+    },
+    remark1: {
+      type: 'text' as const,
+      label: 'Remark 1',
+      colSpan: 2 as const
+    },
+    remark2: {
+      type: 'text' as const,
+      label: 'Remark 2',
+      colSpan: 2 as const
+    },
+
+    // Readonly fields
+    subtotalTax: { type: 'readonly' as const, label: 'Subtotal Tax' },
+    itemGroupCode: { type: 'readonly' as const, label: 'Item Group' },
+    itemCategoryCode: { type: 'readonly' as const, label: 'Item Category' },
+    itemRate: { type: 'readonly' as const, label: 'Item Rate' },
+    amount: { type: 'readonly' as const, label: 'Amount' },
+    subTotal: { type: 'readonly' as const, label: 'Subtotal' },
+    taxRate: { type: 'readonly' as const, label: 'Tax Rate' },
+  };
+
+  const handleMobileFieldChange = (rowId: string, fieldId: string, value: any) => {
+    const rowIndex = parseInt(rowId);
+    const row = table.getRowModel().rows[rowIndex];
+
+    if (!row) return;
+
+    // Update the row's original data
+    row.original[fieldId] = value;
+
+    // Handle calculations for price/quantity/discount changes
+    if (fieldId === "price" || fieldId === "quantity") {
+      const price = Number(row.original.price) || 0;
+      const quantity = Number(row.original.quantity) || 0;
+      const totalValue = price * quantity;
+
+      if (row.original.discountRate) {
+        row.original.discountAmount = ((totalValue * Number(row.original.discountRate)) / 100)
+          .toFixed(2)
+          .toString();
+      }
+    } else if (fieldId === "discountRate" && value) {
+      const price = Number(row.original.price) || 0;
+      const quantity = Number(row.original.quantity) || 0;
+      const totalValue = price * quantity;
+
+      row.original.discountAmount = ((totalValue * Number(value)) / 100).toFixed(2).toString();
+    } else if (fieldId === "discountAmount" && value) {
+      const price = Number(row.original.price) || 0;
+      const quantity = Number(row.original.quantity) || 0;
+      const totalValue = price * quantity;
+
+      if (totalValue > 0) {
+        row.original.discountRate = ((100 * Number(value)) / totalValue).toFixed(2).toString();
+      }
+    }
+
+    // Update setTempRowConsolidateEInvoiceDetailsList
+    setTempRowConsolidateEInvoiceDetailsList((prevList) =>
+      prevList.map((item, idx) => {
+        if ((item.UUID && item.UUID === row.original.UUID) || idx === row.index) {
+          return { ...item, [fieldId]: value };
+        }
+        return item;
+      }),
+    );
+  };
+
+  // Mobile View (Totals Configuration)
+  const totalsConfig = {
+    title: "Total",
+    sections: [
+      {
+        fields: [
+          {
+            key: "noOfRecord",
+            label: "No. of Record",
+            value: table.getRowModel().rows ? table.getPrePaginationRowModel().rows.length : 0,
+            readOnly: true,
+          },
+          {
+            key: "quantity",
+            label: "Quantity",
+            value: table.getRowModel().rows ? calculateTotal("quantity") : 0,
+            readOnly: true,
+          },
+          {
+            key: "subtotal",
+            label: "Subtotal",
+            value: table.getRowModel().rows ? calculateTotal("subTotal") : 0,
+            readOnly: true,
+          },
+          {
+            key: "taxAmount",
+            label: "Tax Amount",
+            value: table.getRowModel().rows ? calculateTotal("taxAmount") : 0,
+            readOnly: true,
+          },
+          {
+            key: "subtotalTax",
+            label: "Subtotal (Tax)",
+            value: table.getRowModel().rows
+              ? formatNumber(
+                parseFloat(calculateTotal("subTotal")) +
+                parseFloat(calculateTotal("taxAmount")),
+              )
+              : 0,
+            readOnly: true,
+          },
+        ],
+      },
+      {
+        fields: [
+          {
+            label: "Subtotal (e-Invoice)",
+            value: table.getRowModel().rows ? calculateTotal("subTotalEInvoice") : 0,
+            readOnly: true,
+          },
+          {
+            key: "localNetTotal",
+            label: "Local Net Total",
+            value: table.getRowModel().rows ? calculateNetTotal(true) : 0,
+            readOnly: true,
+          },
+          {
+            key: "netTotal",
+            label: "Net Total (RM)",
+            value: table.getRowModel().rows ? calculateNetTotal(false) : 0,
+            readOnly: true,
+          },
+        ],
+      },
+    ],
+  };
+
+  // Column Drag and Drop and Resize (Unified Drag Handler for Both Rows and Columns)
+  const handleUnifiedDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    // Check if it's a column drag (column IDs are simple strings like "itemName", "description")
+    const isColumnDrag = columnOrder.includes(active.id as string);
+
+    if (isColumnDrag) {
+      // Handle column drag
+      handleDndDragEnd(event, setColumnOrder);
+    } else {
+      // Handle row drag
+      handleDragEnd(event);
+    }
+  };
+
+  // Three Discount (Row Calculations)
+  // Real-Time Total Calculations (Calculation Function)
+  const calculateRowValues = (rowData: any, rowIndex: number) => {
+    // Multi-UOM Calculation Logic - multiply all quantities with price
+    const quantity1 = rowData.quantity ? Number(rowData.quantity) : 0;
+    const quantity2 = rowData.quantity2 ? Number(rowData.quantity2) : 1;
+    const quantity3 = rowData.quantity3 ? Number(rowData.quantity3) : 1;
+
+    const price = rowData.price ? Number(rowData.price) : 0;
+
+    // Calculate total amount: Quantity1 × Quantity2 × Quantity3 × Price
+    const totalAmount = (quantity1 || 1) * (quantity2 || 1) * (quantity3 || 1) * price;
+
+    // Helper function to calculate discount amount from rate
+    const calculateDiscountAmount = (rate: number, baseAmount: number) => {
+      return (baseAmount * rate) / 100;
+    };
+
+    // Helper function to calculate discount rate from amount
+    const calculateDiscountRate = (amount: number, baseAmount: number) => {
+      return baseAmount > 0 ? (amount * 100) / baseAmount : 0;
+    };
+
+    // 3-tier discount calculation - preserve amounts when both rate and amount exist
+    let currentAmount = totalAmount;
+    let totalDiscountAmount = 0;
+
+    // First discount - preserve existing amount if it exists
+    if (rowData.discountAmount && Number(rowData.discountAmount) > 0) {
+      // Use existing amount, calculate rate if needed
+      if (!rowData.discountRate || Number(rowData.discountRate) === 0) {
+        rowData.discountRate = calculateDiscountRate(Number(rowData.discountAmount), currentAmount).toFixed(2);
+      }
+    } else if (rowData.discountRate && Number(rowData.discountRate) > 0) {
+      // Calculate amount from rate
+      rowData.discountAmount = calculateDiscountAmount(Number(rowData.discountRate), currentAmount).toFixed(2);
+    }
+
+    const discountAmount1 = Number(rowData.discountAmount) || 0;
+
+    currentAmount -= discountAmount1;
+    totalDiscountAmount += discountAmount1;
+
+    // Second discount - preserve existing amount if it exists
+    if (rowData.discountAmount2 && Number(rowData.discountAmount2) > 0) {
+      // Use existing amount, calculate rate if needed
+      if (!rowData.discountRate2 || Number(rowData.discountRate2) === 0) {
+        rowData.discountRate2 = calculateDiscountRate(Number(rowData.discountAmount2), currentAmount).toFixed(2);
+      }
+    } else if (rowData.discountRate2 && Number(rowData.discountRate2) > 0) {
+      // Calculate amount from rate
+      rowData.discountAmount2 = calculateDiscountAmount(Number(rowData.discountRate2), currentAmount).toFixed(2);
+    }
+
+    const discountAmount2 = Number(rowData.discountAmount2) || 0;
+
+    currentAmount -= discountAmount2;
+    totalDiscountAmount += discountAmount2;
+
+    // Third discount - preserve existing amount if it exists
+    if (rowData.discountAmount3 && Number(rowData.discountAmount3) > 0) {
+      // Use existing amount, calculate rate if needed
+      if (!rowData.discountRate3 || Number(rowData.discountRate3) === 0) {
+        rowData.discountRate3 = calculateDiscountRate(Number(rowData.discountAmount3), currentAmount).toFixed(2);
+      }
+    } else if (rowData.discountRate3 && Number(rowData.discountRate3) > 0) {
+      // Calculate amount from rate
+      rowData.discountAmount3 = calculateDiscountAmount(Number(rowData.discountRate3), currentAmount).toFixed(2);
+    }
+
+    const discountAmount3 = Number(rowData.discountAmount3) || 0;
+
+    currentAmount -= discountAmount3;
+    totalDiscountAmount += discountAmount3;
+
+    // Helper function to safely parse tax rate
+    function safeParseTaxRate(value) {
+      if (!value) return 0;
+
+      const parsed = parseFloat(value);
+
+      return isNaN(parsed) ? 0 : parsed;
+    }
+
+    // Update tax and totals
+    // if (taxInclusiveStates[rowIndex] === "1") {
+    //   rowData.amount = totalAmount;
+    //   rowData.subTotalEInvoice = totalAmount;
+    //   rowData.subTotal = totalAmount - totalDiscountAmount;
+    //   rowData.taxAmount = parseFloat((rowData.subTotal * (safeParseTaxRate(rowData.taxRate) / 100)).toFixed(2));
+    //   rowData.subtotalTax = rowData.subTotal;
+    // } else {
+    //   rowData.amount = totalAmount;
+    //   rowData.subTotalEInvoice = totalAmount;
+    //   rowData.subTotal = totalAmount - totalDiscountAmount;
+    //   rowData.taxAmount = parseFloat((rowData.subTotal * (safeParseTaxRate(rowData.taxRate) / 100)).toFixed(2));
+    //   rowData.subtotalTax = rowData.subTotal + rowData.taxAmount;
+    // }
+
+    // rowData.taxableAmount = rowData.taxAmount;
+
+    rowData.amountExclTax =
+      (rowData.subTotal ? Number(rowData.subTotal) : 0) +
+      (rowData.feeAmount ? Number(rowData.feeAmount) : 0);
+
+    rowData.amountInclTax =
+      (rowData.subtotalTax ? Number(rowData.subtotalTax) : 0) +
+      (rowData.feeAmount ? Number(rowData.feeAmount) : 0);
+
+    // Add local tax amount calculation using form currency rate
+    const currencyRate = form.getValues("currencyRate");
+
+    rowData.localTaxAmount = rowData.taxAmount * (currencyRate ? Number(currencyRate) : 1);
+
+    return rowData;
+  };
+
+  // Real-Time Total Calculations (useEffect)
+  useEffect(() => {
+    if (tableData && tableData.length > 0) {
+      const updatedData = tableData.map((rowData, index) => {
+        return calculateRowValues({ ...rowData }, index);
+      });
+
+      // Only update if there are actual changes to prevent infinite loops
+      const hasChanges = updatedData.some((newRow, index) => {
+        const oldRow = tableData[index];
+        return newRow.subtotalTax !== oldRow.subtotalTax ||
+          newRow.taxAmount !== oldRow.taxAmount ||
+          newRow.localTaxAmount !== oldRow.localTaxAmount;
+      });
+
+      if (hasChanges) {
+        setTempRowConsolidateEInvoiceDetailsList(updatedData);
+      }
+    }
+  }, [
+    tableData,
+    form.watch("currencyRate"),
+    tempRowConsolidateEInvoiceDetailsList,
+  ]);
+
+  return (
+    <Card
+      collapsible
+      defaultCollapsed={false}
+      className="h-auto p-0 shadow-md"
+    >
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Charges Details</CardTitle>
+      </CardHeader>
+      <CardContent className="px-2 py-0">
+        <div className="h-[98cqh] p-2 md:h-[58cqh]">
+          <div className="flex h-[95cqh] flex-col rounded-md bg-erp-blue-3 @container-[size] md:h-[55cqh]">
+            <ConsolidateEInvoiceDetailsDataTableToolbar
+              table={table}
+              onAdd={handleOnAdd}
+              setTempRowConsolidateEInvoiceDetailsListData={setTempRowConsolidateEInvoiceDetailsListData}
+              tempRowConsolidateEInvoiceDetailsList={tempRowConsolidateEInvoiceDetailsList}
+              revalidateConsolidateEInvoiceDetails={revalidateConsolidateEInvoiceDetails}
+              slug={slug}
+              form={form}
+            />
+            <Separator className="bg-erp-blue-11" />
+            <ScrollArea className="h-[100cqh] bg-erp-gray-3">
+              {/* Mobile View (Form Data Table) */}
+              <MobileFormDataTable
+                table={table}
+                headerFields={['itemName', 'itemName']}
+                fieldConfigs={mobileFieldConfigs}
+                initialVisibleFields={4}
+                onFieldChange={handleMobileFieldChange}
+                UOMInputs={UOMInputs}
+                setUOMInputs={setUOMInputs}
+                setTempRowDetailsList={setTempRowConsolidateEInvoiceDetailsList}
+              />
+
+              {/* Web View (Data Table) */}
+              <div className="hidden md:block">
+                {/* Column Drag and Drop (DnD Context) */}
+                <DndContext
+                  collisionDetection={closestCenter}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleUnifiedDragEnd}
+                  sensors={sensors}
+                >
+                  {/* Row Drag and Drop (Data Table) */}
+                  <DragDropDataTable
+                    items={items}
+                    disabled={false}
+                    hasParentDndContext={true}
+                  >
+                    {/* Column Drag and Drop and Resize (Table) */}
+                    <Table
+                      className="table-fixed border-separate border-spacing-[3px] whitespace-nowrap border bg-erp-gray-1 overflow-visible"
+                      style={{ ...columnSizeVars, width: table.getTotalSize() }}
+                    >
+                      <TableHeader className="sticky top-0 z-10">
+                        {table.getHeaderGroups().map((headerGroup) => (
+                          <TableRow key={headerGroup.id}>
+                            {/* Column Drag and Drop and Resize (Sortable Context) */}
+                            <SortableContext
+                              items={columnOrder}
+                              strategy={horizontalListSortingStrategy}
+                            >
+                              {headerGroup.headers.map((header) => (
+                                // Column Drag and Drop and Resize (Dragable Table Head)
+                                <DragableTableHead
+                                  key={header.id}
+                                  header={header}
+                                  className="bg-erp-blue-11 font-normal"
+                                  style={{
+                                    width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                                  }}
+                                >
+                                  {header.column.id === "valid" ? (
+                                    <TableHeadValidityFilter table={table} />
+                                  ) : (
+                                    <TableHeadColumnTextFilter
+                                      column={header.column}
+                                      table={table}
+                                    />
+                                  )}
+                                  <ColumnResizer header={header} />
+                                </DragableTableHead>
+                              ))}
+                            </SortableContext>
+                          </TableRow>
+                        ))}
+                      </TableHeader>
+                      {/* Column Drag and Drop and Resize (Table Body) */}
+                      {table.getState().columnSizingInfo.isResizingColumn ? (
+                        <MemoizedTableBody
+                          table={table}
+                          onRowSelection={onRowSelection}
+                          getRowId={getRowId}
+                          refreshKey={refreshKey}
+                          textInputCell={textInputCell}
+                          numberInputCell={numberInputCell}
+                          dropDownInputCell={dropDownInputCell}
+                          dateInputCell={dateInputCell}
+                        />
+                      ) : (
+                        <NonMemoizedTableBody
+                          table={table}
+                          onRowSelection={onRowSelection}
+                          getRowId={getRowId}
+                          refreshKey={refreshKey}
+                          textInputCell={textInputCell}
+                          numberInputCell={numberInputCell}
+                          dropDownInputCell={dropDownInputCell}
+                          dateInputCell={dateInputCell}
+                        />
+                      )}
+                    </Table>
+                  </DragDropDataTable>
+                </DndContext>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+
+            {/* Mobile View (Totals) */}
+            <DataTableTotals {...totalsConfig} />
+
+            {/* Web View (Totals) */}
+            <div className="hidden flex-grow flex-row bg-white md:flex">
+              <div className="flex flex-grow flex-row border-2 border-solid border-erp-blue-18">
+                <div className="flex w-max items-center justify-center bg-erp-blue-14 px-[1rem] text-white">
+                  Total
+                </div>
+
+                <div className="flex flex-col justify-start px-[0.5rem]">
+                  <p className="text-left text-sm">No. of Record:</p>
+                  <Input
+                    className="h-3 w-28 text-right text-sm"
+                    readOnly
+                    value={table.getRowModel().rows ? table.getPrePaginationRowModel().rows.length : 0}
+                  />
+                </div>
+                <div className="flex flex-col justify-start px-[0.5rem]">
+                  <p className="text-left text-sm">Quantity:</p>
+                  <Input
+                    className="h-3 w-28 text-right text-sm"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateTotal("quantity") : 0}
+                  />
+                </div>
+                <div className="flex flex-col justify-start px-[0.5rem]">
+                  <p className="text-left text-sm">Subtotal:</p>
+                  <Input
+                    className="h-3 w-28 text-right text-sm"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateTotal("amount") : 0}
+                  />
+                </div>
+                <div className="flex flex-col justify-start px-[0.5rem]">
+                  <p className="text-left text-sm">Tax Amount:</p>
+                  <Input
+                    className="h-3 w-28 text-right text-sm"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateTotal("taxAmount") : 0}
+                  />
+                </div>
+                <div className="flex flex-col justify-start px-[0.5rem]">
+                  <p className="text-left text-sm">Subtotal (Tax):</p>
+                  <Input
+                    className="h-3 w-28 text-right text-sm"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateTotal("subtotalTax") : 0}
+                  />
+                </div>
+                {/* <div className="flex flex-col justify-start px-[0.5rem]">
+                  <p className="text-left text-sm">Subtotal (e-Invoice):</p>
+                  <Input
+                    className="h-3 w-28 text-right text-sm"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateTotal("amount") : 0}
+                  />
+                </div> */}
+              </div>
+
+              <div className="flex flex-none flex-row border-2 border-solid border-erp-blue-18">
+                <div className="flex flex-col justify-start px-[0.5rem]">
+                  <p className="text-left text-sm">Local Subtotal (Tax):</p>
+                  <Input
+                    className="h-3 w-28 text-right text-sm localNetTotal"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateNetTotal(true) : 0}
+                  />
+                </div>
+                <div className="flex flex-col justify-start px-[0.5rem]">
+                  <p className="text-left text-sm">Subtotal (Tax) - Rounding:</p>
+                  <Input
+                    className="h-3 w-28 text-right text-sm netTotal"
+                    readOnly
+                    value={table.getRowModel().rows ? calculateNetTotal(false) : 0}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <ItemPopover
+              open={dialogOpen}
+              setOpen={setDialogOpen}
+              columns={itemType === "service" ? ServiceColumns : StockColumns}
+              data={data}
+              setTempRowConsolidateEInvoiceDetailsListData={setTempRowConsolidateEInvoiceDetailsListData}
+              tempRowConsolidateEInvoiceDetailsList={tempRowConsolidateEInvoiceDetailsList}
+              revalidateConsolidateEInvoiceDetails={revalidateConsolidateEInvoiceDetails}
+              itemTable={itemTable}
+              fetchItemData={fetchItemData}
+              itemType={itemType}
+              form={form}
+              updateItem={updateItem}
+              itemData={itemData}
+              slug={slug}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Column Drag and Drop and Resize (Table Body)
+type TableBodyProps = {
+  table: TableType<ConsolidateEInvoice>;
+  onRowSelection: (
+    row: Row<ConsolidateEInvoice>
+  ) => (event: MouseEvent<HTMLTableRowElement>) => void;
+  getRowId: (row: any, index: number) => string;
+  refreshKey: number;
+  textInputCell: (cell: any, className: string) => JSX.Element;
+  numberInputCell: (cell: any, decimalPoint: number) => JSX.Element;
+  dropDownInputCell: (cell: any) => JSX.Element;
+  dateInputCell: (cell: any) => JSX.Element;
+  
+};
+
+function NonMemoizedTableBody({
+  table,
+  onRowSelection,
+  getRowId,
+  refreshKey,
+  textInputCell,
+  numberInputCell,
+  dropDownInputCell,
+  dateInputCell
+}: TableBodyProps) {
+  return (
+    <TableBody>
+      {table.getRowModel().rows?.length ? (
+        table.getRowModel().rows.map((row, index) => {
+          return (
+            // Row Drag and Drop (Row)
+            <DraggableRow
+              key={`${getRowId(row.original, index)}-${refreshKey}`}
+              id={getRowId(row.original, index)}
+              className="odd:bg-erp-blue-5 even:bg-erp-blue-1 hover:bg-erp-blue-7 data-[state=selected]:bg-erp-blue-17"
+              onClick={onRowSelection(row)}
+              data-state={row.getIsSelected() && "selected"}
+              disabled={false}
+            >
+              {row.getVisibleCells().map((cell, cellIndex) => {
+                if (
+                  cell.column.id === "description" ||
+                  cell.column.id === "remark1" ||
+                  cell.column.id === "remark2"
+                ) {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-center truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                    >
+                      {textInputCell(cell, "h-7.5")}
+                    </TableCell>
+                  );
+                } else if (cell.column.id === "price") {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-center truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                    >
+                      {numberInputCell(cell, 2)}
+                    </TableCell>
+                  );
+                } else if (cell.column.id === "quantity") {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-center truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                    >
+                      {numberInputCell(cell, 0)}
+                    </TableCell>
+                  );
+                } else if (cell.column.id === "classificationCode") {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-center overflow-visible relative"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                        overflow: 'visible',
+                        position: 'relative',
+                      }}
+                    >
+                      {dropDownInputCell(cell)}
+                    </TableCell>
+                  );
+                }
+                else if (
+                  cell.column.id === "docDate"
+                ) {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-right truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                    >
+                      {dateInputCell(cell)}
+                    </TableCell>
+                  );
+                }
+                else {
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      className="truncate"
+                      title={(cell.getValue() ?? "").toString()}
+                      style={{
+                        width: `calc(var(--col-${cell.column.id}-size) * 1px)`,
+                        minWidth: cell.column.columnDef.minSize,
+                      }}
+                    >
+                      {cellIndex === 0 ? (
+                        <div className="flex items-center gap-2">
+                          <DragHandle
+                            id={getRowId(row.original, index)}
+                            className="flex-shrink-0"
+                          />
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      ) : (
+                        flexRender(cell.column.columnDef.cell, cell.getContext())
+                      )}
+                    </TableCell>
+                  );
+                }
+              })}
+            </DraggableRow>
+          );
+        })
+      ) : (
+        <NoResultsTableRow columns={table.getVisibleLeafColumns()} />
+      )}
+    </TableBody>
+  );
+}
+
+const MemoizedTableBody = memo(
+  NonMemoizedTableBody,
+  (prev, next) => prev.table.options.data === next.table.options.data
+) as typeof NonMemoizedTableBody;

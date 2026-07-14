@@ -1,0 +1,100 @@
+"use client";
+
+import { ColumnDef } from "@tanstack/react-table";
+import { useSearchParams } from "next/navigation";
+import { ORIGIN } from "@/lib/constants";
+import ChangelogDataTable from "@/components/features/changelog/DataTable";
+import { ChangelogConfig } from "@/components/features/changelog/types";
+
+// Define the customer tag changelog config
+const CustomerTagChangelogConfig: ChangelogConfig = {
+  // Default endpoints (fallback)
+  getHistoryUrl: (id: string) =>
+    `${ORIGIN}/customer_tag/api/customer-tag/get-customer-tag-log?id=${id}`,
+  getDetailsUrl: (id: string, action: string) =>
+    `${ORIGIN}/customer_tag/api/customer-tag/get-customer-tag-log-details?id=${id}&action=${action}`,
+
+  fieldNameMapping: {
+    // Main Details
+    UUID: "UUID",
+    account: "Account",
+    company: "Company",
+    customerTagCode: "Customer Tag Code",
+    customerTag: "Customer Tag",
+    description: "Description",
+    createdByUsername: "Created By",
+    updatedByUsername: "Updated By",
+    createdAtFormat: "Created At",
+    updatedAtFormat: "Updated At",
+
+    // Custom Information
+    fieldName: "Field Name",
+    fieldValue: "Field Value",
+    attachment: "Attachment",
+  },
+
+  fieldsToFilter: [
+    "UUID",
+    "account",
+    "historyUUID",
+    "createdAt",
+    "createdBy",
+    "_actionUUID",
+    "_version",
+    "action",
+    "updatedBy",
+    "valid",
+  ],
+
+  entityName: "customerTag",
+
+  defaultSortField: "createdAt",
+
+  tabs: [
+    {
+      value: "customerTag",
+      label: "Customer Tag",
+      referenceField: "customerTag",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/customer_tag/api/customer-tag/get-customer-tag-log?id=${id}`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/customer_tag/api/customer-tag/get-customer-tag-log-details?id=${id}&action=${action}`,
+    },
+    {
+      value: "customerTagHasCustomInfo",
+      label: "Custom Information",
+      referenceField: "fieldName",
+      getHistoryUrl: (id: string) =>
+        `${ORIGIN}/customer_tag/api/customer-tag/get-customer-tag-has-custom-info-log?id=${id}`,
+      getDetailsUrl: (id: string, action: string) =>
+        `${ORIGIN}/customer_tag/api/customer-tag/get-customer-tag-has-custom-info-log-details?id=${id}&action=${action}`,
+    },
+  ],
+};
+
+export default function CustomerTagChangelogDataTable<TData, TValue>({
+  columns,
+  initialData,
+  onTableParamsChange,
+}: {
+  columns: ColumnDef<TData, TValue>[];
+  initialData?: any | null;
+  onTableParamsChange?: any;
+}) {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return <div>Missing entity ID</div>;
+  }
+
+  return (
+    <ChangelogDataTable
+      columns={columns}
+      initialData={initialData}
+      config={CustomerTagChangelogConfig}
+      entityId={id}
+      onTableParamsChange={onTableParamsChange}
+    />
+  );
+}

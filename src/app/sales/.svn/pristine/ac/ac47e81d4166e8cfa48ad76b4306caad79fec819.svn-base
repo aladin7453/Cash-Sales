@@ -1,0 +1,457 @@
+"use client";
+
+import React, { useState, useEffect, useRef } from "react";
+import { FaMagnifyingGlass } from "react-icons/fa6";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import DropdownTable from "@/components/data-table/DropdownTable";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+
+import { ORIGIN, getAuthHeaders } from "@/lib/constants";
+
+type Params = {
+  form: any;
+  defaultCurrentCompany: any
+};
+
+export function SupplierDetailsForm({ form, defaultCurrentCompany }: Params) {
+  const headers = getAuthHeaders();
+
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = (event) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target) && inputRef.current !== event.target) {
+      setShowTableMISCCode(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.addEventListener('click', handleClickOutside);
+
+    return () => {
+      document.body.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  // MISC Code Dropdown
+  const [showTableMISCCode, setShowTableMISCCode] = useState(false);
+  const [MISCCodeDropdownTableData, setMISCCodeDropdownTableData] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const dropdownMISCCodeColumns = [
+    { accessorKey: "code", header: "MSIC" },
+    { accessorKey: "description", header: "Description", cell: ({ row }) => <DescriptionCellTooltip row={row} /> },
+  ];
+
+  const toggleTableMISCCode = async () => {
+    const formData = new FormData();
+    const MISCCode = "MISCCode";
+
+    formData.append('table[]', MISCCode);
+
+    if (!showTableMISCCode) {
+      try {
+        const response = await fetch(
+          `${ORIGIN}/universal/get-all-drop-down-table-data`,
+          {
+            method: "POST",
+            headers,
+            body: formData,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch agent drop-down data");
+        }
+
+        const MISCCodeData = await response.json();
+
+        setMISCCodeDropdownTableData(MISCCodeData.rows);
+        setShowTableMISCCode(true);
+      } catch (error) {
+        console.error("Error fetching MSIC Code drop-down data:", error);
+      }
+    } else {
+      setShowTableMISCCode(false);
+    }
+  };
+
+  const onClickRowMISCCode = (row) => {
+    form.setValue('supplierMSICCode', row.UUID);
+    form.setValue('MISCCodeCode', row.code);
+    form.setValue('supplierBusinessNature', row.description);
+    setSearchTerm(row.code);
+
+    setShowTableMISCCode(false);
+  };
+
+  const [currentCompanyUUID, setCurrentCompanyUUID] = useState<string | null>(null);
+
+  useEffect(() => {
+    const currentCompany = JSON.parse(localStorage.getItem("currentCompany") || "null");
+
+    if (currentCompany && currentCompany.UUID) {
+      setCurrentCompanyUUID(currentCompany.UUID);
+    } else {
+      setCurrentCompanyUUID(null);
+    }
+  }, []);
+
+  const fetcher = async (url) => {
+    const username = JSON.parse(localStorage.getItem("username"));
+    const authToken = JSON.parse(localStorage.getItem("authToken"));
+    const headers = getAuthHeaders();
+
+    return fetch(url, { headers }).then((res) => {
+      if (!res.ok) {
+        throw new Error('Failed to fetch data');
+      }
+
+      return res.json();
+    });
+  };
+
+  useEffect(() => {
+    const savedState = localStorage.getItem("consolidated-invoice.currentCompanyChecked");
+
+    if (savedState === "true") {
+      form.setValue("currentCompany", "1");
+    } else {
+      form.setValue("currentCompany", "0");
+    }
+  }, [form]);
+
+  const handleCurrentCompanyChange = async (event) => {
+    const isChecked = event.target.checked;
+
+    localStorage.setItem("consolidated-invoice.currentCompanyChecked", isChecked);
+
+    if (isChecked) {
+      try {
+        const apiUrl = `${ORIGIN}/company/api/company/get-update-company-data?id=${currentCompanyUUID}`;
+        const data = await fetcher(apiUrl);
+
+        const companyData = data.data;
+
+        form.setValue("supplierName", companyData.company);
+        form.setValue("supplierTIN", companyData.TIN);
+        form.setValue("supplierBRN", companyData.BRN);
+        form.setValue("supplierSSTNo", companyData.SSTNo);
+        form.setValue("supplierTTXNo", companyData.TTxNo);
+        form.setValue("supplierMSICCode", companyData.MISCCode);
+        form.setValue("MISCCodeCode", companyData.MISCCodeCode);
+        setSearchTerm(companyData.MISCCodeCode);
+        form.setValue("supplierBusinessNature", companyData.businessNature);
+        form.setValue("supplierEmail", companyData.email);
+        form.setValue("supplierPhoneNo", companyData.phoneNo);
+        form.setValue("supplierAddress", companyData.address);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    } else {
+     
+      form.setValue("supplierName", "");
+      form.setValue("supplierTIN", "");
+      form.setValue("supplierBRN", "");
+      form.setValue("supplierSSTNo", "");
+      form.setValue("supplierTTXNo", "");
+      form.setValue("supplierMSICCode", "");
+      form.setValue("MISCCodeCode", "");
+      setSearchTerm("");
+      form.setValue("supplierBusinessNature", "");
+      form.setValue("supplierEmail", "");
+      form.setValue("supplierPhoneNo", "");
+      form.setValue("supplierAddress", "");
+    }
+  };
+
+
+  useEffect(() => {
+    
+    if (defaultCurrentCompany) {
+
+      form.setValue("currentCompany", "1");
+      const companyData = defaultCurrentCompany.data;
+   
+      form.setValue("supplierName", companyData.company);
+      form.setValue("supplierTIN", companyData.TIN);
+      form.setValue("supplierBRN", companyData.BRN);
+      form.setValue("supplierSSTNo", companyData.SSTNo);
+      form.setValue("supplierTTXNo", companyData.TTxNo);
+      form.setValue("supplierMSICCode", companyData.MSIC);
+      form.setValue("MISCCodeCode", companyData.MSICCode);
+      setSearchTerm(companyData.MSICCode);
+      form.setValue("supplierBusinessNature", companyData.businessNature);
+      form.setValue("supplierEmail", companyData.email);
+      form.setValue("supplierPhoneNo", companyData.phoneNo);
+      form.setValue("supplierAddress", companyData.address);
+
+    }
+    return () => {
+
+    }
+  }, [defaultCurrentCompany])
+
+  return (
+    <Card collapsible defaultCollapsed={false} className="shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-lg font-bold">Own Company Information</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form>
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6">
+              
+              <FormField
+                control={form.control}
+                name="supplierName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Supplier Name:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7.5"
+                        {...field}
+                        moduleName="consolidatedInvoice"
+                        fieldName="supplierName"
+                        columnName="Supplier Name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="currentCompany"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1 pt-6">
+                    <div className="flex items-center">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value === "1"}
+                          onCheckedChange={(state) => {
+                            field.onChange(state ? "1" : "0");
+                            handleCurrentCompanyChange({ target: { checked: state } });
+                          }}
+                        />
+                      </FormControl>
+                      <FormLabel className="ml-2">Current Company</FormLabel>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierTIN"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Supplier TIN:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierBRN"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Supplier BRN/NRIC/Passport:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierSSTNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Supplier SST No.:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierTTXNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>TTx No.:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6 mt-4">
+              <FormField
+                control={form.control}
+                name="supplierMSICCode"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormLabel>UUID:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7" {...field} readOnly={true} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="MISCCodeCode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>MSIC:</FormLabel>
+                    <FormControl className="relative">
+                      <div className="relative">
+                        <Input
+                          className="h-7.5 pr-8"
+                          {...field}
+                          onClick={toggleTableMISCCode}
+                          ref={inputRef}
+                          value={searchTerm}
+                          onChange={(e) => {
+                            setSearchTerm(e.target.value);
+                            setShowTableMISCCode(true);
+                          }}
+                          autoComplete="off"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <FaMagnifyingGlass className="text-gray-400" />{" "}
+                          {/* Using the search icon */}
+                        </div>
+                        {showTableMISCCode && (
+                          <div
+                            ref={dropdownRef}
+                            className="absolute top-full z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md"
+                          >
+                            <ScrollArea className="h-[30cqh] bg-erp-gray-3">
+                              <DropdownTable
+                                columns={dropdownMISCCodeColumns}
+                                data={MISCCodeDropdownTableData}
+                                onClickRow={onClickRowMISCCode}
+                              />
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierBusinessNature"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 md:col-span-3 flex flex-col space-y-1">
+                    <FormLabel>Business Nature:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierEmail"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Supplier Email:</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-7.5"
+                        {...field}
+                        moduleName="consolidatedInvoice"
+                        fieldName="supplierEmail"
+                        columnName="Supplier Email"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierPhoneNo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col space-y-1">
+                    <FormLabel>Supplier Phone No.:</FormLabel>
+                    <FormControl>
+                      <Input className="h-7.5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid items-start gap-x-8 gap-y-1 grid-cols-1 md:grid-cols-6 mt-4">
+              <FormField
+                control={form.control}
+                name="supplierAddress"
+                render={({ field }) => (
+                  <FormItem className="col-span-6 row-span-3 grid h-full grid-rows-[auto_1fr] space-y-1">
+                    <FormLabel>Supplier Address:</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="h-7.5 resize-none"
+                        {...field}
+                        moduleName="consolidatedInvoice"
+                        fieldName="supplierAddress"
+                        columnName="Supplier Address"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

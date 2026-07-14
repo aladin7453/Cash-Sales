@@ -1,0 +1,28 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { FaPenToSquare } from "react-icons/fa6";
+
+import type { Table } from "@tanstack/react-table";
+
+type Props<TData> = {
+  table: Table<TData>;
+  destination: string;
+  forceEnabled?: boolean;
+  isMobile?: boolean;
+};
+
+export default function EditButton<TData>({ table, destination, forceEnabled, isMobile }: Props<TData>) {
+  const router = useRouter();
+
+  return (
+    <button
+      className={isMobile? "w-full flex jutify-start items-center gap-2" : "group flex flex-col items-center gap-y-1 disabled:cursor-not-allowed"}
+      onClick={() => router.push(destination)}
+      disabled={forceEnabled ? false : !(table.getSelectedRowModel().rows.length === 1)}
+    >
+      <FaPenToSquare className={isMobile? "size-4.5 text-erp-blue-11" : "size-5.5 text-erp-blue-11 group-disabled:text-erp-gray-5"} />
+      <span className={isMobile? "text-[10px]/none font-normal" : "text-[11px]/none font-medium group-disabled:text-erp-gray-5"}>Edit</span>
+    </button>
+  );
+}

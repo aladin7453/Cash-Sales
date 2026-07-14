@@ -1,0 +1,205 @@
+"use client";
+
+import React from "react";
+import { UseFormReturn } from "react-hook-form";
+
+import { Input } from "@/components/ui/input";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormControl,
+} from "@/components/ui/form";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+interface OutstandingAgingFormProps {
+  form: UseFormReturn<any>;
+}
+
+export default function OutstandingAgingForm({ form }: OutstandingAgingFormProps) {
+  // Helper function to format decimal values
+  const formatDecimal = (value: any) => {
+    if (value === undefined || value === null || value === "") return "0.00";
+
+    const num = parseFloat(value.toString().replace(/,/g, ""));
+    
+    return isNaN(num) ? "0.00" : num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  return (
+    <Form {...form}>
+      <Table className="w-full border-collapse border border-gray-300 mt-2">
+        <TableHeader>
+          <TableRow>
+            <TableCell 
+              colSpan={7} 
+              className="text-center font-bold text-md bg-erp-blue-8 border border-gray-300 py-2"
+            >
+              OUTSTANDING AGING
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableHead className="border border-gray-300 text-center font-semibold text-xs text-black">
+              &lt; 1 MTHS
+            </TableHead>
+            <TableHead className="border border-gray-300 text-center font-semibold text-xs text-black">
+              1 MTHS/+
+            </TableHead>
+            <TableHead className="border border-gray-300 text-center font-semibold text-xs text-black">
+              2 MTHS/+
+            </TableHead>
+            <TableHead className="border border-gray-300 text-center font-semibold text-xs text-black">
+              3 MTHS/+
+            </TableHead>
+            <TableHead className="border border-gray-300 text-center font-semibold text-xs text-black">
+              4 MTHS/+
+            </TableHead>
+            <TableHead className="border border-gray-300 text-center font-semibold text-xs text-black">
+              5 MTHS/+
+            </TableHead>
+            <TableHead className="border border-gray-300 text-center font-semibold text-xs text-black">
+              6 MTHS/+
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell className="border border-gray-300 p-1">
+              <FormField
+                control={form.control}
+                name="lessThanOneMonthAge"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input 
+                        className="h-7 text-center border-0 bg-transparent" 
+                        {...field} 
+                        value={formatDecimal(field.value)}
+                        readOnly 
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </TableCell>
+            <TableCell className="border border-gray-300 p-1">
+              <FormField
+                control={form.control}
+                name="oneMonthAge"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input 
+                        className="h-7 text-center border-0 bg-transparent" 
+                        {...field} 
+                        value={formatDecimal(field.value)}
+                        readOnly 
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </TableCell>
+            <TableCell className="border border-gray-300 p-1">
+              <FormField
+                control={form.control}
+                name="twoMonthAge"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input 
+                        className="h-7 text-center border-0 bg-transparent" 
+                        {...field} 
+                        value={formatDecimal(field.value)}
+                        readOnly 
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </TableCell>
+            <TableCell className="border border-gray-300 p-1">
+              <FormField
+                control={form.control}
+                name="threeMonthAge"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input 
+                        className="h-7 text-center border-0 bg-transparent" 
+                        {...field} 
+                        value={formatDecimal(field.value)}
+                        readOnly 
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </TableCell>
+            <TableCell className="border border-gray-300 p-1">
+              <FormField
+                control={form.control}
+                name="fourMonthAge"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input 
+                        className="h-7 text-center border-0 bg-transparent" 
+                        {...field} 
+                        value={formatDecimal(field.value)}
+                        readOnly 
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </TableCell>
+            <TableCell className="border border-gray-300 p-1">
+              <FormField
+                control={form.control}
+                name="fiveMonthAge"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input 
+                        className="h-7 text-center border-0 bg-transparent" 
+                        {...field} 
+                        value={formatDecimal(field.value)}
+                        readOnly 
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </TableCell>
+            <TableCell className="border border-gray-300 p-1">
+              <FormField
+                control={form.control}
+                name="sixMonthAge"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input 
+                        className="h-7 text-center border-0 bg-transparent" 
+                        {...field} 
+                        value={formatDecimal(field.value)}
+                        readOnly 
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </Form>
+  );
+}

@@ -1,0 +1,158 @@
+//Imports
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+
+//Action Button
+import CancelButton from "@/components/form/ActionButton/Cancel";
+import CloneButton from "@/components/form/ActionButton/Clone";
+import DeleteButton from "@/components/form/ActionButton/Delete";
+import NewButton from "@/components/form/ActionButton/New";
+import ResetButton from "@/components/form/ActionButton/Reset";
+import SaveButton from "@/components/form/ActionButton/Save";
+import LayoutToggleButton from "@/components/form/ActionButton/LayoutToggleButton";
+
+import { Checkbox } from "@/components/ui/checkbox";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+
+// Mobile View (Imports)
+import MobileFormActionGroup from "@/components/form/MobileFormActionGroup";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+
+import type { AutoBillingConfig } from "../columns";
+
+type TopActionBarProps = {
+  autoBillingConfig?: AutoBillingConfig | null;
+  form: any;
+  handleSubmit: () => void;
+  action: string;
+  params: any;
+  layout: "new" | "old";
+  onLayoutChange: (layout: "new" | "old") => void;
+  isLoading?: boolean;
+};
+
+export default function TopActionBar({
+  autoBillingConfig,
+  form,
+  handleSubmit,
+  action,
+  params,
+  layout,
+  onLayoutChange,
+  isLoading
+}: TopActionBarProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
+  useEffect(() => {
+    form.reset(autoBillingConfig || {});
+  }, [autoBillingConfig, form]);
+
+  const handleReset = () => {
+    const excludedKeys = ['account', 'accountName', '_actionUUID', '_version', 'UUID', 'company', 'companyName'];
+    if (params.slug == "new") {//new reset all to empty
+      const defaultValues = Object.keys(form.getValues()).reduce((acc, key) => {
+        const originalValue = form.getValues(key); // Get the original value
+
+        if (!excludedKeys.includes(key)) {
+          acc[key] = ''; // Reset to an empty string
+        } else {
+          acc[key] = originalValue; // Keep the original value
+        }
+        return acc;
+      }, {});
+      defaultValues.valid = '1'
+      form.reset(defaultValues)
+    } else {//reset back to previous data
+      form.reset();
+
+    }
+  };
+
+  // Change layout button condition (HardCode)
+  const systemAccount = JSON.parse(localStorage.getItem("system-account") || "{}");
+  const canChangeLayout = ["infollective", "infollectivetesting", "dev", "mymug", "vminimarket", "tridentmed"].includes(systemAccount);
+
+  return (
+    <div className="flex h-full w-full items-center justify-between bg-erp-gray-3 py-2">
+      <div className="flex space-x-3">
+        {/* Mobile View Action Buttons*/}
+        <MobileFormActionGroup
+          config={{
+            onSave: handleSubmit,
+            onReset: handleReset,
+            onCancel: () => router.push(`/sales/auto-billing-config/`),
+            newDestination: "/sales/auto-billing-config/new",
+            cloneDestination: `/sales/auto-billing-config/clone?id=${id}`,
+            deleteConfig: id && action !== "clone" ? {
+              module: "auto_billing_config",
+              model: "auto-billing-config",
+              id: `${id}`,
+              indexPath: `/sales/auto-billing-config/`
+            } : undefined,
+            showNew: !!(id && action !== "clone"),
+            showClone: !!(id && action !== "clone"),
+            showDelete: !!(id && action !== "clone"),
+          }}
+        >
+          {/* Additional Actions (Other than Save, New, Clone, Reset, Delete, and Cancel) */}
+        </MobileFormActionGroup>
+
+        {/* Web View Action Buttons */}
+        <div className="hidden md:flex space-x-3">
+
+          {/* Save Button */}
+          <SaveButton onSubmit={handleSubmit} disabled={isLoading}/>
+
+          {/* New Button */}
+          {id && action !== "clone" && <NewButton destination="/sales/auto-billing-config/new" />}
+
+          {/* Clone Button */}
+          {id && action !== "clone" && (
+            <CloneButton destination={`/sales/auto-billing-config/clone?id=${id}`} />
+          )}
+
+          {/* Reset Button */}
+          <ResetButton onClick={handleReset} />
+
+          {/* Delete Button */}
+          {id && action !== "clone" && (
+            <DeleteButton
+              module={"auto_billing_config"}
+              model={"auto-billing-config"}
+              id={`${id}`}
+              indexPath={`/sales/auto-billing-config/`}
+            />
+          )}
+
+          {/* Cancel Button */}
+          <CancelButton onClick={() => router.push(`/sales/auto-billing-config/`)} />
+
+          {/* Switch Button */}
+          {canChangeLayout && <LayoutToggleButton layout={layout} onChange={onLayoutChange} />}
+        </div>
+      </div>
+
+      <Form id="topActionBarForm" {...form}>
+        <div className="flex items-center gap-x-4 px-3">
+          <FormField
+            control={form.control}
+            name="valid"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-x-2 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value === "1"}
+                    onCheckedChange={(state) => field.onChange(state ? "1" : "0")}
+                  />
+                </FormControl>
+                <FormLabel>Valid</FormLabel>
+              </FormItem>
+            )}
+          />
+        </div>
+      </Form>
+    </div>
+  );
+}

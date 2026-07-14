@@ -1,0 +1,1073 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+import React, { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { FaClipboard, FaLayerGroup, FaQrcode } from "react-icons/fa6";
+import { Tab, TabList, TabPanel, Tabs } from "react-tabs";
+import useSWR from "swr";
+import { z } from "zod";
+
+import { DateRestrictionContext } from "@/components/custom/DateRestrictionContext";
+import { CustomFieldDefinition, CustomFieldHandle } from "@/components/DisplayCustomField";
+import LoadingUI from "@/components/LoadingUI";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form } from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { TabsNavigator } from "@/components/ui/TabsNavigator";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { useApi } from "@/lib/hooks/useAPI";
+import { cn } from "@/lib/utils/cn";
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+
+import { BuyerDetailsForm } from "./e-invoice-details/buyer-details/BuyerDetailsFormOld";
+import { EInvoiceDetailsForm } from "./e-invoice-details/e-invoice-document-details/EInvoiceDetailsFormOld";
+import { ImportExportOfGoodsForm } from "./e-invoice-details/import-&-export-of-goods/Import&ExportOfGoodsDetailsFormOld";
+import { PaymentDetailsForm } from "./e-invoice-details/payment-details/PaymentDetailsFormOld";
+import { ShippingRecipientDetailsForm } from "./e-invoice-details/shipping-recipient-details/ShippingRecipientDetailsFormOld";
+import { SupplierDetailsForm } from "./e-invoice-details/supplier-details/SupplierDetailsFormOld";
+import { CustomerDetailsForm } from "./main-details/customer-details/CustomerDetailsForm";
+import { CustomerDetailsFormOld } from "./main-details/customer-details/CustomerDetailsFormOld";
+import { DocumentDetailsForm } from "./main-details/document-details/DocumentDetailsForm";
+import { DocumentDetailsFormOld } from "./main-details/document-details/DocumentDetailsFormOld";
+import { knockOffDetailsColumns } from "./main-details/knock-off-details/columns";
+import KnockOffDetailsDataTable from "./main-details/knock-off-details/DataTable";
+import KnockOffDetailsDataTableOld from "./main-details/knock-off-details/DataTableOld";
+import { SalesCreditNoteColumns } from "./main-details/sales-credit-note-details/columns";
+import SalesCreditNoteDataTable from "./main-details/sales-credit-note-details/DataTable";
+import SalesCreditNoteDataTableOld from "./main-details/sales-credit-note-details/DataTableOld";
+import MoreDetailsForm from "./more-details/MoreDetailsFormOld";
+import TopActionBar from "./TopActionBar";
+
+type PageParams = {
+  params: { slug: string };
+};
+
+const validRoutes = ["new", "edit", "clone", "transfer-to", "transfer-from"] as const;
+
+const fetcher = async (url) => {
+  const headers = getAuthHeaders();
+
+  return fetch(url, { headers }).then((res) => {
+    if (!res.ok) {
+      throw new Error("Failed to fetch data");
+    }
+
+    return res.json();
+  });
+};
+
+const knockOffDetailsFetcher = async ({ url, formValues }) => {
+  const headers = getAuthHeaders();
+  const formData = new FormData();
+
+  // Get the currency value from the passed form values
+  const customerCode = formValues.customerCode;
+  const currency = formValues.currency;
+
+  // Append the currency value to the formData
+  // formData.append("currency", currency || "");
+
+  // formData.append(`param[limit]`, "20");
+  // formData.append(`param[offset]`, "0");
+  // formData.append(`param[filter]`, "{}");
+  // formData.append(`param[order]`, "desc");
+  formData.append(`param[valid]`, "1");
+  // formData.append(`param[sort]`, "docDateFormat");
+
+  formData.append(`param[customerCode]`, customerCode);
+  formData.append(`param[currency]`, currency);
+
+  return fetch(url, {
+    method: "POST",
+    headers,
+    body: formData,
+  }).then((res) => {
+    if (!res.ok) {
+      throw new Error("Failed to fetch data");
+    }
+
+    return res.json();
+  });
+};
+
+type ValidRoute = (typeof validRoutes)[number];
+
+const salesCreditNoteFormSchema = z.object({
+  customerCodeCode: z.string().min(1, {
+    message: "Required",
+  }),
+});
+
+function isValidRoute(route: string): route is ValidRoute {
+  return validRoutes.includes(route as ValidRoute);
+}
+
+export default function SalesCreditNoteDetailsPage({ params }: PageParams) {
+  const headers = getAuthHeaders();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const customFieldRef = useRef<CustomFieldHandle>(null);
+  const slug = params.slug;
+  const id = searchParams.get("id");
+
+  const { toast } = useToast();
+  const [allowPastRecord, setAllowPastRecord] = useState(false);
+
+  const [formResetKey, setFormResetKey] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [approvalStatus, setApprovalStatus] = useState({});
+
+  const [salesCreditNoteData, setSalesCreditNoteData] = useState({});
+  const [tempRowSalesCreditNoteDetailsList, setTempRowSalesCreditNoteDetailsList] = useState([]);
+  const [tempRowAttachments, setTempRowAttachments] = useState([]);
+  const [UOMDetails, setUOMDetails] = useState({});
+  const currentCompany = JSON.parse(localStorage.getItem("currentCompany") || "null");
+
+  const [customerCode, setCustomerCode] = useState("");
+  const [tempRowKnockOffDetails, setTempRowKnockOffDetails] = useState([]);
+  const [modifiedKnockOffDetails, setModifiedKnockOffDetails] = useState([]);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
+
+  if (!isValidRoute(slug)) {
+    notFound();
+  }
+
+  // ─── Layout State ─────────────────────────────────────────────────────────────
+  const [layout, setLayout] = useState<"new" | "old">(() => {
+    if (typeof window === "undefined") return "old";
+    return (localStorage.getItem("Layout") as "new" | "old") || "old";
+  });
+
+  const handleLayoutChange = (newLayout: "new" | "old") => {
+    localStorage.setItem("Layout", newLayout);
+    setLayout(newLayout);
+  };
+
+  const {
+    data: salesCreditNote,
+    error,
+    isLoading,
+    isValidating,
+    mutate: mutateSalesCreditNote,
+  } = useApi(
+    id
+      ? `${ORIGIN}/sales_credit_note/api/sales-credit-note/get-update-sales-credit-note-data?id=${id}`
+      : null,
+    { revalidateOnFocus: false },
+  );
+
+  const { data: defaultCurrentCompany } = useApi(
+    !id && `${ORIGIN}/universal/get-current-company?id=${currentCompany?.UUID}`,
+    { revalidateOnFocus: false },
+  );
+
+  const {
+    data: salesCreditNoteDetails,
+    error: salesCreditNoteDetailsError,
+    mutate: mutateSalesCreditNoteDetails,
+  } = useApi(
+    id
+      ? `${ORIGIN}/sales_credit_note/api/sales-credit-note/get-update-sales-credit-note-has-details-data?id=${id}`
+      : null,
+    { revalidateOnFocus: false },
+  );
+
+  const {
+    data: getPermissions,
+    error: getPermissionsError,
+    mutate: mutateGetPermissions,
+  } = useApi(!id ? `${ORIGIN}/sales_credit_note/api/sales-credit-note/get-permissions` : null, {
+    revalidateOnFocus: false,
+  });
+
+  const viewEInvoiceDetails = [
+    ...(Array.isArray(getPermissions?.data) ? getPermissions.data : []),
+    ...(Array.isArray(salesCreditNote?.rules) ? salesCreditNote.rules : []),
+  ].includes("view-sales-credit-note-e-invoice-details");
+
+  const tabs = [
+    {
+      id: "mainDetails",
+      name: "Main Details",
+      icon: FaClipboard,
+      shortName: "Main",
+    },
+    {
+      id: "moreDetails",
+      name: "More Details",
+      icon: FaLayerGroup,
+      shortName: "More",
+    },
+    // {
+    //   id: "eInvoiceDetails",
+    //   name: "e-Invoice Details",
+    //   icon: FaQrcode,
+    //   shortName: "E-Inv",
+    // },
+    ...(viewEInvoiceDetails
+      ? [
+        {
+          id: "eInvoiceDetails",
+          name: "e-Invoice Details",
+          icon: FaQrcode,
+          shortName: "E-Inv",
+        },
+      ]
+      : []),
+  ];
+
+  const isFetching = isLoading || isValidating || isSaving;
+
+  // Preference (State)
+  const [preferenceData, setPreferenceData] = useState<any>(null);
+  const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
+  const [customFieldSavedData, setCustomFieldSavedData] = useState<Record<string, unknown>>({});
+
+  const fetchPreferenceData = async () => {
+    try {
+      const headers = getAuthHeaders();
+
+      const response = await fetch(`${ORIGIN}/universal/get-preference?module=sales`, {
+        method: "GET",
+        headers,
+      });
+      if (!response.ok) throw new Error("Failed to fetch preference data");
+      const data = await response.json();
+      setPreferenceData(data);
+
+      // Fetch custom field definitions
+      const prefRes = await fetch(
+        `${ORIGIN}/sales_preference/api/sales-preference/get-index-sales-preference`,
+        { method: "GET", headers },
+      );
+      if (!prefRes.ok) throw new Error("Failed to fetch custom field preference");
+      const prefData = await prefRes.json();
+      const raw = prefData?.data?.customDIYFields ?? prefData?.customDIYFields ?? [];
+      const rawFields: CustomFieldDefinition[] = (() => {
+        try {
+          const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })();
+      setCustomFieldDefs(rawFields);
+    } catch (error) {
+      console.error("Error fetching preference data:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchPreferenceData();
+  }, []);
+
+  useEffect(() => {
+    if (salesCreditNote && slug !== "transfer-to" && slug !== "transfer-from") {
+      const salesCreditNoteDataCopy = { ...salesCreditNote.data };
+
+      // Clear docNo if it's a clone page
+      if (slug === "clone") {
+        salesCreditNoteDataCopy.docNo = "";
+        salesCreditNoteDataCopy.docDate = Math.floor(Date.now() / 1000);
+        salesCreditNoteDataCopy.eInvoiceStatus = "";
+        salesCreditNoteDataCopy.digitalSignature = "";
+        salesCreditNoteDataCopy.oriRefNo = "";
+        salesCreditNoteDataCopy.eInvoiceVersion = "";
+        salesCreditNoteDataCopy.eInvoiceCode = "";
+        salesCreditNoteDataCopy.consolidateTo = "";
+        salesCreditNoteDataCopy.consolidatedInvoiceDocNo = "";
+      }
+
+      const qrLink = salesCreditNoteDataCopy.QRAttachmentLink;
+      salesCreditNoteDataCopy.QRAttachmentLink = Array.isArray(qrLink)
+        ? qrLink[0] ?? null
+        : qrLink ?? null;
+
+      setSalesCreditNoteData(salesCreditNoteDataCopy);
+      setApprovalStatus(salesCreditNote.approval);
+      setCustomerCode(salesCreditNote.data?.customerCode);
+      setAllowPastRecord(salesCreditNote.data.allowPastDates === "1");
+      setIsSaving(false);
+      setTempRowAttachments(
+        salesCreditNote.data.attachmentLink ? salesCreditNote.data.attachmentLink : [],
+      );
+
+      const rawSaved = salesCreditNote?.customDIYFieldData;
+      if (rawSaved) {
+        setCustomFieldSavedData(typeof rawSaved === "string" ? JSON.parse(rawSaved) : rawSaved);
+      } else {
+        setCustomFieldSavedData({});
+      }
+    }
+  }, [salesCreditNote, slug, preferenceData]);
+
+  useEffect(() => {
+    if (salesCreditNoteDetails && slug !== "transfer-to" && slug !== "transfer-from") {
+      // Preference (Add Preference Data to Table Details)
+      const detailsWithPreferences = salesCreditNoteDetails.rows.map((row) => ({
+        ...row,
+        preferenceData: preferenceData,
+      }));
+
+      setTempRowSalesCreditNoteDetailsList(detailsWithPreferences);
+    }
+  }, [salesCreditNoteDetails, slug, preferenceData]);
+
+  const revalidateSalesCreditNoteDetails = () => {
+    mutateSalesCreditNoteDetails();
+  };
+
+  const handleSubmit = async () => {
+    setSubmitAttempted(true);
+    setActiveTab("items");
+    const isFormValid = await form.trigger();
+
+    if (!isFormValid) {
+      const errors = form.formState.errors;
+
+      if (errors.customerCodeCode) {
+        toast({
+          title: "Customer Required",
+          description: "Please select a customer before saving.",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+      return;
+    }
+
+    try {
+      await onSubmit();
+    } catch (error) {
+      console.error("Form submission error:", error);
+    }
+  };
+
+  const revalidateSalesCreditNote = () => {
+    mutateSalesCreditNote(undefined, { revalidate: true });
+  };
+
+  const form = useForm<z.infer<typeof salesCreditNoteFormSchema>>({
+    resolver: zodResolver(salesCreditNoteFormSchema),
+    defaultValues: {
+      docNo: salesCreditNote?.docNo ?? "",
+      agentName: salesCreditNote?.agentName ?? "",
+      term: salesCreditNote?.term ?? "",
+      creditTermCode: salesCreditNote?.creditTermCode ?? "",
+      closingDate: salesCreditNote?.closingDate ?? "",
+      description: salesCreditNote?.description ?? "",
+      customerCode: salesCreditNote?.customerCode ?? "",
+      customerCodeCode: salesCreditNote?.customerCodeCode ?? "",
+      customerName: salesCreditNote?.customerName ?? "",
+      BRN: salesCreditNote?.BRN ?? "",
+      attentionName: salesCreditNote?.attentionName ?? "",
+      address: salesCreditNote?.address ?? "",
+      TIN: salesCreditNote?.TIN ?? "",
+      SSTNo: salesCreditNote?.SSTNo ?? "",
+      phoneNo: salesCreditNote?.phoneNo ?? "",
+      email: salesCreditNote?.email ?? "",
+      valid: salesCreditNote?.valid ?? "1",
+      currency: salesCreditNote?.currency ?? "",
+      currencyCode: salesCreditNote?.currencyCode ?? "",
+      currencyRate: salesCreditNote?.currencyRate ?? "",
+      eInvoiceType: "02",
+      eInvoiceTypeDescription: "Credit Note",
+    },
+  });
+
+  const {
+    data: knockOffDetailsData,
+    error: knockOffDetailsError,
+    mutate: mutateKnockOffDetails,
+  } = useSWR(
+    customerCode && (id || slug === "new")
+      ? {
+        url: `${ORIGIN}/sales_credit_note/api/sales-credit-note/get-invoices?id=${id}`,
+        formValues: {
+          currency: form.getValues("currency"),
+          customerCode: form.getValues("customerCode"),
+        },
+      }
+      : id
+        ? {
+          url: `${ORIGIN}/sales_credit_note/api/sales-credit-note/get-invoices?id=${id}`,
+          formValues: {
+            currency: form.getValues("currency"),
+            customerCode: form.getValues("customerCode"),
+          },
+        }
+        : null,
+    knockOffDetailsFetcher,
+    { revalidateOnFocus: false },
+  );
+
+  // Knock-Off Details Data Logic
+  useEffect(() => {
+    if (knockOffDetailsData && knockOffDetailsData.rows) {
+      // Preference (Add Preference Data to Table Details)
+      setTempRowKnockOffDetails(knockOffDetailsData.rows);
+    }
+  }, [knockOffDetailsData]);
+
+  // New Page Logic
+  useEffect(() => {
+    if (customerCode && slug === "new") {
+      // Clear existing knock-off details when customer changes on new page
+      setTempRowKnockOffDetails([]);
+
+      // Trigger revalidation to fetch new data
+      mutateKnockOffDetails();
+    }
+  }, [customerCode, slug, mutateKnockOffDetails]);
+
+  const revalidateKnockOffDetail = () => {
+    mutateKnockOffDetails();
+  };
+
+  // Currency Change Handler
+  const handleCurrencyChange = () => {
+    mutateKnockOffDetails();
+  };
+
+  const onSubmit = async () => {
+    setIsSaving(true);
+
+    setSubmitAttempted(true);
+
+    const ok = await customFieldRef.current?.save();
+    if (ok === false) {
+      setIsSaving(false);
+      return;
+    }
+
+    var form_data = new FormData();
+    var formValues = form.getValues();
+
+    const localNetTotal = document.querySelector(".localNetTotal");
+    const netTotal = document.querySelector(".netTotal");
+
+    var saveType =
+      slug == "clone"
+        ? `create-data?c_id=1`
+        : id
+          ? `update-sales-credit-note-data?id=${id}`
+          : `create-data`;
+
+    var transferType = "";
+    var transferData = "";
+
+    if (slug === "transfer-to") {
+      transferData = JSON.parse(localStorage.getItem("transfer-to.sales-credit-note") || "{}");
+    } else if (slug === "transfer-from") {
+      transferData = JSON.parse(localStorage.getItem("transfer-from.sales-credit-note") || "{}");
+    }
+
+    var transferDocType = transferData?.data?.transferDocType;
+
+    // Preference (Get Decimal Places for Calculations)
+    const decimal = preferenceData?.data?.decimal || 2;
+
+    transferType =
+      slug == "transfer-to" || slug == "transfer-from" ? `?transferFrom=${transferDocType}` : "";
+
+    // Ensure all required fields exist and default to 0 if undefined or empty
+    let totalAmount = tempRowSalesCreditNoteDetailsList.reduce((sum, row) => {
+      return sum + (row.amount ? parseFloat(row.amount) : 0);
+    }, 0);
+
+    let totalDiscount = tempRowSalesCreditNoteDetailsList.reduce((sum, row) => {
+      const discount1 = row.discountAmount ? parseFloat(row.discountAmount) : 0;
+      const discount2 = row.discountAmount2 ? parseFloat(row.discountAmount2) : 0;
+      const discount3 = row.discountAmount3 ? parseFloat(row.discountAmount3) : 0;
+
+      return sum + discount1 + discount2 + discount3;
+    }, 0);
+
+    let totalTax = tempRowSalesCreditNoteDetailsList.reduce((sum, row) => {
+      return sum + (row.taxAmount ? parseFloat(row.taxAmount) : 0);
+    }, 0);
+
+    // Fix the calculation of totalSubtotal
+    let totalSubtotal = totalAmount - totalDiscount + totalTax;
+    let totalSubtotalWithoutTax = totalAmount - totalDiscount;
+
+    let prepaymentAmount = parseFloat(formValues.prepaymentAmount) || 0;
+    let totalFeeAmount = parseFloat(formValues.totalFeeAmount) || 0;
+
+    // Use the actual rounding amount from the form instead of calculating
+    let roundingAmount = parseFloat(formValues.roundingAmount) || 0;
+
+    // Correct totalPayable Calculation using the form's rounding amount
+    let totalPayable =
+      totalAmount - totalDiscount + totalTax - prepaymentAmount + totalFeeAmount + roundingAmount;
+
+    let localNetTotalValue = localNetTotal?.value;
+
+    // Validation: Prevent save if invoiceType == "Consolidate" and totalPayable >= 10,000
+    if (
+      formValues.invoiceType == "Consolidate" &&
+      (totalPayable >= 10000 || localNetTotalValue >= 10000)
+    ) {
+      toast({
+        title: "Error",
+        description: "Total invoice amount cannot exceed RM10,000 for Consolidate Invoice.",
+        variant: "destructive",
+        duration: 4000,
+      });
+      setIsSaving(false);
+      return;
+    }
+
+    // Set outstanding amount based on isPaid status
+    let outstandingAmount = isPaid ? parseFloat(formValues.outstandingAmount) : totalPayable;
+
+    // Preference (Apply Decimal Formatting to Totals)
+    formValues.totalAmount = totalAmount.toFixed(decimal);
+    formValues.totalDiscount = totalDiscount.toFixed(decimal);
+    formValues.totalTax = totalTax.toFixed(decimal);
+    formValues.totalSubtotal = totalSubtotalWithoutTax.toFixed(decimal);
+    formValues.roundingAmount = roundingAmount.toFixed(decimal);
+    formValues.totalPayable = totalPayable.toFixed(decimal);
+    formValues.outstandingAmount = outstandingAmount.toFixed(decimal);
+
+    formValues.localNetTotal = localNetTotal?.value;
+    formValues.netTotal = netTotal?.value;
+
+    // Create salesCreditNote object excluding attachments
+    const salesCreditNoteData = { ...formValues };
+
+    delete salesCreditNoteData.attachmentLink;
+    delete salesCreditNoteData.attachment;
+
+    // Always send only modified knock-off details for all operations
+    // This ensures we only send data that has actually been changed by the user
+    // const knockOffDetailsToSend = modifiedKnockOffDetails;
+
+    // Restructure salesCreditNoteHasKnockoffs before pass to backend
+    const knockOffDetailsToSend = modifiedKnockOffDetails.map((item) => ({
+      UUID: item.UUID,
+      outstandingAmount: item.outstandingAmount,
+      docType: item.docType,
+      knockoffAmount: item.knockoffAmount,
+    }));
+
+    // Combine salesCreditNote and salesCreditNoteHasDetails into single data object
+    const combinedData = {
+      salesCreditNote: salesCreditNoteData,
+      salesCreditNoteHasDetails: tempRowSalesCreditNoteDetailsList,
+      salesCreditNoteHasKnockoffs: knockOffDetailsToSend,
+    };
+
+    // Add combined data as JSON string
+    form_data.append("data", JSON.stringify(combinedData));
+
+    if (saveType === "create-data") {
+      var counter = 0;
+
+      for (const file of tempRowAttachments) {
+        const base64 = await getFileToBase64(file);
+
+        form_data.append(`salesCreditNote[attachment][${counter}][Name]`, file.name);
+
+        form_data.append(`salesCreditNote[attachment][${counter}][File]`, base64);
+
+        counter++;
+      }
+    } else {
+      var counter = 0;
+
+      for (const attachment of tempRowAttachments) {
+        if (attachment.link) {
+          form_data.append(`salesCreditNote[attachment][${counter}][Name]`, attachment.name);
+          form_data.append(`salesCreditNote[attachment][${counter}][File]`, "");
+        } else {
+          const base64 = await getFileToBase64(attachment);
+
+          form_data.append(`salesCreditNote[attachment][${counter}][Name]`, attachment.name);
+          form_data.append(`salesCreditNote[attachment][${counter}][File]`, base64);
+        }
+
+        counter++;
+      }
+    }
+
+    try {
+      const response = await fetch(
+        `${ORIGIN}/sales_credit_note/api/sales-credit-note/${saveType}${transferType}`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        setIsSaving(false);
+
+        let errorMessage = errorData.message;
+
+        // Error Handling for "Data too long"
+        if (errorMessage.includes("Data too long")) {
+          errorMessage = errorMessage.split("\n")[0];
+        }
+
+        toast({
+          title: errorData.name,
+          description: errorMessage,
+          variant: "destructive",
+          duration: 2000,
+        });
+
+        throw new Error("Failed to fetch data");
+      }
+
+      const responseData = await response.json();
+
+      if (responseData && responseData.item) {
+        if (slug === "transfer-to") localStorage.removeItem("transfer-to.sales-credit-note");
+        else if (slug === "transfer-from")
+          localStorage.removeItem("transfer-from.sales-credit-note");
+
+        if (customFieldRef.current) {
+          try {
+            await customFieldRef.current.save(responseData.data, responseData.item);
+          } catch (err) {
+            console.error("Failed to save custom fields:", err);
+          }
+        }
+
+        const url = `/sales/sales-credit-note/edit?item=${responseData.item}&id=${responseData.data}`;
+
+        router.push(url);
+
+        if (params.slug == "edit") {
+          mutateSalesCreditNote();
+          mutateSalesCreditNoteDetails();
+        }
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+
+        // Clear modified details after successful save
+        setModifiedKnockOffDetails([]);
+
+        // Revalidate knock-off details data
+        mutateKnockOffDetails();
+      } else if (responseData.message) {
+        if (slug === "transfer-to") localStorage.removeItem("transfer-to.sales-credit-note");
+        else if (slug === "transfer-from")
+          localStorage.removeItem("transfer-from.sales-credit-note");
+
+        setIsSaving(false);
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      } else if (slug === "clone" && id) {
+        router.push(`/sales/sales-credit-note/clone?id=${id}`);
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+
+        // Revalidate knock-off details data
+        mutateKnockOffDetails();
+      }
+    } catch (error) {
+      setIsSaving(false);
+
+      console.error("Error creating new job order data:", error);
+
+      toast({
+        title: `${error.message}`,
+        variant: "destructive",
+        duration: 2000,
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && (slug === "transfer-to" || slug === "transfer-from")) {
+      const transferDataKey =
+        slug === "transfer-to"
+          ? "transfer-to.sales-credit-note"
+          : "transfer-from.sales-credit-note";
+      const transferData = JSON.parse(localStorage.getItem(transferDataKey) || "{}");
+      if (transferData) {
+        transferData.data.eInvoiceStatus = "";
+        transferData.data.digitalSignature = "";
+        transferData.data.oriRefNo = "";
+        transferData.data.eInvoiceVersion = "";
+        transferData.data.eInvoiceCode = "";
+        transferData.data.consolidateTo = "";
+        transferData.data.consolidatedInvoiceDocNo = "";
+      }
+      const mappedData = {
+        ...transferData?.data,
+        description: "",
+        note: "",
+        UUID: "",
+        docDate: Math.floor(Date.now() / 1000),
+      };
+
+      setSalesCreditNoteData(mappedData);
+
+      transferData?.subData?.forEach((detail) => {
+        detail["item"] = detail["item"];
+        detail["itemGroup"] = detail["itemGroup"];
+        detail["itemCategory"] = detail["itemCategory"];
+        detail["transferredFrom"] = detail["UUID"];
+      });
+
+      setTempRowSalesCreditNoteDetailsList(transferData?.subData);
+
+      function beforeUnload(e: BeforeUnloadEvent) {
+        localStorage.removeItem(transferDataKey);
+
+        e.preventDefault();
+      }
+
+      window.addEventListener("beforeunload", beforeUnload);
+
+      return () => {
+        window.removeEventListener("beforeunload", beforeUnload);
+      };
+    }
+  }, [slug]);
+
+  // ─── Shared Props ─────────────────────────────────────────────────────────────
+  const [isExpand, setIsExpand] = useState(false);
+
+  const documentDetailsProps = {
+    key: formResetKey,
+    form,
+    slug,
+    preferenceData,
+    tempRowAttachments,
+    setTempRowAttachments,
+    salesCreditNoteData: salesCreditNote,
+    defaultCurrentCompany,
+    id,
+    salesCreditNoteDetails,
+    tempRowSalesCreditNoteDetailsList,
+    isExpand,
+  };
+
+  const dataTableProps = {
+    columns: SalesCreditNoteColumns,
+    data: id
+      ? salesCreditNoteDetails
+        ? salesCreditNoteDetails.rows
+        : []
+      : tempRowSalesCreditNoteDetailsList,
+    tempRowSalesCreditNoteDetailsList,
+    setTempRowSalesCreditNoteDetailsList,
+    revalidateSalesCreditNoteDetails,
+    form,
+    salesCreditNoteData,
+    UOMDetails,
+    preferenceData,
+    slug,
+  };
+
+  // Create refs for each section
+  const mainDetailsRef = useRef(null);
+  const moreDetailsRef = useRef(null);
+  const eInvoiceDetailsRef = useRef(null);
+
+  const isPaid = slug === "clone" ? false : salesCreditNote?.isPaid || false;
+  const [activeTab, setActiveTab] = useState<"items" | "knockoff">("items");
+
+  return (
+    <DateRestrictionContext.Provider value={{ allowPastRecord, setAllowPastRecord }}>
+      <div className="sticky top-0 z-20">
+        <TopActionBar
+          salesCreditNote={salesCreditNoteData}
+          approvalStatus={approvalStatus}
+          tempRowSalesCreditNoteDetailsList={tempRowSalesCreditNoteDetailsList}
+          form={form}
+          handleSubmit={handleSubmit}
+          salesCreditNoteFormSchema={salesCreditNoteFormSchema}
+          slug={slug}
+          isSaving={isSaving}
+          setIsSaving={setIsSaving}
+          revalidateSalesCreditNote={revalidateSalesCreditNote}
+          viewEInvoiceDetails={viewEInvoiceDetails}
+          modifiedKnockOffDetails={modifiedKnockOffDetails}
+          // Layout switcher props
+          layout={layout}
+          onLayoutChange={handleLayoutChange}
+          salesCreditNoteData={salesCreditNote}
+        />
+      </div>
+
+      {/* New Design */}
+      {layout === "new" && (
+        <div className="box-border flex h-full w-full items-center justify-between gap-x-2 p-1.5">
+          <Form {...form}>
+            {/* Left Container */}
+            <div className="flex h-full w-[480px] min-w-[380px] flex-col gap-y-2">
+              <CustomerDetailsForm
+                form={form}
+                setIsExpand={setIsExpand}
+                isExpand={isExpand}
+                id={id}
+                docNo={salesCreditNoteData?.docNo}
+                customFieldRef={customFieldRef}
+                preferenceData={preferenceData}
+                slug={slug}
+                customFieldDefs={customFieldDefs}
+                customFieldSavedData={customFieldSavedData}
+                submitAttempted={submitAttempted}
+              />
+              <DocumentDetailsForm {...documentDetailsProps} />
+            </div>
+            {/* Right */}
+            <div className="mt-3.5 flex h-full w-full flex-1 flex-col md:mt-0">
+              <Card className="w-full shadow-sm">
+                <CardContent className="px-0 py-1">
+                  <Tabs>
+                    <TabList className="flex px-1.5">
+                      {["Items", "Knock Off"].map((label) => (
+                        <Tab
+                          key={label}
+                          className="cursor-pointer rounded-tl-md rounded-tr-md border-[1px] border-gray-200 bg-transparent px-2 py-1 text-[12px] text-black outline-none transition-all duration-300 ease-in-out"
+                          selectedClassName="!bg-blue-300 border-blue-300 text-white"
+                        >
+                          {label}
+                        </Tab>
+                      ))}
+                    </TabList>
+
+                    <TabPanel
+                      forceRender
+                      className="hidden"
+                      selectedClassName="react-tabs__tab-panel--selected"
+                    >
+                      <SalesCreditNoteDataTable {...dataTableProps} />
+                    </TabPanel>
+
+                    <TabPanel
+                      forceRender
+                      className="hidden"
+                      selectedClassName="react-tabs__tab-panel--selected"
+                    >
+                      <KnockOffDetailsDataTable
+                        columns={knockOffDetailsColumns}
+                        data={
+                          customerCode && (id || slug === "new")
+                            ? knockOffDetailsData
+                              ? knockOffDetailsData.rows || []
+                              : []
+                            : tempRowKnockOffDetails
+                        }
+                        tempRowKnockOffDetails={tempRowKnockOffDetails}
+                        setTempRowKnockOffDetails={setTempRowKnockOffDetails}
+                        revalidateKnockOffDetailsData={revalidateKnockOffDetail}
+                        currencyRate={salesCreditNoteData.currencyRate}
+                        docDate={salesCreditNoteData.docDate}
+                        docUnappliedAmount={salesCreditNoteData.outstandingAmount}
+                        modifiedKnockOffDetails={modifiedKnockOffDetails}
+                        setModifiedKnockOffDetails={setModifiedKnockOffDetails}
+                        form={form}
+                        preferenceData={preferenceData}
+                      />
+                    </TabPanel>
+                  </Tabs>
+                </CardContent>
+              </Card>
+            </div>
+            {/* Loading */}
+            {isFetching && <LoadingUI />}
+          </Form>
+        </div>
+      )}
+
+      {/* Old Design */}
+      {layout === "old" && (
+        <div className="grid h-full grid-rows-[auto_1fr]">
+          <Form {...form}>
+            <div className="grid h-full grid-cols-[1fr_auto] gap-x-2">
+              {/* Preference (Pass preferenceData Prop) */}
+              <ScrollArea className="h-full">
+                <div id="mainDetails" className="mt-2" ref={mainDetailsRef}>
+                  <DocumentDetailsFormOld
+                    key={formResetKey}
+                    form={form}
+                    slug={slug}
+                    preferenceData={preferenceData}
+                    modifiedKnockOffDetails={modifiedKnockOffDetails}
+                  />
+                </div>
+
+                <div className="mt-2">
+                  <CustomerDetailsFormOld form={form} setCustomerCode={setCustomerCode} />
+                </div>
+
+                <div className="mt-2">
+                  <Card
+                    collapsible
+                    defaultCollapsed={false}
+                    className="h-auto pb-2 shadow-md"
+                    style={{ marginTop: "10px" }}
+                  >
+                    <CardHeader>
+                      <CardTitle className="text-lg font-bold">Items/Knockoff Details</CardTitle>
+                    </CardHeader>
+
+                    {/* Tabs */}
+                    <div className="flex border-b border-gray-200 px-2">
+                      <button
+                        className={`px-4 py-2 font-medium ${activeTab === "items"
+                            ? "border-b-2 border-blue-500 text-blue-500"
+                            : "text-gray-500 hover:text-blue-500"
+                          }`}
+                        onClick={() => setActiveTab("items")}
+                      >
+                        Items
+                      </button>
+                      <button
+                        className={`px-4 py-2 font-medium ${activeTab === "knockoff"
+                            ? "border-b-2 border-blue-500 text-blue-500"
+                            : "text-gray-500 hover:text-blue-500"
+                          }`}
+                        onClick={() => setActiveTab("knockoff")}
+                      >
+                        Knockoff
+                      </button>
+                    </div>
+
+                    <CardContent className="px-2 py-0">
+                      {activeTab === "items" && (
+                        <SalesCreditNoteDataTableOld
+                          columns={SalesCreditNoteColumns}
+                          data={
+                            id
+                              ? salesCreditNoteDetails
+                                ? salesCreditNoteDetails.rows
+                                : []
+                              : tempRowSalesCreditNoteDetailsList
+                          }
+                          tempRowSalesCreditNoteDetailsList={tempRowSalesCreditNoteDetailsList}
+                          setTempRowSalesCreditNoteDetailsList={
+                            setTempRowSalesCreditNoteDetailsList
+                          }
+                          revalidateSalesCreditNoteDetails={revalidateSalesCreditNoteDetails}
+                          form={form}
+                          salesCreditNoteData={salesCreditNoteData}
+                          UOMDetails={UOMDetails}
+                          preferenceData={preferenceData}
+                          slug={slug}
+                        />
+                      )}
+
+                      {activeTab === "knockoff" && (
+                        <KnockOffDetailsDataTableOld
+                          columns={knockOffDetailsColumns}
+                          data={
+                            customerCode && (id || slug === "new")
+                              ? knockOffDetailsData
+                                ? knockOffDetailsData.rows || []
+                                : []
+                              : tempRowKnockOffDetails
+                          }
+                          tempRowKnockOffDetails={tempRowKnockOffDetails}
+                          setTempRowKnockOffDetails={setTempRowKnockOffDetails}
+                          revalidateKnockOffDetailsData={revalidateKnockOffDetail}
+                          currencyRate={salesCreditNoteData.currencyRate}
+                          docDate={salesCreditNoteData.docDate}
+                          docUnappliedAmount={salesCreditNoteData.outstandingAmount}
+                          modifiedKnockOffDetails={modifiedKnockOffDetails}
+                          setModifiedKnockOffDetails={setModifiedKnockOffDetails}
+                          form={form}
+                          preferenceData={preferenceData}
+                        />
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div id="moreDetails" className="mt-2" ref={moreDetailsRef}>
+                  <MoreDetailsForm
+                    tempRowAttachments={tempRowAttachments}
+                    setTempRowAttachments={setTempRowAttachments}
+                    form={form}
+                    slug={slug}
+                    preferenceData={preferenceData}
+                  />
+                </div>
+
+                <Card
+                  collapsible
+                  defaultCollapsed={false}
+                  // className="h-auto pb-2 shadow-md"
+                  className={`h-auto pb-2 shadow-md ${!viewEInvoiceDetails ? "hidden" : ""}`}
+                  style={{ marginTop: "10px" }}
+                >
+                  <CardHeader>
+                    <CardTitle className="text-lg font-bold">E-invoice Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-2 py-0">
+                    <div id="eInvoiceDetails" ref={eInvoiceDetailsRef}>
+                      <SupplierDetailsForm
+                        form={form}
+                        supplierCode={form.getValues("supplierCode")}
+                        defaultCurrentCompany={slug == "new" ? defaultCurrentCompany : ""}
+                      />
+
+                      <div className="mt-2">
+                        <BuyerDetailsForm form={form} />
+                      </div>
+
+                      <div className="mt-2">
+                        <EInvoiceDetailsForm
+                          form={form}
+                          salesCreditNoteDetails={
+                            id
+                              ? salesCreditNoteDetails
+                                ? salesCreditNoteDetails.rows
+                                : []
+                              : tempRowSalesCreditNoteDetailsList
+                          }
+                          tempRowSalesCreditNoteDetailsList={tempRowSalesCreditNoteDetailsList}
+                          preferenceData={preferenceData}
+                          salesCreditNoteData={salesCreditNoteData}
+                        />
+                      </div>
+
+                      <div className="mt-2">
+                        <PaymentDetailsForm form={form} />
+                      </div>
+
+                      <div className="mt-2">
+                        <ShippingRecipientDetailsForm form={form} />
+                      </div>
+
+                      <div className="mt-2">
+                        <ImportExportOfGoodsForm form={form} />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </ScrollArea>
+
+              <TabsNavigator tabs={tabs} initialActiveTabId="mainDetails" stickyTop="top-14" />
+            </div>
+          </Form>
+
+          {isFetching && <LoadingUI />}
+        </div>
+      )}
+    </DateRestrictionContext.Provider>
+  );
+}

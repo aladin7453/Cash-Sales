@@ -1,0 +1,353 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { FaClipboard, FaLayerGroup, FaObjectUngroup } from "react-icons/fa6";
+
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+import { Form } from "@/components/ui/form";
+import useSWR from "swr";
+
+import { useToast } from "@/components/ui/use-toast";
+import LoadingUI from "@/components/LoadingUI";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { TabsNavigator } from "@/components/ui/TabsNavigator";
+import { getFileToBase64 } from "@/lib/utils/commonFunction";
+import {
+  ORIGIN,
+  getAuthHeaders,
+  getCurrentAcc,
+  getCurrentAccount,
+  getCurrentCompany,
+  getCurrentCompanyUUID,
+  removeKeys
+} from "@/lib/constants";
+
+//New UI
+import { AutoBillingConfigForm } from "./main-details/general-details/AutoBillingConfigForm";
+import QuotationDataTable from "./main-details/quotation-details/DataTable";
+import { QuotationColumns } from "./main-details/quotation-details/columns";
+
+//Old UI
+import { AutoBillingConfigFormOld } from "./main-details/general-details/AutoBillingConfigFormOld";
+
+import TopActionBar from "./TopActionBar";
+
+type PageParams = {
+  params: { slug: string };
+};
+
+const validRoutes = ["new", "edit", "clone"] as const;
+
+const fetcher = async (url: string) => {
+  const headers = getAuthHeaders();
+
+  return fetch(url, { headers }).then((res) => {
+    if (!res.ok) {
+      throw new Error("Failed to fetch data");
+    }
+    return res.json();
+  });
+};
+
+type ValidRoute = (typeof validRoutes)[number];
+
+const autoBillingConfigFormSchema = z.object({
+  customerCode: z.string().min(1, {
+    message: "Required",
+  }),
+});
+
+function isValidRoute(route: string): route is ValidRoute {
+  return validRoutes.includes(route as ValidRoute);
+}
+
+const tabs = [
+  {
+    id: "mainDetails",
+    name: "Main Details",
+    icon: FaClipboard,
+    shortName: "Main",
+  }
+];
+
+export default function AutoBillingConfigDetailsPage({ params }: PageParams) {
+  const headers = getAuthHeaders();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const id = searchParams.get("id");
+
+  const { toast } = useToast();
+
+  const slug = params.slug;
+
+  const [autoBillingConfigData, setAutoBillingConfigData] = useState({});
+
+  const [tempRowCustomInfo, setTempRowCustomInfo] = useState([]);
+
+  const [formResetKey, setFormResetKey] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const mainDetailsRef = useRef(null);
+
+  const [tempRowQuotationDetailsList, setTempRowQuotationDetailsList] = useState([]);
+
+  const resetForm = () => {
+    setFormResetKey((prevKey) => prevKey + 1);
+  };
+
+  if (!isValidRoute(slug)) {
+    notFound();
+  }
+
+  const {
+    data: autoBillingConfig,
+    error,
+    isLoading,
+    isValidating,
+    mutate: mutateAutoBillingConfig,
+  } = useSWR(
+    id
+      ? `${ORIGIN}/auto_billing_config/api/auto-billing-config/get-update-auto-billing-config-data?id=${id}`
+      : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+
+
+  const isFetching = isLoading || isValidating || isSaving;
+
+
+  useEffect(() => {
+    if (autoBillingConfig) {
+      const autoBillingConfigDataCopy = { ...autoBillingConfig.data };
+      const autoBillingConfigSubDataCopy = [...autoBillingConfig.subData];
+
+      // Clear autoBillingConfigCode if it's a clone page
+      if (slug === "clone") {
+        autoBillingConfigDataCopy.ID = "";
+      }
+      setAutoBillingConfigData(autoBillingConfigDataCopy);
+      setTempRowQuotationDetailsList(autoBillingConfigSubDataCopy)
+      setIsSaving(false);
+    }
+  }, [autoBillingConfig, slug]);
+
+  const handleSubmit = async () => {
+    const isFormValid = await form.trigger();
+
+    if (!isFormValid) {
+      const errors = form.formState.errors;
+
+      if (errors.customerCode) {
+        toast({
+          title: "Customer Required",
+          description: "Please select a customer before saving.",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+      return;
+    }
+
+    try {
+      await onSubmit();
+    } catch (error) {
+      console.error("Form submission error:", error);
+    }
+  };
+
+  const form = useForm<z.infer<typeof autoBillingConfigFormSchema>>({
+    resolver: zodResolver(autoBillingConfigFormSchema),
+    defaultValues: {
+      ID: autoBillingConfig?.ID ?? "",
+      description: autoBillingConfig?.description ?? "",
+      customer: autoBillingConfig?.customer ?? "",
+      valid: autoBillingConfig?.valid ?? "1",
+    },
+  });
+
+  const onSubmit = async () => {
+    setIsSaving(true);
+
+    var form_data = new FormData();
+    var formValues = form.getValues();
+    var saveType =
+      slug == "clone"
+        ? `create-data?c_id=1`
+        : id
+          ? `update-auto-billing-config-data?id=${id}`
+          : `create-data`;
+
+    const autoBillingConfigData = { ...formValues };
+    const updatedTempRowQuotationDetailsList = tempRowQuotationDetailsList.map(item => ({
+      UUID: item.UUID,
+      seq: item.seq,
+      quotation: item.quotation
+    }));
+
+
+    const combinedData = {
+      autoBillingConfig: autoBillingConfigData,
+      autoBillingConfigHasDocuments: updatedTempRowQuotationDetailsList,
+    };
+
+    form_data.append("data", JSON.stringify(combinedData));
+
+    try {
+      const response = await fetch(
+        `${ORIGIN}/auto_billing_config/api/auto-billing-config/${saveType}`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        },
+      );
+
+      if (response.status === 401) {
+        console.error("Session expired. Redirecting to login.");
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "Your session has expired. Redirecting to login page.",
+        });
+        router.push("/login");
+        throw new Error("Session expired");
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        setIsSaving(false);
+
+        let errorMessage = errorData.message;
+
+        // Error Handling for "Data too long"
+        if (errorMessage.includes("Data too long")) {
+          errorMessage = errorMessage.split("\n")[0];
+        }
+
+        toast({
+          title: errorData.name,
+          description: errorMessage,
+          variant: "destructive",
+          duration: 2000,
+        });
+
+        throw new Error("Failed to fetch data");
+      }
+
+      const responseData = await response.json();
+
+      if (responseData && responseData.item) {
+        const url = `/sales/auto-billing-config/edit?item=${responseData.item}&id=${responseData.data}`;
+
+        router.push(url);
+
+        if (params.slug == "edit") {
+          mutateAutoBillingConfig();
+          // mutateAuthorizedUser();
+        }
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      } else if (slug === "clone" && id) {
+        router.push(`/sales/auto-billing-config/clone?id=${id}`);
+
+        toast({
+          title: responseData.message,
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      console.error("Error creating new customer group data:", error);
+    }
+  };
+
+  //Layout State
+  const [layout, setLayout] = useState<"new" | "old">(() => {
+    if (typeof window === "undefined") return "old";
+    return (localStorage.getItem("Layout") as "new" | "old") || "old";
+  });
+
+  const handleLayoutChange = (newLayout: "new" | "old") => {
+    localStorage.setItem("Layout", newLayout);
+    setLayout(newLayout);
+  };
+
+  return (
+    <>
+      <div className="sticky top-0 z-20">
+        <TopActionBar
+          autoBillingConfig={autoBillingConfigData}
+          form={form}
+          action={slug}
+          handleSubmit={handleSubmit}
+          autoBillingConfigFormSchema={autoBillingConfigFormSchema}
+          params={params}
+          layout={layout}
+          onLayoutChange={handleLayoutChange}
+        />
+      </div>
+
+      {/* New Design */}
+      {layout === "new" && (
+        <div className="box-border flex w-full h-full items-center justify-between gap-x-2 p-1.5">
+          <Form {...form}>
+            {/* Left Container */}
+            <div className="flex h-full min-w-[380px] w-[480px] flex-col gap-y-2">
+              <AutoBillingConfigForm
+                form={form}
+              />
+            </div>
+
+            {/* Right */}
+            <div className="w-full flex flex-1 flex-col h-full mt-3.5 md:mt-0">
+              <QuotationDataTable
+                columns={QuotationColumns}
+                data={tempRowQuotationDetailsList}
+                tempRowQuotationDetailsList={tempRowQuotationDetailsList}
+                setTempRowQuotationDetailsList={setTempRowQuotationDetailsList}
+                form={form}
+              />
+            </div>
+            {/* Loading */}
+            {isFetching && <LoadingUI />}
+          </Form>
+        </div>
+      )}
+
+      {/* Old Design */}
+      {layout === "old" && (
+        <div className="grid h-full grid-rows-[auto_1fr]">
+          <Form {...form}>
+            <div className="grid h-full grid-cols-[1fr_auto] gap-x-2">
+              <ScrollArea className="h-full">
+                <div id="mainDetails" className="mt-2" ref={mainDetailsRef}>
+                  <AutoBillingConfigFormOld
+                    key={formResetKey}
+                    tempRowCustomInfo={tempRowCustomInfo}
+                    form={form}
+                    slug={slug}
+                    tempRowQuotationDetailsList={tempRowQuotationDetailsList}
+                    setTempRowQuotationDetailsList={setTempRowQuotationDetailsList}
+                  />
+                </div>
+              </ScrollArea>
+
+              <TabsNavigator tabs={tabs} initialActiveTabId="mainDetails" stickyTop="top-14" />
+            </div>
+
+          </Form>
+          {isFetching && <LoadingUI />}
+        </div>
+      )}
+    </>
+  );
+}

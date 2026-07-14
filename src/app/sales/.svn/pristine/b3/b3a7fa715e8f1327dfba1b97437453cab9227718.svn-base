@@ -1,0 +1,70 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { FaMinus, FaPlus } from "react-icons/fa6";
+import ConfirmationDialog from './ConfirmationDialog';
+import { useSearchParams } from "next/navigation";
+import { getAuthHeaders } from "@/lib/constants";
+import { useToast } from "@/components/ui/use-toast";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import { Button } from "@/components/ui/button";
+
+import type { Table } from "@tanstack/react-table";
+
+// Mobile View (Imports)
+import MobileFormTableActionGroupEnd from "@/components/form/MobileFormTableActionGroupEnd";
+
+type Props<TData> = {
+  table: Table<TData>;
+  revalidateAssigneeDetails: () => void;
+};
+
+export default function AssigneeDetailsDataTableToolbar<TData>({
+  table,
+  revalidateAssigneeDetails,
+}: Props<TData>) {
+
+  return (
+    <>
+      <div className="flex items-center justify-center px-2">
+        <div className="flex items-center gap-x-1 pl-2">
+        </div>
+
+        {/* Mobile View (Hide Pagination) */}
+        {/* <div className="hidden md:block">
+          <Pagination table={table} />
+        </div> */}
+
+        {/* Mobile View (End Action Buttons) */}
+        <MobileFormTableActionGroupEnd
+          table={table}
+          config={{
+            search: {
+              column: "assigneeFullName",
+              placeholder: "Search Assignee"
+            },
+            sort: {
+              column: "assigneeFullName"
+            }
+          }}
+        >
+          <Export table={table} />
+
+          {/* Mobile View (Hide Refresh and Column Visibility Toggle) */}
+          <div className="flex items-center justify-center gap-x-4 text-erp-blue-14">
+            <div className="[&_button]:!size-6 [&_svg]:!size-4">
+              <Refresh refreshTable={revalidateAssigneeDetails} />
+            </div>
+
+            <div className="[&_button]:!size-6 [&_svg]:!size-4">
+              <ColumnVisibilityToggle table={table} />
+            </div>
+          </div>
+        </MobileFormTableActionGroupEnd>
+      </div>
+    </>
+  );
+}

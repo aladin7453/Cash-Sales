@@ -1,0 +1,141 @@
+"use client";
+
+import { useCallback, useRef } from "react";
+import Skeleton from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils/cn";
+
+import type { Row, Table as TableType } from "@tanstack/react-table";
+
+interface MobileDataTableProps<T> {
+  table: TableType<T>;
+  renderCard: (row: Row<T>, isSelectionMode: boolean) => React.ReactNode;
+  className?: string;
+  isLoading?: boolean;
+  skeletonCount?: number;
+  isSelectionMode?: boolean;
+  onSelectionModeChange?: (val: boolean) => void;
+}
+
+// ms
+const LONG_PRESS_DURATION = 500;
+
+export default function MobileDataTable<T>({
+  table,
+  renderCard,
+  className,
+  isLoading = true,
+  skeletonCount = 6,
+  isSelectionMode = false,
+  onSelectionModeChange,
+}: MobileDataTableProps<T>) {
+  const rows = table.getRowModel().rows;
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLongPress = useRef(false);
+
+  const handlePointerDown = useCallback(
+    (row: Row<T>) => {
+      isLongPress.current = false;
+      timerRef.current = setTimeout(() => {
+        isLongPress.current = true;
+        // Enter Selection Mode And Select This Row
+        onSelectionModeChange?.(true);
+        table.resetRowSelection();
+        row.toggleSelected(true);
+      }, LONG_PRESS_DURATION);
+    },
+    [table],
+  );
+
+  const handlePointerUp = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const handlePointerCancel = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const handleCardClick = useCallback(
+    (row: Row<T>) => {
+      // If Long Press Triggered, Dont Fire Click
+      if (isLongPress.current) return;
+
+      if (isSelectionMode) {
+        // In Selection Mode, Tap Toggles Selection
+        row.toggleSelected();
+      }
+    },
+    [isSelectionMode, table],
+  );
+
+  if (isLoading) {
+    return (
+      <div className={cn("mt-1 block space-y-2 bg-erp-blue-5 px-2 md:hidden", className)}>
+        {Array.from({ length: skeletonCount }).map((_, i) => (
+          <div key={i} className="w-full rounded-lg border bg-white p-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-[80px]" />
+              <Skeleton className="h-4 w-4 rounded-full" />
+            </div>
+            <div className="mt-1.5 flex items-center justify-between">
+              <Skeleton className="h-5 w-[150px]" />
+              <Skeleton className="h-5 w-[70px] rounded-2xl" />
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-x-3">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+            <hr className="mt-2.5" />
+            <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-x-3">
+              <div className="flex flex-col gap-y-2">
+                <Skeleton className="h-4 w-[150px]" />
+                <Skeleton className="h-4 w-[150px]" />
+                <Skeleton className="h-4 w-[150px]" />
+              </div>
+              <div className="flex flex-col items-end gap-y-1">
+                <Skeleton className="h-3 w-[60px]" />
+                <Skeleton className="h-5 w-[100px]" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  } else if (rows.length === 0) {
+    return (
+      <div className="absolute z-[30] flex h-full w-full items-center justify-center md:hidden">
+        <p>No data</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("mt-1 block space-y-2 bg-erp-blue-5 px-2 md:hidden", className)}>
+      {table.getRowModel().rows.map((row) => (
+        <div
+          key={row.id}
+          onPointerDown={() => handlePointerDown(row)}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          onClick={() => handleCardClick(row)}
+          // Prevent Context Menu On Long Press (Mobile Browsers)
+          onContextMenu={(e) => e.preventDefault()}
+          className={cn(
+            "select-none",
+            isSelectionMode &&
+              row.getIsSelected() &&
+              "rounded-lg ring-2 ring-blue-500 transition-all duration-300 ease-in-out",
+          )}
+        >
+          {renderCard(row, isSelectionMode)}
+        </div>
+      ))}
+    </div>
+  );
+}

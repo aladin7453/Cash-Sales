@@ -1,0 +1,131 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+
+import CloneButton from "@/components/data-table/ActionButton/Clone";
+import DeleteButton from "@/components/data-table/ActionButton/Delete";
+import EditButton from "@/components/data-table/ActionButton/Edit";
+import NewButton from "@/components/data-table/ActionButton/New";
+import RestoreButton from "@/components/data-table/ActionButton/Restore";
+import TrashButton from "@/components/data-table/ActionButton/Trash";
+import ColumnVisibilityToggle from "@/components/data-table/ColumnVisibilityToggle";
+import Export from "@/components/data-table/Export";
+import { Pagination } from "@/components/data-table/Pagination";
+import Refresh from "@/components/data-table/Refresh";
+import Validity from "@/components/data-table/Validity";
+
+import type { Table, VisibilityState } from "@tanstack/react-table";
+
+import type { OpeningClosingBalance } from "./columns";
+
+type Props = {
+  table: Table<OpeningClosingBalance>;
+  refreshTable: () => void;
+  totalNumOfRows: number;
+  defaultColumns: VisibilityState;
+  dataStatusBadgeDisplay: React.ReactNode;
+  onResetColumnOrdering?: () => void;
+};
+
+export default function OpeningClosingBalanceDataTableToolbar({
+  table,
+  refreshTable,
+  dataStatusBadgeDisplay,
+  totalNumOfRows,
+  defaultColumns,
+  onResetColumnOrdering,
+}: Props) {
+  return (
+    <div className="flex items-center justify-between p-1.5">
+      <ActionGroupStart table={table} refreshTable={refreshTable} />
+
+      <Pagination table={table} totalNumOfRows={totalNumOfRows} />
+
+      <ActionGroupEnd
+        table={table}
+        refreshTable={refreshTable}
+        defaultColumns={defaultColumns}
+        dataStatusBadgeDisplay={dataStatusBadgeDisplay}
+        onResetColumnOrdering={onResetColumnOrdering}
+      />
+    </div>
+  );
+}
+
+function ActionGroupStart({
+  table,
+  refreshTable,
+}: Omit<
+  Props,
+  "totalNumOfRows" | "defaultColumns" | "dataStatusBadgeDisplay"
+>) {
+  const [selectedRow, setSelectedRow] = useState("");
+  const [openingClosingBalance, setOpeningClosingBalance] = useState("");
+
+  const selectedRowModel = table.getSelectedRowModel();
+
+  useEffect(() => {
+    if (selectedRowModel.rows.length === 1) {
+      setSelectedRow(selectedRowModel.rows[0].original.UUID);
+      setOpeningClosingBalance(selectedRowModel.rows[0].original.openingClosingBalance);
+    }
+  }, [selectedRowModel]);
+
+  return (
+    <div className="flex flex-wrap items-center justify-start gap-x-2 p-1">
+      <NewButton destination="/sales/opening-closing-balance/new" />
+      <EditButton
+        table={table}
+        destination={`/sales/opening-closing-balance/edit?item=${openingClosingBalance}&id=${selectedRow}`}
+      />
+      <CloneButton
+        table={table}
+        destination={`/sales/opening-closing-balance/clone?id=${selectedRow}`}
+      />
+      <TrashButton
+        table={table}
+        module={"opening_closing_balance"}
+        model={"opening-closing-balance"}
+        refreshTable={refreshTable}
+      />
+      <RestoreButton
+        table={table}
+        module={"opening_closing_balance"}
+        model={"opening-closing-balance"}
+        refreshTable={refreshTable}
+      />
+      <DeleteButton
+        table={table}
+        module={"opening_closing_balance"}
+        model={"opening-closing-balance"}
+        refreshTable={refreshTable}
+      />
+    </div>
+  );
+}
+
+function ActionGroupEnd({
+  table,
+  refreshTable,
+  defaultColumns,
+  dataStatusBadgeDisplay,
+  onResetColumnOrdering
+}: Omit<Props, "totalNumOfRows">) {
+  return (
+    <div className="relative flex items-center gap-x-1 pr-1.5 text-erp-blue-14">
+      <span className="absolute -left-32">{dataStatusBadgeDisplay}</span>
+
+      <Export table={table} module={"openingClosingBalance"} mainModule={"sales"} />
+      <Refresh
+        refreshTable={refreshTable}
+        resetRowSelection={() => table.resetRowSelection()}
+      />
+      <Validity table={table} />
+      <ColumnVisibilityToggle 
+        table={table} 
+        defaultColumns={defaultColumns} 
+        onResetColumnOrdering={onResetColumnOrdering}
+      />
+    </div>
+  );
+}

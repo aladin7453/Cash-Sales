@@ -1,0 +1,231 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { FaEraser, FaTriangleExclamation } from "react-icons/fa6";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, ORIGIN } from "@/lib/constants";
+import { showLoadingToast } from "@/lib/utils/showLoadingToast";
+
+import type { Row, Table } from "@tanstack/react-table";
+
+type Props<TData> = {
+  table: Table<TData>;
+  model: string;
+  module: string;
+  account?: string;
+  refreshTable: () => Promise<void>;
+  isMobile?: boolean;
+  isSelectionMode?: boolean;
+};
+
+type RemoveData = {
+  Success: string;
+  Failed: string;
+  message: string;
+};
+
+export default function DeleteButton<TData>({
+  table,
+  module,
+  model,
+  account,
+  refreshTable,
+  isMobile,
+  isSelectionMode
+}: Props<TData>) {
+  const { toast } = useToast();
+  const headers = getAuthHeaders();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isOkButtonDisabled, setIsOkButtonDisabled] = useState(true);
+  const [countdown, setCountdown] = useState(3);
+
+  // Enable the OK button after 3 seconds when dialog opens with countdown
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+
+    if (isDialogOpen) {
+      setIsOkButtonDisabled(true);
+      setCountdown(3);
+
+      // Set an interval to update countdown every second
+      timer = setInterval(() => {
+        setCountdown((prevCount) => {
+          const newCount = prevCount - 1;
+          if (newCount <= 0) {
+            clearInterval(timer);
+            setIsOkButtonDisabled(false);
+            return 0;
+          }
+          return newCount;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [isDialogOpen]);
+
+  const deleteRows = async () => {
+    const form_data = new FormData();
+    const selectedRows = table.getSelectedRowModel().rows;
+
+    selectedRows.forEach((row: Row<TData>) => {
+      if ((row.original as any).UUID !== undefined) {
+        form_data.append(`UUIDs[]`, (row.original as { UUID: string }).UUID);
+      }
+    });
+
+    let successMessage = "";
+    let failedMessage = "";
+    let message = "";
+
+    const { id: loadingToastId, dismiss } = showLoadingToast("Deleting rows...");
+
+    try {
+      const response = await fetch(
+        account
+          ? `${ORIGIN}/${module}/api/${model}/remove?account=${account}`
+          : `${ORIGIN}/${module}/api/${model}/remove`,
+        {
+          method: "POST",
+          headers,
+          body: form_data,
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        toast({
+          title: errorData.message,
+          duration: 2000,
+        });
+
+        throw new Error("Failed to fetch data");
+      } else {
+        const data: RemoveData = await response.json();
+
+        table.resetRowSelection();
+
+        await refreshTable();
+
+        successMessage = data["Success"];
+        failedMessage = data["Failed"];
+        message = data["message"];
+      }
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      dismiss();
+
+      setTimeout(() => {
+        if (successMessage) {
+          showSuccessDeleteToast(successMessage, message);
+        }
+
+        if (failedMessage) {
+          showFailedDeleteToast(failedMessage, message);
+        }
+      }, 2000);
+    }
+  };
+
+  const showSuccessDeleteToast = (rows: RemoveData["Success"], records: RemoveData["message"]) => {
+    toast({
+      title: `${records}`,
+      description: `${rows} has been deleted.`,
+    });
+  };
+
+  const showFailedDeleteToast = (rows: RemoveData["Failed"], records: RemoveData["message"]) => {
+    records = `This record cannot be deleted because it is already in use. Please remove the dependencies before trying again.`;
+    toast({
+      title: `${rows} Delete Failed`,
+      description: `${records}`,
+      variant: "destructive",
+    });
+  };
+
+  return (
+    <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <AlertDialogTrigger asChild>
+        <button
+          className={
+            isMobile
+              ? isSelectionMode ? "flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-transparent bg-white text-erp-blue-14 shadow-md transition-all duration-300 ease-in-out" : "flex w-full items-center justify-start gap-2"
+              : "group flex flex-col items-center gap-y-1 disabled:cursor-not-allowed"
+          }
+          disabled={table.getSelectedRowModel().rows.length === 0}
+          type="button"
+          id="delete-btn"
+        >
+          <FaEraser
+            className={
+              isMobile
+                ? "size-4.5 text-erp-blue-11"
+                : "size-5.5 text-erp-blue-11 group-disabled:text-erp-gray-5"
+            }
+          />
+          <span
+            className={
+              isMobile
+                ? isSelectionMode ? "hidden" : "text-[10px]/none font-normal"
+                : "text-[11px]/none font-medium group-disabled:text-erp-gray-5"
+            }
+          >
+            Delete
+          </span>
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent className="max-w-sm">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="sr-only">Are you sure absolutely sure?</AlertDialogTitle>
+          <AlertDialogDescription className="flex justify-center">
+            <FaTriangleExclamation className="size-12 text-erp-red-1" />
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-center text-sm text-erp-red-1">
+            If you wish to be able to recover this data later, please use the <strong>TRASH</strong>{" "}
+            action instead.
+          </p>
+
+          <p className="text-sm text-erp-blue-14">
+            Proceed to <strong>DELETE</strong> the selected data row(s)?
+          </p>
+
+          {isOkButtonDisabled && (
+            <p className="text-xs italic text-gray-500">
+              Please wait {countdown} {countdown === 1 ? "second" : "seconds"} before confirming...
+            </p>
+          )}
+        </div>
+        <AlertDialogFooter className="mt-2 flex items-center !justify-center justify-center gap-3 [&>*]:m-0">
+          <AlertDialogAction className="h-9 w-24" autoFocus>
+            Cancel
+          </AlertDialogAction>
+          <AlertDialogCancel
+            className="h-9 w-24"
+            onClick={() => deleteRows()}
+            disabled={isOkButtonDisabled}
+          >
+            OK
+          </AlertDialogCancel>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}

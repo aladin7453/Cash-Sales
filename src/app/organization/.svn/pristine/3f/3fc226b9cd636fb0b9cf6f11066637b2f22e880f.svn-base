@@ -1,0 +1,73 @@
+"use client";
+
+import { format, parseISO } from "date-fns";
+
+import DescriptionCellTooltip from "@/components/data-table/DescriptionCellTooltip";
+import filterWithStringConversion from "@/lib/utils/data-table/filterWithStringConversion";
+
+import type { ColumnDef } from "@tanstack/react-table";
+
+export type CompanyList = {
+  company: string;
+  businessRegNo: string;
+  description: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  validity: 0 | 1;
+};
+
+export const companyListColumns: ColumnDef<CompanyList>[] = [
+  {
+    accessorKey: "company",
+    header: "Company",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "businessRegNo",
+    header: "Business Reg. No.",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => <DescriptionCellTooltip row={row} />,
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "createdAt",
+    header: "Created At",
+    cell: ({ row }) => {
+      const date = row.getValue("updatedAt");
+      return format(parseISO(date as string), "yyyy-MM-dd h:mm:ss a");
+    },
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "createdBy",
+    header: "Created By",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "updatedAt",
+    header: "Updated At",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "updatedBy",
+    header: "Updated By",
+    filterFn: "includesString"
+  },
+  {
+    accessorKey: "validity",
+    header: "Validity",
+    cell: ({ row }) => {
+      const validity = row.getValue("validity") as CompanyList["validity"];
+      return validity ? "Valid" : "Invalid";
+    },
+    // Custom filter function that first convert the row's numeric boolean
+    // value to string, then check if the string contains the filterValue
+    filterFn: filterWithStringConversion,
+  },
+];
