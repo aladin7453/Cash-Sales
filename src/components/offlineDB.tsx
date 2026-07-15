@@ -295,6 +295,30 @@ export async function getCachedAuthData() {
   }
 }
 
+export async function savePendingPreference(data: any) {
+  const db = await dbPromise();
+  await db.put("cash-sales-preferences", {
+    id: "pendingPreference",
+    data,
+    updatedAt: Date.now(),
+  });
+}
+
+export async function getPendingPreference(): Promise<any | null> {
+  const db = await dbPromise();
+  try {
+    const record = await db.get("cash-sales-preferences", "pendingPreference");
+    return record ? record.data : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearPendingPreference() {
+  const db = await dbPromise();
+  await db.delete("cash-sales-preferences", "pendingPreference");
+}
+
 export async function generateOfflineDocNo(): Promise<string> {
   const cachedPref = await getCachedPreferenceData();
   const format: string = cachedPref?.preference?.data?.cashSalesFormat || "CS????????";

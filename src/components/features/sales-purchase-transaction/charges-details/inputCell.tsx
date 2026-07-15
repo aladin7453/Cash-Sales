@@ -94,6 +94,8 @@ type DropdownInputCellProps = {
   setTempRowDetailsList: (updater: (prevList: any[]) => any[]) => void;
   fetchDropdownData: (table: string) => Promise<void>;
   dropdownTableColumns: Record<string, any[]>;
+  dropdownTableNames?: Record<string, string>;
+  onDropdownRefreshed?: (dropdownKey: string, freshRows: any[]) => void;
   inputRef: React.RefObject<HTMLInputElement>;
   dropdownRef: React.RefObject<HTMLDivElement>;
   currentLocation?: { locationCode: string | null; UUID: string | null };
@@ -1212,6 +1214,8 @@ export function DropdownInputCellComponent({
   setTempRowDetailsList,
   fetchDropdownData,
   dropdownTableColumns,
+  dropdownTableNames,
+  onDropdownRefreshed,
   inputRef,
   dropdownRef,
   currentLocation,
@@ -1464,6 +1468,8 @@ export function DropdownInputCellComponent({
                 columns={dropdownTableColumns[id]}
                 data={dropdownDatas[id] ?? []}
                 onClickRow={onClickRow}
+                tableName={dropdownTableNames?.[id]}
+                onRefreshed={(freshRows) => onDropdownRefreshed?.(id, freshRows)}
               />
               <ScrollBar orientation="vertical" />
             </ScrollArea>

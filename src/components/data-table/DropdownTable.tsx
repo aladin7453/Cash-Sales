@@ -33,9 +33,9 @@ import { toast } from "@/components/ui/use-toast";
 import { DEFAULT_DATA_TABLE_PAGE_SIZE, getAuthHeaders, ORIGIN } from "@/lib/constants";
 import usePreventShiftTextSelect from "@/lib/hooks/usePreventShiftTextSelect";
 import { cn } from "@/lib/utils/cn";
+import { refreshDropdownTable } from "@/components/data-table/GetAllDropdown";
 
 import DropdownTableToolbar from "./DropdownTableToolbar";
-
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
 
 type Props = {
@@ -50,6 +50,8 @@ type Props = {
   enableRowHighlight?: boolean;
   selectedRows?: string[];
   selectedKey?: string;
+  tableName?: string;
+  onRefreshed?: (rows: any[]) => void;
 };
 
 export default function DropdownTable({
@@ -64,6 +66,8 @@ export default function DropdownTable({
   enableRowHighlight = false,
   selectedRows = [],
   selectedKey = "UUID",
+  tableName,
+  onRefreshed,
 }: Props) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState([]);
@@ -117,6 +121,34 @@ export default function DropdownTable({
       },
     },
   });
+
+  const handleRefreshTable = async () => {
+    if (!tableName) return; 
+    if (!navigator.onLine) {
+      toast({
+        title: "Offline",
+        description: "Can't refresh while offline.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const freshRows = await refreshDropdownTable(tableName as any);
+      onRefreshed?.(freshRows); 
+    } catch (error) {
+      console.error(`Failed to refresh ${tableName} dropdown:`, error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   // Prevent text selection when performing multiple row selection with "shift" + click
   usePreventShiftTextSelect();
@@ -274,7 +306,7 @@ export default function DropdownTable({
 
         {/* Toolbar */}
         <div className="w-full sticky top-0 z-20 bg-erp-blue-3">
-          <DropdownTableToolbar table={table} showAddButton={showAddButton} onAdd={handleAdd} />
+          <DropdownTableToolbar table={table} showAddButton={showAddButton} onAdd={handleAdd} refreshTable={handleRefreshTable}/>
         </div>
 
         {/* ScrollArea */}

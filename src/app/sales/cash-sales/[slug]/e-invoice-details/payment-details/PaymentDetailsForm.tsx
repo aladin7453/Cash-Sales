@@ -108,6 +108,18 @@ export function PaymentDetailsForm({ form, isPaid, setIsPaidAmountManuallyUpdate
     setProjectDropdownTableData(allDropdowns.project ?? []);
   }, [allDropdowns]);
 
+  const handlePaymentMethodDropdownRefreshed = (freshRows: any[]) => {
+    setDropdownState((prev) => ({
+      ...prev,
+      originalData: freshRows,
+      data: prev.currentDropdown === "paymentMethod" ? freshRows : prev.data,
+    }));
+  };
+
+  const handleProjectDropdownRefreshed = (freshRows: any[]) => {
+    setProjectDropdownTableData(freshRows);
+  };
+
   const fetchDropdownData1 = (dropdownKey: string) => {
     const config = dropdownConfigs[dropdownKey];
     if (!config) return;
@@ -336,7 +348,14 @@ export function PaymentDetailsForm({ form, isPaid, setIsPaidAmountManuallyUpdate
                       {dropdownState.showTable && dropdownState.currentDropdown === "paymentMethod" && (
                         <div ref={dropdownTableRef} className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md">
                           <ScrollArea className="h-[50cqh] bg-erp-gray-3">
-                            <DropdownTable columns={dropdownConfigs.paymentMethod.columns} data={dropdownState.data} onClickRow={onClickRow} customerId={form.getValues("customerCode") ?? ""} />
+                            <DropdownTable
+                              columns={dropdownConfigs.paymentMethod.columns}
+                              data={dropdownState.data}
+                              onClickRow={onClickRow}
+                              customerId={form.getValues("customerCode") ?? ""}
+                              tableName="paymentMethod"
+                              onRefreshed={handlePaymentMethodDropdownRefreshed}
+                            />
                             <ScrollBar orientation="vertical" />
                           </ScrollArea>
                         </div>
@@ -505,7 +524,14 @@ export function PaymentDetailsForm({ form, isPaid, setIsPaidAmountManuallyUpdate
                     {showPrepaymentRefNoTable && (
                       <div ref={prepaymentRefNoDropdownRef} className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md">
                         <ScrollArea className="h-[50cqh] bg-erp-gray-3">
-                          <DropdownTable columns={dropdownPrepaymentRefNoColumns} data={prepaymentRefNoDropdownData} onClickRow={onClickRowPrepaymentRefNo} customerId={form.getValues("customerCode") ?? ""} />
+                          <DropdownTable
+                            columns={dropdownPrepaymentRefNoColumns}
+                            data={prepaymentRefNoDropdownData}
+                            onClickRow={onClickRowPrepaymentRefNo}
+                            customerId={form.getValues("customerCode") ?? ""}
+                            tableName="project"
+                            onRefreshed={handleProjectDropdownRefreshed}
+                          />
                           <ScrollBar orientation="vertical" />
                         </ScrollArea>
                       </div>

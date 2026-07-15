@@ -266,7 +266,22 @@ export default function ReportPreviewButton({
     }
   };
 
-  const selectedDocType = docType ? formatDocType(docType) : "";
+  const noFilterPreviewTypes = [
+    "STATEMENT OF ACCOUNT",
+    "SALES ANALYSIS BY DOCUMENT",
+    "SALES COLLECTION",
+    "CUSTOMER POST DATED CHEQUE",
+    "CUSTOMER ANALYSIS BY DOCUMENT",
+    "YEARLY SALES ANALYSIS",
+    "SUPPLIER BALANCE",
+    "PURCHASE OUTSTANDING DOCUMENT LISTING",
+    "SUPPLIER DOCUMENT INTER BANK",
+    "SUPPLIER BILLS AND PAYMENT",
+    "SUPPLIER STATEMENT",
+    "SUPPLIER POST DATED CHEQUE"
+  ];
+
+  let selectedDocType = docType ? formatDocType(docType) : "";
   const filteredDocumentList = React.useMemo(() => {
     if (!Array.isArray(documentList)) return [];
 
@@ -275,14 +290,18 @@ export default function ReportPreviewButton({
     if (isAllDocType) {
       return documentList;
     }
-
-    if (previewType == "STATEMENT OF ACCOUNT" || previewType == "SALES ANALYSIS BY DOCUMENT") {
+    if (noFilterPreviewTypes.includes(previewType)) {
       return documentList;
-    } else {
-      return documentList.filter((item) =>
-        item.fileName.toLowerCase().includes(selectedDocType.toLowerCase()),
-      );
     }
+    if(previewType=="CUSTOMER DUE DOCUMENT" && (selectedDocType=="Sales Invoice" || selectedDocType=="Sales Debit Note" )){       
+        selectedDocType=selectedDocType.replace("Sales","")
+    }
+    if(previewType=="SUPPLIER DUE DOCUMENT" && (selectedDocType=="Purchase Invoice" || selectedDocType=="Purchase Debit Note" )){       
+        selectedDocType=selectedDocType.replace("Purchase","")
+    }
+    return documentList.filter((item) =>
+      item.fileName.toLowerCase().includes(selectedDocType.toLowerCase()),
+    );
   }, [documentList, docType, selectedDocType]);
 
   return (

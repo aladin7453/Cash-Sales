@@ -82,6 +82,10 @@ export function ImportExportOfGoodsForm({ form, isMobile, allDropdowns }: Params
     setCountryDropdownTableData(allDropdowns.countryOfOrigin ?? []);
   }, [allDropdowns]);
 
+  const handleCountryDropdownRefreshed = (freshRows: any[]) => {
+    setCountryDropdownTableData(freshRows);
+  };
+
   const toggleTableCountry = () => setShowTableCountry((prev) => !prev);
 
   const onClickRowCountry = (row: any) => {
@@ -341,6 +345,8 @@ export function ImportExportOfGoodsForm({ form, isMobile, allDropdowns }: Params
                               data={filteredCountryData}
                               onClickRow={onClickRowCountry}
                               customerId={form.getValues("customerCode") ?? ""}
+                              tableName="countryOfOrigin"
+                              onRefreshed={handleCountryDropdownRefreshed}
                             />
                           </ScrollArea>
                         </div>

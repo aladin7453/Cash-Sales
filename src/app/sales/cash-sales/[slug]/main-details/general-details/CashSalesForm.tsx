@@ -31,7 +31,7 @@ import { toast } from "@/components/ui/use-toast";
 import { ORIGIN, getAuthHeaders } from "@/lib/constants";
 import { Tab, TabList, TabPanel, Tabs } from "react-tabs";
 import { cn } from "@/lib/utils/cn";
-import { DropdownData } from "@/components/data-table/GetAllDropdown";
+import { DropdownData, refreshDropdownTable } from "@/components/data-table/GetAllDropdown";
 import { cacheDropdowns, getCachedDropdowns } from "@/components/offlineDB";
 
 interface ContactFormData {
@@ -75,6 +75,10 @@ export function CashSalesForm({ form, setIsExpand, isExpand, isMobile, slug, id,
   const [customerFilter, setCustomerFilter] = useState("");
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
+
+  const handleRefreshCustomerDropdown = (freshRows: any[]) => {
+    setCustomerCodeDropdownTableData(freshRows);
+  };
 
   const dropdownCustomerCodeColumns = [
     { accessorKey: "customerCode", header: "Customer Code" },
@@ -577,6 +581,8 @@ export function CashSalesForm({ form, setIsExpand, isExpand, isMobile, slug, id,
                                       onClickRow={onClickRowCustomerCode}
                                       filterValue={customerFilter}
                                       filterColumn="customerName"
+                                      tableName="customer"
+                                      onRefreshed={handleRefreshCustomerDropdown}
                                     />
                                     <ScrollBar orientation="vertical" />
                                   </ScrollArea>

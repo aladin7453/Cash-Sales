@@ -18,6 +18,8 @@ import { cn } from "@/lib/utils/cn";
 
 import erpLogoWithWordings from "../../public/erpLogo_withWordings.svg";
 import erpLogo from "../../public/erpLogo.svg";
+// import erpLogoWithWordings from "../../public/erpLogo_withWordings_prod.svg";  // Change to production logo when deploying to production
+// import erpLogo from "../../public/erpLogo_prod.svg";  // Change to production logo when deploying to production
 import { useMyContext } from "../app/organization/contextProvider";
 import { menus } from "../data/menus";
 import SearchBar from "./SearchBar";

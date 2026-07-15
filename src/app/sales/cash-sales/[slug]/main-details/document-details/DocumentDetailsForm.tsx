@@ -146,38 +146,27 @@ export function DocumentDetailsForm({
     { accessorKey: "description", header: "Description", cell: ({ row }) => <DescriptionCellTooltip row={row} /> },
   ];
 
-  //  Payment Method Dropdown 
-  const [paymentMethodDropdownTableData, setPaymentMethodDropdownTableData] = useState<any[]>([]);
-  const [showTablePaymentMethod, setShowTablePaymentMethod] = useState(false);
-  const paymentMethodInputRef = useRef(null);
-  const paymentMethodDropdownRef = useRef(null);
-
-  const dropdownPaymentMethodColumns = [
-    { accessorKey: "paymentMethodCode", header: "Payment Method Code" },
-    { accessorKey: "eInvoicePaymentMethodCode", header: "E-Invoice Payment Method Code" },
-    { accessorKey: "description", header: "Description", cell: ({ row }) => <DescriptionCellTooltip row={row} /> },
-  ];
-
-  //  Project Dropdown ─
-  const [projectDropdownTableData, setProjectDropdownTableData] = useState<any[]>([]);
-  const [showTableProject, setShowTableProject] = useState(false);
-  const projectInputRef = useRef(null);
-  const projectDropdownRef = useRef(null);
-
-  const dropdownProjectColumns = [
-    { accessorKey: "projectCode", header: "Project Code" },
-    { accessorKey: "description", header: "Description" },
-  ];
-
   useEffect(() => {
     setSalesAgentDropdownData(allDropdowns.agent ?? []);
     setServicingAgentDropdownData(allDropdowns.agent ?? []);
     setCollectionAgentDropdownData(allDropdowns.agent ?? []);
     setDealerDropdownTableData(allDropdowns.customer ?? []);
     setTermsDropdownTableData(allDropdowns.creditTerm ?? []);
-    setPaymentMethodDropdownTableData(allDropdowns.paymentMethod ?? []);
-    setProjectDropdownTableData(allDropdowns.project ?? []);
   }, [allDropdowns]);
+
+  const handleAgentDropdownRefreshed = (freshRows: any[]) => {
+    setSalesAgentDropdownData(freshRows);
+    setServicingAgentDropdownData(freshRows);
+    setCollectionAgentDropdownData(freshRows);
+  };
+
+  const handleDealerDropdownRefreshed = (freshRows: any[]) => {
+    setDealerDropdownTableData(freshRows);
+  };
+
+  const handleTermsDropdownRefreshed = (freshRows: any[]) => {
+    setTermsDropdownTableData(freshRows);
+  };
 
   const fetchAgentDropdownData = (type: "sales" | "servicing" | "collection") => {
     if (type === "sales") setShowSalesAgentTable(true);
@@ -187,8 +176,6 @@ export function DocumentDetailsForm({
 
   const toggleTableDealer = () => setShowTableDealer((prev) => !prev);
   const toggleTableTerms = () => setShowTableTerms((prev) => !prev);
-  const toggleTablePaymentMethod = () => setShowTablePaymentMethod((prev) => !prev);
-  const toggleTableProject = () => setShowTableProject((prev) => !prev);
 
   const onClickRowSalesAgent = (row: any) => {
     form.setValue("salesAgentName", row.agentName);
@@ -223,32 +210,6 @@ export function DocumentDetailsForm({
     form.setValue("creditTermType", row.creditTermType);
     setTermsFilter("");
     setShowTableTerms(false);
-  };
-
-  const onClickRowPaymentMethod = (row: any) => {
-    form.setValue("paymentMethod", row.UUID);
-    form.setValue("paymentMethodCode", row.paymentMethodCode);
-    setShowTablePaymentMethod(false);
-  };
-
-  const onClickRowProject = (row: any) => {
-    form.setValue("paymentProject", row.UUID);
-    form.setValue("paymentProject", row.projectCode);
-    setShowTableProject(false);
-  };
-
-  const handlePaidAmountChange = (value: string) => {
-    if (value === "0.00" || value === "0" || value.startsWith("0.")) {
-      setIsPaidAmountManuallyUpdated(false);
-    } else {
-      setIsPaidAmountManuallyUpdated(true);
-    }
-    form.setValue("paidAmount", value);
-  };
-
-  const handleAdditionalDiscountChange = (value: string) => {
-    form.setValue("additionalDiscount", value);
-    form.trigger("additionalDiscount");
   };
 
   useEffect(() => {
@@ -353,8 +314,6 @@ export function DocumentDetailsForm({
         [collectionAgentDropdownRef, collectionAgentInputRef, () => setShowCollectionAgentTable(false)],
         [dealerDropdownRef, dealerInputRef, () => setShowTableDealer(false)],
         [termsDropdownRef, termsInputRef, () => setShowTableTerms(false)],
-        [paymentMethodDropdownRef, paymentMethodInputRef, () => setShowTablePaymentMethod(false)],
-        [projectDropdownRef, projectInputRef, () => setShowTableProject(false)],
         [dropdownRef, inputRef, () => setShowTableDealer(false)],
       ];
 
@@ -608,6 +567,8 @@ export function DocumentDetailsForm({
                                         onClickRow={onClickRowTerms}
                                         filterValue={termsFilter}
                                         filterColumn="creditTermCode"
+                                        tableName="creditTerm"
+                                        onRefreshed={handleTermsDropdownRefreshed}
                                       />
                                     </ScrollArea>
                                   </div>
@@ -660,6 +621,8 @@ export function DocumentDetailsForm({
                                         onClickRow={onClickRowDealer}
                                         filterValue={dealerFilter}
                                         filterColumn="customerName"
+                                        tableName="customer"
+                                        onRefreshed={handleDealerDropdownRefreshed}
                                       />
                                     </ScrollArea>
                                   </div>
@@ -722,6 +685,8 @@ export function DocumentDetailsForm({
                                         columns={dropdownAgentColumns}
                                         data={salesAgentDropdownData}
                                         onClickRow={onClickRowSalesAgent}
+                                        tableName="agent"
+                                        onRefreshed={handleAgentDropdownRefreshed}
                                       />
                                       <ScrollBar orientation="vertical" />
                                     </ScrollArea>
@@ -785,6 +750,8 @@ export function DocumentDetailsForm({
                                         columns={dropdownAgentColumns}
                                         data={servicingAgentDropdownData}
                                         onClickRow={onClickRowServicingAgent}
+                                        tableName="agent"
+                                        onRefreshed={handleAgentDropdownRefreshed}
                                       />
                                       <ScrollBar orientation="vertical" />
                                     </ScrollArea>
@@ -848,6 +815,8 @@ export function DocumentDetailsForm({
                                         columns={dropdownAgentColumns}
                                         data={collectionAgentDropdownData}
                                         onClickRow={onClickRowCollectionAgent}
+                                        tableName="agent"
+                                        onRefreshed={handleAgentDropdownRefreshed}
                                       />
                                       <ScrollBar orientation="vertical" />
                                     </ScrollArea>

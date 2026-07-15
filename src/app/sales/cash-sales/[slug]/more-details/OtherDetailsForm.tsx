@@ -151,6 +151,22 @@ export function OtherDetailsForm({
     setShipperDropdownData(allDropdowns.shipper ?? []);
   }, [allDropdowns]);
 
+  const handleCurrencyDropdownRefreshed = (freshRows: any[]) => {
+    setCurrencyDropdownData(freshRows);
+  };
+
+  const handleProjectDropdownRefreshed = (freshRows: any[]) => {
+    setProjectDropdownData(freshRows);
+  };
+
+  const handleShipperDropdownRefreshed = (freshRows: any[]) => {
+    setShipperDropdownData(freshRows);
+  };
+
+  const handleDeliveryTermDropdownRefreshed = (freshRows: any[]) => {
+    setDeliveryTermDropdownData(freshRows);
+  };
+
   const fetchDropdownData = (table: string) => {
     if (table === "currency") setShowCurrencyTable((prev) => !prev);
     else if (table === "project") setShowProjectTable((prev) => !prev);
@@ -356,7 +372,15 @@ export function OtherDetailsForm({
                             {showCurrencyTable && (
                               <div ref={currencyDropdownRef} className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md">
                                 <ScrollArea className="h-[50cqh] bg-erp-gray-3">
-                                  <DropdownTable columns={dropdownCurrencyColumns} data={currencyDropdownData} onClickRow={onClickRowCurrency} filterValue={currencyFilter} filterColumn="currencyCode" />
+                                  <DropdownTable
+                                    columns={dropdownCurrencyColumns}
+                                    data={currencyDropdownData}
+                                    onClickRow={onClickRowCurrency}
+                                    filterValue={currencyFilter}
+                                    filterColumn="currencyCode"
+                                    tableName="currency"
+                                    onRefreshed={handleCurrencyDropdownRefreshed}
+                                  />
                                   <ScrollBar orientation="vertical" />
                                 </ScrollArea>
                               </div>
@@ -421,7 +445,15 @@ export function OtherDetailsForm({
                             {showProjectTable && (
                               <div ref={projectDropdownRef} className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md">
                                 <ScrollArea className="h-[50cqh] bg-erp-gray-3">
-                                  <DropdownTable columns={dropdownProjectColumns} data={projectDropdownData} onClickRow={onClickRowProject} filterValue={projectFilter} filterColumn="projectCode" />
+                                  <DropdownTable
+                                    columns={dropdownProjectColumns}
+                                    data={projectDropdownData}
+                                    onClickRow={onClickRowProject}
+                                    filterValue={projectFilter}
+                                    filterColumn="projectCode"
+                                    tableName="project"
+                                    onRefreshed={handleProjectDropdownRefreshed}
+                                  />
                                   <ScrollBar orientation="vertical" />
                                 </ScrollArea>
                               </div>
@@ -481,7 +513,13 @@ export function OtherDetailsForm({
                             {showShipperTable && (
                               <div ref={shipperDropdownRef} className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md">
                                 <ScrollArea className="h-[50cqh] bg-erp-gray-3">
-                                  <DropdownTable columns={dropdownShipperColumns} data={shipperDropdownData} onClickRow={onClickRowShipper} />
+                                  <DropdownTable
+                                    columns={dropdownShipperColumns}
+                                    data={shipperDropdownData}
+                                    onClickRow={onClickRowShipper}
+                                    tableName="shipper"
+                                    onRefreshed={handleShipperDropdownRefreshed}
+                                  />
                                   <ScrollBar orientation="vertical" />
                                 </ScrollArea>
                               </div>
@@ -517,7 +555,13 @@ export function OtherDetailsForm({
                             {showDeliveryTermTable && (
                               <div ref={deliveryTermDropdownRef} className="absolute bottom-[170px] z-50 h-[200px] rounded border border-gray-200 bg-white shadow-md">
                                 <ScrollArea className="h-[50cqh] bg-erp-gray-3">
-                                  <DropdownTable columns={dropdownDeliveryTermColumns} data={deliveryTermDropdownData} onClickRow={onClickRowDeliveryTerm} />
+                                  <DropdownTable
+                                    columns={dropdownDeliveryTermColumns}
+                                    data={deliveryTermDropdownData}
+                                    onClickRow={onClickRowDeliveryTerm}
+                                    tableName="deliveryTerm"
+                                    onRefreshed={handleDeliveryTermDropdownRefreshed}
+                                  />
                                   <ScrollBar orientation="vertical" />
                                 </ScrollArea>
                               </div>

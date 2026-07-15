@@ -367,6 +367,15 @@ export default function CashSalesDetailsDataTable({
     ],
   };
 
+  const dropdownTableNames: Record<string, string> = {
+    classificationCode: "classification",
+    projectCode: "project",
+    stockBatchCode: "stockBatch",
+    locationCode: "location",
+    taxCode: "tax",
+    customerCodeCode: "customer",
+  };
+
   useEffect(() => {
     setDropdownDatas({
       classificationCode: allDropdowns.classification ?? [],
@@ -380,6 +389,15 @@ export default function CashSalesDetailsDataTable({
       })),
     });
   }, [allDropdowns]);
+
+  const handleDropdownDataRefreshed = (dropdownKey: string, freshRows: any[]) => {
+    const rows =
+      dropdownKey === "customerCodeCode"
+        ? freshRows.map((row) => ({ ...row, customerCodeCode: row.customerCode }))
+        : freshRows;
+
+    setDropdownDatas((prev) => ({ ...prev, [dropdownKey]: rows }));
+  };
 
   usePreventShiftTextSelect();
 
@@ -553,6 +571,8 @@ export default function CashSalesDetailsDataTable({
       setTempRowDetailsList={setTempRowCashSalesDetailsList}
       fetchDropdownData={fetchDropdownData}
       dropdownTableColumns={dropdownTableColumns}
+      dropdownTableNames={dropdownTableNames}      
+      onDropdownRefreshed={handleDropdownDataRefreshed}
       inputRef={inputRef} dropdownRef={dropdownRef} isPaid={isPaid}
     />
   );

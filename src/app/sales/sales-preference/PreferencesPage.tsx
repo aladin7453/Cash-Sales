@@ -29,6 +29,15 @@ import {
   // SalesInvoiceColumns,
 } from "./CreditTerm/columns";
 import SelectDialog from "./CreditTerm/SelectDialog";
+import {
+  acquireSyncLock,
+  releaseSyncLock,
+  cachePreferenceData,
+  getCachedPreferenceData,
+  savePendingPreference,
+  getPendingPreference,
+  clearPendingPreference
+} from "@/components/offlineDB";
 
 // Dialog configuration object
 const DIALOG_CONFIGS = {
@@ -195,6 +204,21 @@ export default function PreferencesPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [selectedSupplierId, setSelectedSupplierId] = useState(null);
 
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true
+  );
+
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
+
   // Enhanced dialog states with server-side properties
   const [dialogStates, setDialogStates] = useState(() => {
     const initialStates = {};
@@ -219,7 +243,7 @@ export default function PreferencesPage() {
     isLoading,
     mutate: mutateSales,
   } = useSWR(
-    `${ORIGIN}/sales_preference/api/sales-preference/get-index-sales-preference`,
+    isOnline ? `${ORIGIN}/sales_preference/api/sales-preference/get-index-sales-preference` : null,
     fetcher, { revalidateOnFocus: false, shouldRetryOnError: false }
   );
 
@@ -471,12 +495,34 @@ export default function PreferencesPage() {
   };
 
   useEffect(() => {
+    if (isOnline) return;
+
+    const loadOfflineData = async () => {
+      const [pending, cached] = await Promise.all([
+        getPendingPreference(),
+        getCachedPreferenceData(),
+      ]);
+
+      const merged = { ...(cached || {}), ...(pending || {}) };
+
+      if (Object.keys(merged).length > 0) {
+        setTempSalesPreferences(merged);
+        setOriginalSalesPreferences(cached ? { ...cached } : { ...merged });
+        form.reset({ ...form.getValues(), ...merged });
+      }
+    };
+
+    loadOfflineData();
+  }, [isOnline]);
+
+  useEffect(() => {
     if (data) {
       setTempSalesPreferences(data.data);
       setOriginalSalesPreferences(data.data ? { ...data.data } : null);
 
       if (data.data) {
         const preferences = data.data;
+        cachePreferenceData(preferences);
         form.reset({
           creditTerm: preferences.creditTerm || "",
           currency: preferences.currency || "",
@@ -850,85 +896,92 @@ export default function PreferencesPage() {
       return;
     }
 
+    // Get default values from form schema
+    const defaultValues = {
+      customerCategoryNextNum: "1",
+      customerGroupNextNum: "1",
+      customerNextNum: "1",
+      quotationNextNum: "1",
+      salesOrderNextNum: "1",
+      salesDeliveryOrderNextNum: "1",
+      salesInvoiceNextNum: "1",
+      cashSalesNextNum: "1",
+      salesDebitNoteNextNum: "1",
+      salesCreditNoteNextNum: "1",
+      consolidateInvoiceNextNum: "1",
+      customerPaymentNextNum: "1",
+      salesPurchaseContraNextNum: "1",
+      decimal: "2",
+      rounding: "1",
+      customerCategoryAutoGenEn: "0",
+      customerCategoryFormat: "CUSTCATyyyymm???",
+      customerGroupAutoGenEn: "0",
+      customerGroupFormat: "CGyyyymm???",
+      customerTagAutoGenEn: "0",
+      customerTagFormat: "CTyyyymm???",
+      customerTagNextNum: "1",
+
+      agentTypeAutoGenEn: "0",
+      agentTypeFormat: "ATyyyymm???",
+      agentTypeNextNum: "1",
+
+      agentAutoGenEn: "0",
+      agentFormat: "Ayyyymm???",
+      agentNextNum: "1",
+
+      customerAutoGenEn: "1",
+      customerFormat: "CU-#?????",
+      quotationAutoGenEn: "1",
+      quotationFormat: "QT????????",
+      salesOrderAutoGenEn: "1",
+      salesOrderFormat: "SO????????",
+      salesDeliveryOrderAutoGenEn: "1",
+      salesDeliveryOrderFormat: "DO????????",
+      salesInvoiceAutoGenEn: "1",
+      salesInvoiceFormat: "IV????????",
+      cashSalesAutoGenEn: "1",
+      cashSalesFormat: "CS????????",
+      salesDebitNoteAutoGenEn: "1",
+      salesDebitNoteFormat: "DN????????",
+      salesCreditNoteAutoGenEn: "1",
+      salesCreditNoteFormat: "CN????????",
+      consolidateInvoiceAutoGenEn: "1",
+      consolidateInvoiceFormat: "ES????????",
+      customerPaymentAutoGenEn: "1",
+      customerPaymentFormat: "OR????????",
+      salesPurchaseContraAutoGenEn: "1",
+      salesPurchaseContraFormat: "CT????????",
+
+      quotationDefaultDate: "0",
+      salesOrderDefaultDate: "0",
+      deliveryOrderDefaultDate: "0",
+      salesInvoiceDefaultDate: "0",
+      salesCreditNoteDefaultDate: "0",
+      salesDebitNoteDefaultDate: "0",
+      cashSalesDefaultDate: "0"
+    };
+
+    const finalPreferences = { ...tempSalesPreferences };
+    Object.keys(defaultValues).forEach((key) => {
+      if (!finalPreferences[key] || finalPreferences[key].toString().trim() === "") {
+        finalPreferences[key] = defaultValues[key];
+      }
+    });
+
+    if (!isOnline) {
+      await savePendingPreference(finalPreferences);
+      setOriginalSalesPreferences({ ...tempSalesPreferences });
+
+      toast({
+        variant: "default",
+        title: "Saved Offline",
+        description: "Changes saved on this device and will sync automatically once you're back online.",
+      });
+      return;
+    }
+
     try {
       const formData = new FormData();
-
-      // Get default values from form schema
-      const defaultValues = {
-        customerCategoryNextNum: "1",
-        customerGroupNextNum: "1",
-        customerNextNum: "1",
-        quotationNextNum: "1",
-        salesOrderNextNum: "1",
-        salesDeliveryOrderNextNum: "1",
-        salesInvoiceNextNum: "1",
-        cashSalesNextNum: "1",
-        salesDebitNoteNextNum: "1",
-        salesCreditNoteNextNum: "1",
-        consolidateInvoiceNextNum: "1",
-        customerPaymentNextNum: "1",
-        salesPurchaseContraNextNum: "1",
-        decimal: "2",
-        rounding: "1",
-        customerCategoryAutoGenEn: "0",
-        customerCategoryFormat: "CUSTCATyyyymm???",
-        customerGroupAutoGenEn: "0",
-        customerGroupFormat: "CGyyyymm???",
-        customerTagAutoGenEn: "0",
-        customerTagFormat: "CTyyyymm???",
-        customerTagNextNum: "1",
-
-        agentTypeAutoGenEn: "0",
-        agentTypeFormat: "ATyyyymm???",
-        agentTypeNextNum: "1",
-
-        agentAutoGenEn: "0",
-        agentFormat: "Ayyyymm???",
-        agentNextNum: "1",
-
-        customerAutoGenEn: "1",
-        customerFormat: "CU-#?????",
-        quotationAutoGenEn: "1",
-        quotationFormat: "QT????????",
-        salesOrderAutoGenEn: "1",
-        salesOrderFormat: "SO????????",
-        salesDeliveryOrderAutoGenEn: "1",
-        salesDeliveryOrderFormat: "DO????????",
-        salesInvoiceAutoGenEn: "1",
-        salesInvoiceFormat: "IV????????",
-        cashSalesAutoGenEn: "1",
-        cashSalesFormat: "CS????????",
-        salesDebitNoteAutoGenEn: "1",
-        salesDebitNoteFormat: "DN????????",
-        salesCreditNoteAutoGenEn: "1",
-        salesCreditNoteFormat: "CN????????",
-        consolidateInvoiceAutoGenEn: "1",
-        consolidateInvoiceFormat: "ES????????",
-        customerPaymentAutoGenEn: "1",
-        customerPaymentFormat: "OR????????",
-        salesPurchaseContraAutoGenEn: "1",
-        salesPurchaseContraFormat: "CT????????",
-
-        quotationDefaultDate: "0",
-        salesOrderDefaultDate: "0",
-        deliveryOrderDefaultDate: "0",
-        salesInvoiceDefaultDate: "0",
-        salesCreditNoteDefaultDate: "0",
-        salesDebitNoteDefaultDate: "0",
-        cashSalesDefaultDate: "0"
-
-
-      };
-
-      // Merge tempSalesPreferences with defaults for empty values
-      const finalPreferences = { ...tempSalesPreferences };
-
-      // Apply defaults for empty or undefined values
-      Object.keys(defaultValues).forEach(key => {
-        if (!finalPreferences[key] || finalPreferences[key].toString().trim() === "") {
-          finalPreferences[key] = defaultValues[key];
-        }
-      });
 
       // Append finalPreferences data as form data
       for (const key in finalPreferences) {
@@ -953,10 +1006,12 @@ export default function PreferencesPage() {
         throw new Error("Failed to update preferences");
       }
 
-      const result = await response.json();
+      await response.json();
 
       // Update originalSalesPreferences after successful save
       setOriginalSalesPreferences({ ...tempSalesPreferences });
+      await cachePreferenceData(finalPreferences);
+      await clearPendingPreference();
 
       toast({
         variant: "default",
@@ -1099,9 +1154,6 @@ export default function PreferencesPage() {
       const originalValue = originalSalesPreferences[field];
       const currentValue = formVal[field];
 
-
-
-
       // Normalize values for comparison (handle null, undefined, empty string)
       const normalizeValue = (val) => {
         if (val === null || val === undefined) return '';
@@ -1152,6 +1204,15 @@ export default function PreferencesPage() {
     // First execute the save operation
     await onSubmit();
 
+    if (!isOnline) {
+      toast({
+        variant: "default",
+        title: "Offline",
+        description: "Customer selection will be available once you're back online.",
+      });
+      return;
+    }
+
     // Check if there are changes to the credit term and it's not "None"
     const currentCreditTerm =
       tempSalesPreferences?.creditTerm || form.getValues("creditTerm");
@@ -1198,6 +1259,49 @@ export default function PreferencesPage() {
       }));
     }
   };
+
+  const syncPendingPreference = async () => {
+    if (!acquireSyncLock()) return;
+
+    try {
+      const pending = await getPendingPreference();
+      if (!pending) return;
+
+      const formData = new FormData();
+      for (const key in pending) {
+        if (pending.hasOwnProperty(key)) {
+          formData.append(`salesPreference[${key}]`, pending[key] ?? "");
+        }
+      }
+
+      const response = await fetch(
+        `${ORIGIN}/sales_preference/api/sales-preference/update-sales-preference`,
+        { headers, method: "POST", body: formData }
+      );
+
+      if (!response.ok) throw new Error("Failed to sync offline preferences");
+
+      await cachePreferenceData(pending);
+      await clearPendingPreference();
+      await mutateSales();
+
+      toast({
+        variant: "default",
+        title: "Synced",
+        description: "Your offline preference changes have been saved.",
+      });
+    } catch (err) {
+      console.error("Error syncing pending preference:", err);
+    } finally {
+      releaseSyncLock();
+    }
+  };
+
+  useEffect(() => {
+    if (isOnline) {
+      syncPendingPreference();
+    }
+  }, [isOnline]);
 
   return (
     <>

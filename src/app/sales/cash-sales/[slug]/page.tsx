@@ -21,6 +21,7 @@ import {
   getCachedLastDocNo,
   cachePreferenceData,
   getCachedPreferenceData,
+  getPendingPreference,
   getCachedCurrentCompany,
   generateOfflineDocNo,
 } from "@/components/offlineDB";
@@ -324,6 +325,24 @@ export default function CashSalesPage({ params }: PageParams) {
     }
   }
 
+  const getEffectiveOfflinePreference = async () => {
+    const [pending, cached] = await Promise.all([
+      getPendingPreference(),
+      getCachedPreferenceData(),
+    ]);
+
+    const basePreferenceData = cached?.preference?.data || {};
+
+    const preference = pending
+      ? { data: { ...basePreferenceData, ...pending } }
+      : cached?.preference ?? null;
+
+    return {
+      preference,
+      customFieldDefs: cached?.customFieldDefs || [],
+    };
+  };
+
   // Preference (State)
   const [preferenceData, setPreferenceData] = useState<any>(null);
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
@@ -332,7 +351,7 @@ export default function CashSalesPage({ params }: PageParams) {
   // Preference (Fetch Function)
   const fetchPreferenceData = async () => {
     if (!navigator.onLine) {
-      const cached = await getCachedPreferenceData();
+      const cached = await getEffectiveOfflinePreference();
       if (cached) {
         setPreferenceData(cached.preference);
         setCustomFieldDefs(cached.customFieldDefs);
@@ -1460,7 +1479,7 @@ export default function CashSalesPage({ params }: PageParams) {
 
       let prefData = preferenceData;
       if (!prefData) {
-        const cached = await getCachedPreferenceData();
+        const cached = await getEffectiveOfflinePreference();
         prefData = cached?.preference ?? null;
       }
 
@@ -1625,7 +1644,7 @@ export default function CashSalesPage({ params }: PageParams) {
     const loadOfflineCloneSource = async () => {
       const dbItems = await getOffline();
       const source = dbItems.find((item) => item.id === id);
-      if (!source) return; 
+      if (!source) return;
 
       offlineCloneLoadedRef.current = true;
 

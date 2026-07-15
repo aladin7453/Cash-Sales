@@ -248,6 +248,34 @@ export default function Topbar({
           body: formData,
         });
 
+        if (typeof window !== "undefined") {//Reset saved pagination 
+          Object.keys(localStorage)
+            .filter((key) => key.includes("bs.table.pagination"))
+            .forEach((key) => {
+              const raw = localStorage.getItem(key);
+
+              try {
+                const parsed = JSON.parse(raw || "{}");
+
+                localStorage.setItem(
+                  key,
+                  JSON.stringify({
+                    ...parsed,
+                    pageIndex: 0, // reset only page index only
+                  })
+                );
+              } catch (e) {
+                localStorage.setItem(
+                  key,
+                  JSON.stringify({
+                    pageIndex: 0,
+                    pageSize: 20, // safe default
+                  })
+                );
+              }
+            });
+        }
+
         if (!response.ok) {
           const errorData = await response.json();
           console.error("API Error:", errorData);
