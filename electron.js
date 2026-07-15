@@ -3,6 +3,10 @@ const path = require("path");
 const { spawn } = require("child_process");
 const http = require("http");
 const { autoUpdater } = require("electron-updater");
+const log = require("electron-log");
+
+autoUpdater.logger = log;
+autoUpdater.logger.transports.file.level = "info";
 
 let mainWindow;
 let nextProcess;
@@ -77,11 +81,11 @@ function startNext() {
     stdio: ["ignore", "pipe", "pipe"],
   });
 
-  nextProcess.stdout.on("data", (d) => console.log(`[next] ${d}`));
-  nextProcess.stderr.on("data", (d) => console.error(`[next] ${d}`));
-  nextProcess.on("error", (err) => console.error("Failed to start Next.js server:", err));
+  nextProcess.stdout.on("data", (d) => log.info(`[next] ${d}`));
+  nextProcess.stderr.on("data", (d) => log.error(`[next] ${d}`));
+  nextProcess.on("error", (err) => log.error("Failed to start Next.js server:", err));
   nextProcess.on("exit", (code) => {
-    console.log("Next.js server exited with code", code);
+    log.info("Next.js server exited with code", code);
     nextProcess = null;
   });
 }
@@ -95,23 +99,23 @@ function setupAutoUpdater() {
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on("checking-for-update", () => {
-    console.log("Checking for update...");
+    log.info("Checking for update...");
   });
 
   autoUpdater.on("update-available", (info) => {
-    console.log("Update available:", info.version);
+    log.info("Update available:", info);
   });
 
-  autoUpdater.on("update-not-available", () => {
-    console.log("App is up to date.");
+  autoUpdater.on("update-not-available", (info) => {
+    log.info("App is up to date.", info);
   });
 
   autoUpdater.on("error", (err) => {
-    console.error("Auto-updater error:", err);
+    log.error("Auto-updater error:", err);
   });
 
   autoUpdater.on("download-progress", (progress) => {
-    console.log(`Download speed: ${progress.bytesPerSecond} - ${progress.percent.toFixed(1)}%`);
+    log.info(`Download speed: ${progress.bytesPerSecond} - ${progress.percent.toFixed(1)}%`);
   });
 
   autoUpdater.on("update-downloaded", (info) => {
@@ -140,9 +144,11 @@ app.whenReady().then(async () => {
   try {
     await waitForServer(`http://localhost:${PORT}`);
     createWindow();
-    setupAutoUpdater();
+    mainWindow.webContents.once("did-finish-load", () => {
+      setupAutoUpdater();
+    });
   } catch (err) {
-    console.error("Server failed to start:", err);
+    log.error("Server failed to start:", err);
     app.quit();
   }
 });
