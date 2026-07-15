@@ -137,7 +137,7 @@ export const rawColumns: ColumnDef<CashSales>[] = [
           <div className="flex items-center gap-1.5">
             <span>{row.original.docNo}</span>
             <span className="text-[10px] font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 leading-none">
-              Pending
+              Sync Pending
             </span>
           </div>
         );
