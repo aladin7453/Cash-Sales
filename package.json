@@ -16,6 +16,7 @@
   "build": {
     "appId": "com.cashsales",
     "productName": "Cash Sales",
+    "artifactName": "Cash-Sales-Setup-${version}.${ext}",
     "directories": {
       "app": "build-temp"
     },

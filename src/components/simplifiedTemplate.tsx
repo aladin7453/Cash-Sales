@@ -194,7 +194,7 @@ const s = StyleSheet.create({
   dashedBoxValue: {
     fontSize: 7,
     textAlign: 'right',
-    minWidth: 60,
+    width: 60,
   },
 
   // Footer
