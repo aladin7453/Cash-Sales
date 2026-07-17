@@ -10,7 +10,7 @@
     "copy-static": "xcopy /E /I /Y .next\\static .next\\standalone\\.next\\static && xcopy /E /I /Y public .next\\standalone\\public",
     "start": "next start",
     "electron": "node node_modules/electron/cli.js .",
-    "dist": "npm run build && npm run obfuscate && electron-builder",
+    "dist": "npm run build && npm run obfuscate && electron-builder"
   },
   "build": {
     "appId": "com.cashsales",
