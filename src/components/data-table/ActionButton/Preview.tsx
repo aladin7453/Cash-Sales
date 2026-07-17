@@ -245,19 +245,19 @@ export default function PreviewButton<TData>({
     // });
   }, []);
 
-  const {
-    data: documentList,
-    error,
-    isLoading,
-  } = useSWRImmutable(
-    currentAccount && currentCompany && !isOfflineRef.current
-      ? `https://1ofis.infollective.com/application/backend/site/api/site/get-update-module-has-template-data?module=${previewType}&account=${currentAccount?.account}&company=${currentCompany.UUID}`
-      : null,
-    fetcher,
-    {
-      shouldRetryOnError: false,
-    },
-  );
+  // const {
+  //   data: documentList,
+  //   error,
+  //   isLoading,
+  // } = useSWRImmutable(
+  //   currentAccount && currentCompany && !isOfflineRef.current
+  //     ? `https://1ofis.infollective.com/application/backend/site/api/site/get-update-module-has-template-data?module=${previewType}&account=${currentAccount?.account}&company=${currentCompany.UUID}`
+  //     : null,
+  //   fetcher,
+  //   {
+  //     shouldRetryOnError: false,
+  //   },
+  // );
 
   useEffect(() => {
     if (isPreviewTemplatePDFOpen && previewTemplatePDFData) {
@@ -938,7 +938,7 @@ export default function PreviewButton<TData>({
             </AlertDialogTitle>
           </AlertDialogHeader>
           <div className="mb-4 h-[300px] overflow-auto border border-gray-300 bg-white">
-            {isLoading ? (
+            {/* {isLoading ? (
               <LoadingUI />
             ) : currentAccount?.account !== "1_tridentmed" ? (
               (Array.isArray(documentList) ? documentList : []).map((item, index) => (
@@ -952,7 +952,7 @@ export default function PreviewButton<TData>({
                   {item.fileName}
                 </div>
               ))
-            ) : null}
+            ) : null} */}
 
             {previewType === "CASH SALES" && (
               <div

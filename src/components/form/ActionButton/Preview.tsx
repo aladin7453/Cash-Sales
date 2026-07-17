@@ -67,20 +67,6 @@ const fetcher = async (url: string) => {
   return res.json();
 };
 
-const canShowEInvoice = (documentType: string): boolean => {
-  const allowedTypes = [
-    "SALES INVOICE",
-    "SALES CREDIT NOTE",
-    "SALES DEBIT NOTE",
-    "CONSOLIDATED INVOICE",
-    "PURCHASE INVOICE",
-    "PURCHASE DEBIT NOTE",
-    "PURCHASE CREDIT NOTE",
-    "CASH SALES",
-  ];
-  return allowedTypes.includes(documentType);
-};
-
 export default function PreviewButton({
   module,
   model,
@@ -231,19 +217,19 @@ export default function PreviewButton({
     }
   });
 
-  const {
-    data: documentList,
-    error,
-    isLoading,
-  } = useSWRImmutable(
-    currentAccount && currentCompany && !isOfflineRef.current
-      ? `https://1ofis.infollective.com/application/backend/site/api/site/get-update-module-has-template-data?module=${previewType}&account=${currentAccount?.account}&company=${currentCompany.UUID}`
-      : null,
-    fetcher,
-    {
-      shouldRetryOnError: false,
-    },
-  );
+  // const {
+  //   data: documentList,
+  //   error,
+  //   isLoading,
+  // } = useSWRImmutable(
+  //   currentAccount && currentCompany && !isOfflineRef.current
+  //     ? `https://1ofis.infollective.com/application/backend/site/api/site/get-update-module-has-template-data?module=${previewType}&account=${currentAccount?.account}&company=${currentCompany.UUID}`
+  //     : null,
+  //   fetcher,
+  //   {
+  //     shouldRetryOnError: false,
+  //   },
+  // );
 
   useEffect(() => {
     if (isPreviewTemplatePDFOpen && previewTemplatePDFData) {
@@ -352,126 +338,6 @@ export default function PreviewButton({
   var form_data = new FormData();
   form_data.append("UUIDs[]", doc_id);
 
-  const previewEInvoice = async () => {
-    setShowEInvoiceDialog(true);
-    if (isOffline && data) {
-      setIsLoadingEInvoice(true);
-      const url = await generateOfflinePDFBlob(
-        <EInvoice
-          eInvoiceData={[{
-            ...data.previewData,
-            itemsData: data.itemsData,
-          }]}
-          itemsData={data.itemsData}
-          QrCode={QrCode}
-          currentCompanyData={data.currentCompanyData}
-        />
-      );
-      setPdfUrl(url);
-      setIsLoadingEInvoice(false);
-      return;
-    }
-    setIsLoadingEInvoice(true);
-
-    try {
-      const response = await fetch(
-        `${module.includes("purchase") || module.includes("supplier")
-          ? `${ORIGIN}/${module}/api/${model}/preview-pdf?id=${doc_id}&type=EInvoice`
-          : `${ORIGIN}/${module}/api/${model}/preview-pdf?type=EInvoice`
-        }`,
-        {
-          method: "POST",
-          headers,
-          body: form_data,
-        },
-      );
-
-      displayMessage(response);
-
-      if (!response.ok) {
-        throw new Error("Failed");
-      }
-
-      const responseData = await response.json();
-
-      setEInvoiceData(responseData.data);
-      setItemsData(responseData.itemsData);
-      setQrCode(responseData.qrCode);
-      setCurrentCompanyData(responseData.currentCompany);
-    } catch (error) {
-      console.error("Error:", error);
-    } finally {
-      setIsLoadingEInvoice(false);
-    }
-  };
-
-  const previewPDFTemplate = async (variant: number) => {
-    variant === 1 ? setShowPreviewPDFDialog(true) : setShowDefault1ItemizedCG(true);
-    if (isOffline && data) {
-      setIsLoadingPDFPreview(true);
-      const url = await generateOfflinePDFBlob(
-        <PreviewPDF
-          previewData={data.previewData}
-          itemsData={data.itemsData}
-          currentCompanyData={data.currentCompanyData}
-          currentUser={data.currentUser}
-          PDFPreviewType={"CASH SALES"}
-          isProformaInvoice={false}
-          descriptionPreferences={descriptionPreferences}
-          agentPreferences={agentPreferences}
-          QrCode={null}
-          eInvoiceData={null}
-          showDefault1ItemizedCG={variant === 2}
-          eInvoiceStatus={null}
-        />
-      );
-      setPdfUrl(url);
-      setIsLoadingPDFPreview(false);
-      return;
-    }
-    setIsLoadingPDFPreview(true);
-
-    try {
-      const response = await fetch(
-        // temporarily not enable multiple preview for job and purchase
-        `${module.includes("purchase") || module.includes("supplier") ? `${ORIGIN}/${module}/api/${model}/preview-pdf?id=${doc_id}&type=EInvoice` : `${ORIGIN}/${module}/api/${model}/preview-pdf?type=EInvoice`}`,
-        {
-          method: "POST",
-          headers,
-          body: form_data,
-        },
-      );
-
-      displayMessage(response);
-
-      if (!response.ok) {
-        throw new Error("Failed");
-      }
-
-      const responseData = await response.json();
-
-      setPDFPreviewType(previewType);
-      setPreviewData(
-        previewType === "BILL OF LADING"
-          ? {
-            ...responseData.previewData.billOfLading,
-            ...responseData.previewData.billOfLadingHasParty,
-          }
-          : responseData.data,
-      );
-      setItemsData(responseData.itemsData);
-      setCurrentCompanyData(responseData.currentCompany);
-      setCurrentUser(responseData.currentUser);
-      setEInvoiceData(responseData.eInvoiceData);
-      setQrCode(responseData.qrCode);
-      setEInvoiceStatus(responseData.eInvoiceStatus);
-    } catch (error) {
-      console.error("Error:", error);
-    } finally {
-      setIsLoadingPDFPreview(false);
-    }
-  };
-
   const simplifiedPDFTemplate = async () => {
     setShowSimplifiedPDFDialog(true);
     if (data) {
@@ -562,196 +428,6 @@ export default function PreviewButton({
     }
   };
 
-  const previewNormal2 = async (variant: number) => {
-    variant === 1 ? setShowNormal2Dialog(true) : setShowDefault1SummaryCG(true);
-    if (isOffline && data) {
-      setIsLoadingNormal2(true);
-      const url = await generateOfflinePDFBlob(
-        <PreviewNormal2
-          previewData={data.previewData}
-          itemsData={data.itemsData}
-          currentCompanyData={data.currentCompanyData}
-          currentUser={data.currentUser}
-          PDFPreviewType={"CASH SALES"}
-          isProformaInvoice={false}
-          descriptionPreferences={descriptionPreferences}
-          agentPreferences={agentPreferences}
-          QrCode={null}
-          eInvoiceData={null}
-          showDefault1SummaryCG={variant === 2}
-          eInvoiceStatus={null}
-          removeDisplayUOM={variant === 1 ? true : undefined}
-        />
-      );
-      setPdfUrl(url);
-      setIsLoadingNormal2(false);
-      return;
-    }
-    setIsLoadingNormal2(true);
-
-    try {
-      const response = await fetch(
-        // temporarily not enable multiple preview for job and purchase
-        `${module.includes("purchase") || module.includes("supplier") ? `${ORIGIN}/${module}/api/${model}/preview-pdf?id=${doc_id}&type=EInvoice` : `${ORIGIN}/${module}/api/${model}/preview-pdf?type=EInvoice`}`,
-        {
-          method: "POST",
-          headers,
-          body: form_data,
-        },
-      );
-
-      displayMessage(response);
-
-      if (!response.ok) {
-        throw new Error("Failed");
-      }
-
-      const responseData = await response.json();
-
-      setPDFPreviewType(previewType);
-      setPreviewData(
-        previewType === "BILL OF LADING"
-          ? {
-            ...responseData.previewData.billOfLading,
-            ...responseData.previewData.billOfLadingHasParty,
-          }
-          : responseData.data,
-      );
-      setItemsData(responseData.itemsData);
-      setCurrentCompanyData(responseData.currentCompany);
-      setCurrentUser(responseData.currentUser);
-      setEInvoiceData(responseData.eInvoiceData);
-      setQrCode(responseData.qrCode);
-      setEInvoiceStatus(responseData.eInvoiceStatus);
-    } catch (error) {
-      console.error("Error:", error);
-    } finally {
-      setIsLoadingNormal2(false);
-    }
-  };
-
-  const handleEInvoicePreview = async () => {
-    const blob = await pdf(
-      <EInvoice
-        eInvoiceData={eInvoiceData}
-        itemsData={itemsData}
-        QrCode={QrCode}
-        currentCompanyData={currentCompanyData}
-      />,
-    ).toBlob();
-
-    const url = URL.createObjectURL(blob);
-
-    window.open(url, "_blank");
-  };
-
-  const handleItemizedPreview = async () => {
-    let blob;
-
-    if (PDFPreviewType === "BILL OF LADING") {
-      blob = await pdf(
-        <BillOfLadingPreviewTemplate
-          previewData={previewData}
-          itemsData={itemsData}
-          currentCompanyData={currentCompanyData}
-          currentUser={currentUser}
-        />,
-      ).toBlob();
-    } else {
-      blob = await pdf(
-        <PreviewPDF
-          previewData={previewData}
-          itemsData={itemsData}
-          currentCompanyData={currentCompanyData}
-          currentUser={currentUser}
-          PDFPreviewType={PDFPreviewType}
-          isProformaInvoice={isProformaInvoice}
-          descriptionPreferences={descriptionPreferences}
-          agentPreferences={agentPreferences}
-          QrCode={QrCode}
-          eInvoiceData={eInvoiceData}
-          showDefault1ItemizedCG={showDefault1ItemizedCG}
-          eInvoiceStatus={eInvoiceStatus}
-        />,
-      ).toBlob();
-    }
-
-    const url = URL.createObjectURL(blob);
-
-    window.open(url, "_blank");
-  };
-
-  const handleDefault1ItemizedCGPreview = async () => {
-    const blob = await pdf(
-      <PreviewPDF
-        previewData={previewData}
-        itemsData={itemsData}
-        currentCompanyData={currentCompanyData}
-        currentUser={currentUser}
-        PDFPreviewType={PDFPreviewType}
-        isProformaInvoice={isProformaInvoice}
-        descriptionPreferences={descriptionPreferences}
-        agentPreferences={agentPreferences}
-        QrCode={QrCode}
-        eInvoiceData={eInvoiceData}
-        showDefault1ItemizedCG={showDefault1ItemizedCG}
-        eInvoiceStatus={eInvoiceStatus}
-      />,
-    ).toBlob();
-
-    const url = URL.createObjectURL(blob);
-
-    window.open(url, "_blank");
-  };
-
-  const handleItemizedNoCodePreview = async () => {
-    const blob = await pdf(
-      <PreviewNormal2
-        previewData={previewData}
-        itemsData={itemsData}
-        currentCompanyData={currentCompanyData}
-        currentUser={currentUser}
-        PDFPreviewType={PDFPreviewType}
-        isProformaInvoice={isProformaInvoice}
-        descriptionPreferences={descriptionPreferences}
-        agentPreferences={agentPreferences}
-        QrCode={QrCode}
-        eInvoiceData={eInvoiceData}
-        showDefault1SummaryCG={showDefault1SummaryCG}
-        eInvoiceStatus={eInvoiceStatus}
-        removeDisplayUOM={true}
-      />,
-    ).toBlob();
-
-    const url = URL.createObjectURL(blob);
-
-    window.open(url, "_blank");
-  };
-
-  const handleDefault1SummaryCGPreview = async () => {
-    const blob = await pdf(
-      <PreviewNormal2
-        previewData={previewData}
-        itemsData={itemsData}
-        currentCompanyData={currentCompanyData}
-        currentUser={currentUser}
-        PDFPreviewType={PDFPreviewType}
-        isProformaInvoice={isProformaInvoice}
-        descriptionPreferences={descriptionPreferences}
-        agentPreferences={agentPreferences}
-        QrCode={QrCode}
-        eInvoiceData={eInvoiceData}
-        showDefault1SummaryCG={showDefault1SummaryCG}
-        eInvoiceStatus={eInvoiceStatus}
-        removeDisplayUOM={undefined}
-      />,
-    ).toBlob();
-
-    const url = URL.createObjectURL(blob);
-
-    window.open(url, "_blank");
-  };
-
   const handleSimplifiedReceiptPreview = async () => {
     const blob = await pdf(
       <SimplifiedPDF
@@ -762,38 +438,6 @@ export default function PreviewButton({
         preferenceData={preferenceData}
       />,
     ).toBlob();
-
-    const url = URL.createObjectURL(blob);
-
-    window.open(url, "_blank");
-  };
-
-  const handleNormalPreview = async () => {
-    let blob;
-
-    if (selectedTemplate === 2) {
-      blob = await pdf(
-        <PreviewPDF2
-          previewData={previewData}
-          itemsData={itemsData}
-          currentCompanyData={currentCompanyData}
-          currentUser={currentUser}
-          PDFPreviewType={PDFPreviewType}
-          currentBankAccount={currentBankAccount}
-        />,
-      ).toBlob();
-    } else {
-      blob = await pdf(
-        <PreviewPDFCP
-          previewData={previewData}
-          itemsData={itemsData}
-          currentCompanyData={currentCompanyData}
-          currentUser={currentUser}
-          PDFPreviewType={PDFPreviewType}
-          currentBankAccount={currentBankAccount}
-        />,
-      ).toBlob();
-    }
 
     const url = URL.createObjectURL(blob);
 
@@ -820,7 +464,7 @@ export default function PreviewButton({
           </AlertDialogHeader>
 
           <div className="mb-4 h-[300px] space-y-1 overflow-auto border border-gray-300 bg-white px-1 py-1">
-            {isLoading ? (
+            {/* {isLoading ? (
               <LoadingUI />
             ) : currentAccount?.account !== "1_tridentmed" ? (
               (Array.isArray(documentList) ? documentList : []).map((item, index) => (
@@ -834,7 +478,7 @@ export default function PreviewButton({
                   {item.fileName}
                 </div>
               ))
-            ) : null}
+            ) : null} */}
 
             {previewType === "CASH SALES" && (
               <div

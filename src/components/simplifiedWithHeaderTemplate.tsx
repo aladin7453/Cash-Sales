@@ -56,7 +56,10 @@ function buildTaxSummary(items: any[]): Record<string, number> {
 function renderLines(text: string | undefined, style: any, keyPrefix: string) {
     if (!text) return null;
     return String(text)
+        .replace(/\r/g, '')
         .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
         .map((line, i) => (
             <Text key={`${keyPrefix}-${i}`} style={style}>{line}</Text>
         ));
@@ -96,19 +99,23 @@ const s = StyleSheet.create({
     },
 
     topSection: {
-        flexDirection: 'row',
+        position: 'relative',
         alignItems: 'center',
         marginBottom: 8,
+        marginTop: 20,
     },
     companyLogo: {
-        width: 50,
-        height: 36,
-        marginRight: 6,
-        objectFit: 'contain',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: 40,
+        height: 30,
+        objectFit: 'fill',
     },
     companyNameBlock: {
-        flex: 1,
+        width: '70%',
         textAlign: 'center',
+        paddingLeft: 15,
     },
     companyNameText: {
         fontSize: 7,
@@ -229,7 +236,7 @@ const s = StyleSheet.create({
     dashedBoxValue: {
         fontSize: 7,
         textAlign: 'right',
-        minWidth: 60,
+        width: 60,
     },
 
     // Footer
