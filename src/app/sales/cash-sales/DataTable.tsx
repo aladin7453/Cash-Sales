@@ -666,7 +666,6 @@ export default function CashSalesDataTable({ }: DataTableProps) {
               variant: "destructive",
               duration: 3000,
             });
-            await deleteOffline(item.id);
             continue;
           }
 
@@ -713,7 +712,6 @@ export default function CashSalesDataTable({ }: DataTableProps) {
           window.dispatchEvent(new CustomEvent("offlineRecordSynced"));
         } catch (err) {
           console.error("Sync error:", err);
-          await deleteOffline(item.id);
         }
       }
 

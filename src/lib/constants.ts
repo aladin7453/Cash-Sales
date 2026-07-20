@@ -15,8 +15,8 @@ export const versionPath = "view"
 
 export const DATE_TIME_FORMAT = "yyyy-MM-dd HH:mm";
 
-// export const ORIGIN = `https://1ofis.infollective.com/application/backend`;
-export const ORIGIN = `http://192.168.1.101/1ofis/application/backend`;
+export const ORIGIN = `https://1ofis.infollective.com/application/backend`;
+// export const ORIGIN = `http://192.168.1.101/1ofis/application/backend`;
 
 export const downloadFilePath = `https://1ofis.infollective.com/application/backend/../assets/uploads/template`;
 

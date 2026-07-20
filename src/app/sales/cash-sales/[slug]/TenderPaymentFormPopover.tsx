@@ -606,10 +606,10 @@ export default function TenderPaymentFormPopover({
       // For existing records, continue with API call
       const formData = new FormData();
 
-      formData.append("cashSales[totalPayable]", data.totalPayable);
-      formData.append("cashSales[paymentMethod]", data.paymentMethod);
-      formData.append("cashSales[paidAmount]", data.paidAmount);
-      formData.append("cashSales[additionalDiscount]", data.additionalDiscount);
+      formData.append("cashSales[totalPayable]", data.totalPayable || "0.00");
+      formData.append("cashSales[paymentMethod]", data.paymentMethod || "");
+      formData.append("cashSales[paidAmount]", data.paidAmount || "0.00");
+      formData.append("cashSales[additionalDiscount]", data.additionalDiscount || "0.00");
       formData.append("cashSales[remark1]", data.remark1 || "");
       formData.append("cashSales[remark2]", data.remark2 || "");
 
